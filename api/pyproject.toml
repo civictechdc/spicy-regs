@@ -1,0 +1,27 @@
+[project]
+name = "spicy-regs-api"
+version = "0.1.0"
+description = "spicy-regs is an open source civic tech project that creates a platform using regulations.gov data for consumers to extend"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "boto3>=1.40.40",
+    "duckdb>=1.4.0",
+]
+
+[dependency-groups]
+dev = [
+    "nbformat>=5.10.4",
+    "pytest>=8.4.2",
+    "python-lsp-ruff>=2.2.2",
+    "python-lsp-server>=1.13.1",
+    "websockets>=15.0.1",
+    "altair>=5.5.0",
+    "openai>=1.109.1",
+    "polars[pyarrow]>=1.33.1",
+    "sqlglot>=27.19.0",
+    "vegafusion>=2.0.2",
+    "vl-convert-python>=1.8.0",
+    "marimo>=0.16.2",
+    "ruff>=0.13.2",
+]
