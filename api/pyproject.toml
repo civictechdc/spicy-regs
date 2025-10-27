@@ -7,6 +7,8 @@ requires-python = ">=3.12"
 dependencies = [
     "boto3>=1.40.40",
     "duckdb>=1.4.0",
+    "fastapi[standard]>=0.120.0",
+    "polars>=1.33.1",
 ]
 
 [dependency-groups]

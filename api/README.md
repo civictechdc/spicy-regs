@@ -16,5 +16,5 @@ pip install uv
 uv sync
 
 # run main.py
-uv main.py
+uv run fastapi dev src/main.py
 ```

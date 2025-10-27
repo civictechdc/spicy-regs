@@ -1,0 +1,5 @@
+*.pyc
+__marimo__
+*.log
+*.db
+*.wal
