@@ -19,6 +19,13 @@ def get_agencies() -> list[str]:
     """
     return mirrulations.get_agencies()
 
+@app.get("/dockets")
+def get_dockets(agency_code: str) -> list[str]:
+    """
+    Get a list of all dockets for an agency from the Mirrulations S3 bucket
+    """
+    return mirrulations.get_dockets(agency_code)
+
 @app.get("/{agency_code}/{data_type}")
 def get_regulations_data(agency_code: str, data_type: RegulationsDataTypes, docket_id: str = None) -> list[dict]:
     """
