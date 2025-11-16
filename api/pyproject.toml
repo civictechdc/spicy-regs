@@ -9,13 +9,14 @@ dependencies = [
     "duckdb>=1.4.0",
     "fastapi[standard]>=0.120.0",
     "langchain>=1.0.7",
+    "langchain-openai>=1.0.3",
     "langgraph>=1.0.3",
-    "langgraph-cli[inmem]>=0.4.7",
     "polars>=1.33.1",
 ]
 
 [dependency-groups]
 dev = [
+    "langgraph-cli[inmem]>=0.4.7",
     "nbformat>=5.10.4",
     "pytest>=8.4.2",
     "python-lsp-ruff>=2.2.2",

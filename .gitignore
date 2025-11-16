@@ -3,3 +3,5 @@ __marimo__
 *.log
 *.db
 *.wal
+.env
+.langgraph_api
