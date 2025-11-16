@@ -4,6 +4,7 @@ from botocore.client import Config
 
 s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
 
+
 def get_agencies() -> list[str]:
     """
     Get a list of all agencies from the Mirrulations S3 bucket
@@ -17,6 +18,7 @@ def get_agencies() -> list[str]:
     common_prefixes = response.get("CommonPrefixes")
     org_list = [p.get("Prefix").split("/")[1] for p in common_prefixes]
     return org_list
+
 
 def get_dockets(agency_code: str) -> list[str]:
     """

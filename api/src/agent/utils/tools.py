@@ -1,4 +1,5 @@
 """Tools for the agent."""
+
 from typing import Any
 from langchain.tools import tool
 
@@ -14,7 +15,9 @@ def get_agencies() -> list[str]:
 
 
 @tool
-def get_data(data_type: RegulationsDataTypes, agency_code: str, docket_id: str = None) -> list[dict[str, Any]]:
+def get_data(
+    data_type: RegulationsDataTypes, agency_code: str, docket_id: str = None
+) -> list[dict[str, Any]]:
     """Get a list of all data for a given data type for an agency from the database. If docket_id is provided, return data for that docket id."""
     return db.get_data_df(data_type, agency_code, docket_id).to_dicts()
 

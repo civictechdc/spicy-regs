@@ -7,14 +7,22 @@ from .utils import _build_base_query, _build_where_clause
 from . import get_connection
 from ..logger import logger
 
-def get_data_df(data_type_enum: RegulationsDataTypes, agency_code, docket_id: str = None, max_cache_age_hours: int = inf) -> pl.DataFrame:
+
+def get_data_df(
+    data_type_enum: RegulationsDataTypes,
+    agency_code,
+    docket_id: str = None,
+    max_cache_age_hours: int = inf,
+) -> pl.DataFrame:
     """Get data with smart caching based on age"""
     conn = get_connection()
     data_type = data_type_enum.value
-    logger.info(f"Getting data for {data_type} with agency code {agency_code} and docket id {docket_id}")
+    logger.info(
+        f"Getting data for {data_type} with agency code {agency_code} and docket id {docket_id}"
+    )
     table_name = f"{data_type}_cache"
     where_clause = _build_where_clause(agency_code, docket_id)
-    
+
     # Check cache age
     cache_age = conn.sql(f"""
     SELECT 
@@ -25,7 +33,7 @@ def get_data_df(data_type_enum: RegulationsDataTypes, agency_code, docket_id: st
     WHERE {where_clause}
     """).fetchone()
     logger.info(f"Cache age: {cache_age}")
-    
+
     try:
         if cache_age[0] > 0 and cache_age[2] < max_cache_age_hours:
             # Use cached data
@@ -34,7 +42,9 @@ def get_data_df(data_type_enum: RegulationsDataTypes, agency_code, docket_id: st
         else:
             # Cache is stale or doesn't exist, refresh
             refresh_cache(agency_code, docket_id, data_type_enum)
-            return get_data_df(data_type_enum, agency_code, docket_id, max_cache_age_hours)
+            return get_data_df(
+                data_type_enum, agency_code, docket_id, max_cache_age_hours
+            )
     except DataError:
         logger.exception("Error getting data fallback to live query from S3")
         # Fallback to live query
@@ -42,4 +52,3 @@ def get_data_df(data_type_enum: RegulationsDataTypes, agency_code, docket_id: st
         if agency_code or docket_id:
             query += f" WHERE {where_clause.replace('agency_code', 'f.agency_code').replace('docket_id', 'f.docket_id')}"
         return conn.sql(query).pl()
-

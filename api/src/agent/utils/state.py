@@ -1,11 +1,12 @@
 """State for the agent."""
-import operator
 
-from langchain.messages import AnyMessage
-from typing_extensions import Annotated, TypedDict
+from typing import List
+
+from langgraph.graph import MessagesState
+from langgraph.graph.message import Any
 
 
-class MessagesState(TypedDict):
+class AgentState(MessagesState):
     """State for the agent."""
-    messages: Annotated[list[AnyMessage], operator.add]
-    llm_calls: int
+
+    tools: List[Any]

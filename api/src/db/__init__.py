@@ -1,5 +1,6 @@
 import duckdb
 
+
 def get_connection():
     """Get a connection to the database."""
     conn = duckdb.connect("main.db")

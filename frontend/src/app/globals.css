@@ -21,4 +21,31 @@ body {
 body,
 html {
   height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Ensure CopilotChat fills its container */
+main > div {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Target CopilotChat root element to fill height */
+main > div > * {
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Make messages appear from bottom */
+.copilotKitMessagesContainer {
+  display: flex !important;
+  justify-content: flex-start !important;
+}
+
+.copilotKitMessages {
+  display: flex !important;
+  flex-direction: column-reverse !important;
 }

@@ -1,4 +1,5 @@
 """System prompt for the regulations.gov agent."""
+
 from textwrap import dedent
 
 SYSTEM_PROMPT = """You are an expert assistant specialized in understanding and analyzing federal regulation data from regulations.gov. Your primary role is to help users navigate, interpret, and extract insights from regulatory dockets, documents, and public comments.
@@ -93,6 +94,7 @@ You have access to the following tools:
 - Comment periods have specific start and end dates that determine when public input is accepted
 
 Always be thorough, accurate, and helpful when working with this regulatory data. If you need more information to answer a question, use the available tools to retrieve the relevant data."""
+
 
 def get_system_prompt() -> str:
     """Get the system prompt for the regulations.gov agent."""
