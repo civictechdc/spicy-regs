@@ -4,11 +4,12 @@ import polars as pl
 from .models import RegulationsDataTypes
 from .config import refresh_cache
 from .utils import _build_base_query, _build_where_clause
-from . import conn
+from . import get_connection
 from ..logger import logger
 
 def get_data_df(data_type_enum: RegulationsDataTypes, agency_code, docket_id: str = None, max_cache_age_hours: int = inf) -> pl.DataFrame:
     """Get data with smart caching based on age"""
+    conn = get_connection()
     data_type = data_type_enum.value
     logger.info(f"Getting data for {data_type} with agency code {agency_code} and docket id {docket_id}")
     table_name = f"{data_type}_cache"

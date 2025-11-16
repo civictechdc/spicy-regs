@@ -1,12 +1,13 @@
 from fastapi import HTTPException
 from ..db.models import RegulationsDataTypes
-from . import conn
+from . import get_connection
 from .constants import FIELD_MAPPINGS
 from .utils import _build_base_query, _build_where_clause
 from ..logger import logger
 
 def create_empty_tables():
     """Create empty tables without loading any data"""
+    conn = get_connection()
     for data_type in FIELD_MAPPINGS.keys():
         table_name = f"{data_type}_cache"
         
@@ -64,6 +65,7 @@ def create_empty_tables():
 
 def initialize_tables():
     """Create persistent tables for caching data"""
+    conn = get_connection()
     for data_type in FIELD_MAPPINGS.keys():
         table_name = f"{data_type}_cache"
         query = _build_base_query(data_type)
@@ -77,6 +79,7 @@ def initialize_tables():
 
 def create_indexes():
     """Create indexes for faster queries"""
+    conn = get_connection()
     for data_type in FIELD_MAPPINGS.keys():
         table_name = f"{data_type}_cache"
         conn.sql(f"CREATE INDEX IF NOT EXISTS idx_{data_type}_agency ON {table_name}(agency_code)")
@@ -84,6 +87,7 @@ def create_indexes():
     logger.info("Indexes created successfully!")
 
 def refresh_cache(agency_code: str, docket_id: str, data_type_enum: RegulationsDataTypes):
+    conn = get_connection()
     """Refresh cache for specific agency and data type"""   
     if not agency_code or not data_type_enum:
         raise ValueError("agency_code and data_type_enum are required")

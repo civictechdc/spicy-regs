@@ -1,4 +1,4 @@
-from api.src.db import conn
+from . import get_connection
 from .constants import FIELD_MAPPINGS
 
 def _build_base_query(data_type: str, agency_code: str = None, docket_id: str = None) -> str:
@@ -43,6 +43,7 @@ def _build_where_clause(agency_code: str = None, docket_id: str = None) -> str:
 
 def get_cache_stats() -> dict:
     """Get cache statistics"""
+    conn = get_connection()
     stats = {}
     
     for data_type in FIELD_MAPPINGS.keys():
