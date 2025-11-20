@@ -38,10 +38,10 @@ export default function HomePage() {
   });
 
   return (
-    <main className="h-screen w-screen overflow-hidden" style={{ "--copilot-kit-primary-color": themeColor }  as CopilotKitCSSProperties}>
-      <div className="h-full w-full items-center justify-center" style={{ backgroundColor: themeColor }}>
-      <div className="m-8 h-auto">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+    <main className="h-screen w-screen overflow-hidden flex flex-col" style={{ "--copilot-kit-primary-color": themeColor } as CopilotKitCSSProperties}>
+      <div className="h-full w-full p-8 flex flex-col overflow-y-auto" style={{ backgroundColor: themeColor }}>
+      <div className="items-center justify-center h-auto p-8">
+          <h1 className="text-3xl font-bold">
             Spicy Regs
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
@@ -49,7 +49,7 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 flex-1 min-h-0">
           <div className="lg:col-span-1 space-y-4">
             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
               <AgencySelector

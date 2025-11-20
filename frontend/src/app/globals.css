@@ -27,16 +27,7 @@ html {
   padding: 0;
 }
 
-/* Ensure CopilotChat fills its container */
-main > div {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Target CopilotChat root element to fill height */
 main > div > * {
-  height: 100% !important;
   display: flex !important;
   flex-direction: column !important;
 }
