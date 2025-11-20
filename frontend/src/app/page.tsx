@@ -6,15 +6,39 @@ import { DocketSelector } from "@/components/DocketSelector";
 import { DataTypeSelector } from "@/components/DataTypeSelector";
 import { DataViewer } from "@/components/DataViewer";
 import { DataType } from "@/lib/api";
-import { CopilotSidebar } from "@copilotkit/react-ui";
+import { CopilotKitCSSProperties, CopilotSidebar } from "@copilotkit/react-ui";
+import { useCoAgent, useFrontendTool } from "@copilotkit/react-core";
+
+type AgentState = {
+  messages: string[];
+}
 
 export default function HomePage() {
   const [selectedAgency, setSelectedAgency] = useState<string | null>(null);
   const [selectedDocket, setSelectedDocket] = useState<string | null>(null);
   const [dataType, setDataType] = useState<DataType>("dockets");
+  const [themeColor, setThemeColor] = useState("#000000");
+
+  const { state, setState } = useCoAgent<AgentState>({
+    name: "regulations_agent",
+  })
+
+  useFrontendTool({
+    name: "setThemeColor",
+    description: "Change the theme color of the application. Use this to customize the visual appearance.",
+    parameters: [{
+      name: "themeColor",
+      type: "string",
+      description: "The theme color to set. Should be a valid CSS color (hex, rgb, or named color). Make sure to pick nice colors.",
+      required: true, 
+    }],
+    handler({ themeColor }) {
+      setThemeColor(themeColor);
+    },
+  });
 
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <main className="min-h-screen bg-gray-50 dark:bg-gray-900" style={{ "--copilot-kit-primary-color": themeColor }  as CopilotKitCSSProperties}>
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <header className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
