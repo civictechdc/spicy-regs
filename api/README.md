@@ -18,3 +18,12 @@ uv sync
 # run main.py
 uv run fastapi dev src/main.py
 ```
+
+To run the agent
+
+```sh
+uv pip install "langgraph-cli[inmem]"
+langgraph dev
+```
+
+agent will be available on `localhost:2024`

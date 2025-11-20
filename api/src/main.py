@@ -4,8 +4,16 @@ from .mirrulations import service as mirrulations
 from .db import service as db
 from .db.config import initialize_database
 from .db.models import RegulationsDataTypes
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Spicy Regs API", description="API for the Spicy Regs project")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 initialize_database()
 
 

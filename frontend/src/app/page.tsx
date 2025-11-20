@@ -1,15 +1,23 @@
 "use client";
 
-import { useCoAgent, useFrontendTool } from "@copilotkit/react-core";
-import { CopilotChat, CopilotKitCSSProperties, CopilotSidebar } from "@copilotkit/react-ui";
 import { useState } from "react";
+import { AgencySelector } from "@/components/AgencySelector";
+import { DocketSelector } from "@/components/DocketSelector";
+import { DataTypeSelector } from "@/components/DataTypeSelector";
+import { DataViewer } from "@/components/DataViewer";
+import { DataType } from "@/lib/api";
+import { CopilotKitCSSProperties, CopilotSidebar } from "@copilotkit/react-ui";
+import { useCoAgent, useFrontendTool } from "@copilotkit/react-core";
 
 type AgentState = {
   messages: string[];
 }
 
-export default function CopilotKitPage() {
-  const [themeColor, setThemeColor] = useState("#000000");
+export default function HomePage() {
+  const [selectedAgency, setSelectedAgency] = useState<string | null>(null);
+  const [selectedDocket, setSelectedDocket] = useState<string | null>(null);
+  const [dataType, setDataType] = useState<DataType>("dockets");
+  const [themeColor, setThemeColor] = useState("black");
 
   const { state, setState } = useCoAgent<AgentState>({
     name: "regulations_agent",
@@ -29,19 +37,69 @@ export default function CopilotKitPage() {
     },
   });
 
-
   return (
-    <main className="h-screen w-screen m-0 p-0 overflow-hidden" style={{ "--copilot-kit-primary-color": themeColor }  as CopilotKitCSSProperties}>
-      <div className="h-full w-full flex flex-col items-center justify-center" style={{ backgroundColor: themeColor }}>
-        <h1 className="text-2xl font-bold">spicy regs</h1>
-        <CopilotSidebar
-          defaultOpen
-          labels={{
-            title: "spicy regs",
-            initial: "👋 Hi, there! You're chatting with an agent."
-          }}
-        />
+    <main className="h-screen w-screen overflow-hidden" style={{ "--copilot-kit-primary-color": themeColor }  as CopilotKitCSSProperties}>
+      <div className="h-full w-full items-center justify-center" style={{ backgroundColor: themeColor }}>
+      <div className="m-8 h-auto">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            Spicy Regs
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Explore federal regulation data from regulations.gov
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="lg:col-span-1 space-y-4">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+              <AgencySelector
+                selectedAgency={selectedAgency}
+                onSelectAgency={(agency) => {
+                  setSelectedAgency(agency);
+                  setSelectedDocket(null);
+                }}
+              />
+            </div>
+
+            {selectedAgency && (
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                <DocketSelector
+                  agencyCode={selectedAgency}
+                  selectedDocket={selectedDocket}
+                  onSelectDocket={setSelectedDocket}
+                />
+              </div>
+            )}
+
+            {selectedAgency && (
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                <DataTypeSelector
+                  selectedType={dataType}
+                  onSelectType={setDataType}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="lg:col-span-2">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+              <DataViewer
+                agencyCode={selectedAgency}
+                dataType={dataType}
+                docketId={selectedDocket}
+              />
+            </div>
+          </div>
+        </div>
       </div>
+
+      <CopilotSidebar
+        defaultOpen={false}
+        labels={{
+          title: "Spicy Regs Assistant",
+          initial: "Hi! I can help you explore federal regulations. Ask me about agencies, dockets, or specific regulations."
+        }}
+      />
     </main>
   );
 }
