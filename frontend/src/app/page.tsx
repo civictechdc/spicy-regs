@@ -17,7 +17,7 @@ export default function HomePage() {
   const [selectedAgency, setSelectedAgency] = useState<string | null>(null);
   const [selectedDocket, setSelectedDocket] = useState<string | null>(null);
   const [dataType, setDataType] = useState<DataType>("dockets");
-  const [themeColor, setThemeColor] = useState("#000000");
+  const [themeColor, setThemeColor] = useState("black");
 
   const { state, setState } = useCoAgent<AgentState>({
     name: "regulations_agent",
@@ -38,16 +38,16 @@ export default function HomePage() {
   });
 
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-900" style={{ "--copilot-kit-primary-color": themeColor }  as CopilotKitCSSProperties}>
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+    <main className="h-screen w-screen overflow-hidden" style={{ "--copilot-kit-primary-color": themeColor }  as CopilotKitCSSProperties}>
+      <div className="h-full w-full items-center justify-center" style={{ backgroundColor: themeColor }}>
+      <div className="m-8 h-auto">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
             Spicy Regs
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
             Explore federal regulation data from regulations.gov
           </p>
-        </header>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           <div className="lg:col-span-1 space-y-4">
