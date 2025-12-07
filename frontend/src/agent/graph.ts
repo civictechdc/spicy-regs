@@ -74,7 +74,7 @@ async function toolNode(state: typeof AgentState.State) {
     }
     
     // Execute backend tool
-    const tool = toolsByName[toolCall.name as keyof typeof toolsByName];
+    const tool = toolsByName[toolCall.name as keyof typeof toolsByName] as any;
     try {
         const observation = await tool.invoke(toolCall.args);
         // Stringify if object

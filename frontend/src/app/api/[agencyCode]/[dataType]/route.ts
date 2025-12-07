@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getData } from "../../../lib/db/service";
-import { RegulationsDataTypes } from "../../../lib/db/models";
+import { getData } from "@/lib/db/service";
+import { RegulationsDataTypes } from "@/lib/db/models";
 
 export async function GET(
   request: NextRequest,
