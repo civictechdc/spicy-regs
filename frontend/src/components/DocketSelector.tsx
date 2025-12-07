@@ -23,7 +23,7 @@ export function DocketSelector({ agencyCode, selectedDocket, onSelectDocket }: D
     async function loadDockets() {
       try {
         setLoading(true);
-        const data = await getDockets(agencyCode);
+        const data = await getDockets(agencyCode as string);
         setDockets(data);
         setError(null);
       } catch (err) {

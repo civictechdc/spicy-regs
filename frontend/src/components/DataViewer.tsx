@@ -517,10 +517,11 @@ export function DataViewer({ agencyCode, dataType, docketId }: DataViewerProps) 
     }
 
     async function loadData() {
+      if (!agencyCode) return;
       try {
         setLoading(true);
         setError(null);
-        const result = await getRegulationData(agencyCode, dataType, docketId || undefined);
+        const result = await getRegulationData(agencyCode as string, dataType, docketId || undefined);
         setData(result);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load data');
