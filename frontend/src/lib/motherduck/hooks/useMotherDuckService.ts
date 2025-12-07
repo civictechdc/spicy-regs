@@ -187,7 +187,9 @@ export function useMotherDuckService() {
     dataType: RegulationsDataTypes,
     agencyCode: string,
     docketId?: string,
-    maxCacheAgeHours = Infinity
+    maxCacheAgeHours = Infinity,
+    limit?: number,
+    offset?: number
   ): Promise<any[]> => {
     // Ensure tables exist
     await initializeDatabase();
@@ -212,13 +214,25 @@ export function useMotherDuckService() {
     if (count > 0 && ageHours !== null && ageHours < maxCacheAgeHours) {
       // Use cached data
       console.log("[MotherDuck] Using cached data");
-      const query = `SELECT * FROM ${tableName} WHERE ${whereClause}`;
+      let query = `SELECT * FROM ${tableName} WHERE ${whereClause}`;
+      if (limit !== undefined) {
+        query += ` LIMIT ${limit}`;
+      }
+      if (offset !== undefined) {
+        query += ` OFFSET ${offset}`;
+      }
       return runQuery(query);
     } else {
       // Refresh cache
       try {
         await refreshCache(agencyCode, docketId, dataType);
-        const query = `SELECT * FROM ${tableName} WHERE ${whereClause}`;
+        let query = `SELECT * FROM ${tableName} WHERE ${whereClause}`;
+        if (limit !== undefined) {
+          query += ` LIMIT ${limit}`;
+        }
+        if (offset !== undefined) {
+          query += ` OFFSET ${offset}`;
+        }
         return runQuery(query);
       } catch (e) {
         console.error("[MotherDuck] Error refreshing cache, falling back to live query", e);
@@ -234,6 +248,23 @@ export function useMotherDuckService() {
       }
     }
   }, [initializeDatabase, refreshCache, runQuery]);
+
+  /**
+   * Get total count for a data type (for pagination)
+   */
+  const getDataCount = useCallback(async (
+    dataType: RegulationsDataTypes,
+    agencyCode: string,
+    docketId?: string,
+  ): Promise<number> => {
+    await initializeDatabase();
+    const tableName = `${dataType}_cache`;
+    const whereClause = buildWhereClause(agencyCode, docketId);
+    const result = await runQuery<{ count: number }>(
+      `SELECT COUNT(*) as count FROM ${tableName} WHERE ${whereClause}`
+    );
+    return Number(result[0]?.count ?? 0);
+  }, [initializeDatabase, runQuery]);
 
   /**
    * Search resources (same logic as service.ts searchResources)
@@ -280,6 +311,7 @@ export function useMotherDuckService() {
     runQuery,
     initializeDatabase,
     getData,
+    getDataCount,
     searchResources,
     refreshCache,
     isInitialized,

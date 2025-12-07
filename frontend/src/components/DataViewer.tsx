@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { RegulationData, DataType } from '@/lib/api';
 import { CommentCard } from './data-viewer/CommentCard';
 import { DocketOrDocumentCard } from './data-viewer/DocketOrDocumentCard';
 import { stripQuotes } from './data-viewer/utils';
 import { useMotherDuckService } from '@/lib/motherduck/hooks/useMotherDuckService';
 import { RegulationsDataTypes } from '@/lib/db/models';
+import { Virtuoso } from 'react-virtuoso';
 
 interface DataViewerProps {
   agencyCode: string | null;
@@ -14,13 +15,18 @@ interface DataViewerProps {
   docketId: string | null;
 }
 
+const PAGE_SIZE = 20;
+
 export function DataViewer({ agencyCode, dataType, docketId }: DataViewerProps) {
   const [data, setData] = useState<RegulationData[]>([]);
   const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
+  const [offset, setOffset] = useState(0);
   
-  const { getData } = useMotherDuckService();
+  const { getData, getDataCount } = useMotherDuckService();
 
   // Fetch bookmarks
   useEffect(() => {
@@ -29,7 +35,6 @@ export function DataViewer({ agencyCode, dataType, docketId }: DataViewerProps) 
         const res = await fetch('/api/bookmarks');
         if (res.ok) {
           const json = await res.json();
-          // Assuming json.bookmarks is array of objects with resource_id
           const ids = new Set<string>(json.bookmarks.map((b: any) => b.resource_id));
           setBookmarks(ids);
         }
@@ -60,10 +65,8 @@ export function DataViewer({ agencyCode, dataType, docketId }: DataViewerProps) 
 
     try {
       if (isBookmarked) {
-        // Delete
         await fetch(`/api/bookmarks?resource_id=${resourceId}`, { method: 'DELETE' });
       } else {
-        // Add
         const title = stripQuotes(item.title) || item.docket_id;
         await fetch('/api/bookmarks', {
           method: 'POST',
@@ -82,11 +85,18 @@ export function DataViewer({ agencyCode, dataType, docketId }: DataViewerProps) 
       }
     } catch (e) {
       console.error("Failed to toggle bookmark", e);
-      // Revert on error
       setBookmarks(bookmarks);
     }
   };
 
+  // Reset data when filters change
+  useEffect(() => {
+    setData([]);
+    setOffset(0);
+    setTotalCount(0);
+  }, [agencyCode, dataType, docketId]);
+
+  // Initial load and load more
   useEffect(() => {
     if (!agencyCode) {
       setData([]);
@@ -95,25 +105,81 @@ export function DataViewer({ agencyCode, dataType, docketId }: DataViewerProps) 
 
     async function loadData() {
       if (!agencyCode) return;
+      
+      const isInitialLoad = offset === 0;
+      
       try {
-        setLoading(true);
+        if (isInitialLoad) {
+          setLoading(true);
+        } else {
+          setLoadingMore(true);
+        }
         setError(null);
-        // Convert dataType string to RegulationsDataTypes enum
+        
+        // Fetch count on initial load
+        if (isInitialLoad) {
+          const count = await getDataCount(
+            dataType as RegulationsDataTypes,
+            agencyCode,
+            docketId || undefined
+          );
+          setTotalCount(count);
+        }
+        
         const result = await getData(
           dataType as RegulationsDataTypes,
-          agencyCode as string,
-          docketId || undefined
+          agencyCode,
+          docketId || undefined,
+          Infinity,
+          PAGE_SIZE,
+          offset
         );
-        setData(result);
+        
+        if (isInitialLoad) {
+          setData(result);
+        } else {
+          setData(prev => [...prev, ...result]);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load data');
-        setData([]);
+        if (offset === 0) {
+          setData([]);
+        }
       } finally {
         setLoading(false);
+        setLoadingMore(false);
       }
     }
     loadData();
-  }, [agencyCode, dataType, docketId, getData]);
+  }, [agencyCode, dataType, docketId, getData, getDataCount, offset]);
+
+  const loadMore = useCallback(() => {
+    if (!loadingMore && data.length < totalCount) {
+      setOffset(prev => prev + PAGE_SIZE);
+    }
+  }, [loadingMore, data.length, totalCount]);
+
+  // Deduplicate based on data type
+  const uniqueData = useMemo(() => {
+    const dataMap = new Map<string, RegulationData>();
+    data.forEach(item => {
+      const key = dataType === 'comments' 
+        ? (stripQuotes(item.comment_id) || item.docket_id)
+        : item.docket_id;
+      
+      const existing = dataMap.get(key);
+      if (!existing) {
+        dataMap.set(key, item);
+      } else {
+        const existingDate = existing.cached_at || existing.modify_date || '';
+        const currentDate = item.cached_at || item.modify_date || '';
+        if (currentDate > existingDate) {
+          dataMap.set(key, item);
+        }
+      }
+    });
+    return Array.from(dataMap.values());
+  }, [data, dataType]);
 
   if (!agencyCode) {
     return (
@@ -142,7 +208,7 @@ export function DataViewer({ agencyCode, dataType, docketId }: DataViewerProps) 
     );
   }
 
-  if (data.length === 0) {
+  if (uniqueData.length === 0) {
     return (
       <div className="p-8 text-center text-gray-500 dark:text-gray-400">
         No data found
@@ -150,27 +216,7 @@ export function DataViewer({ agencyCode, dataType, docketId }: DataViewerProps) 
     );
   }
 
-  // Deduplicate based on data type
-  const dataMap = new Map<string, RegulationData>();
-  data.forEach(item => {
-    // For comments, use comment_id; for others, use docket_id
-    const key = dataType === 'comments' 
-      ? (stripQuotes(item.comment_id) || item.docket_id)
-      : item.docket_id;
-    
-    const existing = dataMap.get(key);
-    if (!existing) {
-      dataMap.set(key, item);
-    } else {
-      // Keep the one with the most recent cached_at or modify_date
-      const existingDate = existing.cached_at || existing.modify_date || '';
-      const currentDate = item.cached_at || item.modify_date || '';
-      if (currentDate > existingDate) {
-        dataMap.set(key, item);
-      }
-    }
-  });
-  const uniqueData = Array.from(dataMap.values());
+  const hasMore = uniqueData.length < totalCount;
 
   return (
     <div className="space-y-4">
@@ -180,36 +226,71 @@ export function DataViewer({ agencyCode, dataType, docketId }: DataViewerProps) 
             {dataType.charAt(0).toUpperCase() + dataType.slice(1)}
           </h3>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {uniqueData.length} {uniqueData.length === 1 ? 'result' : 'results'}
+            Showing {uniqueData.length} of {totalCount} {totalCount === 1 ? 'result' : 'results'}
             {docketId && ` for ${docketId}`}
           </p>
         </div>
       </div>
-      <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-        {uniqueData.map((item, index) => {
-          const key = dataType === 'comments' 
-            ? (stripQuotes(item.comment_id) || item.docket_id)
-            : item.docket_id;
-          
-          const isBookmarked = bookmarks.has(key);
+      
+      <div style={{ height: '70vh' }}>
+        <Virtuoso
+          style={{ height: '100%' }}
+          data={uniqueData}
+          endReached={loadMore}
+          overscan={200}
+          itemContent={(index, item) => {
+            const key = dataType === 'comments' 
+              ? (stripQuotes(item.comment_id) || item.docket_id)
+              : item.docket_id;
+            
+            const isBookmarked = bookmarks.has(key);
 
-          return dataType === 'comments' ? (
-            <CommentCard 
-                key={`${key}-${index}`} 
-                item={item} 
-                isBookmarked={isBookmarked}
-                onToggleBookmark={() => handleToggleBookmark(item)}
-            />
-          ) : (
-            <DocketOrDocumentCard 
-                key={`${key}-${index}`} 
-                item={item} 
-                dataType={dataType}
-                isBookmarked={isBookmarked}
-                onToggleBookmark={() => handleToggleBookmark(item)}
-            />
-          );
-        })}
+            return (
+              <div className="pb-4">
+                {dataType === 'comments' ? (
+                  <CommentCard 
+                      key={`${key}-${index}`} 
+                      item={item} 
+                      isBookmarked={isBookmarked}
+                      onToggleBookmark={() => handleToggleBookmark(item)}
+                  />
+                ) : (
+                  <DocketOrDocumentCard 
+                      key={`${key}-${index}`} 
+                      item={item} 
+                      dataType={dataType}
+                      isBookmarked={isBookmarked}
+                      onToggleBookmark={() => handleToggleBookmark(item)}
+                  />
+                )}
+              </div>
+            );
+          }}
+          components={{
+            Footer: () => {
+              if (loadingMore) {
+                return (
+                  <div className="flex justify-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  </div>
+                );
+              }
+              if (hasMore) {
+                return (
+                  <div className="flex justify-center py-4">
+                    <button 
+                      onClick={loadMore}
+                      className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                    >
+                      Load more...
+                    </button>
+                  </div>
+                );
+              }
+              return null;
+            }
+          }}
+        />
       </div>
     </div>
   );
