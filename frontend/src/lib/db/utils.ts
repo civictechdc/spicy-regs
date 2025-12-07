@@ -6,7 +6,6 @@ export function buildBaseQuery(
   agencyCode?: string,
   docketId?: string
 ): string {
-  // Mapping keys are "dockets", "comments", "documents" (matching values of enum)
   const mapping = FIELD_MAPPINGS[dataType];
   const fields = mapping.fields.join(",\n        ");
 
@@ -16,13 +15,9 @@ export function buildBaseQuery(
   } else if (agencyCode) {
     path = `s3://mirrulations/raw-data/${agencyCode}/*/*/${mapping.path_pattern}`;
   } else {
-    // Note: Wildcard matching might be slow or unsupported depending on file count/structure support in httpfs
     path = `s3://mirrulations/raw-data/*/*/${mapping.path_pattern}`;
   }
 
-  // Double quotes for strings in SQL used in Python were single quotes, which is standard SQL.
-  // We keep single quotes for SQL literals.
-  
   return `
     SELECT
         f.agency_code,

@@ -1,12 +1,8 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { getAgencies, getDockets } from "../lib/mirrulations/service"; // Added getDockets export earlier
+import { getAgencies } from "../lib/mirrulations/service";
 import { getData } from "../lib/db/service";
 import { RegulationsDataTypes } from "../lib/db/models";
-
-// We need to ensure getAgencies and other imported functions are consistent.
-// I exported getAgencies and getDockets in lib/mirrulations/service.ts.
-// I exported getData in lib/db/service.ts.
 
 export const getAgenciesTool = tool(
   async () => {

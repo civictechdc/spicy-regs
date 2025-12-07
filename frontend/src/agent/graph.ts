@@ -19,11 +19,6 @@ export const AgentState = Annotation.Root({
   }),
 });
 
-// Define the agent state interface for easier usage in functions
-// type AgentStateType = typeof AgentState.State; 
-// Using `typeof AgentState.State` often doesn't work as expected in some TS versions/setups, 
-// using generic inferred type if needed, but functions below infer correctly usually.
-
 async function llmCall(state: typeof AgentState.State) {
   const model = new ChatOpenAI({
     modelName: "gpt-4o-mini", // Replacement for "gpt-5-mini"
@@ -31,11 +26,7 @@ async function llmCall(state: typeof AgentState.State) {
     apiKey: process.env.OPENAI_API_KEY,
   });
 
-  // Combine tools
-  // CopilotKit tools are in state.tools
   const copilotTools = state.tools || [];
-  
-  // Bind tools
   const modelWithTools = model.bindTools([
     ...tools,
     ...copilotTools
@@ -57,7 +48,6 @@ async function llmCall(state: typeof AgentState.State) {
 
 async function toolNode(state: typeof AgentState.State) {
   const lastMessage = state.messages[state.messages.length - 1];
-  // Check if last message has tool calls
   if (!("tool_calls" in lastMessage) || !Array.isArray(lastMessage.tool_calls)) {
       return { messages: [] };
   }
@@ -73,7 +63,6 @@ async function toolNode(state: typeof AgentState.State) {
       continue;
     }
     
-    // Execute backend tool
     const tool = toolsByName[toolCall.name as keyof typeof toolsByName] as any;
     try {
         const observation = await tool.invoke(toolCall.args);
