@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { RegulationData } from '@/lib/api';
-import { CommentCard, DocketOrDocumentCard } from '@/components/DataViewer';
+import { CommentCard } from '@/components/data-viewer/CommentCard';
+import { DocketOrDocumentCard } from '@/components/data-viewer/DocketOrDocumentCard';
 import { SignOutButton } from '@/components/SignOutButton';
 import Link from 'next/link';
 

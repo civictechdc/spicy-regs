@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { getAgencies } from '@/lib/api';
+import { SearchableSelect } from './SearchableSelect';
 
 interface AgencySelectorProps {
   selectedAgency: string | null;
-  onSelectAgency: (agency: string) => void;
+  onSelectAgency: (agency: string | null) => void;
 }
 
 export function AgencySelector({ selectedAgency, onSelectAgency }: AgencySelectorProps) {
@@ -47,21 +48,14 @@ export function AgencySelector({ selectedAgency, onSelectAgency }: AgencySelecto
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-        Select Agency
-      </label>
-      <select
-        value={selectedAgency || ''}
-        onChange={(e) => onSelectAgency(e.target.value)}
-        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-      >
-        <option value="">-- Select an agency --</option>
-        {agencies.map((agency) => (
-          <option key={agency} value={agency}>
-            {agency}
-          </option>
-        ))}
-      </select>
+      <SearchableSelect
+        label="Select Agency"
+        options={agencies}
+        value={selectedAgency}
+        onChange={onSelectAgency}
+        placeholder="Search agencies..."
+        isLoading={loading}
+      />
     </div>
   );
 }

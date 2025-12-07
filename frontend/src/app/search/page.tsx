@@ -3,7 +3,8 @@
 import { useEffect, useState,  Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { RegulationData } from '@/lib/api';
-import { CommentCard, DocketOrDocumentCard } from '@/components/DataViewer';
+import { CommentCard } from '@/components/data-viewer/CommentCard';
+import { DocketOrDocumentCard } from '@/components/data-viewer/DocketOrDocumentCard';
 import { SearchBar } from '@/components/SearchBar';
 import { SignOutButton } from '@/components/SignOutButton';
 import Link from 'next/link';
@@ -54,42 +55,13 @@ function SearchResults() {
   }, []);
 
   const handleToggleBookmark = async (item: any) => {
-    // Determine ID based on item structure returned by search (which is raw_json + metadata columns)
-    // Search returns: type, title, docket_id, agency_code, year, raw_json
-    // We need to parse raw_json to get full ID if needed, or use docket_id
-    // But wait, the search API returns `type` column.
-    
-    // Logic from DataViewer:
-    // const resourceId = dataType === 'comments' ? (stripQuotes(item.comment_id) || item.docket_id) : item.docket_id;
-    // But `item` here comes from search cache columns.
-    // The `raw_json` has the full original data.
-    
-    // Let's parse raw_json to get the exact object RegulationData expects
     const raw = JSON.parse(item.raw_json); // It's a string in the DB result?
-    // Wait, DuckDB `json_extract` returns string? or json val? 
-    // In `clients.ts`: `getRowObjectsJS()` likely returns objects/strings depending on driver.
-    // `raw_json` column in cache is TEXT/JSON.
-    
-    // In `searchResources`, we select `raw_json`.
-    // Let's assume `item.raw_json` is the JSON string or object.
-    
-    // We can reconstruct the `RegulationData` object
     const regulationData: RegulationData = {
         ...item,
-        // search returns flat columns: title, docket_id, agency_code, year, type
-        // and raw_json
     };
     
-    // However, the `DocketOrDocumentCard` expects `item` to have `raw_json` as string to parse it internally.
-    // And `docket_id` etc.
-    // So passing `item` directly might work if keys match.
-    // `item` from search has: type, title, docket_id, agency_code, year, raw_json
-    
-    // We need to identify ID for bookmarking.
     let resourceId = item.docket_id;
     if (item.type === 'comments') {
-        // Need to extract comment ID
-        // It's in raw_json.data.id
          const parsed = typeof item.raw_json === 'string' ? JSON.parse(item.raw_json) : item.raw_json;
          resourceId = parsed.data.id;
     }
@@ -210,7 +182,7 @@ export default function SearchPage() {
                 <Link href="/" className="text-2xl font-bold text-gray-900 dark:text-gray-100 shrink-0">
                     Spicy Regs
                 </Link>
-                <div className="flex-1 max-w-2xl">
+                <div className="flex-1 max-w-2xl ">
                     <SearchBar />
                 </div>
             </div>

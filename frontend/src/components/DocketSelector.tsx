@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { getDockets } from '@/lib/api';
+import { SearchableSelect } from './SearchableSelect';
 
 interface DocketSelectorProps {
   agencyCode: string | null;
@@ -41,26 +42,14 @@ export function DocketSelector({ agencyCode, selectedDocket, onSelectDocket }: D
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-        Select Docket (Optional)
-      </label>
-      <select
-        value={selectedDocket || ''}
-        onChange={(e) => onSelectDocket(e.target.value || null)}
-        disabled={loading}
-        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-      >
-        <option value="">-- All dockets --</option>
-        {loading ? (
-          <option disabled>Loading...</option>
-        ) : (
-          dockets.map((docket) => (
-            <option key={docket} value={docket}>
-              {docket}
-            </option>
-          ))
-        )}
-      </select>
+      <SearchableSelect
+        label="Select Docket (Optional)"
+        options={dockets}
+        value={selectedDocket}
+        onChange={onSelectDocket}
+        placeholder="Search dockets..."
+        isLoading={loading}
+      />
       {error && (
         <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
       )}

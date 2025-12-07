@@ -11,6 +11,7 @@ import { CopilotKitCSSProperties, CopilotSidebar } from "@copilotkit/react-ui";
 import { SignOutButton } from "@/components/SignOutButton";
 import { SearchBar } from "@/components/SearchBar";
 import Link from "next/link";
+import { CustomMessages } from "@/components/CustomMessages";
 
 export default function HomePage() {
   const [selectedAgency, setSelectedAgency] = useState<string | null>(null);
@@ -26,7 +27,7 @@ export default function HomePage() {
       name: "themeColor",
       type: "string",
       description: "The theme color to set. Should be a valid CSS color (hex, rgb, or named color). Make sure to pick nice colors.",
-      required: true, 
+      required: true,
     }],
     handler({ themeColor }) {
       setThemeColor(themeColor);
@@ -44,15 +45,16 @@ export default function HomePage() {
             <p className="text-gray-600 dark:text-gray-400">
               Explore federal regulation data from regulations.gov
             </p>
-            <div className="mt-4 flex gap-4 items-center">
-                <SearchBar />
-                <Link href="/bookmarks" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
-                    My Bookmarks
-                </Link>
-            </div>
+            <Link href="/bookmarks" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
+              Saved Dockets
+            </Link>
           </div>
           <SignOutButton />
         </div>
+
+        {/* <div className="mb-5">
+          <SearchBar />
+        </div> */}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 flex-1 min-h-0">
           <div className="lg:col-span-1 space-y-4">
@@ -104,6 +106,7 @@ export default function HomePage() {
           title: "Spicy Regs Assistant",
           initial: "Hi! I can help you explore federal regulations. Ask me about agencies, dockets, or specific regulations."
         }}
+        Messages={CustomMessages}
       />
     </main>
   );
