@@ -8,12 +8,15 @@ import { DocketOrDocumentCard } from '@/components/data-viewer/DocketOrDocumentC
 import { SearchBar } from '@/components/SearchBar';
 import { SignOutButton } from '@/components/SignOutButton';
 import Link from 'next/link';
+import { useMotherDuckService } from '@/lib/motherduck/hooks/useMotherDuckService';
 
 function SearchResults() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q');
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  
+  const { searchResources } = useMotherDuckService();
 
   useEffect(() => {
     async function performSearch() {
@@ -21,11 +24,8 @@ function SearchResults() {
       
       try {
         setLoading(true);
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-        if (res.ok) {
-          const json = await res.json();
-          setResults(json.results);
-        }
+        const searchResults = await searchResources(query);
+        setResults(searchResults);
       } catch (e) {
         console.error("Search failed", e);
       } finally {
@@ -33,7 +33,7 @@ function SearchResults() {
       }
     }
     performSearch();
-  }, [query]);
+  }, [query, searchResources]);
 
   // Bookmarks logic for toggle (same as DataViewer, should refactor later)
   const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());

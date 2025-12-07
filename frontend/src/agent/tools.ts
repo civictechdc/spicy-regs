@@ -19,25 +19,25 @@ export const getAgenciesTool = tool(
   }
 );
 
+const getDataSchema = z.object({
+  data_type: z.enum([
+    RegulationsDataTypes.Dockets,
+    RegulationsDataTypes.Comments,
+    RegulationsDataTypes.Documents,
+  ]),
+  agency_code: z.string().describe("The agency code (e.g. 'NASA')"),
+  docket_id: z.string().optional().describe("The docket ID"),
+});
+
 export const getDataTool = tool(
-  async ({ data_type, agency_code, docket_id }) => {
-    // Map string to enum
-    // Runtime validation ensures data_type matches enum values if we construct schema correctly
-    // or we cast/validate inside.
+  async (input) => {
+    const { data_type, agency_code, docket_id } = input as z.infer<typeof getDataSchema>;
     return await getData(data_type as RegulationsDataTypes, agency_code, docket_id);
   },
   {
     name: "get_data",
     description: "Get a list of all data for a given data type for an agency from the database. If docket_id is provided, return data for that docket id.",
-    schema: z.object({
-      data_type: z.enum([
-        RegulationsDataTypes.Dockets,
-        RegulationsDataTypes.Comments,
-        RegulationsDataTypes.Documents,
-      ]),
-      agency_code: z.string().describe("The agency code (e.g. 'NASA')"),
-      docket_id: z.string().optional().describe("The docket ID"),
-    }),
+    schema: getDataSchema,
   }
 );
 

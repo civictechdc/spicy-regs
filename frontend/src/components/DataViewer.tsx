@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getRegulationData, RegulationData, DataType } from '@/lib/api';
+import { RegulationData, DataType } from '@/lib/api';
 import { CommentCard } from './data-viewer/CommentCard';
 import { DocketOrDocumentCard } from './data-viewer/DocketOrDocumentCard';
 import { stripQuotes } from './data-viewer/utils';
+import { useMotherDuckService } from '@/lib/motherduck/hooks/useMotherDuckService';
+import { RegulationsDataTypes } from '@/lib/db/models';
 
 interface DataViewerProps {
   agencyCode: string | null;
@@ -17,6 +19,8 @@ export function DataViewer({ agencyCode, dataType, docketId }: DataViewerProps) 
   const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const { getData } = useMotherDuckService();
 
   // Fetch bookmarks
   useEffect(() => {
@@ -94,7 +98,12 @@ export function DataViewer({ agencyCode, dataType, docketId }: DataViewerProps) 
       try {
         setLoading(true);
         setError(null);
-        const result = await getRegulationData(agencyCode as string, dataType, docketId || undefined);
+        // Convert dataType string to RegulationsDataTypes enum
+        const result = await getData(
+          dataType as RegulationsDataTypes,
+          agencyCode as string,
+          docketId || undefined
+        );
         setData(result);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -104,7 +113,7 @@ export function DataViewer({ agencyCode, dataType, docketId }: DataViewerProps) 
       }
     }
     loadData();
-  }, [agencyCode, dataType, docketId]);
+  }, [agencyCode, dataType, docketId, getData]);
 
   if (!agencyCode) {
     return (

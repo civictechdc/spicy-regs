@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { MotherDuckClientProvider } from "@/lib/motherduck/context/motherduckClientContext";
 
 import { CopilotKit } from "@copilotkit/react-core";
 import "./globals.css";
@@ -19,9 +20,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={"antialiased"}>
-        <CopilotKit runtimeUrl="/api/copilotkit" publicApiKey="ck_pub_0afe2c88b7ff46abe7dfdeef22626f17">
-          {children}
-        </CopilotKit>
+        <MotherDuckClientProvider database="spicy-regs">
+          <CopilotKit runtimeUrl="/api/copilotkit" publicApiKey="ck_pub_0afe2c88b7ff46abe7dfdeef22626f17">
+            {children}
+          </CopilotKit>
+        </MotherDuckClientProvider>
         <SpeedInsights />
         <Analytics />
       </body>

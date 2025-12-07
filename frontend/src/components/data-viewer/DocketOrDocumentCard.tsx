@@ -5,6 +5,21 @@ import { stripQuotes, formatDate, parseRawJson } from './utils';
 import { BookmarkButton } from './BookmarkButton';
 import { ExplainButton } from './ExplainButton';
 
+// Helper to convert BigInt values to numbers for JSON serialization
+function toJsonSafe(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === 'bigint') return Number(obj);
+  if (Array.isArray(obj)) return obj.map(toJsonSafe);
+  if (typeof obj === 'object') {
+    const result: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = toJsonSafe(value);
+    }
+    return result;
+  }
+  return obj;
+}
+
 interface DocketOrDocumentCardProps {
   item: RegulationData;
   dataType: DataType;
@@ -64,7 +79,7 @@ export function DocketOrDocumentCard({
 
   useCopilotReadable({
     description: `A federal regulation ${isDocument ? 'document' : 'docket'}. Title: ${title}. Abstract: ${abstract}. Agency: ${agencyCode}.`,
-    value: item
+    value: toJsonSafe(item)  // Convert BigInt values to avoid serialization error
   });
 
   return (
