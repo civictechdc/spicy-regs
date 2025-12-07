@@ -19,6 +19,6 @@ export async function login(previousState: any, formData: FormData) {
     return { error: error.message }
   }
 
-  revalidatePath('/', 'layout')
-  redirect('/')
+  revalidatePath('/dashboard', 'layout')
+  redirect('/dashboard')
 }

@@ -1,65 +1,107 @@
-import { DuckDBInstance } from '@duckdb/node-api';
+import * as duckdb from '@duckdb/duckdb-wasm';
+import { AsyncDuckDB, ConsoleLogger } from '@duckdb/duckdb-wasm';
 
-const DB_PATH = process.env.NODE_ENV === 'production' ? ':memory:' : 'main.db';
+let dbInstance: AsyncDuckDB | null = null;
+let connInstance: duckdb.AsyncDuckDBConnection | null = null;
 
-let dbInstance: DuckDBInstance | null = null;
+const isBrowser = typeof window !== 'undefined';
 
-export async function getDb(): Promise<DuckDBInstance> {
-  if (!dbInstance) {
-    dbInstance = await DuckDBInstance.create(DB_PATH);
+export async function getDb(): Promise<AsyncDuckDB> {
+  if (dbInstance) return dbInstance;
+
+  const logger = new ConsoleLogger();
+  let worker: any; 
+  let mainModule: string;
+  let pthreadWorker: string | null | undefined;
+
+  if (isBrowser) {
+    const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles();
+    const bundle = await duckdb.selectBundle(JSDELIVR_BUNDLES);
+    
+    worker = new Worker(bundle.mainWorker!);
+    mainModule = bundle.mainModule;
+    pthreadWorker = bundle.pthreadWorker;
+  } else {
+    // Node.js configuration
+    const { createRequire } = await import('module');
+    const require = createRequire(import.meta.url);
+    const { Worker } = require('worker_threads');
+    const path = require('path');
+    
+    // Resolve path to the package distribution
+    // Using process.cwd() to locate node_modules in the project root
+    const distPath = path.resolve(process.cwd(), 'node_modules/@duckdb/duckdb-wasm/dist');
+    
+    // Use MVP bundle for compatibility in Node
+    const workerPath = path.join(distPath, 'duckdb-node-mvp.worker.cjs');
+    const wasmPath = path.join(distPath, 'duckdb-mvp.wasm');
+    
+    mainModule = wasmPath;
+    
+    // Wrapper to adapt Node worker to Browser Worker API
+    class NodeWorkerWrapper {
+      private worker: any;
+      
+      constructor(workerPath: string) {
+        this.worker = new Worker(workerPath);
+      }
+      
+      postMessage(message: any, transfer?: any[]) {
+        this.worker.postMessage(message, transfer);
+      }
+      
+      addEventListener(type: string, listener: any) {
+        this.worker.on(type, (data: any) => {
+           // Adapt 'message' event data structure if needed
+           if (type === 'message') {
+             listener({ data });
+           } else {
+             listener(data);
+           }
+        });
+      }
+      
+      removeEventListener(type: string, listener: any) {
+        this.worker.off(type, listener);
+      }
+      
+      terminate() {
+        this.worker.terminate();
+      }
+    }
+    
+    worker = new NodeWorkerWrapper(workerPath);
   }
+
+  dbInstance = new AsyncDuckDB(logger, worker);
+  await dbInstance.instantiate(mainModule, pthreadWorker);
+
   return dbInstance;
 }
 
-// Wrapper to run queries with Promises
 export async function runQuery<T = any>(sql: string): Promise<T[]> {
   const db = await getDb();
-  const conn = await db.connect();
   
-  try {
-    const reader = await conn.run(sql);
-    const rows = await reader.getRowObjectsJS();
-    return rows as unknown as T[]; // Cast to T[] as T is usually a typed object interface
-  } finally {
-    // It's good practice to close connection if we are creating one per query,
-    // or we could maintain a single connection. For simplicity and safety, let's close it.
-    // However, the node-api docs usually suggest connections are lightweight.
-    // Let's check if there is a close method or if it's auto-managed.
-    // Assuming we can just let it be GC'd or explicit close if available.
-    // The current API might not require explicit close on the connection object depending on version,
-    // but usually `conn.close()` or similar exists.
-    // Looking at standard usages: `using conn = await db.connect()` in modern JS resource management, 
-    // but here we just leave it for GC or explicit close if we find the method.
-    // We'll leave it open for now or rely on the driver.
-    // Actually, let's try to close it if the method exists, but since I can't check typings easily,
-    // I will adhere to the basic "run and get rows" pattern.
-    // Re-reading common patterns: usually you keep a connection open. 
-    // But here `runQuery` implies a stateless call.
-    // Let's assume we can just return.
-    // Update: node-api `connection` objects usually don't need strict manual closing in simple scripts,
-    // but for a server, improved resource management is better.
-    // We'll stick to the simplest working version first.
+  // Re-use connection or create new one.
+  // For better concurrency safety in simple apps, we can just create/close or keep one.
+  // WASM supports concurrent connections but single threaded execution usually (in MVP).
+  if (!connInstance) {
+     connInstance = await db.connect();
   }
+  
+  const result = await connInstance.query(sql);
+  
+  // Convert Arrow Table to JS objects
+  // result.toArray() returns an array of StructRowProxy (or similar)
+  // We map them to clean JSON objects
+  const rows = result.toArray().map((row: any) => row.toJSON());
+  
+  return rows as T[];
 }
 
-// Helper to initialize extensions
-let initialized = false;
 export async function initDb() {
-  if (initialized) return;
-  
-  try {
-    // We can run these directly via runQuery which handles connection
-    await runQuery("INSTALL httpfs;");
-    await runQuery("LOAD httpfs;");
-    
-    // Configure S3 for R2/AWS if needed, usually passed via env vars or here.
-    // For now just basic load.
-    
-    initialized = true;
-    console.log("DuckDB initialized with httpfs");
-  } catch (err) {
-    console.error("Failed to initialize DuckDB extensions:", err);
-    throw err;
-  }
+  const db = await getDb();
+  // Ensure httpfs if needed, though often included in bundles
+  // await db.registerFileURL(...);
+  console.log("DuckDB WASM initialized");
 }
-
