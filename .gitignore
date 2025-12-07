@@ -5,3 +5,5 @@ __marimo__
 *.wal
 .env
 .langgraph_api
+.vercel
+.agent

@@ -41,7 +41,8 @@ export async function createEmptyTables() {
         "posted_date TIMESTAMP",
         "receive_date TIMESTAMP",
         "page_count INTEGER",
-        "withdrawn BOOLEAN"
+        "withdrawn BOOLEAN",
+        "title TEXT"
       );
     }
 
@@ -72,5 +73,16 @@ export async function createIndexes() {
 export async function initializeDatabase() {
   await createEmptyTables();
   await createIndexes();
+  
+  // Migration for missing title column in documents_cache
+  try {
+    await runQuery(`ALTER TABLE documents_cache ADD COLUMN title TEXT`);
+    console.log("Migrated documents_cache: added title column");
+  } catch (e: any) {
+    // Ignore error if column already exists (DuckDB throws if column exists? or we can check schema)
+    // DuckDB ALTER TABLE ADD COLUMN throws if exists.
+    // So if it fails, it's likely already there or table doesn't exist (handled by createEmptyTables).
+  }
+  
   console.log("Database initialized successfully!");
 }

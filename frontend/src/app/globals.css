@@ -27,10 +27,7 @@ html {
   padding: 0;
 }
 
-main > div > * {
-  display: flex !important;
-  flex-direction: column !important;
-}
+
 
 /* Make messages appear from bottom */
 .copilotKitMessagesContainer {

@@ -8,6 +8,9 @@ import { DataTypeSelector } from "@/components/DataTypeSelector";
 import { DataViewer } from "@/components/DataViewer";
 import { DataType } from "@/lib/api";
 import { CopilotKitCSSProperties, CopilotSidebar } from "@copilotkit/react-ui";
+import { SignOutButton } from "@/components/SignOutButton";
+import { SearchBar } from "@/components/SearchBar";
+import Link from "next/link";
 
 export default function HomePage() {
   const [selectedAgency, setSelectedAgency] = useState<string | null>(null);
@@ -33,13 +36,22 @@ export default function HomePage() {
   return (
     <main className="h-screen w-screen overflow-hidden flex flex-col" style={{ "--copilot-kit-primary-color": themeColor } as CopilotKitCSSProperties}>
       <div className="h-full w-full p-8 flex flex-col overflow-y-auto" style={{ backgroundColor: themeColor }}>
-      <div className="items-center justify-center h-auto p-8">
-          <h1 className="text-3xl font-bold">
-            Spicy Regs
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Explore federal regulation data from regulations.gov
-          </p>
+        <div className="flex justify-between items-start mb-8">
+          <div>
+            <h1 className="text-3xl font-bold">
+              Spicy Regs
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Explore federal regulation data from regulations.gov
+            </p>
+            <div className="mt-4 flex gap-4 items-center">
+                <SearchBar />
+                <Link href="/bookmarks" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
+                    My Bookmarks
+                </Link>
+            </div>
+          </div>
+          <SignOutButton />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 flex-1 min-h-0">

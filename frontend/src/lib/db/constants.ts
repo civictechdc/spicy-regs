@@ -34,6 +34,7 @@ export const FIELD_MAPPINGS = {
       "CASE WHEN json_extract(f.content, '$.data.attributes.receiveDate') IS NOT NULL AND json_extract(f.content, '$.data.attributes.receiveDate') != 'null' THEN try_strptime(json_extract(f.content, '$.data.attributes.receiveDate'), '%Y-%m-%dT%H:%M:%SZ') ELSE NULL END as receive_date",
       "CASE WHEN json_extract(f.content, '$.data.attributes.pageCount') IS NOT NULL AND json_extract(f.content, '$.data.attributes.pageCount') != 'null' THEN json_extract(f.content, '$.data.attributes.pageCount')::INT ELSE NULL END as page_count",
       "CASE WHEN json_extract(f.content, '$.data.attributes.withdrawn') IS NOT NULL AND json_extract(f.content, '$.data.attributes.withdrawn') != 'null' THEN json_extract(f.content, '$.data.attributes.withdrawn')::BOOLEAN ELSE NULL END as withdrawn",
+      "json_extract(f.content, '$.data.attributes.title') as title",
     ],
     path_pattern: "documents/*.json",
   },

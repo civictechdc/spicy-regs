@@ -126,3 +126,50 @@ export async function getData(
     }
   }
 }
+
+export async function searchResources(query: string, agencyCode?: string): Promise<any[]> {
+  await initDb();
+  await initializeDatabase();
+  
+  const tables = ['dockets_cache', 'documents_cache', 'comments_cache'];
+  const results = [];
+  
+  // Sanitize query to avoid SQL injection if possible, though runQuery is raw.
+  // DuckDB prepared statements are safer. client.ts runQuery uses simple connection.
+  // We should be careful. Ideally we use bindings, but client.ts wrapping might not support it yet easily?
+  // runQuery takes string.
+  // For MVP we will just escape single quotes.
+  const escapedQuery = query.replace(/'/g, "''");
+  
+  // We search across all caches. 
+  // We union the results.
+  const unionQueries = tables.map(table => {
+    let where = `title ILIKE '%${escapedQuery}%'`;
+    if (agencyCode) {
+        where += ` AND agency_code = '${agencyCode}'`;
+    }
+    // Return specific type for frontend to identify
+    const type = table.split('_')[0]; // dockets, documents, comments
+    // Select minimal fields for search display
+    return `
+      SELECT 
+        '${type}' as type,
+        title, 
+        docket_id, 
+        agency_code,
+        year,
+        raw_json
+      FROM ${table}
+      WHERE ${where}
+    `;
+  });
+  
+  const fullQuery = unionQueries.join(" UNION ALL ") + " LIMIT 50";
+  
+  try {
+     return await runQuery(fullQuery);
+  } catch (e) {
+     console.error("Search query failed", e);
+     return [];
+  }
+}

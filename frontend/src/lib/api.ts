@@ -1,5 +1,3 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
-
 export type DataType = 'dockets' | 'documents' | 'comments';
 
 export interface RegulationData {
@@ -23,7 +21,7 @@ export interface RegulationData {
 }
 
 export async function getAgencies(): Promise<string[]> {
-  const response = await fetch(`${API_BASE_URL}/agencies`);
+  const response = await fetch(`/api/agencies`);
   if (!response.ok) {
     throw new Error('Failed to fetch agencies');
   }
@@ -31,7 +29,7 @@ export async function getAgencies(): Promise<string[]> {
 }
 
 export async function getDockets(agencyCode: string): Promise<string[]> {
-  const response = await fetch(`${API_BASE_URL}/dockets?agency_code=${encodeURIComponent(agencyCode)}`);
+  const response = await fetch(`/api/dockets?agency_code=${encodeURIComponent(agencyCode)}`);
   if (!response.ok) {
     throw new Error('Failed to fetch dockets');
   }
@@ -47,7 +45,7 @@ export async function getRegulationData(
   if (docketId) {
     params.append('docket_id', docketId);
   }
-  const url = `${API_BASE_URL}/${agencyCode}/${dataType}${params.toString() ? `?${params.toString()}` : ''}`;
+  const url = `/api/${agencyCode}/${dataType}${params.toString() ? `?${params.toString()}` : ''}`;
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error('Failed to fetch regulation data');

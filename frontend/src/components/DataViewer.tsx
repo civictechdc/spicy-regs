@@ -37,10 +37,51 @@ function parseRawJson(rawJson: string | undefined): any {
   }
 }
 
-function CommentCard({ item }: { item: RegulationData }) {
+import { createClient } from '@/utils/supabase/client';
+
+function BookmarkButton({ 
+  isBookmarked, 
+  onToggle, 
+  loading 
+}: { 
+  isBookmarked: boolean; 
+  onToggle: () => void;
+  loading: boolean;
+}) {
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      disabled={loading}
+      className={`p-2 rounded-full transition-colors ${
+        isBookmarked 
+          ? 'text-yellow-500 hover:bg-yellow-100 dark:hover:bg-yellow-900/30' 
+          : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+      }`}
+      title={isBookmarked ? "Remove bookmark" : "Bookmark this item"}
+    >
+      <svg 
+        xmlns="http://www.w3.org/2000/svg" 
+        viewBox="0 0 24 24" 
+        fill={isBookmarked ? "currentColor" : "none"} 
+        stroke="currentColor" 
+        strokeWidth="2" 
+        strokeLinecap="round" 
+        strokeLinejoin="round" 
+        className="w-5 h-5"
+      >
+        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+      </svg>
+    </button>
+  );
+}
+
+export function CommentCard({ item, isBookmarked, onToggleBookmark }: { item: RegulationData, isBookmarked: boolean, onToggleBookmark: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const parsedJson = parseRawJson(item.raw_json);
-  const attributes = parsedJson?.data?.attributes || {};
+  const attributes = parsedJson?.data?.attributes || parsedJson?.attributes || (parsedJson && !parsedJson.data ? parsedJson : {});
   const included = parsedJson?.included || [];
 
   const commentId = stripQuotes(item.comment_id) || attributes.id || item.docket_id;
@@ -79,6 +120,11 @@ function CommentCard({ item }: { item: RegulationData }) {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex-1">
               {title}
             </h3>
+            <BookmarkButton 
+              isBookmarked={isBookmarked} 
+              onToggle={onToggleBookmark} 
+              loading={false} 
+            />
             {subtype && (
               <span className="flex-shrink-0 ml-2 text-xs px-2.5 py-1 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 rounded-full font-medium">
                 {subtype}
@@ -203,7 +249,6 @@ function CommentCard({ item }: { item: RegulationData }) {
                   if (Array.isArray(value) && value.length === 0) return false;
                   return true;
                 })
-                .slice(0, 10)
                 .map(([key, value]) => (
                   <div key={key} className="flex flex-col">
                     <span className="font-medium text-gray-600 dark:text-gray-400 text-xs mb-1">
@@ -224,10 +269,20 @@ function CommentCard({ item }: { item: RegulationData }) {
   );
 }
 
-function DocketOrDocumentCard({ item, dataType }: { item: RegulationData; dataType: DataType }) {
+export function DocketOrDocumentCard({ 
+  item, 
+  dataType,
+  isBookmarked,
+  onToggleBookmark
+}: { 
+  item: RegulationData; 
+  dataType: DataType;
+  isBookmarked: boolean;
+  onToggleBookmark: () => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const parsedJson = parseRawJson(item.raw_json);
-  const attributes = parsedJson?.data?.attributes || {};
+  const attributes = parsedJson?.data?.attributes || parsedJson?.attributes || (parsedJson && !parsedJson.data ? parsedJson : {});
   const relationships = parsedJson?.data?.relationships || {};
   const included = parsedJson?.included || [];
 
@@ -278,6 +333,11 @@ function DocketOrDocumentCard({ item, dataType }: { item: RegulationData; dataTy
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex-1">
               {title || docketId}
             </h3>
+            <BookmarkButton 
+              isBookmarked={isBookmarked} 
+              onToggle={onToggleBookmark} 
+              loading={false} 
+            />
             {(docketType || documentType) && (
               <span className="flex-shrink-0 ml-2 text-xs px-2.5 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded-full font-medium">
                 {documentType || docketType}
@@ -479,7 +539,6 @@ function DocketOrDocumentCard({ item, dataType }: { item: RegulationData; dataTy
                   if (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) return false;
                   return true;
                 })
-                .slice(0, 10)
                 .map(([key, value]) => (
                   <div key={key} className="flex flex-col">
                     <span className="font-medium text-gray-600 dark:text-gray-400 text-xs mb-1">
@@ -493,11 +552,7 @@ function DocketOrDocumentCard({ item, dataType }: { item: RegulationData; dataTy
                   </div>
                 ))}
             </div>
-            {Object.keys(attributes).length > 10 && (
-              <div className="text-xs text-gray-500 dark:text-gray-400 pt-2">
-                +{Object.keys(attributes).length - 10} more fields available in raw JSON
-              </div>
-            )}
+
           </div>
         )}
       </div>
@@ -507,8 +562,74 @@ function DocketOrDocumentCard({ item, dataType }: { item: RegulationData; dataTy
 
 export function DataViewer({ agencyCode, dataType, docketId }: DataViewerProps) {
   const [data, setData] = useState<RegulationData[]>([]);
+  const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Fetch bookmarks
+  useEffect(() => {
+    async function fetchBookmarks() {
+      try {
+        const res = await fetch('/api/bookmarks');
+        if (res.ok) {
+          const json = await res.json();
+          // Assuming json.bookmarks is array of objects with resource_id
+          const ids = new Set<string>(json.bookmarks.map((b: any) => b.resource_id));
+          setBookmarks(ids);
+        }
+      } catch (e) {
+        console.error("Failed to fetch bookmarks", e);
+      }
+    }
+    fetchBookmarks();
+  }, []);
+
+  const handleToggleBookmark = async (item: RegulationData) => {
+    const resourceId = dataType === 'comments' 
+      ? (stripQuotes(item.comment_id) || item.docket_id)
+      : item.docket_id;
+
+    if (!resourceId) return;
+
+    const isBookmarked = bookmarks.has(resourceId);
+    
+    // Optimistic update
+    const newBookmarks = new Set(bookmarks);
+    if (isBookmarked) {
+      newBookmarks.delete(resourceId);
+    } else {
+      newBookmarks.add(resourceId);
+    }
+    setBookmarks(newBookmarks);
+
+    try {
+      if (isBookmarked) {
+        // Delete
+        await fetch(`/api/bookmarks?resource_id=${resourceId}`, { method: 'DELETE' });
+      } else {
+        // Add
+        const title = stripQuotes(item.title) || item.docket_id;
+        await fetch('/api/bookmarks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            resource_id: resourceId,
+            resource_type: dataType === 'dockets' ? 'docket' : (dataType === 'documents' ? 'document' : 'comment'),
+            agency_code: agencyCode,
+            title: title,
+            metadata: {
+                docket_id: item.docket_id,
+                year: item.year
+            }
+          })
+        });
+      }
+    } catch (e) {
+      console.error("Failed to toggle bookmark", e);
+      // Revert on error
+      setBookmarks(bookmarks);
+    }
+  };
 
   useEffect(() => {
     if (!agencyCode) {
@@ -609,10 +730,23 @@ export function DataViewer({ agencyCode, dataType, docketId }: DataViewerProps) 
             ? (stripQuotes(item.comment_id) || item.docket_id)
             : item.docket_id;
           
+          const isBookmarked = bookmarks.has(key);
+
           return dataType === 'comments' ? (
-            <CommentCard key={`${key}-${index}`} item={item} />
+            <CommentCard 
+                key={`${key}-${index}`} 
+                item={item} 
+                isBookmarked={isBookmarked}
+                onToggleBookmark={() => handleToggleBookmark(item)}
+            />
           ) : (
-            <DocketOrDocumentCard key={`${key}-${index}`} item={item} dataType={dataType} />
+            <DocketOrDocumentCard 
+                key={`${key}-${index}`} 
+                item={item} 
+                dataType={dataType}
+                isBookmarked={isBookmarked}
+                onToggleBookmark={() => handleToggleBookmark(item)} 
+            />
           );
         })}
       </div>
