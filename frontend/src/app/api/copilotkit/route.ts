@@ -5,15 +5,18 @@ import {
 } from "@copilotkit/runtime";
 import { NextRequest } from "next/server";
 import { OpenAI } from "openai";
-import { getAgencies } from "../../../lib/mirrulations/service";
-import { getData } from "../../../lib/db/service";
-import { RegulationsDataTypes } from "../../../lib/db/models";
+import { getAgencies } from "@/lib/mirrulations/service";
+import { getData } from "@/lib/db/service";
+import { RegulationsDataTypes } from "@/lib/db/models";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
 });
 
-const serviceAdapter = new OpenAIAdapter({ openai });
+const serviceAdapter = new OpenAIAdapter({ 
+  openai,
+  model: "gpt-5-nano",
+});
 
 const runtime = new CopilotRuntime({
   actions: [

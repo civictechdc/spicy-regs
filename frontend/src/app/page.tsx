@@ -1,5 +1,6 @@
 "use client";
 
+import { useFrontendTool } from "@copilotkit/react-core";
 import { useState } from "react";
 import { AgencySelector } from "@/components/AgencySelector";
 import { DocketSelector } from "@/components/DocketSelector";
@@ -7,11 +8,6 @@ import { DataTypeSelector } from "@/components/DataTypeSelector";
 import { DataViewer } from "@/components/DataViewer";
 import { DataType } from "@/lib/api";
 import { CopilotKitCSSProperties, CopilotSidebar } from "@copilotkit/react-ui";
-import { useCoAgent, useFrontendTool } from "@copilotkit/react-core";
-
-type AgentState = {
-  messages: string[];
-}
 
 export default function HomePage() {
   const [selectedAgency, setSelectedAgency] = useState<string | null>(null);
@@ -19,9 +15,6 @@ export default function HomePage() {
   const [dataType, setDataType] = useState<DataType>("dockets");
   const [themeColor, setThemeColor] = useState("black");
 
-  const { state, setState } = useCoAgent<AgentState>({
-    name: "regulations_agent",
-  })
 
   useFrontendTool({
     name: "setThemeColor",
