@@ -10,7 +10,7 @@ import { getData } from "@/lib/db/service";
 import { RegulationsDataTypes } from "@/lib/db/models";
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 const serviceAdapter = new OpenAIAdapter({ 
