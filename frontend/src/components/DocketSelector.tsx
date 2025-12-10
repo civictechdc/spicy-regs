@@ -25,7 +25,7 @@ export function DocketSelector({ agencyCode, selectedDocket, onSelectDocket }: D
       try {
         setLoading(true);
         const data = await getDockets(agencyCode as string);
-        setDockets(data);
+        setDockets(['ALL', ...data]);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load dockets');

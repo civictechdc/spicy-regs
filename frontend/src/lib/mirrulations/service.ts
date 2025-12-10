@@ -67,7 +67,7 @@ export async function getDockets(agencyCode: string): Promise<string[]> {
       return parts[2]; // "raw-data" is 0, agency is 1, docket is 2
     }).filter((docket) => docket !== undefined && docket !== "");
 
-    return docketList;
+    return docketList.sort().reverse();
   } catch (error) {
     console.error(`Error fetching dockets for ${agencyCode}:`, error);
     return [];

@@ -98,13 +98,13 @@ export function DataViewer({ agencyCode, dataType, docketId }: DataViewerProps) 
 
   // Initial load and load more
   useEffect(() => {
-    if (!agencyCode) {
+    if (!agencyCode || !docketId) {
       setData([]);
       return;
     }
 
     async function loadData() {
-      if (!agencyCode) return;
+      if (!agencyCode || !docketId) return;
       
       const isInitialLoad = offset === 0;
       
@@ -121,7 +121,7 @@ export function DataViewer({ agencyCode, dataType, docketId }: DataViewerProps) 
           const count = await getDataCount(
             dataType as RegulationsDataTypes,
             agencyCode,
-            docketId || undefined
+            docketId === 'ALL' ? undefined : (docketId ?? undefined)
           );
           setTotalCount(count);
         }
@@ -129,7 +129,7 @@ export function DataViewer({ agencyCode, dataType, docketId }: DataViewerProps) 
         const result = await getData(
           dataType as RegulationsDataTypes,
           agencyCode,
-          docketId || undefined,
+          docketId === 'ALL' ? undefined : (docketId ?? undefined),
           Infinity,
           PAGE_SIZE,
           offset
@@ -185,6 +185,14 @@ export function DataViewer({ agencyCode, dataType, docketId }: DataViewerProps) 
     return (
       <div className="p-8 text-center text-gray-500 dark:text-gray-400">
         Select an agency to view data
+      </div>
+    );
+  }
+
+  if (!docketId) {
+    return (
+      <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+        Select a docket to view data (or select "All Dockets")
       </div>
     );
   }
