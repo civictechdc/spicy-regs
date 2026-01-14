@@ -2,13 +2,13 @@
 """
 ETL Pipeline: Mirrulations S3 → Parquet on R2
 
-Extracts JSON data from the Mirrulations public S3 bucket,
-transforms it to flattened Parquet files, and uploads to R2.
+Memory-efficient version that processes one agency at a time,
+appending to Parquet files incrementally. Supports resuming
+from where it left off.
 """
 
 import argparse
 import os
-import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -28,6 +28,7 @@ MIRRULATIONS_BUCKET = "s3://mirrulations/raw-data"
 DATA_TYPES = {
     "dockets": {
         "path_pattern": "docket/*.json",
+        "id_field": "docket_id",
         "fields": """
             data.id as docket_id,
             data.attributes.agencyId as agency_code,
@@ -39,6 +40,7 @@ DATA_TYPES = {
     },
     "documents": {
         "path_pattern": "documents/*.json",
+        "id_field": "document_id",
         "fields": """
             data.id as document_id,
             data.attributes.docketId as docket_id,
@@ -53,6 +55,7 @@ DATA_TYPES = {
     },
     "comments": {
         "path_pattern": "comments/*.json",
+        "id_field": "comment_id",
         "fields": """
             data.id as comment_id,
             data.attributes.docketId as docket_id,
@@ -68,95 +71,108 @@ DATA_TYPES = {
 }
 
 
-def get_agencies(conn: duckdb.DuckDBPyConnection) -> list[str]:
+def get_agencies() -> list[str]:
     """Get list of all agencies from S3 bucket."""
-    print("Fetching agency list...")
-    result = conn.execute(f"""
-        SELECT DISTINCT split_part(filename, '/', 4) as agency
-        FROM glob('{MIRRULATIONS_BUCKET}/*/')
-        ORDER BY agency
-    """).fetchall()
-    agencies = [row[0] for row in result if row[0]]
-    print(f"Found {len(agencies)} agencies")
-    return agencies
+    import boto3
+    from botocore import UNSIGNED
+    from botocore.config import Config
+    
+    s3 = boto3.client('s3', region_name='us-east-1', config=Config(signature_version=UNSIGNED))
+    response = s3.list_objects_v2(Bucket='mirrulations', Prefix='raw-data/', Delimiter='/')
+    
+    agencies = []
+    for prefix in response.get('CommonPrefixes', []):
+        agency = prefix['Prefix'].split('/')[1]
+        if agency:
+            agencies.append(agency)
+    
+    return sorted(agencies)
 
 
-def process_data_type(
+def get_processed_agencies(output_dir: Path) -> dict[str, set[str]]:
+    """Get agencies already processed for each data type by checking existing Parquet files."""
+    processed = {dt: set() for dt in DATA_TYPES}
+    conn = duckdb.connect()
+    
+    for data_type in DATA_TYPES:
+        parquet_file = output_dir / f"{data_type}.parquet"
+        if parquet_file.exists():
+            try:
+                result = conn.execute(f"""
+                    SELECT DISTINCT agency_code 
+                    FROM read_parquet('{parquet_file}')
+                """).fetchall()
+                processed[data_type] = {row[0] for row in result if row[0]}
+            except Exception:
+                pass
+    
+    conn.close()
+    return processed
+
+
+def process_agency(
     conn: duckdb.DuckDBPyConnection,
-    data_type: str,
-    agencies: list[str],
+    agency: str,
     output_dir: Path,
-) -> Path:
-    """Process a single data type (dockets/documents/comments) for given agencies."""
-    config = DATA_TYPES[data_type]
-    output_file = output_dir / f"{data_type}.parquet"
-
-    print(f"\n{'='*60}")
-    print(f"Processing {data_type}...")
-    print(f"{'='*60}")
-
-    all_paths = []
-    for agency in agencies:
+) -> dict[str, int]:
+    """Process all data types for a single agency and append to Parquet files."""
+    results = {}
+    
+    for data_type, config in DATA_TYPES.items():
+        output_file = output_dir / f"{data_type}.parquet"
         path = f"{MIRRULATIONS_BUCKET}/{agency}/**/text-*/{config['path_pattern']}"
-        all_paths.append(path)
-    
-    if not all_paths:
-        print(f"No agencies to process for {data_type}")
-        return output_file
-
-    # Use a single query with all paths
-    paths_list = ", ".join([f"'{p}'" for p in all_paths])
-    
-    query = f"""
-        SELECT
-            {config['fields']},
-            filename
-        FROM read_json(
-            [{paths_list}],
-            union_by_name=true,
-            ignore_errors=true,
-            maximum_object_size=10485760
-        )
-    """
-
-    try:
-        print(f"  Executing query for {len(agencies)} agencies...")
-        conn.execute(f"""
-            COPY ({query}) TO '{output_file}'
-            (FORMAT PARQUET, COMPRESSION ZSTD)
-        """)
         
-        # Get row count
-        count = conn.execute(
-            f"SELECT COUNT(*) FROM read_parquet('{output_file}')"
-        ).fetchone()[0]
-        print(f"  ✓ Total rows: {count:,}")
-    except Exception as e:
-        print(f"  Error: {e}")
-
-    return output_file
+        query = f"""
+            SELECT
+                {config['fields']},
+                filename
+            FROM read_json(
+                '{path}',
+                union_by_name=true,
+                ignore_errors=true,
+                maximum_object_size=10485760
+            )
+        """
+        
+        try:
+            # Fetch data for this agency
+            df = conn.execute(query).fetchdf()
+            row_count = len(df)
+            
+            if row_count > 0:
+                if output_file.exists():
+                    # Append to existing Parquet
+                    conn.execute(f"""
+                        COPY (
+                            SELECT * FROM read_parquet('{output_file}')
+                            UNION ALL
+                            SELECT * FROM df
+                        ) TO '{output_file}'
+                        (FORMAT PARQUET, COMPRESSION ZSTD)
+                    """)
+                else:
+                    # Create new Parquet file
+                    conn.execute(f"""
+                        COPY (SELECT * FROM df) TO '{output_file}'
+                        (FORMAT PARQUET, COMPRESSION ZSTD)
+                    """)
+                
+                results[data_type] = row_count
+            else:
+                results[data_type] = 0
+                
+        except Exception:
+            results[data_type] = 0
+    
+    return results
 
 
 def main():
     parser = argparse.ArgumentParser(description="Mirrulations ETL Pipeline")
-    parser.add_argument(
-        "--agency", help="Process only this agency (for testing)", default=None
-    )
-    parser.add_argument(
-        "--incremental",
-        action="store_true",
-        help="Only process changed files (not yet implemented)",
-    )
-    parser.add_argument(
-        "--output-dir",
-        help="Local output directory for Parquet files",
-        default=None,
-    )
-    parser.add_argument(
-        "--skip-upload",
-        action="store_true",
-        help="Skip uploading to R2 (for testing)",
-    )
+    parser.add_argument("--agency", help="Process only this agency", default=None)
+    parser.add_argument("--output-dir", help="Output directory", default=None)
+    parser.add_argument("--skip-upload", action="store_true", help="Skip R2 upload")
+    parser.add_argument("--full-refresh", action="store_true", help="Full refresh (ignore previous progress)")
     args = parser.parse_args()
 
     # Setup output directory
@@ -168,11 +184,10 @@ def main():
 
     print(f"Output directory: {output_dir}")
 
-    # Initialize DuckDB with httpfs for S3 access
+    # Initialize DuckDB
     conn = duckdb.connect()
     conn.execute("INSTALL httpfs; LOAD httpfs;")
     conn.execute("SET s3_region='us-east-1';")
-    # Mirrulations bucket is public, no auth needed
     conn.execute("SET s3_url_style='path';")
 
     # Get agencies to process
@@ -181,30 +196,56 @@ def main():
     elif os.getenv("AGENCIES"):
         agencies = os.getenv("AGENCIES").split(",")
     else:
-        agencies = get_agencies(conn)
+        print("Fetching agency list...")
+        agencies = get_agencies()
+        print(f"Found {len(agencies)} agencies")
+
+    # Check for already processed agencies (default: resume mode)
+    if not args.full_refresh:
+        processed = get_processed_agencies(output_dir)
+        # Find agencies that are complete (in all data types)
+        complete_agencies = set.intersection(*processed.values()) if processed.values() else set()
+        remaining = [a for a in agencies if a not in complete_agencies]
+        if complete_agencies:
+            print(f"Resuming: {len(complete_agencies)} agencies already processed, {len(remaining)} remaining")
+        agencies = remaining
+
+    if not agencies:
+        print("No agencies to process!")
+        return
 
     print(f"\nProcessing {len(agencies)} agencies")
     start_time = datetime.now()
 
-    # Process each data type with progress bar
-    parquet_files = []
-    for data_type in tqdm(DATA_TYPES, desc="Data types", unit="type"):
-        output_file = process_data_type(conn, data_type, agencies, output_dir)
-        if output_file.exists():
-            parquet_files.append(output_file)
+    # Process each agency
+    total_rows = {dt: 0 for dt in DATA_TYPES}
+    
+    for agency in tqdm(agencies, desc="Agencies", unit="agency"):
+        results = process_agency(conn, agency, output_dir)
+        for dt, count in results.items():
+            total_rows[dt] += count
+
+    conn.close()
+
+    # Summary
+    print(f"\n{'='*60}")
+    print("Summary:")
+    for dt, count in total_rows.items():
+        print(f"  {dt}: {count:,} rows")
+    
+    elapsed = datetime.now() - start_time
+    print(f"\nETL completed in {elapsed}")
 
     # Upload to R2
-    if not args.skip_upload and parquet_files:
-        print("\n" + "=" * 60)
+    if not args.skip_upload:
+        print(f"\n{'='*60}")
         print("Uploading to R2...")
-        print("=" * 60)
-        for pf in parquet_files:
-            upload_to_r2(pf)
+        for data_type in DATA_TYPES:
+            pf = output_dir / f"{data_type}.parquet"
+            if pf.exists():
+                upload_to_r2(pf)
 
-    elapsed = datetime.now() - start_time
-    print(f"\n{'='*60}")
-    print(f"ETL completed in {elapsed}")
-    print(f"{'='*60}")
+    print("Done!")
 
 
 if __name__ == "__main__":
