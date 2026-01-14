@@ -48,26 +48,34 @@ export async function getAgencies(): Promise<string[]> {
  * @returns A list of docket IDs
  */
 export async function getDockets(agencyCode: string): Promise<string[]> {
-  const command = new ListObjectsV2Command({
-    Bucket: BUCKET_NAME,
-    Prefix: `raw-data/${agencyCode}/`,
-    Delimiter: "/",
-  });
+  let continuationToken: string | undefined;
+  const allDockets: string[] = [];
 
   try {
-    const response = await s3.send(command);
-    if (!response.CommonPrefixes) {
-      return [];
-    }
+    do {
+      const command = new ListObjectsV2Command({
+        Bucket: BUCKET_NAME,
+        Prefix: `raw-data/${agencyCode}/`,
+        Delimiter: "/",
+        ContinuationToken: continuationToken,
+      });
 
-    // Prefix format: raw-data/{AGENCY}/{DOCKET_ID}/
-    const docketList = response.CommonPrefixes.map((prefix) => {
-      const p = prefix.Prefix || "";
-      const parts = p.split("/");
-      return parts[2]; // "raw-data" is 0, agency is 1, docket is 2
-    }).filter((docket) => docket !== undefined && docket !== "");
+      const response = await s3.send(command);
+      
+      if (response.CommonPrefixes) {
+        const dockets = response.CommonPrefixes.map((prefix) => {
+          const p = prefix.Prefix || "";
+          const parts = p.split("/");
+          return parts[2]; // "raw-data" is 0, agency is 1, docket is 2
+        }).filter((docket) => docket !== undefined && docket !== "");
+        
+        allDockets.push(...dockets);
+      }
 
-    return docketList.sort().reverse();
+      continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+    } while (continuationToken);
+
+    return allDockets.sort().reverse();
   } catch (error) {
     console.error(`Error fetching dockets for ${agencyCode}:`, error);
     return [];

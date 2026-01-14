@@ -1,24 +1,7 @@
 import { useState } from 'react';
 import { RegulationData } from '@/lib/api';
-import { useCopilotReadable } from "@copilotkit/react-core";
 import { stripQuotes, formatDate, parseRawJson } from './utils';
 import { BookmarkButton } from './BookmarkButton';
-import { ExplainButton } from './ExplainButton';
-
-// Helper to convert BigInt values to numbers for JSON serialization
-function toJsonSafe(obj: any): any {
-  if (obj === null || obj === undefined) return obj;
-  if (typeof obj === 'bigint') return Number(obj);
-  if (Array.isArray(obj)) return obj.map(toJsonSafe);
-  if (typeof obj === 'object') {
-    const result: any = {};
-    for (const [key, value] of Object.entries(obj)) {
-      result[key] = toJsonSafe(value);
-    }
-    return result;
-  }
-  return obj;
-}
 
 interface CommentCardProps {
   item: RegulationData;
@@ -35,7 +18,6 @@ export function CommentCard({ item, isBookmarked, onToggleBookmark }: CommentCar
   const commentId = stripQuotes(item.comment_id) || attributes.id || item.docket_id;
   const title = stripQuotes(item.title) || attributes.title || 'Untitled Comment';
   const commentText = stripQuotes(item.comment) || attributes.comment || '';
-  const documentType = stripQuotes(item.document_type) || attributes.documentType || '';
   const subtype = stripQuotes(item.subtype) || attributes.subtype || '';
   
   // Submitter info
@@ -57,12 +39,8 @@ export function CommentCard({ item, isBookmarked, onToggleBookmark }: CommentCar
   const pageCount = attributes.pageCount;
   
   // Attachments
-  const attachments = included.filter((item: any) => item.type === 'attachments');
+  const attachments = included.filter((i: { type: string }) => i.type === 'attachments');
 
-  useCopilotReadable({
-    description: `A public comment on a federal regulation. Title: ${title}. Comment Text: ${commentText}. Submitter: ${submitterName}. Posted Date: ${postedDate}.`,
-    value: toJsonSafe(item)  // Convert BigInt values to avoid serialization error
-  });
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-lg transition-all duration-200">
@@ -78,7 +56,6 @@ export function CommentCard({ item, isBookmarked, onToggleBookmark }: CommentCar
               onToggle={onToggleBookmark} 
               loading={false} 
             />
-            <ExplainButton itemTitle={title} dataType="comment" />
             {subtype && (
               <span className="flex-shrink-0 ml-2 text-xs px-2.5 py-1 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 rounded-full font-medium">
                 {subtype}

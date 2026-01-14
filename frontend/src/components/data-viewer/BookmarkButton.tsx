@@ -1,5 +1,3 @@
-import { createClient } from '@/utils/supabase/client';
-
 interface BookmarkButtonProps {
   isBookmarked: boolean;
   onToggle: () => void;

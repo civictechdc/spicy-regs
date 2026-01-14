@@ -26,16 +26,3 @@ html {
   margin: 0;
   padding: 0;
 }
-
-
-
-/* Make messages appear from bottom */
-.copilotKitMessagesContainer {
-  display: flex !important;
-  justify-content: flex-start !important;
-}
-
-.copilotKitMessages {
-  display: flex !important;
-  flex-direction: column-reverse !important;
-}

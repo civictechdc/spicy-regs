@@ -16,6 +16,28 @@ interface DataViewerProps {
 }
 
 const PAGE_SIZE = 20;
+const BOOKMARKS_KEY = 'spicy-regs-bookmarks';
+
+// Helper to get bookmarks from localStorage
+function getStoredBookmarks(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const stored = localStorage.getItem(BOOKMARKS_KEY);
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+// Helper to save bookmarks to localStorage
+function saveBookmarks(bookmarks: Set<string>) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(BOOKMARKS_KEY, JSON.stringify([...bookmarks]));
+  } catch (e) {
+    console.error('Failed to save bookmarks', e);
+  }
+}
 
 export function DataViewer({ agencyCode, dataType, docketId }: DataViewerProps) {
   const [data, setData] = useState<RegulationData[]>([]);
@@ -28,65 +50,26 @@ export function DataViewer({ agencyCode, dataType, docketId }: DataViewerProps) 
   
   const { getData, getDataCount } = useMotherDuckService();
 
-  // Fetch bookmarks
+  // Load bookmarks from localStorage on mount
   useEffect(() => {
-    async function fetchBookmarks() {
-      try {
-        const res = await fetch('/api/bookmarks');
-        if (res.ok) {
-          const json = await res.json();
-          const ids = new Set<string>(json.bookmarks.map((b: any) => b.resource_id));
-          setBookmarks(ids);
-        }
-      } catch (e) {
-        console.error("Failed to fetch bookmarks", e);
-      }
-    }
-    fetchBookmarks();
+    setBookmarks(getStoredBookmarks());
   }, []);
 
-  const handleToggleBookmark = async (item: RegulationData) => {
+  const handleToggleBookmark = (item: RegulationData) => {
     const resourceId = dataType === 'comments' 
       ? (stripQuotes(item.comment_id) || item.docket_id)
       : item.docket_id;
 
     if (!resourceId) return;
 
-    const isBookmarked = bookmarks.has(resourceId);
-    
-    // Optimistic update
     const newBookmarks = new Set(bookmarks);
-    if (isBookmarked) {
+    if (bookmarks.has(resourceId)) {
       newBookmarks.delete(resourceId);
     } else {
       newBookmarks.add(resourceId);
     }
     setBookmarks(newBookmarks);
-
-    try {
-      if (isBookmarked) {
-        await fetch(`/api/bookmarks?resource_id=${resourceId}`, { method: 'DELETE' });
-      } else {
-        const title = stripQuotes(item.title) || item.docket_id;
-        await fetch('/api/bookmarks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            resource_id: resourceId,
-            resource_type: dataType === 'dockets' ? 'docket' : (dataType === 'documents' ? 'document' : 'comment'),
-            agency_code: agencyCode,
-            title: title,
-            metadata: {
-                docket_id: item.docket_id,
-                year: item.year
-            }
-          })
-        });
-      }
-    } catch (e) {
-      console.error("Failed to toggle bookmark", e);
-      setBookmarks(bookmarks);
-    }
+    saveBookmarks(newBookmarks);
   };
 
   // Reset data when filters change

@@ -1,14 +1,34 @@
 'use client';
 
-import { useEffect, useState,  Suspense } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { RegulationData } from '@/lib/api';
 import { CommentCard } from '@/components/data-viewer/CommentCard';
 import { DocketOrDocumentCard } from '@/components/data-viewer/DocketOrDocumentCard';
 import { SearchBar } from '@/components/SearchBar';
-import { SignOutButton } from '@/components/SignOutButton';
 import Link from 'next/link';
 import { useMotherDuckService } from '@/lib/motherduck/hooks/useMotherDuckService';
+
+const BOOKMARKS_KEY = 'spicy-regs-bookmarks';
+
+function getStoredBookmarks(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const stored = localStorage.getItem(BOOKMARKS_KEY);
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveBookmarks(bookmarks: Set<string>) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(BOOKMARKS_KEY, JSON.stringify([...bookmarks]));
+  } catch (e) {
+    console.error('Failed to save bookmarks', e);
+  }
+}
 
 function SearchResults() {
   const searchParams = useSearchParams();
@@ -35,73 +55,31 @@ function SearchResults() {
     performSearch();
   }, [query, searchResources]);
 
-  // Bookmarks logic for toggle (same as DataViewer, should refactor later)
   const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
   
   useEffect(() => {
-     async function fetchBookmarks() {
-      try {
-        const res = await fetch('/api/bookmarks');
-        if (res.ok) {
-          const json = await res.json();
-          const ids = new Set<string>(json.bookmarks.map((b: any) => b.resource_id));
-          setBookmarks(ids);
-        }
-      } catch (e) {
-        console.error("Failed to fetch bookmarks", e);
-      }
-    }
-    fetchBookmarks();
+    setBookmarks(getStoredBookmarks());
   }, []);
 
-  const handleToggleBookmark = async (item: any) => {
-    const raw = JSON.parse(item.raw_json); // It's a string in the DB result?
-    const regulationData: RegulationData = {
-        ...item,
-    };
-    
+  const handleToggleBookmark = (item: any) => {
     let resourceId = item.docket_id;
     if (item.type === 'comments') {
-         const parsed = typeof item.raw_json === 'string' ? JSON.parse(item.raw_json) : item.raw_json;
-         resourceId = parsed.data.id;
+      try {
+        const parsed = typeof item.raw_json === 'string' ? JSON.parse(item.raw_json) : item.raw_json;
+        resourceId = parsed.data.id;
+      } catch {}
     }
 
     if (!resourceId) return;
 
-    const isBookmarked = bookmarks.has(resourceId);
-    
-    // Optimistic
     const newBookmarks = new Set(bookmarks);
-    if (isBookmarked) {
+    if (bookmarks.has(resourceId)) {
       newBookmarks.delete(resourceId);
     } else {
       newBookmarks.add(resourceId);
     }
     setBookmarks(newBookmarks);
-
-    try {
-      if (isBookmarked) {
-        await fetch(`/api/bookmarks?resource_id=${resourceId}`, { method: 'DELETE' });
-      } else {
-        await fetch('/api/bookmarks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            resource_id: resourceId,
-            resource_type: item.type === 'dockets' ? 'docket' : (item.type === 'documents' ? 'document' : 'comment'),
-            agency_code: item.agency_code,
-            title: item.title,
-            metadata: {
-                docket_id: item.docket_id,
-                year: item.year
-            }
-          })
-        });
-      }
-    } catch (e) {
-      console.error("Bookmark toggle failed", e);
-      setBookmarks(bookmarks);
-    }
+    saveBookmarks(newBookmarks);
   };
 
   if (!query) {
@@ -136,10 +114,8 @@ function SearchResults() {
       </h2>
       <div className="space-y-4">
         {results.map((result, idx) => {
-           // We need to determine if it's comment or docket/doc
            const isComment = result.type === 'comments';
-           // Determine Key
-           let key = result.docket_id; // fallback
+           let key = result.docket_id;
            try {
               if (isComment) {
                  const parsed = typeof result.raw_json === 'string' ? JSON.parse(result.raw_json) : result.raw_json;
@@ -179,7 +155,7 @@ export default function SearchPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex justify-between items-center mb-8">
             <div className="flex items-center gap-4 flex-1">
-                <Link href="/" className="text-2xl font-bold text-gray-900 dark:text-gray-100 shrink-0">
+                <Link href="/dashboard" className="text-2xl font-bold text-gray-900 dark:text-gray-100 shrink-0">
                     Spicy Regs
                 </Link>
                 <div className="flex-1 max-w-2xl ">
@@ -190,7 +166,6 @@ export default function SearchPage() {
                  <Link href="/bookmarks" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium">
                     Bookmarks
                  </Link>
-                 <SignOutButton />
             </div>
         </div>
 

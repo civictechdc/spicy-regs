@@ -1,24 +1,7 @@
 import { useState } from 'react';
 import { RegulationData, DataType } from '@/lib/api';
-import { useCopilotReadable } from "@copilotkit/react-core";
 import { stripQuotes, formatDate, parseRawJson } from './utils';
 import { BookmarkButton } from './BookmarkButton';
-import { ExplainButton } from './ExplainButton';
-
-// Helper to convert BigInt values to numbers for JSON serialization
-function toJsonSafe(obj: any): any {
-  if (obj === null || obj === undefined) return obj;
-  if (typeof obj === 'bigint') return Number(obj);
-  if (Array.isArray(obj)) return obj.map(toJsonSafe);
-  if (typeof obj === 'object') {
-    const result: any = {};
-    for (const [key, value] of Object.entries(obj)) {
-      result[key] = toJsonSafe(value);
-    }
-    return result;
-  }
-  return obj;
-}
 
 interface DocketOrDocumentCardProps {
   item: RegulationData;
@@ -60,7 +43,6 @@ export function DocketOrDocumentCard({
   const commentStartDate = attributes.commentStartDate;
   const commentEndDate = attributes.commentEndDate;
   const openForComment = attributes.openForComment;
-  const withinCommentPeriod = attributes.withinCommentPeriod;
   const frDocNum = attributes.frDocNum;
   const frVolNum = attributes.frVolNum;
   const pageCount = attributes.pageCount;
@@ -71,16 +53,12 @@ export function DocketOrDocumentCard({
   // Attachments (from relationships/included)
   const attachments = (relationships.attachments?.data || [])
     .map((attachmentRef: { id: string }) =>
-      included.find((inc: any) => inc.id === attachmentRef.id && inc.type === 'attachments')
+      included.find((inc: { id: string; type: string }) => inc.id === attachmentRef.id && inc.type === 'attachments')
     )
     .filter(Boolean);
 
   const isDocument = dataType === 'documents';
 
-  useCopilotReadable({
-    description: `A federal regulation ${isDocument ? 'document' : 'docket'}. Title: ${title}. Abstract: ${abstract}. Agency: ${agencyCode}.`,
-    value: toJsonSafe(item)  // Convert BigInt values to avoid serialization error
-  });
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-lg transition-all duration-200">
@@ -96,7 +74,6 @@ export function DocketOrDocumentCard({
               onToggle={onToggleBookmark} 
               loading={false} 
             />
-            <ExplainButton itemTitle={title || docketId} dataType={isDocument ? 'document' : 'docket'} />
             {(docketType || documentType) && (
               <span className="flex-shrink-0 ml-2 text-xs px-2.5 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded-full font-medium">
                 {documentType || docketType}
