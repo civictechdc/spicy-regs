@@ -7,3 +7,5 @@ __marimo__
 .langgraph_api
 .vercel
 .agent
+.venv
+output
