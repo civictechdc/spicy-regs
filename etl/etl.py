@@ -2,18 +2,23 @@
 """
 ETL Pipeline: Mirrulations S3 → Parquet on R2
 
-Memory-efficient version that processes one agency at a time,
-appending to Parquet files incrementally. Supports resuming
-from where it left off.
+Uses boto3 for S3 file listing, Polars for fast data processing,
+and writes Parquet directly. Processes one agency at a time with
+incremental append and resume support.
 """
 
 import argparse
+import json
 import os
 import tempfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
-import duckdb
+import boto3
+import polars as pl
+from botocore import UNSIGNED
+from botocore.config import Config
 from dotenv import load_dotenv
 from tqdm import tqdm
 
@@ -21,150 +26,186 @@ from upload_r2 import upload_to_r2
 
 load_dotenv()
 
-# Mirrulations S3 bucket (public, no auth needed)
-MIRRULATIONS_BUCKET = "s3://mirrulations/raw-data"
+# S3 client for public bucket
+S3 = boto3.client('s3', region_name='us-east-1', config=Config(signature_version=UNSIGNED))
+BUCKET = 'mirrulations'
+PREFIX = 'raw-data'
 
-# Data type configurations
+# Data type configurations with schemas
 DATA_TYPES = {
     "dockets": {
-        "path_pattern": "docket/*.json",
-        "id_field": "docket_id",
-        "fields": """
-            data.id as docket_id,
-            data.attributes.agencyId as agency_code,
-            data.attributes.title as title,
-            data.attributes.docketType as docket_type,
-            data.attributes.modifyDate as modify_date,
-            data.attributes.dkAbstract as abstract
-        """,
+        "path_pattern": "/docket/",
+        "schema": {
+            "docket_id": pl.Utf8,
+            "agency_code": pl.Utf8,
+            "title": pl.Utf8,
+            "docket_type": pl.Utf8,
+            "modify_date": pl.Utf8,
+            "abstract": pl.Utf8,
+        },
+        "extract": lambda d: {
+            "docket_id": d.get("data", {}).get("id"),
+            "agency_code": d.get("data", {}).get("attributes", {}).get("agencyId"),
+            "title": d.get("data", {}).get("attributes", {}).get("title"),
+            "docket_type": d.get("data", {}).get("attributes", {}).get("docketType"),
+            "modify_date": d.get("data", {}).get("attributes", {}).get("modifyDate"),
+            "abstract": d.get("data", {}).get("attributes", {}).get("dkAbstract"),
+        },
     },
     "documents": {
-        "path_pattern": "documents/*.json",
-        "id_field": "document_id",
-        "fields": """
-            data.id as document_id,
-            data.attributes.docketId as docket_id,
-            data.attributes.agencyId as agency_code,
-            data.attributes.title as title,
-            data.attributes.documentType as document_type,
-            data.attributes.postedDate as posted_date,
-            data.attributes.modifyDate as modify_date,
-            data.attributes.commentStartDate as comment_start_date,
-            data.attributes.commentEndDate as comment_end_date
-        """,
+        "path_pattern": "/documents/",
+        "schema": {
+            "document_id": pl.Utf8,
+            "docket_id": pl.Utf8,
+            "agency_code": pl.Utf8,
+            "title": pl.Utf8,
+            "document_type": pl.Utf8,
+            "posted_date": pl.Utf8,
+            "modify_date": pl.Utf8,
+            "comment_start_date": pl.Utf8,
+            "comment_end_date": pl.Utf8,
+        },
+        "extract": lambda d: {
+            "document_id": d.get("data", {}).get("id"),
+            "docket_id": d.get("data", {}).get("attributes", {}).get("docketId"),
+            "agency_code": d.get("data", {}).get("attributes", {}).get("agencyId"),
+            "title": d.get("data", {}).get("attributes", {}).get("title"),
+            "document_type": d.get("data", {}).get("attributes", {}).get("documentType"),
+            "posted_date": d.get("data", {}).get("attributes", {}).get("postedDate"),
+            "modify_date": d.get("data", {}).get("attributes", {}).get("modifyDate"),
+            "comment_start_date": d.get("data", {}).get("attributes", {}).get("commentStartDate"),
+            "comment_end_date": d.get("data", {}).get("attributes", {}).get("commentEndDate"),
+        },
     },
     "comments": {
-        "path_pattern": "comments/*.json",
-        "id_field": "comment_id",
-        "fields": """
-            data.id as comment_id,
-            data.attributes.docketId as docket_id,
-            data.attributes.agencyId as agency_code,
-            data.attributes.title as title,
-            data.attributes.comment as comment,
-            data.attributes.documentType as document_type,
-            data.attributes.postedDate as posted_date,
-            data.attributes.modifyDate as modify_date,
-            data.attributes.receiveDate as receive_date
-        """,
+        "path_pattern": "/comments/",
+        "schema": {
+            "comment_id": pl.Utf8,
+            "docket_id": pl.Utf8,
+            "agency_code": pl.Utf8,
+            "title": pl.Utf8,
+            "comment": pl.Utf8,
+            "document_type": pl.Utf8,
+            "posted_date": pl.Utf8,
+            "modify_date": pl.Utf8,
+            "receive_date": pl.Utf8,
+        },
+        "extract": lambda d: {
+            "comment_id": d.get("data", {}).get("id"),
+            "docket_id": d.get("data", {}).get("attributes", {}).get("docketId"),
+            "agency_code": d.get("data", {}).get("attributes", {}).get("agencyId"),
+            "title": d.get("data", {}).get("attributes", {}).get("title"),
+            "comment": d.get("data", {}).get("attributes", {}).get("comment"),
+            "document_type": d.get("data", {}).get("attributes", {}).get("documentType"),
+            "posted_date": d.get("data", {}).get("attributes", {}).get("postedDate"),
+            "modify_date": d.get("data", {}).get("attributes", {}).get("modifyDate"),
+            "receive_date": d.get("data", {}).get("attributes", {}).get("receiveDate"),
+        },
     },
 }
 
 
 def get_agencies() -> list[str]:
     """Get list of all agencies from S3 bucket."""
-    import boto3
-    from botocore import UNSIGNED
-    from botocore.config import Config
-    
-    s3 = boto3.client('s3', region_name='us-east-1', config=Config(signature_version=UNSIGNED))
-    response = s3.list_objects_v2(Bucket='mirrulations', Prefix='raw-data/', Delimiter='/')
-    
+    response = S3.list_objects_v2(Bucket=BUCKET, Prefix=f'{PREFIX}/', Delimiter='/')
     agencies = []
     for prefix in response.get('CommonPrefixes', []):
         agency = prefix['Prefix'].split('/')[1]
         if agency:
             agencies.append(agency)
-    
     return sorted(agencies)
 
 
-def get_processed_agencies(output_dir: Path) -> dict[str, set[str]]:
-    """Get agencies already processed for each data type by checking existing Parquet files."""
-    processed = {dt: set() for dt in DATA_TYPES}
-    conn = duckdb.connect()
+def list_json_files(agency: str, data_type: str) -> list[str]:
+    """List all JSON files for an agency and data type."""
+    config = DATA_TYPES[data_type]
+    pattern = config["path_pattern"]
+    
+    files = []
+    paginator = S3.get_paginator('list_objects_v2')
+    
+    for page in paginator.paginate(Bucket=BUCKET, Prefix=f'{PREFIX}/{agency}/'):
+        for obj in page.get('Contents', []):
+            key = obj['Key']
+            if '/text-' in key and pattern in key and key.endswith('.json'):
+                files.append(key)
+    
+    return files
+
+
+def download_and_parse(key: str, data_type: str) -> dict | None:
+    """Download and parse a single JSON file."""
+    try:
+        response = S3.get_object(Bucket=BUCKET, Key=key)
+        content = response['Body'].read().decode('utf-8')
+        data = json.loads(content)
+        return DATA_TYPES[data_type]["extract"](data)
+    except Exception:
+        return None
+
+
+def process_agency(agency: str, output_dir: Path, max_workers: int = 10) -> dict[str, int]:
+    """Process all data types for a single agency."""
+    results = {}
+    
+    for data_type, config in DATA_TYPES.items():
+        output_file = output_dir / f"{data_type}.parquet"
+        
+        # List files
+        files = list_json_files(agency, data_type)
+        if not files:
+            results[data_type] = 0
+            continue
+        
+        # Download and parse in parallel
+        records = []
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(download_and_parse, f, data_type): f for f in files}
+            for future in as_completed(futures):
+                result = future.result()
+                if result and result.get(list(result.keys())[0]):
+                    records.append(result)
+        
+        if not records:
+            results[data_type] = 0
+            continue
+        
+        # Create Polars DataFrame with explicit schema
+        schema = config["schema"]
+        df = pl.DataFrame(records, schema=schema)
+        
+        # Append to existing Parquet or create new
+        if output_file.exists():
+            existing = pl.read_parquet(output_file)
+            combined = pl.concat([existing, df])
+            combined.write_parquet(output_file, compression="zstd")
+        else:
+            df.write_parquet(output_file, compression="zstd")
+        
+        results[data_type] = len(records)
+    
+    return results
+
+
+def get_processed_agencies(output_dir: Path) -> set[str]:
+    """Get agencies already processed by checking existing Parquet files."""
+    processed_per_type = []
     
     for data_type in DATA_TYPES:
         parquet_file = output_dir / f"{data_type}.parquet"
         if parquet_file.exists():
             try:
-                result = conn.execute(f"""
-                    SELECT DISTINCT agency_code 
-                    FROM read_parquet('{parquet_file}')
-                """).fetchall()
-                processed[data_type] = {row[0] for row in result if row[0]}
+                df = pl.read_parquet(parquet_file, columns=["agency_code"])
+                processed_per_type.append(set(df["agency_code"].unique().to_list()))
             except Exception:
-                pass
+                processed_per_type.append(set())
+        else:
+            processed_per_type.append(set())
     
-    conn.close()
-    return processed
-
-
-def process_agency(
-    conn: duckdb.DuckDBPyConnection,
-    agency: str,
-    output_dir: Path,
-) -> dict[str, int]:
-    """Process all data types for a single agency and append to Parquet files."""
-    results = {}
-    
-    for data_type, config in DATA_TYPES.items():
-        output_file = output_dir / f"{data_type}.parquet"
-        path = f"{MIRRULATIONS_BUCKET}/{agency}/**/text-*/{config['path_pattern']}"
-        
-        query = f"""
-            SELECT
-                {config['fields']},
-                filename
-            FROM read_json(
-                '{path}',
-                union_by_name=true,
-                ignore_errors=true,
-                maximum_object_size=10485760
-            )
-        """
-        
-        try:
-            # Fetch data for this agency
-            df = conn.execute(query).fetchdf()
-            row_count = len(df)
-            
-            if row_count > 0:
-                if output_file.exists():
-                    # Append to existing Parquet
-                    conn.execute(f"""
-                        COPY (
-                            SELECT * FROM read_parquet('{output_file}')
-                            UNION ALL
-                            SELECT * FROM df
-                        ) TO '{output_file}'
-                        (FORMAT PARQUET, COMPRESSION ZSTD)
-                    """)
-                else:
-                    # Create new Parquet file
-                    conn.execute(f"""
-                        COPY (SELECT * FROM df) TO '{output_file}'
-                        (FORMAT PARQUET, COMPRESSION ZSTD)
-                    """)
-                
-                results[data_type] = row_count
-            else:
-                results[data_type] = 0
-                
-        except Exception:
-            results[data_type] = 0
-    
-    return results
+    # Return agencies that are in ALL data types
+    if processed_per_type:
+        return set.intersection(*processed_per_type)
+    return set()
 
 
 def main():
@@ -173,6 +214,7 @@ def main():
     parser.add_argument("--output-dir", help="Output directory", default=None)
     parser.add_argument("--skip-upload", action="store_true", help="Skip R2 upload")
     parser.add_argument("--full-refresh", action="store_true", help="Full refresh (ignore previous progress)")
+    parser.add_argument("--workers", type=int, default=10, help="Parallel download workers")
     args = parser.parse_args()
 
     # Setup output directory
@@ -183,12 +225,7 @@ def main():
         output_dir = Path(tempfile.mkdtemp(prefix="spicy-regs-etl-"))
 
     print(f"Output directory: {output_dir}")
-
-    # Initialize DuckDB
-    conn = duckdb.connect()
-    conn.execute("INSTALL httpfs; LOAD httpfs;")
-    conn.execute("SET s3_region='us-east-1';")
-    conn.execute("SET s3_url_style='path';")
+    print(f"Workers: {args.workers}")
 
     # Get agencies to process
     if args.agency:
@@ -202,12 +239,10 @@ def main():
 
     # Check for already processed agencies (default: resume mode)
     if not args.full_refresh:
-        processed = get_processed_agencies(output_dir)
-        # Find agencies that are complete (in all data types)
-        complete_agencies = set.intersection(*processed.values()) if processed.values() else set()
+        complete_agencies = get_processed_agencies(output_dir)
         remaining = [a for a in agencies if a not in complete_agencies]
         if complete_agencies:
-            print(f"Resuming: {len(complete_agencies)} agencies already processed, {len(remaining)} remaining")
+            print(f"Resuming: {len(complete_agencies)} agencies done, {len(remaining)} remaining")
         agencies = remaining
 
     if not agencies:
@@ -221,11 +256,9 @@ def main():
     total_rows = {dt: 0 for dt in DATA_TYPES}
     
     for agency in tqdm(agencies, desc="Agencies", unit="agency"):
-        results = process_agency(conn, agency, output_dir)
+        results = process_agency(agency, output_dir, args.workers)
         for dt, count in results.items():
             total_rows[dt] += count
-
-    conn.close()
 
     # Summary
     print(f"\n{'='*60}")
