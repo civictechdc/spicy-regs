@@ -144,11 +144,15 @@ def download_and_parse(key: str, data_type: str) -> dict | None:
         return None
 
 
-def process_agency(agency: str, output_dir: Path, max_workers: int = 10) -> dict[str, int]:
+def process_agency(agency: str, output_dir: Path, max_workers: int = 10, skip_comments: bool = False, only_comments: bool = False) -> dict[str, int]:
     """Process all data types for a single agency."""
     results = {}
     
     for data_type, config in DATA_TYPES.items():
+        if skip_comments and data_type == "comments":
+            continue
+        if only_comments and data_type != "comments":
+            continue
         output_file = output_dir / f"{data_type}.parquet"
         
         # List files
@@ -157,16 +161,22 @@ def process_agency(agency: str, output_dir: Path, max_workers: int = 10) -> dict
             results[data_type] = 0
             continue
         
+        tqdm.write(f"  [{agency}] {data_type}: {len(files)} files found, downloading...")
+        
         # Download and parse in parallel
         records = []
+        failed = 0
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {executor.submit(download_and_parse, f, data_type): f for f in files}
             for future in as_completed(futures):
                 result = future.result()
                 if result and result.get(list(result.keys())[0]):
                     records.append(result)
+                else:
+                    failed += 1
         
         if not records:
+            tqdm.write(f"  [{agency}] {data_type}: no valid records")
             results[data_type] = 0
             continue
         
@@ -179,19 +189,27 @@ def process_agency(agency: str, output_dir: Path, max_workers: int = 10) -> dict
             existing = pl.read_parquet(output_file)
             combined = pl.concat([existing, df])
             combined.write_parquet(output_file, compression="zstd")
+            tqdm.write(f"  [{agency}] {data_type}: ✓ {len(records)} rows added (total: {len(combined):,})")
         else:
             df.write_parquet(output_file, compression="zstd")
+            tqdm.write(f"  [{agency}] {data_type}: ✓ {len(records)} rows (new file)")
         
         results[data_type] = len(records)
     
     return results
 
 
-def get_processed_agencies(output_dir: Path) -> set[str]:
+def get_processed_agencies(output_dir: Path, skip_comments: bool = False, only_comments: bool = False) -> set[str]:
     """Get agencies already processed by checking existing Parquet files."""
     processed_per_type = []
     
     for data_type in DATA_TYPES:
+        # Only check data types we're actually processing
+        if skip_comments and data_type == "comments":
+            continue
+        if only_comments and data_type != "comments":
+            continue
+            
         parquet_file = output_dir / f"{data_type}.parquet"
         if parquet_file.exists():
             try:
@@ -200,9 +218,10 @@ def get_processed_agencies(output_dir: Path) -> set[str]:
             except Exception:
                 processed_per_type.append(set())
         else:
-            processed_per_type.append(set())
+            # File doesn't exist, no agencies processed yet
+            return set()
     
-    # Return agencies that are in ALL data types
+    # Return agencies that are in ALL relevant data types
     if processed_per_type:
         return set.intersection(*processed_per_type)
     return set()
@@ -214,6 +233,8 @@ def main():
     parser.add_argument("--output-dir", help="Output directory", default=None)
     parser.add_argument("--skip-upload", action="store_true", help="Skip R2 upload")
     parser.add_argument("--full-refresh", action="store_true", help="Full refresh (ignore previous progress)")
+    parser.add_argument("--skip-comments", action="store_true", help="Skip comments (process dockets/documents only)")
+    parser.add_argument("--only-comments", action="store_true", help="Only process comments")
     parser.add_argument("--workers", type=int, default=10, help="Parallel download workers")
     args = parser.parse_args()
 
@@ -239,7 +260,7 @@ def main():
 
     # Check for already processed agencies (default: resume mode)
     if not args.full_refresh:
-        complete_agencies = get_processed_agencies(output_dir)
+        complete_agencies = get_processed_agencies(output_dir, args.skip_comments, args.only_comments)
         remaining = [a for a in agencies if a not in complete_agencies]
         if complete_agencies:
             print(f"Resuming: {len(complete_agencies)} agencies done, {len(remaining)} remaining")
@@ -256,7 +277,7 @@ def main():
     total_rows = {dt: 0 for dt in DATA_TYPES}
     
     for agency in tqdm(agencies, desc="Agencies", unit="agency"):
-        results = process_agency(agency, output_dir, args.workers)
+        results = process_agency(agency, output_dir, args.workers, args.skip_comments, args.only_comments)
         for dt, count in results.items():
             total_rows[dt] += count
 
