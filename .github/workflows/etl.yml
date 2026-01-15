@@ -43,9 +43,9 @@ jobs:
         run: |
           cd etl
           if [ "${{ inputs.full_refresh }}" = "true" ]; then
-            python etl.py
+            python etl.py --full-refresh
           else
-            python etl.py --incremental
+            python etl.py
           fi
 
       - name: Upload artifacts (for debugging)
