@@ -48,6 +48,25 @@ def upload_to_r2(local_path: Path, remote_key: str = None):
     print(f"  ✓ Uploaded: {public_url}/{remote_key}")
 
 
+def download_from_r2(remote_key: str, local_path: Path) -> bool:
+    """Download a file from R2 bucket. Returns True if successful."""
+    bucket = os.getenv("R2_BUCKET_NAME", "spicy-regs")
+    
+    if not os.getenv("R2_ACCESS_KEY_ID"):
+        return False
+    
+    client = get_r2_client()
+    
+    try:
+        client.download_file(bucket, remote_key, str(local_path))
+        print(f"  ✓ Downloaded {remote_key} from R2")
+        return True
+    except client.exceptions.ClientError:
+        return False
+    except Exception:
+        return False
+
+
 def list_r2_files():
     """List files in R2 bucket."""
     bucket = os.getenv("R2_BUCKET_NAME", "spicy-regs")

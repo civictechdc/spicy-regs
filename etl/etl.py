@@ -22,7 +22,7 @@ from botocore.config import Config
 from dotenv import load_dotenv
 from tqdm import tqdm
 
-from upload_r2 import upload_to_r2
+from upload_r2 import upload_to_r2, download_from_r2
 
 load_dotenv()
 
@@ -116,8 +116,38 @@ def get_agencies() -> list[str]:
     return sorted(agencies)
 
 
-def list_json_files(agency: str, data_type: str) -> list[str]:
-    """List all JSON files for an agency and data type."""
+def load_manifest(output_dir: Path) -> set[str]:
+    """Load processed keys from manifest Parquet file."""
+    manifest_file = output_dir / "manifest.parquet"
+    
+    # Try local first
+    if manifest_file.exists():
+        df = pl.read_parquet(manifest_file)
+        keys = set(df["key"].to_list())
+        print(f"Loaded manifest: {len(keys):,} processed keys")
+        return keys
+    
+    # Try downloading from R2
+    if download_from_r2("manifest.parquet", manifest_file):
+        df = pl.read_parquet(manifest_file)
+        keys = set(df["key"].to_list())
+        print(f"Downloaded manifest from R2: {len(keys):,} processed keys")
+        return keys
+    
+    print("No manifest found, starting fresh")
+    return set()
+
+
+def save_manifest(output_dir: Path, processed_keys: set[str]):
+    """Save processed keys to manifest Parquet file."""
+    manifest_file = output_dir / "manifest.parquet"
+    df = pl.DataFrame({"key": list(processed_keys)})
+    df.write_parquet(manifest_file, compression="zstd")
+    print(f"Saved manifest: {len(processed_keys):,} keys")
+
+
+def list_json_files(agency: str, data_type: str, processed_keys: set[str] = None) -> list[str]:
+    """List all JSON files for an agency and data type, excluding already processed."""
     config = DATA_TYPES[data_type]
     pattern = config["path_pattern"]
     
@@ -128,6 +158,9 @@ def list_json_files(agency: str, data_type: str) -> list[str]:
         for obj in page.get('Contents', []):
             key = obj['Key']
             if '/text-' in key and pattern in key and key.endswith('.json'):
+                # Skip if already processed
+                if processed_keys and key in processed_keys:
+                    continue
                 files.append(key)
     
     return files
@@ -144,9 +177,10 @@ def download_and_parse(key: str, data_type: str) -> dict | None:
         return None
 
 
-def process_agency(agency: str, output_dir: Path, max_workers: int = 10, skip_comments: bool = False, only_comments: bool = False) -> dict[str, int]:
-    """Process all data types for a single agency."""
+def process_agency(agency: str, output_dir: Path, processed_keys: set[str], max_workers: int = 10, skip_comments: bool = False, only_comments: bool = False) -> tuple[dict[str, int], list[str]]:
+    """Process all data types for a single agency. Returns (results, new_keys)."""
     results = {}
+    new_keys = []
     
     for data_type, config in DATA_TYPES.items():
         if skip_comments and data_type == "comments":
@@ -155,23 +189,26 @@ def process_agency(agency: str, output_dir: Path, max_workers: int = 10, skip_co
             continue
         output_file = output_dir / f"{data_type}.parquet"
         
-        # List files
-        files = list_json_files(agency, data_type)
+        # List files (filtering already processed)
+        files = list_json_files(agency, data_type, processed_keys)
         if not files:
             results[data_type] = 0
             continue
         
-        tqdm.write(f"  [{agency}] {data_type}: {len(files)} files found, downloading...")
+        tqdm.write(f"  [{agency}] {data_type}: {len(files)} new files, downloading...")
         
         # Download and parse in parallel
         records = []
         failed = 0
+        successful_keys = []
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {executor.submit(download_and_parse, f, data_type): f for f in files}
             for future in as_completed(futures):
+                key = futures[future]
                 result = future.result()
                 if result and result.get(list(result.keys())[0]):
                     records.append(result)
+                    successful_keys.append(key)
                 else:
                     failed += 1
         
@@ -195,8 +232,9 @@ def process_agency(agency: str, output_dir: Path, max_workers: int = 10, skip_co
             tqdm.write(f"  [{agency}] {data_type}: ✓ {len(records)} rows (new file)")
         
         results[data_type] = len(records)
+        new_keys.extend(successful_keys)
     
-    return results
+    return results, new_keys
 
 
 def get_processed_agencies(output_dir: Path, skip_comments: bool = False, only_comments: bool = False) -> set[str]:
@@ -232,7 +270,7 @@ def main():
     parser.add_argument("--agency", help="Process only this agency", default=None)
     parser.add_argument("--output-dir", help="Output directory", default=None)
     parser.add_argument("--skip-upload", action="store_true", help="Skip R2 upload")
-    parser.add_argument("--full-refresh", action="store_true", help="Full refresh (ignore previous progress)")
+    parser.add_argument("--full-refresh", action="store_true", help="Full refresh (ignore manifest)")
     parser.add_argument("--skip-comments", action="store_true", help="Skip comments (process dockets/documents only)")
     parser.add_argument("--only-comments", action="store_true", help="Only process comments")
     parser.add_argument("--workers", type=int, default=10, help="Parallel download workers")
@@ -248,6 +286,13 @@ def main():
     print(f"Output directory: {output_dir}")
     print(f"Workers: {args.workers}")
 
+    # Load manifest (unless full refresh)
+    if args.full_refresh:
+        print("Full refresh mode - ignoring manifest")
+        processed_keys = set()
+    else:
+        processed_keys = load_manifest(output_dir)
+
     # Get agencies to process
     if args.agency:
         agencies = [args.agency]
@@ -258,14 +303,6 @@ def main():
         agencies = get_agencies()
         print(f"Found {len(agencies)} agencies")
 
-    # Check for already processed agencies (default: resume mode)
-    if not args.full_refresh:
-        complete_agencies = get_processed_agencies(output_dir, args.skip_comments, args.only_comments)
-        remaining = [a for a in agencies if a not in complete_agencies]
-        if complete_agencies:
-            print(f"Resuming: {len(complete_agencies)} agencies done, {len(remaining)} remaining")
-        agencies = remaining
-
     if not agencies:
         print("No agencies to process!")
         return
@@ -275,20 +312,32 @@ def main():
 
     # Process each agency
     total_rows = {dt: 0 for dt in DATA_TYPES}
+    all_new_keys = []
     
     for agency in tqdm(agencies, desc="Agencies", unit="agency"):
-        results = process_agency(agency, output_dir, args.workers, args.skip_comments, args.only_comments)
+        results, new_keys = process_agency(
+            agency, output_dir, processed_keys,
+            args.workers, args.skip_comments, args.only_comments
+        )
         for dt, count in results.items():
             total_rows[dt] += count
+        all_new_keys.extend(new_keys)
+        # Update processed_keys so subsequent agencies see them
+        processed_keys.update(new_keys)
 
     # Summary
     print(f"\n{'='*60}")
     print("Summary:")
     for dt, count in total_rows.items():
         print(f"  {dt}: {count:,} rows")
+    print(f"  New files processed: {len(all_new_keys):,}")
     
     elapsed = datetime.now() - start_time
     print(f"\nETL completed in {elapsed}")
+
+    # Save manifest
+    if all_new_keys:
+        save_manifest(output_dir, processed_keys)
 
     # Upload to R2
     if not args.skip_upload:
@@ -298,6 +347,10 @@ def main():
             pf = output_dir / f"{data_type}.parquet"
             if pf.exists():
                 upload_to_r2(pf)
+        # Upload manifest too
+        manifest_file = output_dir / "manifest.parquet"
+        if manifest_file.exists():
+            upload_to_r2(manifest_file)
 
     print("Done!")
 
