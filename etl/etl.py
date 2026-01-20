@@ -147,22 +147,29 @@ def save_manifest(output_dir: Path, processed_keys: set[str]):
     print(f"Saved manifest: {len(processed_keys):,} keys")
 
 
-def list_json_files(agency: str, data_type: str, processed_keys: set[str] = None) -> list[str]:
+def list_json_files(agency: str, data_type: str, processed_keys: set[str] = None, verbose: bool = False) -> list[str]:
     """List all JSON files for an agency and data type, excluding already processed."""
     config = DATA_TYPES[data_type]
     pattern = config["path_pattern"]
     
     files = []
+    skipped = 0
+    total_scanned = 0
     paginator = S3.get_paginator('list_objects_v2')
     
     for page in paginator.paginate(Bucket=BUCKET, Prefix=f'{PREFIX}/{agency}/'):
         for obj in page.get('Contents', []):
             key = obj['Key']
             if '/text-' in key and pattern in key and key.endswith('.json'):
+                total_scanned += 1
                 # Skip if already processed
                 if processed_keys and key in processed_keys:
+                    skipped += 1
                     continue
                 files.append(key)
+    
+    if verbose:
+        tqdm.write(f"    [{agency}] {data_type}: scanned {total_scanned}, skipped {skipped}, new {len(files)}")
     
     return files
 
@@ -178,7 +185,7 @@ def download_and_parse(key: str, data_type: str) -> dict | None:
         return None
 
 
-def process_agency(agency: str, output_dir: Path, processed_keys: set[str], max_workers: int = 10, skip_comments: bool = False, only_comments: bool = False, write_lock: threading.Lock = None) -> tuple[dict[str, int], list[str]]:
+def process_agency(agency: str, output_dir: Path, processed_keys: set[str], max_workers: int = 10, skip_comments: bool = False, only_comments: bool = False, write_lock: threading.Lock = None, verbose: bool = False) -> tuple[dict[str, int], list[str]]:
     """Process all data types for a single agency. Returns (results, new_keys)."""
     results = {}
     new_keys = []
@@ -191,7 +198,7 @@ def process_agency(agency: str, output_dir: Path, processed_keys: set[str], max_
         output_file = output_dir / f"{data_type}.parquet"
         
         # List files (filtering already processed)
-        files = list_json_files(agency, data_type, processed_keys)
+        files = list_json_files(agency, data_type, processed_keys, verbose)
         if not files:
             results[data_type] = 0
             continue
@@ -282,6 +289,7 @@ def main():
     parser.add_argument("--only-comments", action="store_true", help="Only process comments")
     parser.add_argument("--workers", type=int, default=10, help="Parallel download workers")
     parser.add_argument("--parallel-agencies", type=int, default=5, help="Parallel agency processing")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose debug logging")
     args = parser.parse_args()
 
     # Setup output directory
@@ -340,7 +348,7 @@ def main():
         results, new_keys = process_agency(
             agency, output_dir, processed_keys,
             args.workers, args.skip_comments, args.only_comments,
-            write_lock
+            write_lock, args.verbose
         )
         with keys_lock:
             for dt, count in results.items():
