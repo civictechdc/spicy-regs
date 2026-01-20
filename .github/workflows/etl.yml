@@ -15,7 +15,7 @@ on:
 jobs:
   etl:
     runs-on: ubuntu-latest
-    timeout-minutes: 60  # Incremental should be fast
+    timeout-minutes: 360  # Incremental should be fast
 
     steps:
       - name: Checkout
