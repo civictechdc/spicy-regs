@@ -292,6 +292,18 @@ def main():
         processed_keys = set()
     else:
         processed_keys = load_manifest(output_dir)
+        
+        # Download existing Parquet files from R2 for incremental append
+        if processed_keys:
+            print("Downloading existing Parquet files from R2...")
+            for data_type in DATA_TYPES:
+                local_file = output_dir / f"{data_type}.parquet"
+                if not local_file.exists():
+                    if download_from_r2(f"{data_type}.parquet", local_file):
+                        size_mb = local_file.stat().st_size / (1024 * 1024)
+                        print(f"  ✓ {data_type}.parquet ({size_mb:.1f} MB)")
+                    else:
+                        print(f"  ⚠ {data_type}.parquet not found in R2")
 
     # Get agencies to process
     if args.agency:
