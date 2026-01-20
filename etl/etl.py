@@ -11,6 +11,7 @@ import argparse
 import json
 import os
 import tempfile
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
@@ -177,7 +178,7 @@ def download_and_parse(key: str, data_type: str) -> dict | None:
         return None
 
 
-def process_agency(agency: str, output_dir: Path, processed_keys: set[str], max_workers: int = 10, skip_comments: bool = False, only_comments: bool = False) -> tuple[dict[str, int], list[str]]:
+def process_agency(agency: str, output_dir: Path, processed_keys: set[str], max_workers: int = 10, skip_comments: bool = False, only_comments: bool = False, write_lock: threading.Lock = None) -> tuple[dict[str, int], list[str]]:
     """Process all data types for a single agency. Returns (results, new_keys)."""
     results = {}
     new_keys = []
@@ -221,15 +222,21 @@ def process_agency(agency: str, output_dir: Path, processed_keys: set[str], max_
         schema = config["schema"]
         df = pl.DataFrame(records, schema=schema)
         
-        # Append to existing Parquet or create new
-        if output_file.exists():
-            existing = pl.read_parquet(output_file)
-            combined = pl.concat([existing, df])
-            combined.write_parquet(output_file, compression="zstd")
-            tqdm.write(f"  [{agency}] {data_type}: ✓ {len(records)} rows added (total: {len(combined):,})")
-        else:
-            df.write_parquet(output_file, compression="zstd")
-            tqdm.write(f"  [{agency}] {data_type}: ✓ {len(records)} rows (new file)")
+        # Append to existing Parquet or create new (thread-safe)
+        if write_lock:
+            write_lock.acquire()
+        try:
+            if output_file.exists():
+                existing = pl.read_parquet(output_file)
+                combined = pl.concat([existing, df])
+                combined.write_parquet(output_file, compression="zstd")
+                tqdm.write(f"  [{agency}] {data_type}: ✓ {len(records)} rows added (total: {len(combined):,})")
+            else:
+                df.write_parquet(output_file, compression="zstd")
+                tqdm.write(f"  [{agency}] {data_type}: ✓ {len(records)} rows (new file)")
+        finally:
+            if write_lock:
+                write_lock.release()
         
         results[data_type] = len(records)
         new_keys.extend(successful_keys)
@@ -274,6 +281,7 @@ def main():
     parser.add_argument("--skip-comments", action="store_true", help="Skip comments (process dockets/documents only)")
     parser.add_argument("--only-comments", action="store_true", help="Only process comments")
     parser.add_argument("--workers", type=int, default=10, help="Parallel download workers")
+    parser.add_argument("--parallel-agencies", type=int, default=5, help="Parallel agency processing")
     args = parser.parse_args()
 
     # Setup output directory
@@ -322,20 +330,33 @@ def main():
     print(f"\nProcessing {len(agencies)} agencies")
     start_time = datetime.now()
 
-    # Process each agency
+    # Process agencies in parallel
     total_rows = {dt: 0 for dt in DATA_TYPES}
     all_new_keys = []
+    write_lock = threading.Lock()
+    keys_lock = threading.Lock()
     
-    for agency in tqdm(agencies, desc="Agencies", unit="agency"):
+    def process_agency_wrapper(agency):
         results, new_keys = process_agency(
             agency, output_dir, processed_keys,
-            args.workers, args.skip_comments, args.only_comments
+            args.workers, args.skip_comments, args.only_comments,
+            write_lock
         )
-        for dt, count in results.items():
-            total_rows[dt] += count
-        all_new_keys.extend(new_keys)
-        # Update processed_keys so subsequent agencies see them
-        processed_keys.update(new_keys)
+        with keys_lock:
+            for dt, count in results.items():
+                total_rows[dt] += count
+            all_new_keys.extend(new_keys)
+            processed_keys.update(new_keys)
+        return agency, len(new_keys)
+    
+    with ThreadPoolExecutor(max_workers=args.parallel_agencies) as executor:
+        futures = {executor.submit(process_agency_wrapper, a): a for a in agencies}
+        with tqdm(total=len(agencies), desc="Agencies", unit="agency") as pbar:
+            for future in as_completed(futures):
+                agency, new_count = future.result()
+                pbar.update(1)
+                if new_count > 0:
+                    pbar.set_postfix({"last": agency, "new": new_count})
 
     # Summary
     print(f"\n{'='*60}")
