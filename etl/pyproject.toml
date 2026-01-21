@@ -10,8 +10,16 @@ dependencies = [
     "tqdm>=4.0.0",
 ]
 
+[project.optional-dependencies]
+embed = [
+    "sentence-transformers>=2.2.0",
+    "torch>=2.0.0",
+]
+
 [project.scripts]
 etl = "etl:main"
+embed = "embed:main"
 
 [tool.setuptools]
-py-modules = ["etl", "upload_r2"]
+py-modules = ["etl", "upload_r2", "embed"]
+
