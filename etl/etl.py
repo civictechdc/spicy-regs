@@ -23,7 +23,8 @@ from botocore.config import Config
 from dotenv import load_dotenv
 from tqdm import tqdm
 
-from upload_r2 import upload_to_r2, download_from_r2
+from upload_r2 import upload_to_r2
+from download_r2 import download_from_r2
 
 load_dotenv()
 

@@ -10,3 +10,4 @@ __marimo__
 .venv
 output
 /data
+*.egg-info
