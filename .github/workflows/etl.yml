@@ -43,9 +43,9 @@ jobs:
         run: |
           cd etl
           if [ "${{ inputs.full_refresh }}" = "true" ]; then
-            python etl.py --full-refresh --parallel-agencies 20
+            python etl.py --full-refresh --parallel-agencies 4 --workers 5
           else
-            python etl.py --parallel-agencies 20
+            python etl.py --parallel-agencies 4 --workers 5
           fi
 
       - name: Upload artifacts (for debugging)
