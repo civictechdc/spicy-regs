@@ -290,6 +290,8 @@ def main():
     parser.add_argument("--only-comments", action="store_true", help="Only process comments")
     parser.add_argument("--workers", type=int, default=10, help="Parallel download workers")
     parser.add_argument("--parallel-agencies", type=int, default=5, help="Parallel agency processing")
+    parser.add_argument("--batch-number", type=int, default=None, help="Batch number (0-indexed) for batched processing")
+    parser.add_argument("--batch-size", type=int, default=45, help="Number of agencies per batch (default: 45)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose debug logging")
     args = parser.parse_args()
 
@@ -331,6 +333,13 @@ def main():
         print("Fetching agency list...")
         agencies = get_agencies()
         print(f"Found {len(agencies)} agencies")
+
+    # Apply batch filtering if specified
+    if args.batch_number is not None:
+        start_idx = args.batch_number * args.batch_size
+        end_idx = start_idx + args.batch_size
+        agencies = agencies[start_idx:end_idx]
+        print(f"Batch {args.batch_number}: agencies {start_idx}-{min(end_idx, start_idx + len(agencies))-1} ({len(agencies)} agencies)")
 
     if not agencies:
         print("No agencies to process!")

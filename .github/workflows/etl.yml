@@ -2,8 +2,23 @@ name: Daily ETL Refresh
 
 on:
   schedule:
-    # Run daily at 6 AM UTC (1 AM EST)
-    - cron: '0 6 * * *'
+    # Run 15 batches spread across the day (21 agencies each = 315 total)
+    # Batch 0: 6 AM UTC, Batch 1: 7 AM UTC, ..., Batch 14: 8 PM UTC
+    - cron: '0 6 * * *'   # Batch 0
+    - cron: '0 7 * * *'   # Batch 1
+    - cron: '0 8 * * *'   # Batch 2
+    - cron: '0 9 * * *'   # Batch 3
+    - cron: '0 10 * * *'  # Batch 4
+    - cron: '0 11 * * *'  # Batch 5
+    - cron: '0 12 * * *'  # Batch 6
+    - cron: '0 13 * * *'  # Batch 7
+    - cron: '0 14 * * *'  # Batch 8
+    - cron: '0 15 * * *'  # Batch 9
+    - cron: '0 16 * * *'  # Batch 10
+    - cron: '0 17 * * *'  # Batch 11
+    - cron: '0 18 * * *'  # Batch 12
+    - cron: '0 19 * * *'  # Batch 13
+    - cron: '0 20 * * *'  # Batch 14
   workflow_dispatch:
     inputs:
       full_refresh:
@@ -11,13 +26,35 @@ on:
         required: false
         default: false
         type: boolean
+      batch_number:
+        description: 'Batch number (0-14) or leave empty for all batches'
+        required: false
+        default: ''
+        type: string
 
 jobs:
   etl:
     runs-on: ubuntu-latest
-    timeout-minutes: 360  # Incremental should be fast
+    timeout-minutes: 60  # Each batch should complete within 60 minutes
 
     steps:
+      - name: Determine batch number
+        id: batch
+        run: |
+          # For scheduled runs, determine batch from the hour
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            HOUR=$(date -u +%H)
+            BATCH=$((HOUR - 6))
+            echo "number=$BATCH" >> $GITHUB_OUTPUT
+            echo "Running scheduled batch $BATCH (hour $HOUR UTC)"
+          elif [ -n "${{ inputs.batch_number }}" ]; then
+            echo "number=${{ inputs.batch_number }}" >> $GITHUB_OUTPUT
+            echo "Running manual batch ${{ inputs.batch_number }}"
+          else
+            echo "number=" >> $GITHUB_OUTPUT
+            echo "Running all agencies (no batch filter)"
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -42,16 +79,21 @@ jobs:
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
         run: |
           cd etl
+          BATCH_ARGS=""
+          if [ -n "${{ steps.batch.outputs.number }}" ]; then
+            BATCH_ARGS="--batch-number ${{ steps.batch.outputs.number }} --batch-size 21"
+          fi
+          
           if [ "${{ inputs.full_refresh }}" = "true" ]; then
-            python etl.py --full-refresh --parallel-agencies 4 --workers 5
+            python etl.py --full-refresh --parallel-agencies 4 --workers 5 $BATCH_ARGS
           else
-            python etl.py --parallel-agencies 4 --workers 5
+            python etl.py --parallel-agencies 4 --workers 5 $BATCH_ARGS
           fi
 
       - name: Upload artifacts (for debugging)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: etl-output
+          name: etl-output-batch-${{ steps.batch.outputs.number }}
           path: etl/output/
           retention-days: 7
