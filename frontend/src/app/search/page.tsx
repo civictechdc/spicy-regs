@@ -7,7 +7,7 @@ import { CommentCard } from '@/components/data-viewer/CommentCard';
 import { DocketOrDocumentCard } from '@/components/data-viewer/DocketOrDocumentCard';
 import { SearchBar } from '@/components/SearchBar';
 import Link from 'next/link';
-import { useMotherDuckService } from '@/lib/motherduck/hooks/useMotherDuckService';
+import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
 
 const BOOKMARKS_KEY = 'spicy-regs-bookmarks';
 
@@ -36,7 +36,7 @@ function SearchResults() {
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   
-  const { searchResources } = useMotherDuckService();
+  const { searchResources } = useDuckDBService();
 
   useEffect(() => {
     async function performSearch() {

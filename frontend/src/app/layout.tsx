@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { MotherDuckClientProvider } from "@/lib/motherduck/context/motherduckClientContext";
+import { DuckDBProvider } from "@/lib/duckdb/context";
 
 import "./globals.css";
 import { SpeedInsights } from "@vercel/speed-insights/next"
@@ -18,12 +18,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={"antialiased"}>
-        <MotherDuckClientProvider database="spicy-regs">
+        <DuckDBProvider>
           {children}
-        </MotherDuckClientProvider>
+        </DuckDBProvider>
         <SpeedInsights />
         <Analytics />
       </body>
     </html>
   );
 }
+

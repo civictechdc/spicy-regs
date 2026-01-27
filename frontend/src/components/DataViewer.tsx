@@ -5,7 +5,7 @@ import { RegulationData, DataType } from '@/lib/api';
 import { CommentCard } from './data-viewer/CommentCard';
 import { DocketOrDocumentCard } from './data-viewer/DocketOrDocumentCard';
 import { stripQuotes } from './data-viewer/utils';
-import { useMotherDuckService } from '@/lib/motherduck/hooks/useMotherDuckService';
+import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
 import { RegulationsDataTypes } from '@/lib/db/models';
 import { Virtuoso } from 'react-virtuoso';
 
@@ -48,7 +48,7 @@ export function DataViewer({ agencyCode, dataType, docketId }: DataViewerProps) 
   const [totalCount, setTotalCount] = useState(0);
   const [offset, setOffset] = useState(0);
   
-  const { getData, getDataCount } = useMotherDuckService();
+  const { getData, getDataCount } = useDuckDBService();
 
   // Load bookmarks from localStorage on mount
   useEffect(() => {

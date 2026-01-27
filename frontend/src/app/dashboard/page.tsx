@@ -5,6 +5,7 @@ import { AgencySelector } from "@/components/AgencySelector";
 import { DocketSelector } from "@/components/DocketSelector";
 import { DataTypeSelector } from "@/components/DataTypeSelector";
 import { DataViewer } from "@/components/DataViewer";
+import { UseCasesShowcase } from "@/components/UseCasesShowcase";
 import { DataType } from "@/lib/api";
 import Link from "next/link";
 
@@ -71,6 +72,11 @@ export default function HomePage() {
               />
             </div>
           </div>
+        </div>
+
+        {/* Use Cases Showcase */}
+        <div className="mb-8">
+          <UseCasesShowcase />
         </div>
       </div>
     </main>
