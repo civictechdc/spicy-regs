@@ -85,9 +85,9 @@ jobs:
           fi
           
           if [ "${{ inputs.full_refresh }}" = "true" ]; then
-            python etl.py --full-refresh --parallel-agencies 4 --workers 5 $BATCH_ARGS
+            python etl.py --full-refresh --parallel-agencies 4 --workers 2 $BATCH_ARGS
           else
-            python etl.py --parallel-agencies 4 --workers 5 $BATCH_ARGS
+            python etl.py --parallel-agencies 4 --workers 2 $BATCH_ARGS
           fi
 
       - name: Upload artifacts (for debugging)
