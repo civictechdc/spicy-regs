@@ -4,7 +4,7 @@ Spicy Regs goal is to build an open, contributor-friendly platform for exploring
 
 ## Open Example Notebooks under /notebooks
 
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/civictechdc/spicy-regs/HEAD)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/civictechdc/spicy-regs/HEAD?urlpath=%2Fdoc%2Ftree%2Fnotebooks%2FREADME.md)
 
 ## Contact us
 
