@@ -130,6 +130,106 @@ def generate_analytics(parquet_dir: Path | None = None, output_dir: Path | None 
     outputs["organizations"] = orgs_file
     print(f"  ✓ organizations.json: {len(orgs_data)} rows")
     
+    # 4. Agency Activity - most active agencies by comment volume
+    print("Generating agency activity...")
+    agency_query = f"""
+    SELECT 
+        agency_code,
+        COUNT(*) as comment_count,
+        COUNT(DISTINCT docket_id) as docket_count
+    FROM read_parquet({comments_src})
+    GROUP BY agency_code
+    ORDER BY comment_count DESC
+    LIMIT 20
+    """
+    result = conn.execute(agency_query).fetchall()
+    columns = ["agency_code", "comment_count", "docket_count"]
+    agency_data = [dict(zip(columns, row)) for row in result]
+    
+    agency_file = analytics_dir / "agency_activity.json"
+    with open(agency_file, "w") as f:
+        json.dump(agency_data, f)
+    outputs["agency_activity"] = agency_file
+    print(f"  ✓ agency_activity.json: {len(agency_data)} rows")
+    
+    # 5. Comment Trends - monthly comment volumes
+    print("Generating comment trends...")
+    trends_query = f"""
+    SELECT 
+        EXTRACT(YEAR FROM TRY_CAST(posted_date AS DATE)) as year,
+        EXTRACT(MONTH FROM TRY_CAST(posted_date AS DATE)) as month,
+        COUNT(*) as comment_count
+    FROM read_parquet({comments_src})
+    WHERE posted_date IS NOT NULL 
+      AND TRY_CAST(posted_date AS DATE) IS NOT NULL
+      AND TRY_CAST(posted_date AS DATE) >= '2010-01-01'
+    GROUP BY 1, 2
+    ORDER BY 1, 2
+    """
+    result = conn.execute(trends_query).fetchall()
+    columns = ["year", "month", "comment_count"]
+    trends_data = [dict(zip(columns, row)) for row in result]
+    
+    trends_file = analytics_dir / "comment_trends.json"
+    with open(trends_file, "w") as f:
+        json.dump(trends_data, f)
+    outputs["comment_trends"] = trends_file
+    print(f"  ✓ comment_trends.json: {len(trends_data)} rows")
+    
+    # 6. Cross-Agency - dockets with comments from multiple agencies
+    print("Generating cross-agency analysis...")
+    cross_query = f"""
+    SELECT 
+        d.docket_id,
+        d.title,
+        d.agency_code as primary_agency,
+        COUNT(DISTINCT c.agency_code) as commenting_agencies,
+        COUNT(*) as total_comments
+    FROM read_parquet({dockets_src}) d
+    JOIN read_parquet({comments_src}) c ON d.docket_id = c.docket_id
+    GROUP BY d.docket_id, d.title, d.agency_code
+    HAVING COUNT(DISTINCT c.agency_code) > 1
+    ORDER BY commenting_agencies DESC, total_comments DESC
+    LIMIT 15
+    """
+    result = conn.execute(cross_query).fetchall()
+    columns = ["docket_id", "title", "primary_agency", "commenting_agencies", "total_comments"]
+    cross_data = [dict(zip(columns, row)) for row in result]
+    
+    cross_file = analytics_dir / "cross_agency.json"
+    with open(cross_file, "w") as f:
+        json.dump(cross_data, f)
+    outputs["cross_agency"] = cross_file
+    print(f"  ✓ cross_agency.json: {len(cross_data)} rows")
+    
+    # 7. Frequent Commenters - entities commenting across many agencies
+    print("Generating frequent commenters...")
+    commenters_query = f"""
+    SELECT 
+        title as commenter,
+        COUNT(*) as total_comments,
+        COUNT(DISTINCT agency_code) as agencies_count,
+        COUNT(DISTINCT docket_id) as dockets_count
+    FROM read_parquet({comments_src})
+    WHERE title IS NOT NULL
+      AND title NOT LIKE 'Comment%'
+      AND title NOT LIKE 'Anonymous%'
+      AND LENGTH(title) > 10
+    GROUP BY title
+    HAVING COUNT(DISTINCT agency_code) > 5
+    ORDER BY agencies_count DESC, total_comments DESC
+    LIMIT 20
+    """
+    result = conn.execute(commenters_query).fetchall()
+    columns = ["commenter", "total_comments", "agencies_count", "dockets_count"]
+    commenters_data = [dict(zip(columns, row)) for row in result]
+    
+    commenters_file = analytics_dir / "frequent_commenters.json"
+    with open(commenters_file, "w") as f:
+        json.dump(commenters_data, f)
+    outputs["frequent_commenters"] = commenters_file
+    print(f"  ✓ frequent_commenters.json: {len(commenters_data)} rows")
+    
     conn.close()
     print(f"\nAnalytics generated in: {analytics_dir}")
     return outputs
