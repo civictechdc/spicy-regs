@@ -6,7 +6,7 @@ import { RegulationData } from '@/lib/api';
 import { CommentCard } from '@/components/data-viewer/CommentCard';
 import { DocketOrDocumentCard } from '@/components/data-viewer/DocketOrDocumentCard';
 import { SearchBar } from '@/components/SearchBar';
-import Link from 'next/link';
+import { Header } from '@/components/Header';
 import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
 
 const BOOKMARKS_KEY = 'spicy-regs-bookmarks';
@@ -151,28 +151,17 @@ function SearchResults() {
 
 export default function SearchPage() {
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-8">
-            <div className="flex items-center gap-4 flex-1">
-                <Link href="/dashboard" className="text-2xl font-bold text-gray-900 dark:text-gray-100 shrink-0">
-                    Spicy Regs
-                </Link>
-                <div className="flex-1 max-w-2xl ">
-                    <SearchBar />
-                </div>
-            </div>
-            <div className="flex items-center gap-4">
-                 <Link href="/bookmarks" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium">
-                    Bookmarks
-                 </Link>
-            </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <Header />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-6">
+          <SearchBar />
         </div>
 
         <Suspense fallback={<div>Loading search...</div>}>
-            <SearchResults />
+          <SearchResults />
         </Suspense>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

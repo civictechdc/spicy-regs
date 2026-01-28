@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { RegulationData } from '@/lib/api';
 import { CommentCard } from '@/components/data-viewer/CommentCard';
 import { DocketOrDocumentCard } from '@/components/data-viewer/DocketOrDocumentCard';
-import Link from 'next/link';
+import { Header } from '@/components/Header';
 
 const BOOKMARKS_KEY = 'spicy-regs-bookmarks';
 
@@ -50,20 +50,14 @@ export default function BookmarksPage() {
   const bookmarkArray = [...bookmarkIds];
 
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-                        My Bookmarks
-                    </h1>
-                    <div className="mt-2">
-                         <Link href="/dashboard" className="text-blue-600 dark:text-blue-400 hover:underline">
-                            &larr; Back to Dashboard
-                         </Link>
-                    </div>
-                </div>
-            </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <Header />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            My Bookmarks
+          </h1>
+        </div>
 
             {loading ? (
                 <div className="flex justify-center p-12">
@@ -102,7 +96,7 @@ export default function BookmarksPage() {
                     </div>
                 </div>
             )}
-        </div>
-    </main>
+      </main>
+    </div>
   );
 }
