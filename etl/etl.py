@@ -22,6 +22,7 @@ from pathlib import Path
 
 import boto3
 import polars as pl
+import pyarrow as pa
 import pyarrow.parquet as pq
 from botocore import UNSIGNED
 from botocore.config import Config
@@ -266,6 +267,7 @@ def merge_staging_files(staging_dir: Path, output_dir: Path, data_types_to_merge
     """
     Merge staging files into final output using PyArrow streaming.
     This processes one file at a time to minimize memory usage.
+    Handles schema evolution by using target schema from DATA_TYPES.
     """
     for data_type in data_types_to_merge:
         staging_type_dir = staging_dir / data_type
@@ -298,14 +300,25 @@ def merge_staging_files(staging_dir: Path, output_dir: Path, data_types_to_merge
         # Stream merge using PyArrow (memory efficient)
         temp_output = output_dir / f"{data_type}_merged.parquet"
         
-        # Read schema from first file
-        first_table = pq.read_table(files_to_merge[0])
-        schema = first_table.schema
+        # Use target schema from DATA_TYPES (handles schema evolution)
+        target_columns = list(DATA_TYPES[data_type]["schema"].keys())
+        target_schema = pa.schema([(col, pa.large_string()) for col in target_columns])
         
         total_rows = 0
-        with pq.ParquetWriter(temp_output, schema, compression='zstd') as writer:
+        with pq.ParquetWriter(temp_output, target_schema, compression='zstd') as writer:
             for file_path in files_to_merge:
                 table = pq.read_table(file_path)
+                
+                # Handle schema evolution - add missing columns with nulls
+                existing_cols = set(table.column_names)
+                for col in target_columns:
+                    if col not in existing_cols:
+                        null_array = pa.nulls(table.num_rows, type=pa.large_string())
+                        table = table.append_column(col, null_array)
+                
+                # Select only target columns in order
+                table = table.select(target_columns)
+                
                 writer.write_table(table)
                 total_rows += table.num_rows
                 # Free memory immediately
@@ -360,6 +373,7 @@ def main():
     parser.add_argument("--batch-number", type=int, default=None, help="Batch number (0-indexed) for batched processing")
     parser.add_argument("--batch-size", type=int, default=45, help="Number of agencies per batch (default: 45)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose debug logging")
+    parser.add_argument("--merge-only", action="store_true", help="Only merge staging files (skip downloading)")
     args = parser.parse_args()
 
     # Setup output directory
@@ -375,6 +389,19 @@ def main():
 
     print(f"Output directory: {output_dir}")
     print(f"Staging directory: {staging_dir}")
+
+    # Merge-only mode: just merge staging files and exit
+    if args.merge_only:
+        print("Merge-only mode - merging existing staging files...")
+        data_types_to_process = ["dockets", "documents", "comments"]
+        if args.skip_comments:
+            data_types_to_process = ["dockets", "documents"]
+        elif args.only_comments:
+            data_types_to_process = ["comments"]
+        merge_staging_files(staging_dir, output_dir, data_types_to_process)
+        print("Merge complete!")
+        return
+
     print(f"Workers: {args.workers}")
 
     # Load manifest (unless full refresh)
