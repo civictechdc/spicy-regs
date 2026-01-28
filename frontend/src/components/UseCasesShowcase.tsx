@@ -323,6 +323,7 @@ function OrganizationsTable({ data }: { data: OrganizationResult[] | null }) {
 
 function AgencyActivityTable({ data }: { data: AgencyActivityResult[] | null }) {
   const { sortedItems, sortKey, sortDir, requestSort } = useSortableData(data, "comment_count");
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   if (!sortedItems || sortedItems.length === 0) {
     return <p className="text-[var(--muted)]">No data available</p>;
@@ -334,6 +335,7 @@ function AgencyActivityTable({ data }: { data: AgencyActivityResult[] | null }) 
     <table className="w-full text-sm">
       <thead>
         <tr className="border-b border-[var(--border)]">
+          <th className="w-8 py-3 px-2"></th>
           <SortableHeader<AgencyActivityResult> label="Agency" sortKey="agency_code" currentKey={sortKey} currentDir={sortDir} onSort={requestSort} />
           <SortableHeader<AgencyActivityResult> label="Comments" sortKey="comment_count" currentKey={sortKey} currentDir={sortDir} onSort={requestSort} align="right" />
           <SortableHeader<AgencyActivityResult> label="Dockets" sortKey="docket_count" currentKey={sortKey} currentDir={sortDir} onSort={requestSort} align="right" />
@@ -341,28 +343,67 @@ function AgencyActivityTable({ data }: { data: AgencyActivityResult[] | null }) 
         </tr>
       </thead>
       <tbody>
-        {sortedItems.map((row, i) => (
-          <tr key={i} className="border-b border-[var(--border)]/50 hover:bg-[var(--surface-elevated)]/50">
-            <td className="py-3 px-4 font-medium">
-              <Link 
-                href={`/dashboard?agency=${row.agency_code}`}
-                className="text-[var(--accent-primary)] hover:underline"
+        {sortedItems.map((row) => {
+          const isExpanded = expandedRow === row.agency_code;
+          return (
+            <>
+              <tr 
+                key={row.agency_code} 
+                className={`border-b border-[var(--border)]/50 hover:bg-[var(--surface-elevated)]/50 cursor-pointer ${isExpanded ? "bg-[var(--surface-elevated)]/30" : ""}`}
+                onClick={() => setExpandedRow(isExpanded ? null : row.agency_code)}
               >
-                {row.agency_code}
-              </Link>
-            </td>
-            <td className="py-3 px-4 text-right">{Number(row.comment_count).toLocaleString()}</td>
-            <td className="py-3 px-4 text-right">{Number(row.docket_count).toLocaleString()}</td>
-            <td className="py-3 px-4">
-              <div className="w-full bg-[var(--surface)] rounded-full h-2">
-                <div 
-                  className="bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)] h-2 rounded-full"
-                  style={{ width: `${(row.comment_count / maxComments) * 100}%` }}
-                />
-              </div>
-            </td>
-          </tr>
-        ))}
+                <td className="py-3 px-2 text-center text-[var(--muted)]">
+                  <span className={`inline-block transition-transform ${isExpanded ? "rotate-90" : ""}`}>▶</span>
+                </td>
+                <td className="py-3 px-4 font-medium">
+                  <span className="text-[var(--accent-primary)]">{row.agency_code}</span>
+                </td>
+                <td className="py-3 px-4 text-right">{Number(row.comment_count).toLocaleString()}</td>
+                <td className="py-3 px-4 text-right">{Number(row.docket_count).toLocaleString()}</td>
+                <td className="py-3 px-4">
+                  <div className="w-full bg-[var(--surface)] rounded-full h-2">
+                    <div 
+                      className="bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)] h-2 rounded-full"
+                      style={{ width: `${(row.comment_count / maxComments) * 100}%` }}
+                    />
+                  </div>
+                </td>
+              </tr>
+              {isExpanded && (
+                <tr key={`${row.agency_code}-expanded`} className="bg-[var(--surface-elevated)]/20">
+                  <td colSpan={5} className="py-4 px-6">
+                    <div className="flex flex-wrap gap-3 items-center">
+                      <span className="text-sm text-[var(--muted)]">Quick actions:</span>
+                      <Link 
+                        href={`/dashboard?agency=${row.agency_code}`}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] text-sm hover:bg-[var(--accent-primary)]/20 transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        Explore Dockets
+                      </Link>
+                      <Link 
+                        href={`/search?q=agency:${row.agency_code}`}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-sm hover:border-[var(--accent-primary)] transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        Search Comments
+                      </Link>
+                      <span className="text-xs text-[var(--muted)] ml-auto">
+                        {((row.comment_count / sortedItems.reduce((sum, r) => sum + r.comment_count, 0)) * 100).toFixed(1)}% of all comments
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </>
+          );
+        })}
       </tbody>
     </table>
   );
