@@ -1,0 +1,20 @@
+# ETL pipeline (large data files)
+etl/
+notebooks/
+sample-data/
+
+# Data files
+*.parquet
+output/
+data/
+
+# Python
+*.pyc
+__pycache__
+.venv
+*.egg-info
+
+# Other
+.agent
+.env
+.env.local
