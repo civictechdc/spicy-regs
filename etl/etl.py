@@ -71,6 +71,7 @@ DATA_TYPES = {
             "modify_date": pl.Utf8,
             "comment_start_date": pl.Utf8,
             "comment_end_date": pl.Utf8,
+            "file_url": pl.Utf8,
         },
         "extract": lambda d: {
             "document_id": d.get("data", {}).get("id"),
@@ -82,6 +83,7 @@ DATA_TYPES = {
             "modify_date": d.get("data", {}).get("attributes", {}).get("modifyDate"),
             "comment_start_date": d.get("data", {}).get("attributes", {}).get("commentStartDate"),
             "comment_end_date": d.get("data", {}).get("attributes", {}).get("commentEndDate"),
+            "file_url": (d.get("data", {}).get("attributes", {}).get("fileFormats") or [{}])[0].get("fileUrl"),
         },
     },
     "comments": {
