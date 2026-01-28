@@ -14,13 +14,25 @@ export default function DashboardPage() {
   const [dataType, setDataType] = useState<DataType>("dockets");
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
+    <div className="min-h-screen bg-[var(--background)] flex flex-col">
       <Header />
       <main className="flex-1 p-6 overflow-auto">
         <div className="max-w-7xl mx-auto">
+          {/* Hero section */}
+          {!selectedAgency && (
+            <div className="text-center py-12 mb-8">
+              <h1 className="text-4xl md:text-5xl font-bold mb-4">
+                <span className="gradient-text">Explore Federal Regulations</span>
+              </h1>
+              <p className="text-[var(--muted)] text-lg max-w-2xl mx-auto">
+                Access 27M+ public comments, 2M+ documents, and 346K+ dockets from regulations.gov
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-1 space-y-4">
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="card-gradient p-6">
                 <AgencySelector
                   selectedAgency={selectedAgency}
                   onSelectAgency={(agency) => {
@@ -31,7 +43,7 @@ export default function DashboardPage() {
               </div>
 
               {selectedAgency && (
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                <div className="card-gradient p-6">
                   <DocketSelector
                     agencyCode={selectedAgency}
                     selectedDocket={selectedDocket}
@@ -41,7 +53,7 @@ export default function DashboardPage() {
               )}
 
               {selectedAgency && (
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                <div className="card-gradient p-6">
                   <DataTypeSelector
                     selectedType={dataType}
                     onSelectType={setDataType}
@@ -51,7 +63,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="lg:col-span-2">
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 h-[calc(100vh-12rem)]">
+              <div className="card-gradient p-6 h-[calc(100vh-12rem)]">
                 <DataViewer
                   agencyCode={selectedAgency}
                   dataType={dataType}

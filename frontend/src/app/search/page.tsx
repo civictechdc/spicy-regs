@@ -2,7 +2,6 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { RegulationData } from '@/lib/api';
 import { CommentCard } from '@/components/data-viewer/CommentCard';
 import { DocketOrDocumentCard } from '@/components/data-viewer/DocketOrDocumentCard';
 import { SearchBar } from '@/components/SearchBar';
@@ -84,23 +83,23 @@ function SearchResults() {
 
   if (!query) {
     return (
-      <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+      <div className="text-center py-12 text-[var(--muted)]">
         Enter a search term to find regulations.
       </div>
     );
   }
 
   if (loading) {
-     return (
-        <div className="flex justify-center p-12">
-             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
+    return (
+      <div className="flex justify-center p-12">
+        <div className="animate-spin h-8 w-8 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full" />
+      </div>
     );
   }
 
   if (results.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+      <div className="text-center py-12 text-[var(--muted)]">
         No results found for "{query}". <br/>
         Try indexing an agency first by visiting its page.
       </div>
@@ -109,40 +108,40 @@ function SearchResults() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-        Results for "{query}"
+      <h2 className="text-xl font-semibold">
+        Results for "<span className="gradient-text">{query}</span>"
       </h2>
       <div className="space-y-4">
         {results.map((result, idx) => {
-           const isComment = result.type === 'comments';
-           let key = result.docket_id;
-           try {
-              if (isComment) {
-                 const parsed = typeof result.raw_json === 'string' ? JSON.parse(result.raw_json) : result.raw_json;
-                 key = parsed.data.id; 
-              }
-           } catch {}
-           
-           const isBookmarked = bookmarks.has(key);
+          const isComment = result.type === 'comments';
+          let key = result.docket_id;
+          try {
+            if (isComment) {
+              const parsed = typeof result.raw_json === 'string' ? JSON.parse(result.raw_json) : result.raw_json;
+              key = parsed.data.id; 
+            }
+          } catch {}
+          
+          const isBookmarked = bookmarks.has(key);
 
-           return (
-             <div key={`${key}-${idx}`}>
-               {isComment ? (
-                 <CommentCard 
-                    item={result} 
-                    isBookmarked={isBookmarked} 
-                    onToggleBookmark={() => handleToggleBookmark(result)} 
-                 />
-               ) : (
-                 <DocketOrDocumentCard 
-                    item={result} 
-                    dataType={result.type === 'dockets' ? 'dockets' : 'documents'} 
-                    isBookmarked={isBookmarked} 
-                    onToggleBookmark={() => handleToggleBookmark(result)} 
-                 />
-               )}
-             </div>
-           );
+          return (
+            <div key={`${key}-${idx}`}>
+              {isComment ? (
+                <CommentCard 
+                  item={result} 
+                  isBookmarked={isBookmarked} 
+                  onToggleBookmark={() => handleToggleBookmark(result)} 
+                />
+              ) : (
+                <DocketOrDocumentCard 
+                  item={result} 
+                  dataType={result.type === 'dockets' ? 'dockets' : 'documents'} 
+                  isBookmarked={isBookmarked} 
+                  onToggleBookmark={() => handleToggleBookmark(result)} 
+                />
+              )}
+            </div>
+          );
         })}
       </div>
     </div>
@@ -151,14 +150,18 @@ function SearchResults() {
 
 export default function SearchPage() {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-[var(--background)]">
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
+        <div className="mb-8">
           <SearchBar />
         </div>
 
-        <Suspense fallback={<div>Loading search...</div>}>
+        <Suspense fallback={
+          <div className="flex justify-center p-12">
+            <div className="animate-spin h-8 w-8 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full" />
+          </div>
+        }>
           <SearchResults />
         </Suspense>
       </main>

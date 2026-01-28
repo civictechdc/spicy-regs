@@ -3,17 +3,19 @@ import { UseCasesShowcase } from "@/components/UseCasesShowcase";
 
 export default function AnalysisPage() {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-[var(--background)]">
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            Analysis
+        {/* Hero */}
+        <div className="text-center py-8 mb-8">
+          <h1 className="text-4xl font-bold mb-4">
+            <span className="gradient-text">Analysis Dashboard</span>
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Explore patterns in federal regulations data
+          <p className="text-[var(--muted)] text-lg max-w-2xl mx-auto">
+            Discover patterns in campaign activity, organizational influence, and comment trends
           </p>
         </div>
+        
         <UseCasesShowcase />
       </main>
     </div>
