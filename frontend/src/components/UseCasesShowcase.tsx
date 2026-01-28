@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 
 const R2_BASE_URL = "https://pub-5fc11ad134984edf8d9af452dd1849d6.r2.dev";
 
@@ -58,36 +59,12 @@ const ANALYTICS_URLS: Record<TabId, string> = {
 };
 
 const TABS: { id: TabId; label: string; description: string }[] = [
-  {
-    id: "statistics",
-    label: "Overview",
-    description: "Total counts across all data",
-  },
-  {
-    id: "agencyActivity",
-    label: "Agency Activity",
-    description: "Most active agencies by comment volume",
-  },
-  {
-    id: "campaigns",
-    label: "Campaigns",
-    description: "Dockets with highest duplicate comment rates",
-  },
-  {
-    id: "organizations",
-    label: "Organizations",
-    description: "Most active commenters across dockets",
-  },
-  {
-    id: "frequentCommenters",
-    label: "Cross-Agency",
-    description: "Entities commenting across multiple agencies",
-  },
-  {
-    id: "commentTrends",
-    label: "Trends",
-    description: "Monthly comment volumes over time",
-  },
+  { id: "statistics", label: "Overview", description: "Total counts across all data" },
+  { id: "agencyActivity", label: "Agency Activity", description: "Most active agencies by comment volume" },
+  { id: "campaigns", label: "Campaigns", description: "Dockets with highest duplicate comment rates" },
+  { id: "organizations", label: "Organizations", description: "Most active commenters across dockets" },
+  { id: "frequentCommenters", label: "Cross-Agency", description: "Entities commenting across multiple agencies" },
+  { id: "commentTrends", label: "Trends", description: "Monthly comment volumes over time" },
 ];
 
 const initialData: Record<TabId, unknown[] | null> = {
@@ -108,6 +85,78 @@ const initialLoading: Record<TabId, boolean> = {
   frequentCommenters: false,
 };
 
+// Sortable table hook
+function useSortableData<T>(items: T[] | null, defaultKey: keyof T, defaultDir: "asc" | "desc" = "desc") {
+  const [sortKey, setSortKey] = useState<keyof T>(defaultKey);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">(defaultDir);
+
+  const sortedItems = useMemo(() => {
+    if (!items) return null;
+    return [...items].sort((a, b) => {
+      const aVal = a[sortKey];
+      const bVal = b[sortKey];
+      if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [items, sortKey, sortDir]);
+
+  const requestSort = (key: keyof T) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+  };
+
+  return { sortedItems, sortKey, sortDir, requestSort };
+}
+
+// Sortable header component
+function SortableHeader<T>({ 
+  label, 
+  sortKey, 
+  currentKey, 
+  currentDir, 
+  onSort,
+  align = "left" 
+}: { 
+  label: string; 
+  sortKey: keyof T; 
+  currentKey: keyof T; 
+  currentDir: "asc" | "desc";
+  onSort: (key: keyof T) => void;
+  align?: "left" | "right";
+}) {
+  const isActive = currentKey === sortKey;
+  return (
+    <th 
+      className={`py-3 px-4 font-medium text-[var(--muted)] cursor-pointer hover:text-[var(--foreground)] transition-colors select-none ${align === "right" ? "text-right" : "text-left"}`}
+      onClick={() => onSort(sortKey)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <span className={`text-xs ${isActive ? "text-[var(--accent-primary)]" : "opacity-30"}`}>
+          {isActive ? (currentDir === "asc" ? "↑" : "↓") : "↕"}
+        </span>
+      </span>
+    </th>
+  );
+}
+
+// Tooltip wrapper
+function Tooltip({ text, children }: { text: string; children: React.ReactNode }) {
+  return (
+    <span className="group relative">
+      {children}
+      <span className="absolute z-10 hidden group-hover:block bottom-full left-0 mb-1 px-2 py-1 text-xs bg-[var(--surface-elevated)] border border-[var(--border)] rounded shadow-lg whitespace-nowrap max-w-xs truncate">
+        {text}
+      </span>
+    </span>
+  );
+}
+
 export function UseCasesShowcase() {
   const [activeTab, setActiveTab] = useState<TabId>("statistics");
   const [data, setData] = useState<Record<TabId, unknown[] | null>>(initialData);
@@ -123,9 +172,7 @@ export function UseCasesShowcase() {
 
       try {
         const response = await fetch(ANALYTICS_URLS[activeTab]);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch ${activeTab} analytics`);
-        }
+        if (!response.ok) throw new Error(`Failed to fetch ${activeTab} analytics`);
         const result = await response.json();
         setData((prev) => ({ ...prev, [activeTab]: result }));
       } catch (err) {
@@ -173,24 +220,12 @@ export function UseCasesShowcase() {
           <div className="text-red-400">{queryError}</div>
         ) : (
           <div className="overflow-x-auto">
-            {activeTab === "statistics" && (
-              <StatisticsCards data={data.statistics as StatisticsResult[] | null} />
-            )}
-            {activeTab === "agencyActivity" && (
-              <AgencyActivityTable data={data.agencyActivity as AgencyActivityResult[] | null} />
-            )}
-            {activeTab === "campaigns" && (
-              <CampaignsTable data={data.campaigns as CampaignResult[] | null} />
-            )}
-            {activeTab === "organizations" && (
-              <OrganizationsTable data={data.organizations as OrganizationResult[] | null} />
-            )}
-            {activeTab === "frequentCommenters" && (
-              <FrequentCommentersTable data={data.frequentCommenters as FrequentCommenterResult[] | null} />
-            )}
-            {activeTab === "commentTrends" && (
-              <CommentTrendsChart data={data.commentTrends as CommentTrendResult[] | null} />
-            )}
+            {activeTab === "statistics" && <StatisticsCards data={data.statistics as StatisticsResult[] | null} />}
+            {activeTab === "agencyActivity" && <AgencyActivityTable data={data.agencyActivity as AgencyActivityResult[] | null} />}
+            {activeTab === "campaigns" && <CampaignsTable data={data.campaigns as CampaignResult[] | null} />}
+            {activeTab === "organizations" && <OrganizationsTable data={data.organizations as OrganizationResult[] | null} />}
+            {activeTab === "frequentCommenters" && <FrequentCommentersTable data={data.frequentCommenters as FrequentCommenterResult[] | null} />}
+            {activeTab === "commentTrends" && <CommentTrendsChart data={data.commentTrends as CommentTrendResult[] | null} />}
           </div>
         )}
       </div>
@@ -199,7 +234,9 @@ export function UseCasesShowcase() {
 }
 
 function CampaignsTable({ data }: { data: CampaignResult[] | null }) {
-  if (!data || data.length === 0) {
+  const { sortedItems, sortKey, sortDir, requestSort } = useSortableData(data, "duplicate_percentage");
+
+  if (!sortedItems || sortedItems.length === 0) {
     return <p className="text-[var(--muted)]">No data available</p>;
   }
 
@@ -207,18 +244,32 @@ function CampaignsTable({ data }: { data: CampaignResult[] | null }) {
     <table className="w-full text-sm">
       <thead>
         <tr className="border-b border-[var(--border)]">
-          <th className="text-left py-3 px-4 font-medium text-[var(--muted)]">Docket ID</th>
-          <th className="text-left py-3 px-4 font-medium text-[var(--muted)]">Agency</th>
-          <th className="text-right py-3 px-4 font-medium text-[var(--muted)]">Total</th>
-          <th className="text-right py-3 px-4 font-medium text-[var(--muted)]">Unique</th>
-          <th className="text-right py-3 px-4 font-medium text-[var(--muted)]">Duplicates</th>
+          <SortableHeader<CampaignResult> label="Docket ID" sortKey="docket_id" currentKey={sortKey} currentDir={sortDir} onSort={requestSort} />
+          <SortableHeader<CampaignResult> label="Agency" sortKey="agency_code" currentKey={sortKey} currentDir={sortDir} onSort={requestSort} />
+          <SortableHeader<CampaignResult> label="Total" sortKey="total_comments" currentKey={sortKey} currentDir={sortDir} onSort={requestSort} align="right" />
+          <SortableHeader<CampaignResult> label="Unique" sortKey="unique_texts" currentKey={sortKey} currentDir={sortDir} onSort={requestSort} align="right" />
+          <SortableHeader<CampaignResult> label="Duplicates" sortKey="duplicate_percentage" currentKey={sortKey} currentDir={sortDir} onSort={requestSort} align="right" />
         </tr>
       </thead>
       <tbody>
-        {data.map((row, i) => (
+        {sortedItems.map((row, i) => (
           <tr key={i} className="border-b border-[var(--border)]/50 hover:bg-[var(--surface-elevated)]/50">
-            <td className="py-3 px-4 font-mono text-xs">{row.docket_id}</td>
-            <td className="py-3 px-4">{row.agency_code}</td>
+            <td className="py-3 px-4 font-mono text-xs">
+              <Link 
+                href={`/dashboard?agency=${row.agency_code}&docket=${row.docket_id}`}
+                className="text-[var(--accent-primary)] hover:underline"
+              >
+                {row.docket_id}
+              </Link>
+            </td>
+            <td className="py-3 px-4">
+              <Link 
+                href={`/dashboard?agency=${row.agency_code}`}
+                className="hover:text-[var(--accent-primary)] hover:underline"
+              >
+                {row.agency_code}
+              </Link>
+            </td>
             <td className="py-3 px-4 text-right">{Number(row.total_comments).toLocaleString()}</td>
             <td className="py-3 px-4 text-right">{Number(row.unique_texts).toLocaleString()}</td>
             <td className="py-3 px-4 text-right">
@@ -234,7 +285,9 @@ function CampaignsTable({ data }: { data: CampaignResult[] | null }) {
 }
 
 function OrganizationsTable({ data }: { data: OrganizationResult[] | null }) {
-  if (!data || data.length === 0) {
+  const { sortedItems, sortKey, sortDir, requestSort } = useSortableData(data, "docket_count");
+
+  if (!sortedItems || sortedItems.length === 0) {
     return <p className="text-[var(--muted)]">No data available</p>;
   }
 
@@ -242,15 +295,19 @@ function OrganizationsTable({ data }: { data: OrganizationResult[] | null }) {
     <table className="w-full text-sm">
       <thead>
         <tr className="border-b border-[var(--border)]">
-          <th className="text-left py-3 px-4 font-medium text-[var(--muted)]">Organization</th>
-          <th className="text-right py-3 px-4 font-medium text-[var(--muted)]">Comments</th>
-          <th className="text-right py-3 px-4 font-medium text-[var(--muted)]">Dockets</th>
+          <SortableHeader<OrganizationResult> label="Organization" sortKey="title" currentKey={sortKey} currentDir={sortDir} onSort={requestSort} />
+          <SortableHeader<OrganizationResult> label="Comments" sortKey="comment_count" currentKey={sortKey} currentDir={sortDir} onSort={requestSort} align="right" />
+          <SortableHeader<OrganizationResult> label="Dockets" sortKey="docket_count" currentKey={sortKey} currentDir={sortDir} onSort={requestSort} align="right" />
         </tr>
       </thead>
       <tbody>
-        {data.map((row, i) => (
+        {sortedItems.map((row, i) => (
           <tr key={i} className="border-b border-[var(--border)]/50 hover:bg-[var(--surface-elevated)]/50">
-            <td className="py-3 px-4 max-w-md truncate">{row.title}</td>
+            <td className="py-3 px-4 max-w-md">
+              <Tooltip text={row.title}>
+                <span className="truncate block">{row.title}</span>
+              </Tooltip>
+            </td>
             <td className="py-3 px-4 text-right">{Number(row.comment_count).toLocaleString()}</td>
             <td className="py-3 px-4 text-right">
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]">
@@ -265,26 +322,35 @@ function OrganizationsTable({ data }: { data: OrganizationResult[] | null }) {
 }
 
 function AgencyActivityTable({ data }: { data: AgencyActivityResult[] | null }) {
-  if (!data || data.length === 0) {
+  const { sortedItems, sortKey, sortDir, requestSort } = useSortableData(data, "comment_count");
+
+  if (!sortedItems || sortedItems.length === 0) {
     return <p className="text-[var(--muted)]">No data available</p>;
   }
 
-  const maxComments = Math.max(...data.map(d => d.comment_count));
+  const maxComments = Math.max(...sortedItems.map(d => d.comment_count));
 
   return (
     <table className="w-full text-sm">
       <thead>
         <tr className="border-b border-[var(--border)]">
-          <th className="text-left py-3 px-4 font-medium text-[var(--muted)]">Agency</th>
-          <th className="text-right py-3 px-4 font-medium text-[var(--muted)]">Comments</th>
-          <th className="text-right py-3 px-4 font-medium text-[var(--muted)]">Dockets</th>
+          <SortableHeader<AgencyActivityResult> label="Agency" sortKey="agency_code" currentKey={sortKey} currentDir={sortDir} onSort={requestSort} />
+          <SortableHeader<AgencyActivityResult> label="Comments" sortKey="comment_count" currentKey={sortKey} currentDir={sortDir} onSort={requestSort} align="right" />
+          <SortableHeader<AgencyActivityResult> label="Dockets" sortKey="docket_count" currentKey={sortKey} currentDir={sortDir} onSort={requestSort} align="right" />
           <th className="w-32 py-3 px-4"></th>
         </tr>
       </thead>
       <tbody>
-        {data.map((row, i) => (
+        {sortedItems.map((row, i) => (
           <tr key={i} className="border-b border-[var(--border)]/50 hover:bg-[var(--surface-elevated)]/50">
-            <td className="py-3 px-4 font-medium">{row.agency_code}</td>
+            <td className="py-3 px-4 font-medium">
+              <Link 
+                href={`/dashboard?agency=${row.agency_code}`}
+                className="text-[var(--accent-primary)] hover:underline"
+              >
+                {row.agency_code}
+              </Link>
+            </td>
             <td className="py-3 px-4 text-right">{Number(row.comment_count).toLocaleString()}</td>
             <td className="py-3 px-4 text-right">{Number(row.docket_count).toLocaleString()}</td>
             <td className="py-3 px-4">
@@ -303,7 +369,9 @@ function AgencyActivityTable({ data }: { data: AgencyActivityResult[] | null }) 
 }
 
 function FrequentCommentersTable({ data }: { data: FrequentCommenterResult[] | null }) {
-  if (!data || data.length === 0) {
+  const { sortedItems, sortKey, sortDir, requestSort } = useSortableData(data, "agencies_count");
+
+  if (!sortedItems || sortedItems.length === 0) {
     return <p className="text-[var(--muted)]">No data available</p>;
   }
 
@@ -311,16 +379,20 @@ function FrequentCommentersTable({ data }: { data: FrequentCommenterResult[] | n
     <table className="w-full text-sm">
       <thead>
         <tr className="border-b border-[var(--border)]">
-          <th className="text-left py-3 px-4 font-medium text-[var(--muted)]">Commenter</th>
-          <th className="text-right py-3 px-4 font-medium text-[var(--muted)]">Comments</th>
-          <th className="text-right py-3 px-4 font-medium text-[var(--muted)]">Agencies</th>
-          <th className="text-right py-3 px-4 font-medium text-[var(--muted)]">Dockets</th>
+          <SortableHeader<FrequentCommenterResult> label="Commenter" sortKey="commenter" currentKey={sortKey} currentDir={sortDir} onSort={requestSort} />
+          <SortableHeader<FrequentCommenterResult> label="Comments" sortKey="total_comments" currentKey={sortKey} currentDir={sortDir} onSort={requestSort} align="right" />
+          <SortableHeader<FrequentCommenterResult> label="Agencies" sortKey="agencies_count" currentKey={sortKey} currentDir={sortDir} onSort={requestSort} align="right" />
+          <SortableHeader<FrequentCommenterResult> label="Dockets" sortKey="dockets_count" currentKey={sortKey} currentDir={sortDir} onSort={requestSort} align="right" />
         </tr>
       </thead>
       <tbody>
-        {data.map((row, i) => (
+        {sortedItems.map((row, i) => (
           <tr key={i} className="border-b border-[var(--border)]/50 hover:bg-[var(--surface-elevated)]/50">
-            <td className="py-3 px-4 max-w-md truncate">{row.commenter}</td>
+            <td className="py-3 px-4 max-w-md">
+              <Tooltip text={row.commenter}>
+                <span className="truncate block">{row.commenter}</span>
+              </Tooltip>
+            </td>
             <td className="py-3 px-4 text-right">{Number(row.total_comments).toLocaleString()}</td>
             <td className="py-3 px-4 text-right">
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-500/10 text-purple-400">
@@ -340,7 +412,7 @@ function CommentTrendsChart({ data }: { data: CommentTrendResult[] | null }) {
     return <p className="text-[var(--muted)]">No data available</p>;
   }
 
-  // Group by year for a simpler visualization
+  // Group by year
   const yearlyData = data.reduce((acc, row) => {
     const year = row.year;
     acc[year] = (acc[year] || 0) + row.comment_count;
@@ -386,18 +458,21 @@ function StatisticsCards({ data }: { data: StatisticsResult[] | null }) {
       <StatCard label="Dockets" value={Number(stats.total_dockets).toLocaleString()} />
       <StatCard label="Documents" value={Number(stats.total_documents).toLocaleString()} />
       <StatCard label="Comments" value={Number(stats.total_comments).toLocaleString()} />
-      <StatCard
-        label={`Top: ${stats.top_agency}`}
-        value={Number(stats.top_agency_comments).toLocaleString()}
-        sublabel="comments"
-      />
+      <Link href={`/dashboard?agency=${stats.top_agency}`}>
+        <StatCard
+          label={`Top: ${stats.top_agency}`}
+          value={Number(stats.top_agency_comments).toLocaleString()}
+          sublabel="comments"
+          clickable
+        />
+      </Link>
     </div>
   );
 }
 
-function StatCard({ label, value, sublabel }: { label: string; value: string; sublabel?: string }) {
+function StatCard({ label, value, sublabel, clickable }: { label: string; value: string; sublabel?: string; clickable?: boolean }) {
   return (
-    <div className="bg-[var(--surface-elevated)] rounded-xl p-5 border border-[var(--border)]">
+    <div className={`bg-[var(--surface-elevated)] rounded-xl p-5 border border-[var(--border)] ${clickable ? "hover:border-[var(--accent-primary)] cursor-pointer transition-colors" : ""}`}>
       <p className="text-sm text-[var(--muted)]">{label}</p>
       <p className="text-3xl font-bold gradient-text mt-1">{value}</p>
       {sublabel && <p className="text-xs text-[var(--muted)] mt-1">{sublabel}</p>}
