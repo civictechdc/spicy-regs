@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useDuckDB, R2_BASE_URL } from "@/lib/duckdb/context";
+
+const R2_BASE_URL = "https://pub-5fc11ad134984edf8d9af452dd1849d6.r2.dev";
 
 type TabId = "campaigns" | "organizations" | "statistics";
 
@@ -27,58 +28,11 @@ interface StatisticsResult {
   top_agency_comments: number;
 }
 
-const QUERIES = {
-  campaigns: `
-    SELECT 
-      docket_id,
-      agency_code,
-      COUNT(*) as total_comments,
-      COUNT(DISTINCT comment) as unique_texts,
-      ROUND(100.0 * (COUNT(*) - COUNT(DISTINCT comment)) / COUNT(*), 1) as duplicate_percentage
-    FROM read_parquet('${R2_BASE_URL}/comments.parquet')
-    WHERE comment IS NOT NULL
-    GROUP BY docket_id, agency_code
-    HAVING COUNT(*) > 1000 AND COUNT(*) > COUNT(DISTINCT comment)
-    ORDER BY duplicate_percentage DESC
-    LIMIT 10
-  `,
-  organizations: `
-    SELECT 
-      title,
-      COUNT(*) as comment_count,
-      COUNT(DISTINCT docket_id) as docket_count
-    FROM read_parquet('${R2_BASE_URL}/comments.parquet')
-    WHERE title IS NOT NULL
-      AND title NOT LIKE 'Comment%'
-      AND title NOT LIKE 'Anonymous%'
-      AND LENGTH(title) > 5
-    GROUP BY title
-    HAVING COUNT(DISTINCT docket_id) > 50
-    ORDER BY docket_count DESC
-    LIMIT 15
-  `,
-  statistics: `
-    WITH stats AS (
-      SELECT 
-        (SELECT COUNT(*) FROM read_parquet('${R2_BASE_URL}/dockets.parquet')) as total_dockets,
-        (SELECT COUNT(*) FROM read_parquet('${R2_BASE_URL}/documents.parquet')) as total_documents,
-        (SELECT COUNT(*) FROM read_parquet('${R2_BASE_URL}/comments.parquet')) as total_comments
-    ),
-    top_agency AS (
-      SELECT agency_code, COUNT(*) as cnt
-      FROM read_parquet('${R2_BASE_URL}/comments.parquet')
-      GROUP BY agency_code
-      ORDER BY cnt DESC
-      LIMIT 1
-    )
-    SELECT 
-      s.total_dockets,
-      s.total_documents,
-      s.total_comments,
-      t.agency_code as top_agency,
-      t.cnt as top_agency_comments
-    FROM stats s, top_agency t
-  `,
+// Pre-computed analytics JSON endpoints
+const ANALYTICS_URLS: Record<TabId, string> = {
+  statistics: `${R2_BASE_URL}/statistics.json`,
+  campaigns: `${R2_BASE_URL}/campaigns.json`,
+  organizations: `${R2_BASE_URL}/organizations.json`,
 };
 
 const TABS: { id: TabId; label: string; description: string }[] = [
@@ -100,7 +54,6 @@ const TABS: { id: TabId; label: string; description: string }[] = [
 ];
 
 export function UseCasesShowcase() {
-  const { runQuery, isReady, error } = useDuckDB();
   const [activeTab, setActiveTab] = useState<TabId>("statistics");
   const [data, setData] = useState<Record<TabId, unknown[] | null>>({
     campaigns: null,
@@ -115,35 +68,29 @@ export function UseCasesShowcase() {
   const [queryError, setQueryError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isReady || data[activeTab] !== null || loading[activeTab]) return;
+    if (data[activeTab] !== null || loading[activeTab]) return;
 
     const loadData = async () => {
       setLoading((prev) => ({ ...prev, [activeTab]: true }));
       setQueryError(null);
 
       try {
-        const result = await runQuery(QUERIES[activeTab]);
+        const response = await fetch(ANALYTICS_URLS[activeTab]);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch ${activeTab} analytics`);
+        }
+        const result = await response.json();
         setData((prev) => ({ ...prev, [activeTab]: result }));
       } catch (err) {
-        console.error(`[UseCases] Query failed for ${activeTab}:`, err);
-        setQueryError(err instanceof Error ? err.message : "Query failed");
+        console.error(`[UseCases] Fetch failed for ${activeTab}:`, err);
+        setQueryError(err instanceof Error ? err.message : "Fetch failed");
       } finally {
         setLoading((prev) => ({ ...prev, [activeTab]: false }));
       }
     };
 
     loadData();
-  }, [activeTab, isReady, data, loading, runQuery]);
-
-  if (error) {
-    return (
-      <div className="card-gradient p-6">
-        <p className="text-red-400">
-          Failed to initialize DuckDB: {error.message}
-        </p>
-      </div>
-    );
-  }
+  }, [activeTab, data, loading]);
 
   return (
     <div className="card-gradient overflow-hidden">
@@ -170,15 +117,10 @@ export function UseCasesShowcase() {
           {TABS.find((t) => t.id === activeTab)?.description}
         </p>
 
-        {!isReady ? (
+        {loading[activeTab] ? (
           <div className="flex items-center gap-3 text-[var(--muted)]">
             <div className="animate-spin h-5 w-5 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full" />
-            Initializing DuckDB...
-          </div>
-        ) : loading[activeTab] ? (
-          <div className="flex items-center gap-3 text-[var(--muted)]">
-            <div className="animate-spin h-5 w-5 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full" />
-            Running query...
+            Loading analytics...
           </div>
         ) : queryError ? (
           <div className="text-red-400">{queryError}</div>
