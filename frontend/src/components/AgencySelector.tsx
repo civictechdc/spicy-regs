@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getAgencies } from '@/lib/api';
+import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
 import { SearchableSelect } from './SearchableSelect';
 
 interface AgencySelectorProps {
@@ -13,8 +13,12 @@ export function AgencySelector({ selectedAgency, onSelectAgency }: AgencySelecto
   const [agencies, setAgencies] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  const { getAgencies, isReady } = useDuckDBService();
 
   useEffect(() => {
+    if (!isReady) return;
+    
     async function loadAgencies() {
       try {
         setLoading(true);
@@ -28,9 +32,9 @@ export function AgencySelector({ selectedAgency, onSelectAgency }: AgencySelecto
       }
     }
     loadAgencies();
-  }, []);
+  }, [isReady, getAgencies]);
 
-  if (loading) {
+  if (!isReady || loading) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="text-sm text-gray-500">Loading agencies...</div>

@@ -128,10 +128,43 @@ export function useDuckDBService() {
     [runQuery, isReady]
   );
 
+  /**
+   * Get list of agencies from R2 Parquet files
+   */
+  const getAgencies = useCallback(async (): Promise<string[]> => {
+    if (!isReady) {
+      throw new Error("DuckDB not ready");
+    }
+
+    const parquetFile = `${R2_BASE_URL}/dockets.parquet`;
+    const query = `SELECT DISTINCT agency_code FROM read_parquet('${parquetFile}') ORDER BY agency_code`;
+    const result = await runQuery<{ agency_code: string }>(query);
+    return result.map((r) => r.agency_code);
+  }, [runQuery, isReady]);
+
+  /**
+   * Get list of dockets for an agency from R2 Parquet files
+   */
+  const getDockets = useCallback(
+    async (agencyCode: string): Promise<string[]> => {
+      if (!isReady) {
+        throw new Error("DuckDB not ready");
+      }
+
+      const parquetFile = `${R2_BASE_URL}/dockets.parquet`;
+      const query = `SELECT DISTINCT docket_id FROM read_parquet('${parquetFile}') WHERE agency_code = '${agencyCode.toUpperCase()}' ORDER BY docket_id DESC`;
+      const result = await runQuery<{ docket_id: string }>(query);
+      return result.map((r) => r.docket_id);
+    },
+    [runQuery, isReady]
+  );
+
   return {
     getData,
     getDataCount,
     searchResources,
+    getAgencies,
+    getDockets,
     isReady,
   };
 }

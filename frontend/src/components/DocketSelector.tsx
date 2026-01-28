@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getDockets } from '@/lib/api';
+import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
 import { SearchableSelect } from './SearchableSelect';
 
 interface DocketSelectorProps {
@@ -14,9 +14,11 @@ export function DocketSelector({ agencyCode, selectedDocket, onSelectDocket }: D
   const [dockets, setDockets] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const { getDockets, isReady } = useDuckDBService();
 
   useEffect(() => {
-    if (!agencyCode) {
+    if (!agencyCode || !isReady) {
       setDockets([]);
       return;
     }
@@ -34,7 +36,7 @@ export function DocketSelector({ agencyCode, selectedDocket, onSelectDocket }: D
       }
     }
     loadDockets();
-  }, [agencyCode]);
+  }, [agencyCode, isReady, getDockets]);
 
   if (!agencyCode) {
     return null;
@@ -56,4 +58,5 @@ export function DocketSelector({ agencyCode, selectedDocket, onSelectDocket }: D
     </div>
   );
 }
+
 
