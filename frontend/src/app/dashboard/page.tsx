@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { AgencySelector } from "@/components/AgencySelector";
 import { DocketSelector } from "@/components/DocketSelector";
 import { DataTypeSelector } from "@/components/DataTypeSelector";
@@ -9,9 +10,18 @@ import { Header } from "@/components/Header";
 import { DataType } from "@/lib/api";
 
 export default function DashboardPage() {
+  const searchParams = useSearchParams();
   const [selectedAgency, setSelectedAgency] = useState<string | null>(null);
   const [selectedDocket, setSelectedDocket] = useState<string | null>(null);
   const [dataType, setDataType] = useState<DataType>("dockets");
+
+  // Initialize from URL params
+  useEffect(() => {
+    const agency = searchParams.get("agency");
+    const docket = searchParams.get("docket");
+    if (agency) setSelectedAgency(agency.toUpperCase());
+    if (docket) setSelectedDocket(docket.toUpperCase());
+  }, [searchParams]);
 
   return (
     <div className="min-h-screen bg-[var(--background)] flex flex-col">
