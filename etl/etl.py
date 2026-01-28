@@ -5,11 +5,15 @@ ETL Pipeline: Mirrulations S3 → Parquet on R2
 Uses boto3 for S3 file listing, Polars for fast data processing,
 and writes Parquet directly. Processes one agency at a time with
 incremental append and resume support.
+
+Memory-Optimized: Uses staging files per agency and streams the
+final merge using PyArrow to avoid loading entire datasets into memory.
 """
 
 import argparse
 import json
 import os
+import shutil
 import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -18,6 +22,7 @@ from pathlib import Path
 
 import boto3
 import polars as pl
+import pyarrow.parquet as pq
 from botocore import UNSIGNED
 from botocore.config import Config
 from dotenv import load_dotenv
@@ -186,8 +191,20 @@ def download_and_parse(key: str, data_type: str) -> dict | None:
         return None
 
 
-def process_agency(agency: str, output_dir: Path, processed_keys: set[str], max_workers: int = 10, skip_comments: bool = False, only_comments: bool = False, write_lock: threading.Lock = None, verbose: bool = False) -> tuple[dict[str, int], list[str]]:
-    """Process all data types for a single agency. Returns (results, new_keys)."""
+def process_agency(
+    agency: str,
+    staging_dir: Path,
+    processed_keys: set[str],
+    max_workers: int = 10,
+    skip_comments: bool = False,
+    only_comments: bool = False,
+    verbose: bool = False
+) -> tuple[dict[str, int], list[str]]:
+    """
+    Process all data types for a single agency.
+    Writes to staging directory (one file per agency per data type).
+    Returns (results, new_keys).
+    """
     results = {}
     new_keys = []
     
@@ -196,7 +213,11 @@ def process_agency(agency: str, output_dir: Path, processed_keys: set[str], max_
             continue
         if only_comments and data_type != "comments":
             continue
-        output_file = output_dir / f"{data_type}.parquet"
+        
+        # Staging file for this agency/data_type
+        staging_type_dir = staging_dir / data_type
+        staging_type_dir.mkdir(parents=True, exist_ok=True)
+        staging_file = staging_type_dir / f"{agency}.parquet"
         
         # List files (filtering already processed)
         files = list_json_files(agency, data_type, processed_keys, verbose)
@@ -226,30 +247,74 @@ def process_agency(agency: str, output_dir: Path, processed_keys: set[str], max_
             results[data_type] = 0
             continue
         
-        # Create Polars DataFrame with explicit schema
+        # Create Polars DataFrame with explicit schema and write to staging
         schema = config["schema"]
         df = pl.DataFrame(records, schema=schema)
+        df.write_parquet(staging_file, compression="zstd")
         
-        # Append to existing Parquet or create new (thread-safe)
-        if write_lock:
-            write_lock.acquire()
-        try:
-            if output_file.exists():
-                existing = pl.read_parquet(output_file)
-                combined = pl.concat([existing, df])
-                combined.write_parquet(output_file, compression="zstd")
-                tqdm.write(f"  [{agency}] {data_type}: ✓ {len(records)} rows added (total: {len(combined):,})")
-            else:
-                df.write_parquet(output_file, compression="zstd")
-                tqdm.write(f"  [{agency}] {data_type}: ✓ {len(records)} rows (new file)")
-        finally:
-            if write_lock:
-                write_lock.release()
+        tqdm.write(f"  [{agency}] {data_type}: ✓ {len(records)} rows -> staging")
         
         results[data_type] = len(records)
         new_keys.extend(successful_keys)
     
     return results, new_keys
+
+
+def merge_staging_files(staging_dir: Path, output_dir: Path, data_types_to_merge: list[str]):
+    """
+    Merge staging files into final output using PyArrow streaming.
+    This processes one file at a time to minimize memory usage.
+    """
+    for data_type in data_types_to_merge:
+        staging_type_dir = staging_dir / data_type
+        output_file = output_dir / f"{data_type}.parquet"
+        
+        if not staging_type_dir.exists():
+            continue
+        
+        staging_files = list(staging_type_dir.glob("*.parquet"))
+        if not staging_files:
+            continue
+        
+        print(f"Merging {len(staging_files)} staging files for {data_type}...")
+        
+        # Collect files to merge (existing + staging)
+        files_to_merge = []
+        
+        # Add existing output file if it exists
+        if output_file.exists():
+            files_to_merge.append(output_file)
+        
+        files_to_merge.extend(staging_files)
+        
+        if len(files_to_merge) == 1 and not output_file.exists():
+            # Just one staging file, move it directly
+            shutil.move(files_to_merge[0], output_file)
+            print(f"  {data_type}: moved single file")
+            continue
+        
+        # Stream merge using PyArrow (memory efficient)
+        temp_output = output_dir / f"{data_type}_merged.parquet"
+        
+        # Read schema from first file
+        first_table = pq.read_table(files_to_merge[0])
+        schema = first_table.schema
+        
+        total_rows = 0
+        with pq.ParquetWriter(temp_output, schema, compression='zstd') as writer:
+            for file_path in files_to_merge:
+                table = pq.read_table(file_path)
+                writer.write_table(table)
+                total_rows += table.num_rows
+                # Free memory immediately
+                del table
+        
+        # Replace original with merged
+        if output_file.exists():
+            output_file.unlink()
+        temp_output.rename(output_file)
+        
+        print(f"  {data_type}: ✓ merged {total_rows:,} total rows")
 
 
 def get_processed_agencies(output_dir: Path, skip_comments: bool = False, only_comments: bool = False) -> set[str]:
@@ -302,7 +367,12 @@ def main():
     else:
         output_dir = Path(tempfile.mkdtemp(prefix="spicy-regs-etl-"))
 
+    # Setup staging directory
+    staging_dir = output_dir / "staging"
+    staging_dir.mkdir(parents=True, exist_ok=True)
+
     print(f"Output directory: {output_dir}")
+    print(f"Staging directory: {staging_dir}")
     print(f"Workers: {args.workers}")
 
     # Load manifest (unless full refresh)
@@ -348,17 +418,25 @@ def main():
     print(f"\nProcessing {len(agencies)} agencies")
     start_time = datetime.now()
 
-    # Process agencies in parallel
+    # Determine which data types we're processing
+    data_types_to_process = []
+    for dt in DATA_TYPES:
+        if args.skip_comments and dt == "comments":
+            continue
+        if args.only_comments and dt != "comments":
+            continue
+        data_types_to_process.append(dt)
+
+    # Process agencies in parallel (writes to staging, not final output)
     total_rows = {dt: 0 for dt in DATA_TYPES}
     all_new_keys = []
-    write_lock = threading.Lock()
     keys_lock = threading.Lock()
     
     def process_agency_wrapper(agency):
         results, new_keys = process_agency(
-            agency, output_dir, processed_keys,
+            agency, staging_dir, processed_keys,
             args.workers, args.skip_comments, args.only_comments,
-            write_lock, args.verbose
+            args.verbose
         )
         with keys_lock:
             for dt, count in results.items():
@@ -375,6 +453,16 @@ def main():
                 pbar.update(1)
                 if new_count > 0:
                     pbar.set_postfix({"last": agency, "new": new_count})
+
+    # Merge staging files into final output (streaming, memory-efficient)
+    if any(total_rows.values()):
+        print(f"\n{'='*60}")
+        print("Merging staging files...")
+        merge_staging_files(staging_dir, output_dir, data_types_to_process)
+        
+        # Clean up staging directory
+        shutil.rmtree(staging_dir)
+        print("Cleaned up staging directory")
 
     # Summary
     print(f"\n{'='*60}")
