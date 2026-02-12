@@ -16,7 +16,7 @@ const R2_BASE_URL = "https://pub-5fc11ad134984edf8d9af452dd1849d6.r2.dev";
 // Iceberg catalog config (Worker proxy injects auth server-side)
 const ICEBERG_PROXY_URL =
   process.env.NEXT_PUBLIC_ICEBERG_PROXY_URL ||
-  "https://iceberg-proxy.ekim.workers.dev";
+  "https://iceberg-proxy.simplyeugene94.workers.dev";
 const ICEBERG_WAREHOUSE =
   process.env.NEXT_PUBLIC_ICEBERG_WAREHOUSE ||
   "a18589c7a7a0fc4febecadfc9c71b105_spicy-regs";
@@ -77,7 +77,8 @@ async function initDuckDB(): Promise<{
     await conn.query(`
       ATTACH '${ICEBERG_WAREHOUSE}' AS spicy_regs (
         TYPE ICEBERG,
-        ENDPOINT '${ICEBERG_PROXY_URL}'
+        ENDPOINT '${ICEBERG_PROXY_URL}',
+        AUTHORIZATION_TYPE 'none'
       );
     `);
     await conn.query("USE spicy_regs.regulations;");
