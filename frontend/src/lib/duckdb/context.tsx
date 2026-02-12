@@ -13,14 +13,6 @@ import {
 
 const R2_BASE_URL = "https://pub-5fc11ad134984edf8d9af452dd1849d6.r2.dev";
 
-// Iceberg catalog config (Worker proxy injects auth server-side)
-const ICEBERG_PROXY_URL =
-  process.env.NEXT_PUBLIC_ICEBERG_PROXY_URL ||
-  "https://iceberg-proxy.simplyeugene94.workers.dev";
-const ICEBERG_WAREHOUSE =
-  process.env.NEXT_PUBLIC_ICEBERG_WAREHOUSE ||
-  "a18589c7a7a0fc4febecadfc9c71b105_spicy-regs";
-
 interface DuckDBContextValue {
   db: duckdb.AsyncDuckDB | null;
   conn: duckdb.AsyncDuckDBConnection | null;
@@ -55,7 +47,6 @@ async function initDuckDB(): Promise<{
   const db = new duckdb.AsyncDuckDB(logger, worker);
   await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
 
-  // Install and load httpfs for remote Parquet access
   await db.open({
     path: ":memory:",
     query: {
@@ -65,27 +56,11 @@ async function initDuckDB(): Promise<{
 
   const conn = await db.connect();
 
-  // Install extensions
+  // Install and load httpfs for remote Parquet access
   await conn.query("INSTALL httpfs; LOAD httpfs;");
-  await conn.query("INSTALL iceberg; LOAD iceberg;");
 
   // Set S3 region (required for httpfs even with public URLs)
   await conn.query("SET s3_region='auto';");
-
-  // Attach Iceberg catalog via CORS proxy (auth is injected by the Worker)
-  try {
-    await conn.query(`
-      ATTACH '${ICEBERG_WAREHOUSE}' AS spicy_regs (
-        TYPE ICEBERG,
-        ENDPOINT '${ICEBERG_PROXY_URL}',
-        AUTHORIZATION_TYPE 'none'
-      );
-    `);
-    await conn.query("USE spicy_regs.regulations;");
-    console.log("[DuckDB-WASM] Iceberg catalog attached");
-  } catch (err) {
-    console.warn("[DuckDB-WASM] Iceberg attach failed, falling back to Parquet:", err);
-  }
 
   console.log("[DuckDB-WASM] Initialized successfully");
 
