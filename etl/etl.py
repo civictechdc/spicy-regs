@@ -385,24 +385,32 @@ def optimize_parquet(output_dir: Path):
             shutil.rmtree(comments_out)
         comments_out.mkdir(parents=True)
 
-        # Stream through source file in batches to extract unique years
+        # Read the full table — we need it in memory for filtering anyway,
+        # but we process one year at a time and free each partition immediately.
+        # For 31M rows of text at ~2.9GB compressed, PyArrow mmap keeps this manageable.
         source = pds.dataset(comments_file, format="parquet")
 
-        # Discover years by scanning the date column only
+        # Extract year as first 4 chars of ISO date string (avoids timestamp parsing)
         year_col = source.to_table(columns=["posted_date"])
-        dates = pc.cast(year_col.column("posted_date"), pa.timestamp("s"), safe=False)
-        years = pc.year(dates)
-        unique_years = pc.unique(years.drop_null()).to_pylist()
-        unique_years.sort()
-        del year_col, dates, years
-        print(f"  Found {len(unique_years)} year partitions: {unique_years[0]}..{unique_years[-1]}")
+        year_strings = pc.utf8_slice_codeunits(year_col.column("posted_date"), start=0, stop=4)
+        unique_year_strings = pc.unique(year_strings.drop_null()).to_pylist()
+        del year_col, year_strings
 
-        # Process one year at a time to bound memory
+        # Filter to valid years only (2000-2030), bucket the rest as "other"
+        valid_years = sorted([y for y in unique_year_strings if y.isdigit() and 2000 <= int(y) <= 2030])
+        other_years = [y for y in unique_year_strings if y not in valid_years]
+        print(f"  Found {len(valid_years)} valid year partitions: {valid_years[0]}..{valid_years[-1]}")
+        if other_years:
+            print(f"  ({len(other_years)} invalid year values will go into year=other)")
+
         total_written = 0
-        for year_val in unique_years:
-            # Filter to this year
+
+        for year_str in valid_years:
+            # Filter by string range — '2024' <= posted_date < '2025'
+            next_year = str(int(year_str) + 1)
             year_filter = (
-                (pc.year(pc.cast(pds.field("posted_date"), pa.timestamp("s"), safe=False)) == year_val)
+                (pds.field("posted_date") >= year_str) &
+                (pds.field("posted_date") < next_year)
             )
             year_table = source.to_table(filter=year_filter)
 
@@ -414,7 +422,7 @@ def optimize_parquet(output_dir: Path):
             ])
 
             # Write to Hive directory
-            year_dir = comments_out / f"year={year_val}"
+            year_dir = comments_out / f"year={year_str}"
             year_dir.mkdir(parents=True, exist_ok=True)
             pq.write_table(
                 year_table,
@@ -424,10 +432,33 @@ def optimize_parquet(output_dir: Path):
                 write_statistics=True,
             )
             total_written += year_table.num_rows
-            print(f"    year={year_val}: {year_table.num_rows:,} rows")
+            print(f"    year={year_str}: {year_table.num_rows:,} rows")
             del year_table
 
-        print(f"  ✓ comments: {total_written:,} total rows across {len(unique_years)} partitions")
+        # Write remaining dirty/null dates into catch-all partition
+        if other_years:
+            # Negate all valid year ranges + catch nulls
+            valid_range = (
+                (pds.field("posted_date") >= valid_years[0]) &
+                (pds.field("posted_date") < str(int(valid_years[-1]) + 1))
+            )
+            other_filter = ~valid_range | pds.field("posted_date").is_null()
+            other_table = source.to_table(filter=other_filter)
+            if other_table.num_rows > 0:
+                other_dir = comments_out / "year=other"
+                other_dir.mkdir(parents=True, exist_ok=True)
+                pq.write_table(
+                    other_table,
+                    other_dir / "part-0.parquet",
+                    compression="zstd",
+                    row_group_size=500_000,
+                    write_statistics=True,
+                )
+                total_written += other_table.num_rows
+                print(f"    year=other: {other_table.num_rows:,} rows")
+            del other_table
+
+        print(f"  ✓ comments: {total_written:,} total rows across {len(valid_years) + (1 if other_years else 0)} partitions")
 
     print(f"\n{'='*60}")
     print("Optimization complete!")
