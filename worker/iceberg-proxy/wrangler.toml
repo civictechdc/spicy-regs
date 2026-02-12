@@ -4,6 +4,7 @@ compatibility_date = "2025-01-01"
 
 [vars]
 CATALOG_ORIGIN = "https://catalog.cloudflarestorage.com"
+CATALOG_PATH_PREFIX = "/a18589c7a7a0fc4febecadfc9c71b105/spicy-regs"
 
 # Token is stored as a secret, not in this file.
 # Set it with: npx wrangler secret put R2_API_TOKEN

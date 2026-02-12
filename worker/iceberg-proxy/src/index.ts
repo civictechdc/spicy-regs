@@ -4,12 +4,15 @@
  * Sits between browser DuckDB-WASM and the Cloudflare R2 Data Catalog.
  * - Adds CORS headers so the browser can call the catalog
  * - Injects the R2 API token server-side (never exposed to browsers)
+ * - Prepends the catalog path prefix (account_id/bucket) to the upstream URL
  * - Forwards all other request details unchanged
  */
 
 interface Env {
   R2_API_TOKEN: string;
   CATALOG_ORIGIN: string;
+  /** e.g. "/a18589c7a7a0fc4febecadfc9c71b105/spicy-regs" */
+  CATALOG_PATH_PREFIX: string;
 }
 
 const CORS_HEADERS: Record<string, string> = {
@@ -28,9 +31,12 @@ export default {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
     }
 
-    // Build the upstream URL: proxy path → catalog origin
+    // Build the upstream URL:
+    // DuckDB sends /v1/config, /v1/namespaces/..., etc.
+    // R2 catalog expects /<account_id>/<bucket>/v1/config, etc.
     const url = new URL(request.url);
-    const upstream = `${env.CATALOG_ORIGIN}${url.pathname}${url.search}`;
+    const prefix = env.CATALOG_PATH_PREFIX || "";
+    const upstream = `${env.CATALOG_ORIGIN}${prefix}${url.pathname}${url.search}`;
 
     // Forward the request with auth injected
     const headers = new Headers(request.headers);
