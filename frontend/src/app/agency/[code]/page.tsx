@@ -51,7 +51,7 @@ export default function AgencyPage() {
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [activeTab, setActiveTab] = useState<SortTab>('new');
-  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+  const [collapsedComments, setCollapsedComments] = useState<Set<string>>(new Set());
   const [stats, setStats] = useState<{ docketCount: number; documentCount: number; commentCount: number } | undefined>();
 
   // Bookmarks
@@ -106,7 +106,7 @@ export default function AgencyPage() {
   }, [isReady, agencyCode, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleComments = useCallback((docketId: string) => {
-    setExpandedComments(prev => {
+    setCollapsedComments(prev => {
       const next = new Set(prev);
       if (next.has(docketId)) next.delete(docketId);
       else next.add(docketId);
@@ -214,7 +214,7 @@ export default function AgencyPage() {
                   itemContent={(index, item) => {
                     const docketId = stripQuotes(item.docket_id);
                     const isBookmarked = bookmarks.has(docketId);
-                    const showComments = expandedComments.has(docketId);
+                    const showComments = !collapsedComments.has(docketId);
 
                     return (
                       <div className="pb-3">

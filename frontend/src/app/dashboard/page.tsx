@@ -44,7 +44,7 @@ function DocketFeed() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+  const [collapsedComments, setCollapsedComments] = useState<Set<string>>(new Set());
 
   // Filters
   const [selectedAgency, setSelectedAgency] = useState('');
@@ -109,7 +109,7 @@ function DocketFeed() {
   }, [isReady, selectedAgency, sortBy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleComments = useCallback((docketId: string) => {
-    setExpandedComments(prev => {
+    setCollapsedComments(prev => {
       const next = new Set(prev);
       if (next.has(docketId)) {
         next.delete(docketId);
@@ -172,7 +172,7 @@ function DocketFeed() {
             itemContent={(index, item) => {
               const docketId = stripQuotes(item.docket_id);
               const isBookmarked = bookmarks.has(docketId);
-              const showComments = expandedComments.has(docketId);
+              const showComments = !collapsedComments.has(docketId);
 
               return (
                 <div className="pb-3">
@@ -180,8 +180,6 @@ function DocketFeed() {
                     item={item}
                     isBookmarked={isBookmarked}
                     onToggleBookmark={() => handleToggleBookmark(docketId)}
-                    commentCount={0}
-                    documentCount={0}
                     onViewComments={() => toggleComments(docketId)}
                     showComments={showComments}
                   />
