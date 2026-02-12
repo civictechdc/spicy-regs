@@ -36,7 +36,7 @@ function stripQuotes(s: any): string {
 }
 
 function DocketFeed() {
-  const { getRecentDockets, getCommentCounts, getDataCount, isReady } = useDuckDBService();
+  const { getRecentDocketsWithCounts, isReady } = useDuckDBService();
 
   const [dockets, setDockets] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -74,20 +74,24 @@ function DocketFeed() {
     });
   }, []);
 
-  // Load dockets
+  // Load dockets (combined with comment counts in a single query)
   const loadDockets = useCallback(async (reset = false) => {
     if (!isReady || loading) return;
 
     try {
       setLoading(true);
       const newOffset = reset ? 0 : offset;
-      const results = await getRecentDockets(PAGE_SIZE, newOffset, selectedAgency || undefined, sortBy);
+      const { dockets: results, commentCounts: counts } = await getRecentDocketsWithCounts(
+        PAGE_SIZE, newOffset, selectedAgency || undefined, sortBy
+      );
 
       if (reset) {
         setDockets(results);
+        setCommentCounts(counts);
         setOffset(PAGE_SIZE);
       } else {
         setDockets(prev => [...prev, ...results]);
+        setCommentCounts(prev => ({ ...prev, ...counts }));
         setOffset(prev => prev + PAGE_SIZE);
       }
 
@@ -98,7 +102,7 @@ function DocketFeed() {
       setLoading(false);
       setInitialLoading(false);
     }
-  }, [isReady, loading, offset, selectedAgency, sortBy, getRecentDockets]);
+  }, [isReady, loading, offset, selectedAgency, sortBy, getRecentDocketsWithCounts]);
 
   // Initial load and filter change
   useEffect(() => {
@@ -108,14 +112,6 @@ function DocketFeed() {
     }
   }, [isReady, selectedAgency, sortBy]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch comment counts when dockets change
-  useEffect(() => {
-    if (dockets.length === 0) return;
-    const ids = dockets.map(d => stripQuotes(d.docket_id));
-    getCommentCounts(ids)
-      .then(counts => setCommentCounts(prev => ({ ...prev, ...counts })))
-      .catch(console.error);
-  }, [dockets, getCommentCounts]);
   // Deduplicate
   const uniqueDockets = useMemo(() => {
     const seen = new Set<string>();

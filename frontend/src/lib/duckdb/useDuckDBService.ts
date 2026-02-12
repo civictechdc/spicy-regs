@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useDuckDB, R2_BASE_URL } from "./context";
 import { RegulationsDataTypes } from "@/lib/db/models";
 
@@ -16,6 +16,9 @@ const parquetRef = (dataType: RegulationsDataTypes) =>
  */
 export function useDuckDBService() {
   const { runQuery, isReady } = useDuckDB();
+
+  /** Cache agency list to avoid re-fetching dockets.parquet just for DISTINCT agency_code */
+  const agencyCache = useRef<string[] | null>(null);
 
   /**
    * Get data with filters and pagination.
@@ -118,9 +121,13 @@ export function useDuckDBService() {
   const getAgencies = useCallback(async (): Promise<string[]> => {
     if (!isReady) throw new Error("DuckDB not ready");
 
+    // Return cached list if available (populated by getRecentDocketsWithCounts)
+    if (agencyCache.current) return agencyCache.current;
+
     const query = `SELECT DISTINCT agency_code FROM ${parquetRef("dockets" as RegulationsDataTypes)} ORDER BY agency_code`;
     const result = await runQuery<{ agency_code: string }>(query);
-    return result.map((r) => r.agency_code);
+    agencyCache.current = result.map((r) => r.agency_code);
+    return agencyCache.current;
   }, [runQuery, isReady]);
 
   /**
@@ -153,10 +160,58 @@ export function useDuckDBService() {
   );
 
   /**
-   * Get recent dockets across all agencies (or filtered by agency).
-   * Powers the main feed — ordered by modify_date DESC.
-   * Only selects columns needed by DocketPost to minimize Parquet reads.
+   * Get recent dockets with comment counts in a single query.
+   * Uses LEFT JOIN to combine dockets + comments, avoiding a second Parquet fetch.
+   * Returns { dockets, commentCounts } so the page doesn't need a separate call.
    */
+  const getRecentDocketsWithCounts = useCallback(
+    async (
+      limit: number = 20,
+      offset: number = 0,
+      agencyCode?: string,
+      sortBy: 'recent' | 'popular' | 'open' = 'recent'
+    ): Promise<{ dockets: any[]; commentCounts: Record<string, number> }> => {
+      if (!isReady) throw new Error("DuckDB not ready");
+
+      const conditions: string[] = [];
+      if (agencyCode) {
+        conditions.push(`d.agency_code = '${agencyCode.toUpperCase()}'`);
+      }
+
+      const whereClause =
+        conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+      const orderClause = 'ORDER BY d.modify_date DESC';
+
+      const cols = 'd.docket_id, d.agency_code, d.title, d.abstract, d.docket_type, d.modify_date';
+      const query = `
+        SELECT ${cols}, COALESCE(c.cnt, 0) AS comment_count
+        FROM ${parquetRef("dockets" as RegulationsDataTypes)} d
+        LEFT JOIN (
+          SELECT REPLACE(docket_id, '"', '') AS did, COUNT(*) AS cnt
+          FROM ${parquetRef("comments" as RegulationsDataTypes)}
+          GROUP BY did
+        ) c ON REPLACE(d.docket_id, '"', '') = c.did
+        ${whereClause} ${orderClause}
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+
+      const rows = await runQuery<any>(query);
+
+      const commentCounts: Record<string, number> = {};
+      const dockets = rows.map((row: any) => {
+        const id = String(row.docket_id).replace(/^"|"$/g, '').toUpperCase();
+        commentCounts[id] = Number(row.comment_count || 0);
+        const { comment_count, ...docket } = row;
+        return docket;
+      });
+
+      return { dockets, commentCounts };
+    },
+    [runQuery, isReady]
+  );
+
+  /** Legacy single-query version (used by detail pages) */
   const getRecentDockets = useCallback(
     async (
       limit: number = 20,
@@ -174,12 +229,8 @@ export function useDuckDBService() {
       const whereClause =
         conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-      let orderClause = 'ORDER BY modify_date DESC';
-      if (sortBy === 'popular') {
-        orderClause = 'ORDER BY modify_date DESC'; // could sort by comment count with a JOIN
-      }
-
-      const cols = 'docket_id, agency_code, title, abstract, docket_type, modify_date, file_url';
+      const orderClause = 'ORDER BY modify_date DESC';
+      const cols = 'docket_id, agency_code, title, abstract, docket_type, modify_date';
       const query = `SELECT ${cols} FROM ${parquetRef("dockets" as RegulationsDataTypes)} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
       return runQuery(query);
     },
@@ -310,6 +361,7 @@ export function useDuckDBService() {
     getDockets,
     getDocketById,
     getRecentDockets,
+    getRecentDocketsWithCounts,
     getCommentsForDocket,
     getCommentCounts,
     getAgencyStats,
