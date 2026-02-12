@@ -21,7 +21,8 @@ interface DocketPostProps {
   onToggleBookmark: () => void;
   commentCount?: number;
   documentCount?: number;
-  onViewComments?: () => void;
+  /** If true, we're on the detail page — don't render title as link */
+  isDetailView?: boolean;
   showComments?: boolean;
 }
 
@@ -52,7 +53,7 @@ export function DocketPost({
   onToggleBookmark,
   commentCount = 0,
   documentCount = 0,
-  onViewComments,
+  isDetailView = false,
   showComments = false,
 }: DocketPostProps) {
   const [expanded, setExpanded] = useState(false);
@@ -120,9 +121,18 @@ export function DocketPost({
               )}
             </div>
 
-            <h3 className="text-lg font-semibold text-[var(--foreground)] leading-snug">
-              {title}
-            </h3>
+            {isDetailView ? (
+              <h3 className="text-lg font-semibold text-[var(--foreground)] leading-snug">
+                {title}
+              </h3>
+            ) : (
+              <Link
+                href={`/docket/${encodeURIComponent(docketId)}`}
+                className="text-lg font-semibold text-[var(--foreground)] leading-snug hover:text-[var(--accent-primary)] transition-colors block"
+              >
+                {title}
+              </Link>
+            )}
 
             {/* Badges */}
             <div className="flex items-center gap-2 mt-1.5">
@@ -219,12 +229,14 @@ export function DocketPost({
             {isBookmarked ? 'Saved' : 'Save'}
           </button>
 
-          {onViewComments && (
-            <button onClick={onViewComments} className="action-btn">
+          {!isDetailView && (
+            <Link
+              href={`/docket/${encodeURIComponent(docketId)}`}
+              className="action-btn"
+            >
               <MessageSquare size={16} />
-              Comments
-              {showComments ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            </button>
+              {commentCount > 0 ? `${formatCount(commentCount)} Comments` : 'Comments'}
+            </Link>
           )}
 
           <a

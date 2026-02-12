@@ -5,7 +5,6 @@ import { useParams } from 'next/navigation';
 import { Virtuoso } from 'react-virtuoso';
 import { Header } from '@/components/Header';
 import { DocketPost } from '@/components/feed/DocketPost';
-import { ThreadedComments } from '@/components/feed/ThreadedComments';
 import { AgencySidebar } from '@/components/feed/AgencySidebar';
 import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
 import { getAgencyInfo } from '@/lib/agencyMetadata';
@@ -51,7 +50,7 @@ export default function AgencyPage() {
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [activeTab, setActiveTab] = useState<SortTab>('new');
-  const [collapsedComments, setCollapsedComments] = useState<Set<string>>(new Set());
+
   const [stats, setStats] = useState<{ docketCount: number; documentCount: number; commentCount: number } | undefined>();
 
   // Bookmarks
@@ -105,14 +104,7 @@ export default function AgencyPage() {
     }
   }, [isReady, agencyCode, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const toggleComments = useCallback((docketId: string) => {
-    setCollapsedComments(prev => {
-      const next = new Set(prev);
-      if (next.has(docketId)) next.delete(docketId);
-      else next.add(docketId);
-      return next;
-    });
-  }, []);
+
 
   const uniqueDockets = useMemo(() => {
     const seen = new Set<string>();
@@ -214,7 +206,6 @@ export default function AgencyPage() {
                   itemContent={(index, item) => {
                     const docketId = stripQuotes(item.docket_id);
                     const isBookmarked = bookmarks.has(docketId);
-                    const showComments = !collapsedComments.has(docketId);
 
                     return (
                       <div className="pb-3">
@@ -222,14 +213,7 @@ export default function AgencyPage() {
                           item={item}
                           isBookmarked={isBookmarked}
                           onToggleBookmark={() => handleToggleBookmark(docketId)}
-                          onViewComments={() => toggleComments(docketId)}
-                          showComments={showComments}
                         />
-                        {showComments && (
-                          <div className="mt-0 rounded-b-xl overflow-hidden border border-t-0 border-[var(--border)]">
-                            <ThreadedComments docketId={docketId} />
-                          </div>
-                        )}
                       </div>
                     );
                   }}

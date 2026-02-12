@@ -4,7 +4,6 @@ import { useState, useCallback, useEffect, Suspense, useMemo } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import { Header } from '@/components/Header';
 import { DocketPost } from '@/components/feed/DocketPost';
-import { ThreadedComments } from '@/components/feed/ThreadedComments';
 import { FeedFilters } from '@/components/feed/FeedFilters';
 import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
 import { Flame, Loader2 } from 'lucide-react';
@@ -44,7 +43,7 @@ function DocketFeed() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const [collapsedComments, setCollapsedComments] = useState<Set<string>>(new Set());
+
 
   // Filters
   const [selectedAgency, setSelectedAgency] = useState('');
@@ -108,17 +107,7 @@ function DocketFeed() {
     }
   }, [isReady, selectedAgency, sortBy]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const toggleComments = useCallback((docketId: string) => {
-    setCollapsedComments(prev => {
-      const next = new Set(prev);
-      if (next.has(docketId)) {
-        next.delete(docketId);
-      } else {
-        next.add(docketId);
-      }
-      return next;
-    });
-  }, []);
+
 
   // Deduplicate
   const uniqueDockets = useMemo(() => {
@@ -172,7 +161,6 @@ function DocketFeed() {
             itemContent={(index, item) => {
               const docketId = stripQuotes(item.docket_id);
               const isBookmarked = bookmarks.has(docketId);
-              const showComments = !collapsedComments.has(docketId);
 
               return (
                 <div className="pb-3">
@@ -180,14 +168,7 @@ function DocketFeed() {
                     item={item}
                     isBookmarked={isBookmarked}
                     onToggleBookmark={() => handleToggleBookmark(docketId)}
-                    onViewComments={() => toggleComments(docketId)}
-                    showComments={showComments}
                   />
-                  {showComments && (
-                    <div className="mt-0 rounded-b-xl overflow-hidden border border-t-0 border-[var(--border)]">
-                      <ThreadedComments docketId={docketId} />
-                    </div>
-                  )}
                 </div>
               );
             }}
