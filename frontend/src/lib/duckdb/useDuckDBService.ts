@@ -250,6 +250,7 @@ export function useDuckDBService() {
   /**
    * Get comments for a specific docket.
    * Powers the threaded comments section below each docket post.
+   * Handles both quoted and unquoted docket_id values in the data.
    */
   const getCommentsForDocket = useCallback(
     async (
@@ -260,16 +261,22 @@ export function useDuckDBService() {
     ): Promise<any[]> => {
       if (!isReady) throw new Error("DuckDB not ready");
 
+      // Strip any existing quotes from input
+      const cleanId = docketId.replace(/^"|"$/g, '').toUpperCase();
+
       const orderClause = sortBy === 'oldest'
         ? 'ORDER BY posted_date ASC'
         : 'ORDER BY posted_date DESC';
 
-      const query = `SELECT * FROM ${tableRef("comments" as RegulationsDataTypes)} WHERE docket_id = '${docketId.toUpperCase()}' ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
+      // Match both quoted ("EPA-HQ-...") and unquoted (EPA-HQ-...) forms
+      const whereClause = `WHERE REPLACE(docket_id, '"', '') = '${cleanId}'`;
+
+      const query = `SELECT * FROM ${tableRef("comments" as RegulationsDataTypes)} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
 
       try {
         return await runQuery(query);
       } catch {
-        const fallback = `SELECT * FROM ${parquetRef("comments" as RegulationsDataTypes)} WHERE docket_id = '${docketId.toUpperCase()}' ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
+        const fallback = `SELECT * FROM ${parquetRef("comments" as RegulationsDataTypes)} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
         return runQuery(fallback);
       }
     },

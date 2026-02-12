@@ -212,10 +212,10 @@ export function DocketPost({
             {isBookmarked ? 'Saved' : 'Save'}
           </button>
 
-          {commentCount > 0 && onViewComments && (
+          {onViewComments && (
             <button onClick={onViewComments} className="action-btn">
               <MessageSquare size={16} />
-              {formatCount(commentCount)} Comments
+              Comments
               {showComments ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
           )}
