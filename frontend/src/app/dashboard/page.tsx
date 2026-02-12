@@ -1,102 +1,244 @@
-"use client";
+'use client';
 
-import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import { AgencySelector } from "@/components/AgencySelector";
-import { DocketSelector } from "@/components/DocketSelector";
-import { DataTypeSelector } from "@/components/DataTypeSelector";
-import { DataViewer } from "@/components/DataViewer";
-import { Header } from "@/components/Header";
-import { DataType } from "@/lib/api";
+import { useState, useCallback, useEffect, Suspense, useMemo } from 'react';
+import { Virtuoso } from 'react-virtuoso';
+import { Header } from '@/components/Header';
+import { DocketPost } from '@/components/feed/DocketPost';
+import { ThreadedComments } from '@/components/feed/ThreadedComments';
+import { FeedFilters } from '@/components/feed/FeedFilters';
+import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
+import { Flame, Loader2 } from 'lucide-react';
 
-function DashboardContent() {
-  const searchParams = useSearchParams();
-  const [selectedAgency, setSelectedAgency] = useState<string | null>(null);
-  const [selectedDocket, setSelectedDocket] = useState<string | null>(null);
-  const [dataType, setDataType] = useState<DataType>("dockets");
+const BOOKMARKS_KEY = 'spicy-regs-bookmarks';
+const PAGE_SIZE = 20;
 
-  // Initialize from URL params
+function getStoredBookmarks(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const stored = localStorage.getItem(BOOKMARKS_KEY);
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveBookmarks(bookmarks: Set<string>) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(BOOKMARKS_KEY, JSON.stringify([...bookmarks]));
+  } catch (e) {
+    console.error('Failed to save bookmarks', e);
+  }
+}
+
+function stripQuotes(s: any): string {
+  if (!s) return '';
+  return String(s).replace(/^"|"$/g, '');
+}
+
+function DocketFeed() {
+  const { getRecentDockets, getDataCount, isReady } = useDuckDBService();
+
+  const [dockets, setDockets] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+
+  // Filters
+  const [selectedAgency, setSelectedAgency] = useState('');
+  const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'open'>(() => {
+    if (typeof window === 'undefined') return 'recent';
+    try {
+      return (localStorage.getItem('spicy-regs-sort-preference') as any) || 'recent';
+    } catch {
+      return 'recent';
+    }
+  });
+
+  // Bookmarks
+  const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
+  useEffect(() => { setBookmarks(getStoredBookmarks()); }, []);
+
+  const handleToggleBookmark = useCallback((docketId: string) => {
+    setBookmarks(prev => {
+      const next = new Set(prev);
+      if (next.has(docketId)) {
+        next.delete(docketId);
+      } else {
+        next.add(docketId);
+      }
+      saveBookmarks(next);
+      return next;
+    });
+  }, []);
+
+  // Load dockets
+  const loadDockets = useCallback(async (reset = false) => {
+    if (!isReady || loading) return;
+
+    try {
+      setLoading(true);
+      const newOffset = reset ? 0 : offset;
+      const results = await getRecentDockets(PAGE_SIZE, newOffset, selectedAgency || undefined, sortBy);
+
+      if (reset) {
+        setDockets(results);
+        setOffset(PAGE_SIZE);
+      } else {
+        setDockets(prev => [...prev, ...results]);
+        setOffset(prev => prev + PAGE_SIZE);
+      }
+
+      setHasMore(results.length === PAGE_SIZE);
+    } catch (err) {
+      console.error('Failed to load dockets:', err);
+    } finally {
+      setLoading(false);
+      setInitialLoading(false);
+    }
+  }, [isReady, loading, offset, selectedAgency, sortBy, getRecentDockets]);
+
+  // Initial load and filter change
   useEffect(() => {
-    const agency = searchParams.get("agency");
-    const docket = searchParams.get("docket");
-    if (agency) setSelectedAgency(agency.toUpperCase());
-    if (docket) setSelectedDocket(docket.toUpperCase());
-  }, [searchParams]);
+    if (isReady) {
+      setInitialLoading(true);
+      loadDockets(true);
+    }
+  }, [isReady, selectedAgency, sortBy]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleComments = useCallback((docketId: string) => {
+    setExpandedComments(prev => {
+      const next = new Set(prev);
+      if (next.has(docketId)) {
+        next.delete(docketId);
+      } else {
+        next.add(docketId);
+      }
+      return next;
+    });
+  }, []);
+
+  // Deduplicate
+  const uniqueDockets = useMemo(() => {
+    const seen = new Set<string>();
+    return dockets.filter(d => {
+      const id = stripQuotes(d.docket_id);
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  }, [dockets]);
+
+  if (initialLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-4">
+        <Loader2 size={32} className="animate-spin text-[var(--accent-primary)]" />
+        <p className="text-[var(--muted)] text-sm">Loading feed...</p>
+      </div>
+    );
+  }
 
   return (
-    <>
-      {/* Hero section */}
-      {!selectedAgency && (
-        <div className="text-center py-12 mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            <span className="gradient-text">Explore Federal Regulations</span>
-          </h1>
-          <p className="text-[var(--muted)] text-lg max-w-2xl mx-auto">
-            Access 27M+ public comments, 2M+ documents, and 346K+ dockets from regulations.gov
+    <div>
+      {/* Filter Bar */}
+      <div className="mb-6 p-4 bg-[var(--surface)] rounded-xl border border-[var(--border)]">
+        <FeedFilters
+          selectedAgency={selectedAgency}
+          onAgencyChange={(a) => { setSelectedAgency(a); }}
+          sortBy={sortBy}
+          onSortChange={(s) => { setSortBy(s); }}
+        />
+      </div>
+
+      {/* Feed */}
+      {uniqueDockets.length === 0 && !loading ? (
+        <div className="text-center py-16">
+          <p className="text-lg text-[var(--muted)]">No dockets found.</p>
+          <p className="text-sm text-[var(--muted-foreground)] mt-1">
+            Try adjusting your filters or search.
           </p>
         </div>
+      ) : (
+        <div style={{ height: '75vh' }}>
+          <Virtuoso
+            style={{ height: '100%' }}
+            data={uniqueDockets}
+            endReached={() => {
+              if (hasMore && !loading) loadDockets(false);
+            }}
+            overscan={400}
+            itemContent={(index, item) => {
+              const docketId = stripQuotes(item.docket_id);
+              const isBookmarked = bookmarks.has(docketId);
+              const showComments = expandedComments.has(docketId);
+
+              return (
+                <div className="pb-3">
+                  <DocketPost
+                    item={item}
+                    isBookmarked={isBookmarked}
+                    onToggleBookmark={() => handleToggleBookmark(docketId)}
+                    commentCount={0}
+                    documentCount={0}
+                    onViewComments={() => toggleComments(docketId)}
+                    showComments={showComments}
+                  />
+                  {showComments && (
+                    <div className="mt-0 rounded-b-xl overflow-hidden border border-t-0 border-[var(--border)]">
+                      <ThreadedComments docketId={docketId} />
+                    </div>
+                  )}
+                </div>
+              );
+            }}
+            components={{
+              Footer: () =>
+                loading ? (
+                  <div className="flex justify-center py-6">
+                    <Loader2 size={20} className="animate-spin text-[var(--accent-primary)]" />
+                  </div>
+                ) : !hasMore && uniqueDockets.length > 0 ? (
+                  <div className="text-center py-6 text-sm text-[var(--muted)]">
+                    You&apos;ve reached the end 🌶️
+                  </div>
+                ) : null,
+            }}
+          />
+        </div>
       )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1 space-y-4">
-          <div className="card-gradient p-6">
-            <AgencySelector
-              selectedAgency={selectedAgency}
-              onSelectAgency={(agency) => {
-                setSelectedAgency(agency);
-                setSelectedDocket(null);
-              }}
-            />
-          </div>
-
-          {selectedAgency && (
-            <div className="card-gradient p-6">
-              <DocketSelector
-                agencyCode={selectedAgency}
-                selectedDocket={selectedDocket}
-                onSelectDocket={setSelectedDocket}
-              />
-            </div>
-          )}
-
-          {selectedAgency && (
-            <div className="card-gradient p-6">
-              <DataTypeSelector
-                selectedType={dataType}
-                onSelectType={setDataType}
-              />
-            </div>
-          )}
-        </div>
-
-        <div className="lg:col-span-2">
-          <div className="card-gradient p-6 h-[calc(100vh-12rem)]">
-            <DataViewer
-              agencyCode={selectedAgency}
-              dataType={dataType}
-              docketId={selectedDocket}
-            />
-          </div>
-        </div>
-      </div>
-    </>
+    </div>
   );
 }
 
 export default function DashboardPage() {
   return (
-    <div className="min-h-screen bg-[var(--background)] flex flex-col">
+    <div className="min-h-screen bg-[var(--background)]">
       <Header />
-      <main className="flex-1 p-6 overflow-auto">
-        <div className="max-w-7xl mx-auto">
-          <Suspense fallback={
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin h-8 w-8 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full" />
-            </div>
-          }>
-            <DashboardContent />
-          </Suspense>
+      <main className="max-w-3xl mx-auto px-4 py-6">
+        {/* Hero */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2 mb-3">
+            <Flame size={28} className="text-[var(--accent-primary)]" />
+            <h1 className="text-3xl font-bold">
+              <span className="gradient-text">Spicy Regs</span>
+            </h1>
+          </div>
+          <p className="text-[var(--muted)] text-sm">
+            Explore federal regulations. Dockets as posts, agencies as communities.
+          </p>
         </div>
+
+        <Suspense
+          fallback={
+            <div className="flex justify-center py-12">
+              <Loader2 size={24} className="animate-spin text-[var(--accent-primary)]" />
+            </div>
+          }
+        >
+          <DocketFeed />
+        </Suspense>
       </main>
     </div>
   );

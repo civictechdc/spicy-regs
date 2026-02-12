@@ -208,12 +208,116 @@ export function useDuckDBService() {
     [runQuery, isReady]
   );
 
+  /**
+   * Get recent dockets across all agencies (or filtered by agency).
+   * Powers the main feed — ordered by modify_date DESC.
+   */
+  const getRecentDockets = useCallback(
+    async (
+      limit: number = 20,
+      offset: number = 0,
+      agencyCode?: string,
+      sortBy: 'recent' | 'popular' | 'open' = 'recent'
+    ): Promise<any[]> => {
+      if (!isReady) throw new Error("DuckDB not ready");
+
+      const conditions: string[] = [];
+      if (agencyCode) {
+        conditions.push(`agency_code = '${agencyCode.toUpperCase()}'`);
+      }
+
+      const whereClause =
+        conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+      let orderClause = 'ORDER BY modify_date DESC';
+      if (sortBy === 'popular') {
+        orderClause = 'ORDER BY modify_date DESC'; // same for now; could sort by comment count with a JOIN
+      }
+
+      const query = `SELECT * FROM ${tableRef("dockets" as RegulationsDataTypes)} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
+
+      try {
+        return await runQuery(query);
+      } catch (err) {
+        console.warn("[DuckDB] Iceberg query failed, falling back to Parquet:", err);
+        const fallback = `SELECT * FROM ${parquetRef("dockets" as RegulationsDataTypes)} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
+        return runQuery(fallback);
+      }
+    },
+    [runQuery, isReady]
+  );
+
+  /**
+   * Get comments for a specific docket.
+   * Powers the threaded comments section below each docket post.
+   */
+  const getCommentsForDocket = useCallback(
+    async (
+      docketId: string,
+      limit: number = 10,
+      offset: number = 0,
+      sortBy: 'recent' | 'oldest' = 'recent'
+    ): Promise<any[]> => {
+      if (!isReady) throw new Error("DuckDB not ready");
+
+      const orderClause = sortBy === 'oldest'
+        ? 'ORDER BY posted_date ASC'
+        : 'ORDER BY posted_date DESC';
+
+      const query = `SELECT * FROM ${tableRef("comments" as RegulationsDataTypes)} WHERE docket_id = '${docketId.toUpperCase()}' ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
+
+      try {
+        return await runQuery(query);
+      } catch {
+        const fallback = `SELECT * FROM ${parquetRef("comments" as RegulationsDataTypes)} WHERE docket_id = '${docketId.toUpperCase()}' ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
+        return runQuery(fallback);
+      }
+    },
+    [runQuery, isReady]
+  );
+
+  /**
+   * Get aggregate stats for an agency (docket, document, comment counts).
+   * Powers the agency subreddit sidebar.
+   */
+  const getAgencyStats = useCallback(
+    async (agencyCode: string): Promise<{ docketCount: number; documentCount: number; commentCount: number }> => {
+      if (!isReady) throw new Error("DuckDB not ready");
+
+      const upper = agencyCode.toUpperCase();
+      const tables = ["dockets", "documents", "comments"] as const;
+      const counts: number[] = [];
+
+      for (const table of tables) {
+        const query = `SELECT COUNT(*) as count FROM ${tableRef(table as RegulationsDataTypes)} WHERE agency_code = '${upper}'`;
+        try {
+          const result = await runQuery<{ count: number }>(query);
+          counts.push(Number(result[0]?.count ?? 0));
+        } catch {
+          const fallback = `SELECT COUNT(*) as count FROM ${parquetRef(table as RegulationsDataTypes)} WHERE agency_code = '${upper}'`;
+          const result = await runQuery<{ count: number }>(fallback);
+          counts.push(Number(result[0]?.count ?? 0));
+        }
+      }
+
+      return {
+        docketCount: counts[0],
+        documentCount: counts[1],
+        commentCount: counts[2],
+      };
+    },
+    [runQuery, isReady]
+  );
+
   return {
     getData,
     getDataCount,
     searchResources,
     getAgencies,
     getDockets,
+    getRecentDockets,
+    getCommentsForDocket,
+    getAgencyStats,
     isReady,
   };
 }

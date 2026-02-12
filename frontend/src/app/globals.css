@@ -1,14 +1,37 @@
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
+/* ─── Design Tokens ─── */
 :root {
-  --background: #0a0a0f;
-  --foreground: #f5f5f7;
+  --background: #0F172A;
+  --foreground: #F8FAFC;
   --accent-primary: #6366f1;
   --accent-secondary: #8b5cf6;
-  --surface: #16161d;
-  --surface-elevated: #1e1e28;
-  --border: #2a2a35;
-  --muted: #71717a;
+  --accent-green: #22C55E;
+  --accent-amber: #F59E0B;
+  --surface: #1E293B;
+  --surface-elevated: #334155;
+  --border: #334155;
+  --border-subtle: #1E293B;
+  --muted: #94A3B8;
+  --muted-foreground: #64748B;
+
+  /* Agency Color System */
+  --agency-epa: #22C55E;
+  --agency-fda: #3B82F6;
+  --agency-fcc: #8B5CF6;
+  --agency-dot: #F97316;
+  --agency-sec: #1D4ED8;
+  --agency-usda: #A16207;
+  --agency-doe: #EAB308;
+  --agency-hhs: #EF4444;
+  --agency-dhs: #0EA5E9;
+  --agency-doj: #DC2626;
+  --agency-dod: #475569;
+  --agency-hud: #0891B2;
+  --agency-ed: #7C3AED;
+  --agency-noaa: #0284C7;
+  --agency-default: #6366f1;
 }
 
 body {
@@ -26,7 +49,14 @@ html {
   padding: 0;
 }
 
-/* Gradient text utility */
+/* ─── Typography ─── */
+.font-mono-id {
+  font-family: 'Fira Code', ui-monospace, monospace;
+  font-size: 0.75rem;
+  letter-spacing: -0.01em;
+}
+
+/* ─── Gradient Utilities ─── */
 .gradient-text {
   background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
   -webkit-background-clip: text;
@@ -34,7 +64,7 @@ html {
   background-clip: text;
 }
 
-/* Gradient border cards */
+/* ─── Card Styles ─── */
 .card-gradient {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -56,7 +86,186 @@ html {
   pointer-events: none;
 }
 
-/* Button styles */
+/* ─── Docket Post Card ─── */
+.docket-post {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.docket-post:hover {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.15), 0 4px 24px rgba(0, 0, 0, 0.2);
+}
+
+/* ─── Agency Avatar ─── */
+.agency-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  color: white;
+  flex-shrink: 0;
+}
+
+.agency-avatar-sm {
+  width: 32px;
+  height: 32px;
+}
+
+.agency-avatar-md {
+  width: 48px;
+  height: 48px;
+  font-size: 0.875rem;
+}
+
+.agency-avatar-lg {
+  width: 72px;
+  height: 72px;
+  font-size: 1.25rem;
+}
+
+/* ─── Comment Thread ─── */
+.comment-thread {
+  position: relative;
+  padding-left: 1.25rem;
+}
+
+.thread-line {
+  position: absolute;
+  left: 0.875rem;
+  top: 2.5rem;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+  border-radius: 1px;
+}
+
+.thread-line:hover {
+  background: var(--accent-primary);
+}
+
+/* ─── Comment Avatar ─── */
+.comment-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: 0.625rem;
+  color: white;
+  flex-shrink: 0;
+}
+
+/* ─── Filter Chips ─── */
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.375rem 0.875rem;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.filter-chip:hover {
+  border-color: var(--accent-primary);
+  color: var(--foreground);
+}
+
+.filter-chip-active {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+/* ─── Attachment Link ─── */
+.attachment-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  color: var(--foreground);
+  transition: all 0.15s ease;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.attachment-link:hover {
+  border-color: var(--accent-primary);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+/* ─── Metadata Pill ─── */
+.metadata-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+/* ─── Status Badge ─── */
+.status-open {
+  color: var(--accent-green);
+}
+
+.status-closed {
+  color: var(--muted-foreground);
+}
+
+/* ─── Action Bar ─── */
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: none;
+  border: none;
+}
+
+.action-btn:hover {
+  background: var(--surface-elevated);
+  color: var(--foreground);
+}
+
+/* ─── Agency Banner ─── */
+.agency-banner {
+  height: 120px;
+  border-radius: 12px 12px 0 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.agency-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 40%, var(--background) 100%);
+}
+
+/* ─── Button Styles ─── */
 .btn-primary {
   background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
   color: white;
@@ -71,7 +280,18 @@ html {
   transform: translateY(-1px);
 }
 
-/* Glow effect */
+/* ─── Glow Effect ─── */
 .glow {
   box-shadow: 0 0 40px rgba(99, 102, 241, 0.15);
+}
+
+/* ─── Reduced Motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
