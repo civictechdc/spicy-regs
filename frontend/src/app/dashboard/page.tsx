@@ -36,13 +36,14 @@ function stripQuotes(s: any): string {
 }
 
 function DocketFeed() {
-  const { getRecentDockets, getDataCount, isReady } = useDuckDBService();
+  const { getRecentDockets, getCommentCounts, getDataCount, isReady } = useDuckDBService();
 
   const [dockets, setDockets] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
 
 
   // Filters
@@ -107,8 +108,14 @@ function DocketFeed() {
     }
   }, [isReady, selectedAgency, sortBy]); // eslint-disable-line react-hooks/exhaustive-deps
 
-
-
+  // Fetch comment counts when dockets change
+  useEffect(() => {
+    if (dockets.length === 0) return;
+    const ids = dockets.map(d => stripQuotes(d.docket_id));
+    getCommentCounts(ids)
+      .then(counts => setCommentCounts(prev => ({ ...prev, ...counts })))
+      .catch(console.error);
+  }, [dockets, getCommentCounts]);
   // Deduplicate
   const uniqueDockets = useMemo(() => {
     const seen = new Set<string>();
@@ -168,6 +175,7 @@ function DocketFeed() {
                     item={item}
                     isBookmarked={isBookmarked}
                     onToggleBookmark={() => handleToggleBookmark(docketId)}
+                    commentCount={commentCounts[docketId.toUpperCase()] || 0}
                   />
                 </div>
               );

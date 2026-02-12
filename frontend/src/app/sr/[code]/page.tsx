@@ -42,7 +42,7 @@ export default function AgencyPage() {
   const agencyCode = (params.code as string || '').toUpperCase();
   const agency = useMemo(() => getAgencyInfo(agencyCode), [agencyCode]);
 
-  const { getRecentDockets, getAgencyStats, isReady } = useDuckDBService();
+  const { getRecentDockets, getCommentCounts, getAgencyStats, isReady } = useDuckDBService();
 
   const [dockets, setDockets] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -50,7 +50,7 @@ export default function AgencyPage() {
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [activeTab, setActiveTab] = useState<SortTab>('new');
-
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [stats, setStats] = useState<{ docketCount: number; documentCount: number; commentCount: number } | undefined>();
 
   // Bookmarks
@@ -104,8 +104,14 @@ export default function AgencyPage() {
     }
   }, [isReady, agencyCode, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-
-
+  // Fetch comment counts
+  useEffect(() => {
+    if (dockets.length === 0) return;
+    const ids = dockets.map(d => stripQuotes(d.docket_id));
+    getCommentCounts(ids)
+      .then(counts => setCommentCounts(prev => ({ ...prev, ...counts })))
+      .catch(console.error);
+  }, [dockets, getCommentCounts]);
   const uniqueDockets = useMemo(() => {
     const seen = new Set<string>();
     return dockets.filter(d => {
@@ -213,6 +219,7 @@ export default function AgencyPage() {
                           item={item}
                           isBookmarked={isBookmarked}
                           onToggleBookmark={() => handleToggleBookmark(docketId)}
+                          commentCount={commentCounts[docketId.toUpperCase()] || 0}
                         />
                       </div>
                     );

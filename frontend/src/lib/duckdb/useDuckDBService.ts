@@ -209,6 +209,28 @@ export function useDuckDBService() {
   );
 
   /**
+   * Get a single docket by its ID.
+   */
+  const getDocketById = useCallback(
+    async (docketId: string): Promise<Record<string, any> | null> => {
+      if (!isReady) throw new Error("DuckDB not ready");
+
+      const escaped = docketId.replace(/'/g, "''");
+      const query = `SELECT * FROM ${tableRef("dockets" as RegulationsDataTypes)} WHERE docket_id = '${escaped}' LIMIT 1`;
+
+      try {
+        const results = await runQuery<Record<string, any>>(query);
+        return results[0] || null;
+      } catch {
+        const fallback = `SELECT * FROM ${parquetRef("dockets" as RegulationsDataTypes)} WHERE docket_id = '${escaped}' LIMIT 1`;
+        const results = await runQuery<Record<string, any>>(fallback);
+        return results[0] || null;
+      }
+    },
+    [runQuery, isReady]
+  );
+
+  /**
    * Get recent dockets across all agencies (or filtered by agency).
    * Powers the main feed — ordered by modify_date DESC.
    */
@@ -279,6 +301,34 @@ export function useDuckDBService() {
         const fallback = `SELECT * FROM ${parquetRef("comments" as RegulationsDataTypes)} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
         return runQuery(fallback);
       }
+    },
+    [runQuery, isReady]
+  );
+
+  /**
+   * Get comment counts for a batch of docket IDs.
+   */
+  const getCommentCounts = useCallback(
+    async (docketIds: string[]): Promise<Record<string, number>> => {
+      if (!isReady || docketIds.length === 0) return {};
+
+      const cleanIds = docketIds.map(id => id.replace(/^"|"$/g, '').toUpperCase());
+      const inClause = cleanIds.map(id => `'${id}'`).join(',');
+      const query = `SELECT REPLACE(docket_id, '"', '') as did, COUNT(*) as cnt FROM ${tableRef("comments" as RegulationsDataTypes)} WHERE REPLACE(docket_id, '"', '') IN (${inClause}) GROUP BY did`;
+
+      let rows: { did: string; cnt: number }[];
+      try {
+        rows = await runQuery<{ did: string; cnt: number }>(query);
+      } catch {
+        const fb = `SELECT REPLACE(docket_id, '"', '') as did, COUNT(*) as cnt FROM ${parquetRef("comments" as RegulationsDataTypes)} WHERE REPLACE(docket_id, '"', '') IN (${inClause}) GROUP BY did`;
+        rows = await runQuery<{ did: string; cnt: number }>(fb);
+      }
+
+      const result: Record<string, number> = {};
+      for (const r of rows) {
+        result[r.did] = Number(r.cnt);
+      }
+      return result;
     },
     [runQuery, isReady]
   );
@@ -385,8 +435,10 @@ export function useDuckDBService() {
     searchResources,
     getAgencies,
     getDockets,
+    getDocketById,
     getRecentDockets,
     getCommentsForDocket,
+    getCommentCounts,
     getAgencyStats,
     getPopularAgencies,
     getAllAgencyCounts,

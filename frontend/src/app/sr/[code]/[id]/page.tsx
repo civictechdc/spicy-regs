@@ -36,10 +36,11 @@ function stripQuotes(s: any): string {
 
 export default function DocketDetailPage() {
   const params = useParams();
+  const agencyCode = ((params.code as string) || '').toUpperCase();
   const rawId = params.id as string || '';
   const docketId = decodeURIComponent(rawId).toUpperCase();
 
-  const { getData, getAgencyStats, isReady } = useDuckDBService();
+  const { getDocketById, getAgencyStats, isReady } = useDuckDBService();
   const [docket, setDocket] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>();
@@ -58,27 +59,20 @@ export default function DocketDetailPage() {
     });
   }, [docketId]);
 
-  const agencyCode = useMemo(() => {
-    if (!docket) return '';
-    return stripQuotes(docket.agency_code) || docketId.split('-')[0] || '';
-  }, [docket, docketId]);
 
-  // Load docket
+
   useEffect(() => {
     if (!isReady || !docketId) return;
-    getData('dockets', 100, 0)
-      .then(results => {
-        const match = results.find((d: any) =>
-          stripQuotes(d.docket_id).toUpperCase() === docketId
-        );
-        setDocket(match || null);
+    getDocketById(docketId)
+      .then(result => {
+        setDocket(result);
         setLoading(false);
       })
       .catch(err => {
         console.error('Failed to load docket:', err);
         setLoading(false);
       });
-  }, [isReady, docketId, getData]);
+  }, [isReady, docketId, getDocketById]);
 
   // Load agency stats
   useEffect(() => {
@@ -104,8 +98,8 @@ export default function DocketDetailPage() {
         <div className="max-w-3xl mx-auto px-4 py-16 text-center">
           <h1 className="text-2xl font-bold mb-2">Docket not found</h1>
           <p className="text-[var(--muted)] mb-4">{docketId}</p>
-          <Link href="/dashboard" className="text-[var(--accent-primary)] hover:underline">
-            ← Back to feed
+          <Link href={`/sr/${agencyCode}`} className="text-[var(--accent-primary)] hover:underline">
+            ← Back to sr/{agencyCode}
           </Link>
         </div>
       </div>
@@ -118,11 +112,11 @@ export default function DocketDetailPage() {
       <main className="max-w-5xl mx-auto px-4 py-6">
         {/* Back button */}
         <Link
-          href="/dashboard"
+          href={`/sr/${agencyCode}`}
           className="inline-flex items-center gap-1.5 text-sm text-[var(--muted)] hover:text-[var(--foreground)] mb-4 transition-colors"
         >
           <ArrowLeft size={14} />
-          Back to feed
+          sr/{agencyCode}
         </Link>
 
         <div className="flex gap-6">

@@ -127,7 +127,7 @@ export function DocketPost({
               </h3>
             ) : (
               <Link
-                href={`/docket/${encodeURIComponent(docketId)}`}
+                href={`/sr/${agencyCode}/${encodeURIComponent(docketId)}`}
                 className="text-lg font-semibold text-[var(--foreground)] leading-snug hover:text-[var(--accent-primary)] transition-colors block"
               >
                 {title}
@@ -231,7 +231,7 @@ export function DocketPost({
 
           {!isDetailView && (
             <Link
-              href={`/docket/${encodeURIComponent(docketId)}`}
+              href={`/sr/${agencyCode}/${encodeURIComponent(docketId)}`}
               className="action-btn"
             >
               <MessageSquare size={16} />
