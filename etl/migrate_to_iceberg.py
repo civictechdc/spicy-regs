@@ -25,7 +25,23 @@ CATALOG_URI = "https://catalog.cloudflarestorage.com/a18589c7a7a0fc4febecadfc9c7
 WAREHOUSE = "a18589c7a7a0fc4febecadfc9c71b105_spicy-regs"
 TOKEN = os.getenv("R2_API_TOKEN")
 
-TABLES = ["dockets", "documents", "comments"]
+# Table configs: name -> optional partition spec
+# NOTE: DuckDB's Iceberg extension does not support PARTITIONED BY as of v1.4.
+# Partition pruning for comments is handled via Hive-partitioned Parquet on R2 instead.
+TABLES = {
+    "dockets": {
+        "partition": None,
+        "source_transform": None,
+    },
+    "documents": {
+        "partition": None,
+        "source_transform": None,
+    },
+    "comments": {
+        "partition": None,
+        "source_transform": None,
+    },
+}
 
 
 def main():
@@ -42,6 +58,16 @@ def main():
         action="store_true",
         help="Show migration plan without executing",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Drop and recreate existing tables",
+    )
+    parser.add_argument(
+        "--table",
+        choices=list(TABLES.keys()),
+        help="Migrate a single table only",
+    )
     args = parser.parse_args()
 
     if not TOKEN:
@@ -50,11 +76,18 @@ def main():
 
     schema = args.schema
 
+    tables_to_migrate = [args.table] if args.table else list(TABLES.keys())
+
     if args.dry_run:
         print("DRY RUN — no changes will be made\n")
-        for table in TABLES:
-            print(f"  CREATE TABLE spicy_regs.{schema}.{table}")
-            print(f"    AS SELECT * FROM read_parquet('{R2_PUBLIC_URL}/{table}.parquet')")
+        for table in tables_to_migrate:
+            config = TABLES[table]
+            partition = config["partition"] or ""
+            select = config["source_transform"] or "SELECT *"
+            print(f"  CREATE TABLE spicy_regs.{schema}.{table} {partition}")
+            print(f"    AS {select} FROM read_parquet('{R2_PUBLIC_URL}/{table}.parquet')")
+            if args.force:
+                print(f"    (will DROP existing table first)")
             print()
         return
 
@@ -89,26 +122,38 @@ def main():
 
     # Migrate each table
     print("=" * 60)
-    for table in TABLES:
+    for table in tables_to_migrate:
+        config = TABLES[table]
         fqn = f"spicy_regs.{schema}.{table}"
         source = f"{R2_PUBLIC_URL}/{table}.parquet"
 
         # Check if table already exists
         try:
             existing = conn.execute(f"SELECT COUNT(*) FROM {fqn}").fetchone()[0]
-            print(f"⏭ {fqn} already exists ({existing:,} rows) — skipping")
-            print()
-            continue
+            if args.force:
+                print(f"🗑 Dropping {fqn} ({existing:,} rows)...")
+                conn.execute(f"DROP TABLE {fqn}")
+            else:
+                print(f"⏭ {fqn} already exists ({existing:,} rows) — skipping (use --force to recreate)")
+                print()
+                continue
         except Exception:
             pass  # Table doesn't exist, proceed
 
         print(f"📦 Migrating {table}...")
         print(f"   Source: {source}")
+
+        partition_clause = config["partition"] or ""
+        select_clause = config["source_transform"] or "SELECT *"
+
+        if partition_clause:
+            print(f"   Partition: {partition_clause}")
+
         start = time.time()
 
         conn.execute(f"""
-            CREATE TABLE {fqn} AS
-            SELECT * FROM read_parquet('{source}')
+            CREATE TABLE {fqn} {partition_clause} AS
+            {select_clause} FROM read_parquet('{source}')
         """)
 
         elapsed = time.time() - start
@@ -118,19 +163,22 @@ def main():
         print(f"   ✓ {count:,} rows in {elapsed:.1f}s")
 
         # Show sample
-        sample = conn.execute(f"SELECT * FROM {fqn} LIMIT 3").fetchdf()
-        print(f"   Sample:\n{sample.to_string(index=False)}")
+        sample = conn.execute(f"SELECT * FROM {fqn} LIMIT 3").fetchall()
+        cols = [desc[0] for desc in conn.description]
+        print(f"   Sample columns: {', '.join(cols)}")
+        for row in sample:
+            print(f"   {row}")
         print()
 
     # Final summary
     print("=" * 60)
     print("Migration complete! Tables in catalog:\n")
-    tables = conn.execute("SHOW ALL TABLES").fetchdf()
-    iceberg_tables = tables[tables["database"] == "spicy_regs"]
-    for _, row in iceberg_tables.iterrows():
-        fqn = f"{row['database']}.{row['schema']}.{row['name']}"
-        count = conn.execute(f"SELECT COUNT(*) FROM {fqn}").fetchone()[0]
-        print(f"  {fqn}: {count:,} rows")
+    tables = conn.execute("SHOW ALL TABLES").fetchall()
+    for row in tables:
+        if row[0] == "spicy_regs":
+            fqn = f"{row[0]}.{row[1]}.{row[2]}"
+            count = conn.execute(f"SELECT COUNT(*) FROM {fqn}").fetchone()[0]
+            print(f"  {fqn}: {count:,} rows")
 
     conn.close()
     print("\n✅ Done!")
