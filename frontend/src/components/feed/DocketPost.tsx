@@ -30,6 +30,13 @@ function stripQuotes(s: any): string {
   return String(s).replace(/^"|"$/g, '');
 }
 
+function decodeHtml(s: string): string {
+  const doc = typeof document !== 'undefined'
+    ? new DOMParser().parseFromString(s, 'text/html')
+    : null;
+  return doc?.documentElement.textContent || s;
+}
+
 function parseRawJson(item: Record<string, any>) {
   try {
     const raw = typeof item.raw_json === 'string' ? JSON.parse(item.raw_json) : item.raw_json;
@@ -56,8 +63,8 @@ export function DocketPost({
   const agencyCode = stripQuotes(item.agency_code) || docketId.split('-')[0] || '';
   const agency = getAgencyInfo(agencyCode);
 
-  const title = stripQuotes(item.title) || attrs.title || docketId;
-  const abstract = stripQuotes(item.abstract) || attrs.abstract || '';
+  const title = decodeHtml(stripQuotes(item.title) || attrs.title || docketId);
+  const abstract = decodeHtml(stripQuotes(item.abstract) || attrs.abstract || '');
   const docketType = stripQuotes(item.docket_type) || attrs.docketType || '';
   const modifyDate = stripQuotes(item.modify_date) || attrs.modifyDate;
 

@@ -14,6 +14,13 @@ function stripQuotes(s: any): string {
   return String(s).replace(/^"|"$/g, '');
 }
 
+function decodeHtml(s: string): string {
+  const doc = typeof document !== 'undefined'
+    ? new DOMParser().parseFromString(s, 'text/html')
+    : null;
+  return doc?.documentElement.textContent || s;
+}
+
 function parseCommentData(item: Record<string, any>) {
   let attrs: Record<string, any> = {};
   try {
@@ -24,11 +31,11 @@ function parseCommentData(item: Record<string, any>) {
   }
 
   // Comment text: prefer direct column, then raw_json attribute
-  const comment = stripQuotes(item.comment) || attrs.comment || '';
+  const comment = decodeHtml(stripQuotes(item.comment) || attrs.comment || '');
 
   return {
     commentId: stripQuotes(item.comment_id) || attrs.id || '',
-    title: stripQuotes(item.title) || attrs.title || 'Untitled Comment',
+    title: decodeHtml(stripQuotes(item.title) || attrs.title || 'Untitled Comment'),
     comment,
     firstName: attrs.firstName || stripQuotes(item.first_name) || '',
     lastName: attrs.lastName || stripQuotes(item.last_name) || '',
