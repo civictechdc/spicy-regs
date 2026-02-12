@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { Link2, ChevronDown, Loader2 } from 'lucide-react';
+import { Link2, ChevronDown, Loader2, FileText, Download } from 'lucide-react';
 import { stringToColor, getInitials, timeAgo } from '@/lib/agencyMetadata';
 import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
 
@@ -23,15 +23,40 @@ function decodeHtml(s: string): string {
 
 function parseCommentData(item: Record<string, any>) {
   let attrs: Record<string, any> = {};
+  let included: any[] = [];
   try {
     const raw = typeof item.raw_json === 'string' ? JSON.parse(item.raw_json) : item.raw_json;
     attrs = raw?.data?.attributes || {};
+    included = raw?.included || [];
   } catch {
     // raw_json parsing failed, use top-level columns only
   }
 
   // Comment text: prefer direct column, then raw_json attribute
   const comment = decodeHtml(stripQuotes(item.comment) || attrs.comment || '');
+
+  // Attachments: from included array or file_url column
+  const attachments: { name: string; url: string; format: string }[] = [];
+  for (const inc of included) {
+    if (inc?.type === 'attachments') {
+      const formats = inc?.attributes?.fileFormats || [];
+      for (const f of formats) {
+        if (f?.fileUrl) {
+          const fileName = f.fileUrl.split('/').pop() || 'Attachment';
+          attachments.push({ name: inc?.attributes?.title || fileName, url: f.fileUrl, format: (f.format || 'file').toUpperCase() });
+        }
+      }
+    }
+  }
+  // Fallback: use file_url column if no attachments found from raw_json
+  if (attachments.length === 0) {
+    const fileUrl = stripQuotes(item.file_url);
+    if (fileUrl) {
+      const fileName = fileUrl.split('/').pop() || 'Attachment';
+      const ext = fileName.split('.').pop()?.toUpperCase() || 'FILE';
+      attachments.push({ name: fileName, url: fileUrl, format: ext });
+    }
+  }
 
   return {
     commentId: stripQuotes(item.comment_id) || attrs.id || '',
@@ -43,6 +68,7 @@ function parseCommentData(item: Record<string, any>) {
     submitterType: attrs.submitterType || '',
     postedDate: attrs.postedDate || stripQuotes(item.posted_date) || '',
     documentSubtype: attrs.documentSubtype || stripQuotes(item.document_subtype) || '',
+    attachments,
   };
 }
 
@@ -56,6 +82,7 @@ interface CommentItemData {
   submitterType: string;
   postedDate: string;
   documentSubtype: string;
+  attachments: { name: string; url: string; format: string }[];
 }
 
 function CommentItem({ data }: { data: CommentItemData }) {
@@ -122,6 +149,26 @@ function CommentItem({ data }: { data: CommentItemData }) {
               </button>
             )}
           </div>
+
+          {/* Attachments */}
+          {data.attachments.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              {data.attachments.map((att, i) => (
+                <a
+                  key={i}
+                  href={att.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="attachment-link !py-1 !text-xs"
+                >
+                  <FileText size={12} className="text-[var(--accent-primary)]" />
+                  <span className="truncate max-w-[200px]">{att.name}</span>
+                  <span className="text-[var(--muted)]">{att.format}</span>
+                  <Download size={10} className="text-[var(--muted)]" />
+                </a>
+              ))}
+            </div>
+          )}
 
           {/* Comment Actions */}
           <div className="flex items-center gap-3 mt-1.5">
