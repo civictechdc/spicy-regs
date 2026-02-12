@@ -201,14 +201,12 @@ export function useDuckDBService() {
       const orderClause = 'ORDER BY d.modify_date DESC';
 
       const cols = 'd.docket_id, d.agency_code, d.title, d.abstract, d.docket_type, d.modify_date';
+      const commentCountsRef = `read_parquet('${R2_BASE_URL}/comment_counts.parquet')`;
       const query = `
-        SELECT ${cols}, COALESCE(c.cnt, 0) AS comment_count
+        SELECT ${cols}, COALESCE(c.comment_count, 0) AS comment_count
         FROM ${parquetRef("dockets" as RegulationsDataTypes)} d
-        LEFT JOIN (
-          SELECT REPLACE(docket_id, '"', '') AS did, COUNT(*) AS cnt
-          FROM ${parquetRef("comments" as RegulationsDataTypes)}
-          GROUP BY did
-        ) c ON REPLACE(d.docket_id, '"', '') = c.did
+        LEFT JOIN ${commentCountsRef} c
+          ON REPLACE(d.docket_id, '"', '') = c.docket_id
         ${whereClause} ${orderClause}
         LIMIT ${limit} OFFSET ${offset}
       `;
