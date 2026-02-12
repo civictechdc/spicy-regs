@@ -56,6 +56,7 @@ function CommentItem({ data }: { data: CommentItemData }) {
 
   const authorName = data.organization
     || [data.firstName, data.lastName].filter(Boolean).join(' ')
+    || data.title
     || 'Anonymous';
 
   const isOrg = !!data.organization;
