@@ -48,6 +48,26 @@ def upload_to_r2(local_path: Path, remote_key: str = None):
     print(f"  ✓ Uploaded: {public_url}/{remote_key}")
 
 
+def upload_directory_to_r2(local_dir: Path, remote_prefix: str = None):
+    """Recursively upload a directory to R2, preserving relative paths as keys."""
+    if not local_dir.is_dir():
+        print(f"  Skipping (not a directory): {local_dir}")
+        return
+
+    if remote_prefix is None:
+        remote_prefix = local_dir.name
+
+    files = sorted(local_dir.rglob("*.parquet"))
+    print(f"  Uploading {len(files)} files from {local_dir.name}/ to R2...")
+
+    for file_path in files:
+        relative = file_path.relative_to(local_dir)
+        remote_key = f"{remote_prefix}/{relative}"
+        upload_to_r2(file_path, remote_key=remote_key)
+
+    print(f"  ✓ Uploaded {len(files)} files under {remote_prefix}/")
+
+
 def list_r2_files():
     """List files in R2 bucket."""
     bucket = os.getenv("R2_BUCKET_NAME", "spicy-regs")

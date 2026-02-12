@@ -23,13 +23,15 @@ from pathlib import Path
 import boto3
 import polars as pl
 import pyarrow as pa
+import pyarrow.compute as pc
+import pyarrow.dataset as pds
 import pyarrow.parquet as pq
 from botocore import UNSIGNED
 from botocore.config import Config
 from dotenv import load_dotenv
 from tqdm import tqdm
 
-from upload_r2 import upload_to_r2
+from upload_r2 import upload_to_r2, upload_directory_to_r2
 from download_r2 import download_from_r2
 
 load_dotenv()
@@ -332,6 +334,105 @@ def merge_staging_files(staging_dir: Path, output_dir: Path, data_types_to_merge
         print(f"  {data_type}: ✓ merged {total_rows:,} total rows")
 
 
+def optimize_parquet(output_dir: Path):
+    """
+    Rewrite merged Parquet files with sorting, tuned row groups,
+    and (for comments) Hive partitioning to improve read performance.
+    """
+    print(f"\n{'='*60}")
+    print("Optimizing Parquet files for read performance...")
+
+    # --- Dockets: sort by agency_code, modify_date ---
+    dockets_file = output_dir / "dockets.parquet"
+    if dockets_file.exists():
+        print("\n  Optimizing dockets...")
+        table = pq.read_table(dockets_file)
+        table = table.sort_by([("agency_code", "ascending"), ("modify_date", "ascending")])
+        pq.write_table(
+            table, dockets_file,
+            compression="zstd",
+            row_group_size=100_000,
+            write_statistics=True,
+        )
+        meta = pq.read_metadata(dockets_file)
+        print(f"  ✓ dockets: {meta.num_rows:,} rows, {meta.num_row_groups} row groups")
+        del table
+
+    # --- Documents: sort by agency_code, posted_date ---
+    documents_file = output_dir / "documents.parquet"
+    if documents_file.exists():
+        print("\n  Optimizing documents...")
+        table = pq.read_table(documents_file)
+        table = table.sort_by([("agency_code", "ascending"), ("posted_date", "ascending")])
+        pq.write_table(
+            table, documents_file,
+            compression="zstd",
+            row_group_size=100_000,
+            write_statistics=True,
+        )
+        meta = pq.read_metadata(documents_file)
+        print(f"  ✓ documents: {meta.num_rows:,} rows, {meta.num_row_groups} row groups")
+        del table
+
+    # --- Comments: Hive partition by year, sort within partitions ---
+    comments_file = output_dir / "comments.parquet"
+    comments_out = output_dir / "comments_optimized"
+    if comments_file.exists():
+        print("\n  Optimizing comments (streaming by year)...")
+
+        # Clean previous output
+        if comments_out.exists():
+            shutil.rmtree(comments_out)
+        comments_out.mkdir(parents=True)
+
+        # Stream through source file in batches to extract unique years
+        source = pds.dataset(comments_file, format="parquet")
+
+        # Discover years by scanning the date column only
+        year_col = source.to_table(columns=["posted_date"])
+        dates = pc.cast(year_col.column("posted_date"), pa.timestamp("s"), safe=False)
+        years = pc.year(dates)
+        unique_years = pc.unique(years.drop_null()).to_pylist()
+        unique_years.sort()
+        del year_col, dates, years
+        print(f"  Found {len(unique_years)} year partitions: {unique_years[0]}..{unique_years[-1]}")
+
+        # Process one year at a time to bound memory
+        total_written = 0
+        for year_val in unique_years:
+            # Filter to this year
+            year_filter = (
+                (pc.year(pc.cast(pds.field("posted_date"), pa.timestamp("s"), safe=False)) == year_val)
+            )
+            year_table = source.to_table(filter=year_filter)
+
+            # Sort within the partition
+            year_table = year_table.sort_by([
+                ("agency_code", "ascending"),
+                ("docket_id", "ascending"),
+                ("posted_date", "ascending"),
+            ])
+
+            # Write to Hive directory
+            year_dir = comments_out / f"year={year_val}"
+            year_dir.mkdir(parents=True, exist_ok=True)
+            pq.write_table(
+                year_table,
+                year_dir / "part-0.parquet",
+                compression="zstd",
+                row_group_size=500_000,
+                write_statistics=True,
+            )
+            total_written += year_table.num_rows
+            print(f"    year={year_val}: {year_table.num_rows:,} rows")
+            del year_table
+
+        print(f"  ✓ comments: {total_written:,} total rows across {len(unique_years)} partitions")
+
+    print(f"\n{'='*60}")
+    print("Optimization complete!")
+
+
 def get_processed_agencies(output_dir: Path, skip_comments: bool = False, only_comments: bool = False) -> set[str]:
     """Get agencies already processed by checking existing Parquet files."""
     processed_per_type = []
@@ -374,6 +475,8 @@ def main():
     parser.add_argument("--batch-size", type=int, default=45, help="Number of agencies per batch (default: 45)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose debug logging")
     parser.add_argument("--merge-only", action="store_true", help="Only merge staging files (skip downloading)")
+    parser.add_argument("--optimize", action="store_true", help="Run optimization after ETL merge")
+    parser.add_argument("--optimize-only", action="store_true", help="Only optimize existing Parquet files (skip ETL)")
     args = parser.parse_args()
 
     # Setup output directory
@@ -389,6 +492,21 @@ def main():
 
     print(f"Output directory: {output_dir}")
     print(f"Staging directory: {staging_dir}")
+
+    # Optimize-only mode: rewrite existing Parquet files and exit
+    if args.optimize_only:
+        print("Optimize-only mode - rewriting existing Parquet files...")
+        optimize_parquet(output_dir)
+        if not args.skip_upload:
+            print("\nUploading optimized files to R2...")
+            for dt in ["dockets", "documents"]:
+                pf = output_dir / f"{dt}.parquet"
+                if pf.exists():
+                    upload_to_r2(pf)
+            comments_out = output_dir / "comments_optimized"
+            if comments_out.exists():
+                upload_directory_to_r2(comments_out)
+        return
 
     # Merge-only mode: just merge staging files and exit
     if args.merge_only:
@@ -493,6 +611,10 @@ def main():
         shutil.rmtree(staging_dir)
         print("Cleaned up staging directory")
 
+    # Optimize if requested
+    if args.optimize:
+        optimize_parquet(output_dir)
+
     # Summary
     print(f"\n{'='*60}")
     print("Summary:")
@@ -515,6 +637,10 @@ def main():
             pf = output_dir / f"{data_type}.parquet"
             if pf.exists():
                 upload_to_r2(pf)
+        # Upload optimized comments directory if it exists
+        comments_out = output_dir / "comments_optimized"
+        if comments_out.exists():
+            upload_directory_to_r2(comments_out)
         # Upload manifest too
         manifest_file = output_dir / "manifest.parquet"
         if manifest_file.exists():
