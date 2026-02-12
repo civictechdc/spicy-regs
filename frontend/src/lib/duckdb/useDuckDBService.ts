@@ -7,9 +7,26 @@ import { RegulationsDataTypes } from "@/lib/db/models";
 /** Default row limit to prevent OOM in the browser */
 const DEFAULT_LIMIT = 1000;
 
-/** Build a read_parquet() reference for a given data type */
-const parquetRef = (dataType: RegulationsDataTypes) =>
-  `read_parquet('${R2_BASE_URL}/${dataType}.parquet')`;
+/** Years covered by the comments_optimized partitions */
+const COMMENT_YEARS = [
+  2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009,
+  2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
+  2020, 2021, 2022, 2023, 2024, 2025, 2026,
+];
+const COMMENT_PARTITION_URLS = COMMENT_YEARS
+  .map(y => `'${R2_BASE_URL}/comments_optimized/year=${y}/part-0.parquet'`)
+  .join(', ');
+
+/**
+ * Build a read_parquet() reference for a given data type.
+ * Comments use the optimized year-partitioned files for faster reads.
+ */
+const parquetRef = (dataType: RegulationsDataTypes) => {
+  if (dataType === 'comments') {
+    return `read_parquet([${COMMENT_PARTITION_URLS}], hive_partitioning = true)`;
+  }
+  return `read_parquet('${R2_BASE_URL}/${dataType}.parquet')`;
+};
 
 /**
  * Hook that provides data fetching via DuckDB-WASM + Parquet on R2.
