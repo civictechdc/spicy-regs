@@ -132,7 +132,7 @@ export default function DocketDetailPage() {
 
             {/* Comments */}
             <div className="mt-0 rounded-b-xl overflow-hidden border border-t-0 border-[var(--border)]">
-              <ThreadedComments docketId={docketId} />
+              <ThreadedComments docketId={docketId} modifyDate={stripQuotes(docket?.modify_date)} />
             </div>
           </div>
 

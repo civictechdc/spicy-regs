@@ -254,14 +254,16 @@ export function useDuckDBService() {
 
   /**
    * Get comments for a specific docket.
-   * Handles both quoted and unquoted docket_id values in the data.
+   * When modifyDate is provided, reads only the relevant year partition(s)
+   * instead of scanning all 27 partitions (~2.9GB total).
    */
   const getCommentsForDocket = useCallback(
     async (
       docketId: string,
       limit: number = 10,
       offset: number = 0,
-      sortBy: 'recent' | 'oldest' = 'recent'
+      sortBy: 'recent' | 'oldest' = 'recent',
+      modifyDate?: string
     ): Promise<any[]> => {
       if (!isReady) throw new Error("DuckDB not ready");
 
@@ -271,7 +273,23 @@ export function useDuckDBService() {
         : 'ORDER BY posted_date DESC';
       const whereClause = `WHERE REPLACE(docket_id, '"', '') = '${cleanId}'`;
 
-      const query = `SELECT * FROM ${parquetRef("comments" as RegulationsDataTypes)} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
+      // If we have a modify_date, only read the relevant year partition(s)
+      let commentsSource: string;
+      if (modifyDate) {
+        const year = new Date(modifyDate).getFullYear();
+        // Read the docket's year ± 1 to catch comments spanning year boundaries
+        const years = [year - 1, year, year + 1].filter(
+          y => y >= 2000 && y <= 2026
+        );
+        const urls = years
+          .map(y => `'${R2_BASE_URL}/comments_optimized/year=${y}/part-0.parquet'`)
+          .join(', ');
+        commentsSource = `read_parquet([${urls}], hive_partitioning = true)`;
+      } else {
+        commentsSource = parquetRef("comments" as RegulationsDataTypes);
+      }
+
+      const query = `SELECT * FROM ${commentsSource} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
       return runQuery(query);
     },
     [runQuery, isReady]

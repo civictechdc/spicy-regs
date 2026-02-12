@@ -7,6 +7,7 @@ import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
 
 interface ThreadedCommentsProps {
   docketId: string;
+  modifyDate?: string;
 }
 
 function stripQuotes(s: any): string {
@@ -190,7 +191,7 @@ function CommentItem({ data }: { data: CommentItemData }) {
 
 const PAGE_SIZE = 10;
 
-export function ThreadedComments({ docketId }: ThreadedCommentsProps) {
+export function ThreadedComments({ docketId, modifyDate }: ThreadedCommentsProps) {
   const { getCommentsForDocket, isReady } = useDuckDBService();
   const [comments, setComments] = useState<CommentItemData[]>([]);
   const [loading, setLoading] = useState(false);
@@ -204,7 +205,7 @@ export function ThreadedComments({ docketId }: ThreadedCommentsProps) {
     try {
       setLoading(true);
       const newOffset = reset ? 0 : offset;
-      const results = await getCommentsForDocket(docketId, PAGE_SIZE, newOffset, sortBy);
+      const results = await getCommentsForDocket(docketId, PAGE_SIZE, newOffset, sortBy, modifyDate);
       const parsed = results.map(parseCommentData);
 
       if (reset) {
