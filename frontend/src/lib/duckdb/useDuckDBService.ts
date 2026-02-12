@@ -316,6 +316,26 @@ export function useDuckDBService() {
     [runQuery, isReady]
   );
 
+  /**
+   * Get agencies ranked by docket count (most dockets first).
+   * Powers the "Popular Agencies" section on /agencies.
+   */
+  const getPopularAgencies = useCallback(
+    async (limit: number = 4): Promise<{ agency_code: string; docket_count: number }[]> => {
+      if (!isReady) throw new Error("DuckDB not ready");
+
+      const query = `SELECT agency_code, COUNT(*) as docket_count FROM ${tableRef("dockets" as RegulationsDataTypes)} GROUP BY agency_code ORDER BY docket_count DESC LIMIT ${limit}`;
+
+      try {
+        return await runQuery<{ agency_code: string; docket_count: number }>(query);
+      } catch {
+        const fallback = `SELECT agency_code, COUNT(*) as docket_count FROM ${parquetRef("dockets" as RegulationsDataTypes)} GROUP BY agency_code ORDER BY docket_count DESC LIMIT ${limit}`;
+        return runQuery<{ agency_code: string; docket_count: number }>(fallback);
+      }
+    },
+    [runQuery, isReady]
+  );
+
   return {
     getData,
     getDataCount,
@@ -325,6 +345,7 @@ export function useDuckDBService() {
     getRecentDockets,
     getCommentsForDocket,
     getAgencyStats,
+    getPopularAgencies,
     isReady,
   };
 }

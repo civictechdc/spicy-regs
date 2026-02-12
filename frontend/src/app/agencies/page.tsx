@@ -7,32 +7,34 @@ import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
 import { Search, Loader2 } from 'lucide-react';
 
 export default function AgenciesPage() {
-  const { getAgencies, isReady } = useDuckDBService();
+  const { getAgencies, getPopularAgencies, isReady } = useDuckDBService();
   const [agencies, setAgencies] = useState<string[]>([]);
+  const [popularAgencies, setPopularAgencies] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (!isReady) return;
-    getAgencies()
-      .then(result => {
-        setAgencies(result);
+    Promise.all([
+      getAgencies(),
+      getPopularAgencies(4),
+    ])
+      .then(([all, popular]) => {
+        setAgencies(all);
+        setPopularAgencies(popular.map(p => p.agency_code));
         setLoading(false);
       })
       .catch(err => {
         console.error('Failed to load agencies:', err);
         setLoading(false);
       });
-  }, [isReady, getAgencies]);
+  }, [isReady, getAgencies, getPopularAgencies]);
 
   const filteredAgencies = useMemo(() => {
     if (!searchQuery) return agencies;
     const q = searchQuery.toLowerCase();
     return agencies.filter(a => a.toLowerCase().includes(q));
   }, [agencies, searchQuery]);
-
-  // Show first 4 as "popular" when no search
-  const popularAgencies = useMemo(() => agencies.slice(0, 4), [agencies]);
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
