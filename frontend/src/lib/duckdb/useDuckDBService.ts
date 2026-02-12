@@ -336,6 +336,49 @@ export function useDuckDBService() {
     [runQuery, isReady]
   );
 
+  /**
+   * Get docket and comment counts for all agencies in one batch.
+   */
+  const getAllAgencyCounts = useCallback(
+    async (): Promise<Record<string, { dockets: number; comments: number }>> => {
+      if (!isReady) throw new Error("DuckDB not ready");
+
+      const docketQ = `SELECT agency_code, COUNT(*) as cnt FROM ${tableRef("dockets" as RegulationsDataTypes)} GROUP BY agency_code`;
+      const commentQ = `SELECT agency_code, COUNT(*) as cnt FROM ${tableRef("comments" as RegulationsDataTypes)} GROUP BY agency_code`;
+
+      let docketRows: { agency_code: string; cnt: number }[];
+      let commentRows: { agency_code: string; cnt: number }[];
+
+      try {
+        [docketRows, commentRows] = await Promise.all([
+          runQuery<{ agency_code: string; cnt: number }>(docketQ),
+          runQuery<{ agency_code: string; cnt: number }>(commentQ),
+        ]);
+      } catch {
+        const dFb = `SELECT agency_code, COUNT(*) as cnt FROM ${parquetRef("dockets" as RegulationsDataTypes)} GROUP BY agency_code`;
+        const cFb = `SELECT agency_code, COUNT(*) as cnt FROM ${parquetRef("comments" as RegulationsDataTypes)} GROUP BY agency_code`;
+        [docketRows, commentRows] = await Promise.all([
+          runQuery<{ agency_code: string; cnt: number }>(dFb),
+          runQuery<{ agency_code: string; cnt: number }>(cFb),
+        ]);
+      }
+
+      const result: Record<string, { dockets: number; comments: number }> = {};
+      for (const r of docketRows) {
+        const code = r.agency_code?.replace(/^"|"$/g, '') || '';
+        if (!result[code]) result[code] = { dockets: 0, comments: 0 };
+        result[code].dockets = Number(r.cnt);
+      }
+      for (const r of commentRows) {
+        const code = r.agency_code?.replace(/^"|"$/g, '') || '';
+        if (!result[code]) result[code] = { dockets: 0, comments: 0 };
+        result[code].comments = Number(r.cnt);
+      }
+      return result;
+    },
+    [runQuery, isReady]
+  );
+
   return {
     getData,
     getDataCount,
@@ -346,6 +389,7 @@ export function useDuckDBService() {
     getCommentsForDocket,
     getAgencyStats,
     getPopularAgencies,
+    getAllAgencyCounts,
     isReady,
   };
 }

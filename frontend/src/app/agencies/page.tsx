@@ -7,9 +7,10 @@ import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
 import { Search, Loader2 } from 'lucide-react';
 
 export default function AgenciesPage() {
-  const { getAgencies, getPopularAgencies, isReady } = useDuckDBService();
+  const { getAgencies, getPopularAgencies, getAllAgencyCounts, isReady } = useDuckDBService();
   const [agencies, setAgencies] = useState<string[]>([]);
   const [popularAgencies, setPopularAgencies] = useState<string[]>([]);
+  const [agencyCounts, setAgencyCounts] = useState<Record<string, { dockets: number; comments: number }>>({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -18,17 +19,19 @@ export default function AgenciesPage() {
     Promise.all([
       getAgencies(),
       getPopularAgencies(4),
+      getAllAgencyCounts(),
     ])
-      .then(([all, popular]) => {
+      .then(([all, popular, counts]) => {
         setAgencies(all);
         setPopularAgencies(popular.map(p => p.agency_code));
+        setAgencyCounts(counts);
         setLoading(false);
       })
       .catch(err => {
         console.error('Failed to load agencies:', err);
         setLoading(false);
       });
-  }, [isReady, getAgencies, getPopularAgencies]);
+  }, [isReady, getAgencies, getPopularAgencies, getAllAgencyCounts]);
 
   const filteredAgencies = useMemo(() => {
     if (!searchQuery) return agencies;
@@ -81,7 +84,12 @@ export default function AgenciesPage() {
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {popularAgencies.map(code => (
-                    <AgencyCard key={code} code={code} />
+                    <AgencyCard
+                      key={code}
+                      code={code}
+                      docketCount={agencyCounts[code]?.dockets}
+                      commentCount={agencyCounts[code]?.comments}
+                    />
                   ))}
                 </div>
               </div>
@@ -99,7 +107,12 @@ export default function AgenciesPage() {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {filteredAgencies.map(code => (
-                    <AgencyCard key={code} code={code} />
+                    <AgencyCard
+                      key={code}
+                      code={code}
+                      docketCount={agencyCounts[code]?.dockets}
+                      commentCount={agencyCounts[code]?.comments}
+                    />
                   ))}
                 </div>
               )}
