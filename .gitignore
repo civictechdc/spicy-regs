@@ -11,3 +11,6 @@ __marimo__
 output
 /data
 *.egg-info
+
+node_modules
+.wrangler

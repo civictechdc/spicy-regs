@@ -19,37 +19,3 @@ export interface RegulationData {
   organization?: string | null;
   [key: string]: any; // Allow for additional fields that may vary by data type
 }
-
-export async function getAgencies(): Promise<string[]> {
-  const response = await fetch(`/api/agencies`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch agencies');
-  }
-  return response.json();
-}
-
-export async function getDockets(agencyCode: string): Promise<string[]> {
-  const response = await fetch(`/api/dockets?agency_code=${encodeURIComponent(agencyCode)}`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch dockets');
-  }
-  return response.json();
-}
-
-export async function getRegulationData(
-  agencyCode: string,
-  dataType: DataType,
-  docketId?: string
-): Promise<RegulationData[]> {
-  const params = new URLSearchParams();
-  if (docketId) {
-    params.append('docket_id', docketId);
-  }
-  const url = `/api/${agencyCode}/${dataType}${params.toString() ? `?${params.toString()}` : ''}`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error('Failed to fetch regulation data');
-  }
-  return response.json();
-}
-
