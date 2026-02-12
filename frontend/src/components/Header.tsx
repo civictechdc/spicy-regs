@@ -58,7 +58,7 @@ export function Header() {
             {NAV_ITEMS.map((item) => {
               const isActive =
                 pathname === item.href ||
-                (item.href === '/agencies' && pathname?.startsWith('/agency'));
+                (item.href === '/agencies' && pathname?.startsWith('/sr'));
               return (
                 <Link
                   key={item.href}

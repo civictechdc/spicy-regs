@@ -14,7 +14,7 @@ export function AgencyCard({ code, docketCount = 0, commentCount = 0 }: AgencyCa
   const agency = getAgencyInfo(code);
 
   return (
-    <Link href={`/agency/${code}`} className="block">
+    <Link href={`/sr/${code}`} className="block">
       <div className="card-gradient p-5 hover:border-[var(--accent-primary)] transition-all duration-200 group">
         <div className="flex items-center gap-3 mb-3">
           <div

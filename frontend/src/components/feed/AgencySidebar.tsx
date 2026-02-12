@@ -110,7 +110,7 @@ export function AgencySidebar({ agencyCode, stats }: AgencySidebarProps) {
               return (
                 <Link
                   key={code}
-                  href={`/agency/${code}`}
+                  href={`/sr/${code}`}
                   className="flex items-center gap-2 text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
                 >
                   <div

@@ -92,7 +92,7 @@ export function DocketPost({
       <div className="p-5">
         {/* Header: Agency + Title */}
         <div className="flex items-start gap-3 mb-3">
-          <Link href={`/agency/${agencyCode}`} className="flex-shrink-0">
+          <Link href={`/sr/${agencyCode}`} className="flex-shrink-0">
             <div
               className="agency-avatar agency-avatar-md"
               style={{ backgroundColor: agency.color }}
@@ -104,7 +104,7 @@ export function DocketPost({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 text-sm mb-1">
               <Link
-                href={`/agency/${agencyCode}`}
+                href={`/sr/${agencyCode}`}
                 className="font-semibold hover:underline"
                 style={{ color: agency.color }}
               >
