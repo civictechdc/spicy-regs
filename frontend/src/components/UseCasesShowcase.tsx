@@ -256,7 +256,7 @@ function CampaignsTable({ data }: { data: CampaignResult[] | null }) {
           <tr key={i} className="border-b border-[var(--border)]/50 hover:bg-[var(--surface-elevated)]/50">
             <td className="py-3 px-4 font-mono text-xs">
               <Link 
-                href={`/dashboard?agency=${row.agency_code}&docket=${row.docket_id}`}
+                href={`/?agency=${row.agency_code}&docket=${row.docket_id}`}
                 className="text-[var(--accent-primary)] hover:underline"
               >
                 {row.docket_id}
@@ -264,7 +264,7 @@ function CampaignsTable({ data }: { data: CampaignResult[] | null }) {
             </td>
             <td className="py-3 px-4">
               <Link 
-                href={`/dashboard?agency=${row.agency_code}`}
+                href={`/?agency=${row.agency_code}`}
                 className="hover:text-[var(--accent-primary)] hover:underline"
               >
                 {row.agency_code}
@@ -375,7 +375,7 @@ function AgencyActivityTable({ data }: { data: AgencyActivityResult[] | null }) 
                     <div className="flex flex-wrap gap-3 items-center">
                       <span className="text-sm text-[var(--muted)]">Quick actions:</span>
                       <Link 
-                        href={`/dashboard?agency=${row.agency_code}`}
+                        href={`/?agency=${row.agency_code}`}
                         className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] text-sm hover:bg-[var(--accent-primary)]/20 transition-colors"
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -499,7 +499,7 @@ function StatisticsCards({ data }: { data: StatisticsResult[] | null }) {
       <StatCard label="Dockets" value={Number(stats.total_dockets).toLocaleString()} />
       <StatCard label="Documents" value={Number(stats.total_documents).toLocaleString()} />
       <StatCard label="Comments" value={Number(stats.total_comments).toLocaleString()} />
-      <Link href={`/dashboard?agency=${stats.top_agency}`}>
+      <Link href={`/?agency=${stats.top_agency}`}>
         <StatCard
           label={`Top: ${stats.top_agency}`}
           value={Number(stats.top_agency_comments).toLocaleString()}

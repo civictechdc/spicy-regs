@@ -155,6 +155,7 @@ export function useDuckDBService() {
   /**
    * Get recent dockets across all agencies (or filtered by agency).
    * Powers the main feed — ordered by modify_date DESC.
+   * Only selects columns needed by DocketPost to minimize Parquet reads.
    */
   const getRecentDockets = useCallback(
     async (
@@ -178,7 +179,8 @@ export function useDuckDBService() {
         orderClause = 'ORDER BY modify_date DESC'; // could sort by comment count with a JOIN
       }
 
-      const query = `SELECT * FROM ${parquetRef("dockets" as RegulationsDataTypes)} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
+      const cols = 'docket_id, agency_code, title, abstract, docket_type, modify_date, file_url';
+      const query = `SELECT ${cols} FROM ${parquetRef("dockets" as RegulationsDataTypes)} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
       return runQuery(query);
     },
     [runQuery, isReady]

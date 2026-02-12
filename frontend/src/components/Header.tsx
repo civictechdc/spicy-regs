@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Flame, Search } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Home" },
+  { href: "/", label: "Home" },
   { href: "/agencies", label: "Agencies" },
   { href: "/analysis", label: "Analysis" },
   { href: "/bookmarks", label: "Bookmarks" },
@@ -29,7 +29,7 @@ export function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-4 h-14">
           {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-1.5 flex-shrink-0">
+          <Link href="/" className="flex items-center gap-1.5 flex-shrink-0">
             <Flame size={22} className="text-[var(--accent-primary)]" />
             <span className="text-lg font-bold gradient-text hidden sm:inline">
               Spicy Regs
