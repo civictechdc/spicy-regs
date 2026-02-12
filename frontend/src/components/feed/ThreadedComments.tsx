@@ -15,33 +15,28 @@ function stripQuotes(s: any): string {
 }
 
 function parseCommentData(item: Record<string, any>) {
+  let attrs: Record<string, any> = {};
   try {
     const raw = typeof item.raw_json === 'string' ? JSON.parse(item.raw_json) : item.raw_json;
-    const attrs = raw?.data?.attributes || {};
-    return {
-      commentId: raw?.data?.id || stripQuotes(item.comment_id) || '',
-      title: attrs.title || stripQuotes(item.title) || 'Untitled Comment',
-      comment: attrs.comment || '',
-      firstName: attrs.firstName || '',
-      lastName: attrs.lastName || '',
-      organization: attrs.organization || '',
-      submitterType: attrs.submitterType || '',
-      postedDate: attrs.postedDate || stripQuotes(item.posted_date) || '',
-      documentSubtype: attrs.documentSubtype || stripQuotes(item.document_subtype) || '',
-    };
+    attrs = raw?.data?.attributes || {};
   } catch {
-    return {
-      commentId: stripQuotes(item.comment_id) || '',
-      title: stripQuotes(item.title) || 'Untitled Comment',
-      comment: '',
-      firstName: '',
-      lastName: '',
-      organization: '',
-      submitterType: '',
-      postedDate: stripQuotes(item.posted_date) || '',
-      documentSubtype: '',
-    };
+    // raw_json parsing failed, use top-level columns only
   }
+
+  // Comment text: prefer direct column, then raw_json attribute
+  const comment = stripQuotes(item.comment) || attrs.comment || '';
+
+  return {
+    commentId: stripQuotes(item.comment_id) || attrs.id || '',
+    title: stripQuotes(item.title) || attrs.title || 'Untitled Comment',
+    comment,
+    firstName: attrs.firstName || stripQuotes(item.first_name) || '',
+    lastName: attrs.lastName || stripQuotes(item.last_name) || '',
+    organization: attrs.organization || stripQuotes(item.organization) || '',
+    submitterType: attrs.submitterType || '',
+    postedDate: attrs.postedDate || stripQuotes(item.posted_date) || '',
+    documentSubtype: attrs.documentSubtype || stripQuotes(item.document_subtype) || '',
+  };
 }
 
 interface CommentItemData {
