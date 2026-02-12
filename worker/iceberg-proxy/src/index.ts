@@ -19,7 +19,7 @@ const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, HEAD, OPTIONS",
   "Access-Control-Allow-Headers":
-    "Content-Type, Authorization, X-Iceberg-Access-Delegation",
+    "Content-Type, Authorization, X-Iceberg-Access-Delegation, X-Iceberg-Access-Token, Accept",
   "Access-Control-Expose-Headers": "Content-Length, Content-Type, ETag",
   "Access-Control-Max-Age": "86400",
 };
