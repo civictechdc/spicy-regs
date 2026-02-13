@@ -235,7 +235,7 @@ export function ThreadedComments({ docketId, modifyDate }: ThreadedCommentsProps
   };
 
   return (
-    <div className="border-t border-[var(--border)] bg-[rgba(15,23,42,0.5)]">
+    <div className="border-t border-[var(--border)] bg-[var(--surface-elevated)]">
       <div className="px-5 py-3">
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
