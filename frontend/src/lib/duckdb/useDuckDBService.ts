@@ -198,7 +198,10 @@ export function useDuckDBService() {
       const whereClause =
         conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-      const orderClause = 'ORDER BY d.modify_date DESC';
+      let orderClause = 'ORDER BY d.modify_date DESC';
+      if (sortBy === 'popular') {
+        orderClause = 'ORDER BY comment_count DESC, d.modify_date DESC';
+      }
 
       const cols = 'd.docket_id, d.agency_code, d.title, d.abstract, d.docket_type, d.modify_date';
       const commentCountsRef = `read_parquet('${R2_BASE_URL}/comment_counts.parquet')`;
