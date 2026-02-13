@@ -504,7 +504,7 @@ def optimize_parquet(output_dir: Path):
 
         query = query_parts[0] + f"\n            FROM read_parquet('{dockets_file}') d" + "".join(join_parts)
 
-        enriched = con.execute(query).arrow()
+        enriched = con.execute(query).fetch_arrow_table()
 
         # Write enriched dockets
         enriched = enriched.sort_by([("agency_code", "ascending"), ("modify_date", "ascending")])
@@ -524,7 +524,7 @@ def optimize_parquet(output_dir: Path):
                 SELECT docket_id, COUNT(*) AS comment_count
                 FROM read_parquet('{comments_file}')
                 GROUP BY docket_id
-            """).arrow()
+            """).fetch_arrow_table()
             pq.write_table(
                 counts, counts_file,
                 compression="zstd",
