@@ -1,43 +1,49 @@
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
-/* ─── Design Tokens ─── */
+/* ─── OpenPolicy-Inspired Design Tokens ─── */
 :root {
-  --background: #0F172A;
-  --foreground: #F8FAFC;
-  --accent-primary: #6366f1;
-  --accent-secondary: #8b5cf6;
-  --accent-green: #22C55E;
-  --accent-amber: #F59E0B;
-  --surface: #1E293B;
-  --surface-elevated: #334155;
-  --border: #334155;
-  --border-subtle: #1E293B;
-  --muted: #94A3B8;
-  --muted-foreground: #64748B;
+  --background: #eef0ff;
+  --foreground: #1a1a2e;
+  --accent-primary: #3B28F6;
+  --accent-secondary: #5b4cf7;
+  --accent-green: #16a34a;
+  --accent-amber: #d97706;
+  --accent-red: #dc2626;
+  --surface: #ffffff;
+  --surface-elevated: #f4f5ff;
+  --border: #c7caef;
+  --border-subtle: #dde0f5;
+  --muted: #6b7094;
+  --muted-foreground: #8b90b3;
 
   /* Agency Color System */
-  --agency-epa: #22C55E;
-  --agency-fda: #3B82F6;
-  --agency-fcc: #8B5CF6;
-  --agency-dot: #F97316;
-  --agency-sec: #1D4ED8;
-  --agency-usda: #A16207;
-  --agency-doe: #EAB308;
-  --agency-hhs: #EF4444;
-  --agency-dhs: #0EA5E9;
-  --agency-doj: #DC2626;
+  --agency-epa: #16a34a;
+  --agency-fda: #2563eb;
+  --agency-fcc: #7c3aed;
+  --agency-dot: #ea580c;
+  --agency-sec: #1d4ed8;
+  --agency-usda: #a16207;
+  --agency-doe: #ca8a04;
+  --agency-hhs: #dc2626;
+  --agency-dhs: #0284c7;
+  --agency-doj: #b91c1c;
   --agency-dod: #475569;
-  --agency-hud: #0891B2;
-  --agency-ed: #7C3AED;
-  --agency-noaa: #0284C7;
-  --agency-default: #6366f1;
+  --agency-hud: #0891b2;
+  --agency-ed: #7c3aed;
+  --agency-noaa: #0369a1;
+  --agency-default: #3B28F6;
+
+  /* Typography */
+  --font-heading: 'EB Garamond', 'Georgia', 'Times New Roman', serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'Fira Code', ui-monospace, monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -50,15 +56,26 @@ html {
 }
 
 /* ─── Typography ─── */
+h1, h2, h3 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  color: var(--foreground);
+  letter-spacing: -0.01em;
+}
+
 .font-mono-id {
-  font-family: 'Fira Code', ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   letter-spacing: -0.01em;
 }
 
+.font-serif {
+  font-family: var(--font-heading);
+}
+
 /* ─── Gradient Utilities ─── */
 .gradient-text {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+  background: linear-gradient(135deg, #3B28F6 0%, #5b4cf7 50%, #8b5cf6 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -67,8 +84,8 @@ html {
 /* ─── Card Styles ─── */
 .card-gradient {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 2px solid var(--border);
+  border-radius: 16px;
   position: relative;
 }
 
@@ -76,9 +93,9 @@ html {
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 1px;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(139, 92, 246, 0.1));
+  background: linear-gradient(135deg, rgba(59, 40, 246, 0.2), rgba(91, 76, 247, 0.05));
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
@@ -89,14 +106,22 @@ html {
 /* ─── Docket Post Card ─── */
 .docket-post {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 2px solid var(--accent-primary);
+  border-radius: 16px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .docket-post:hover {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.15), 0 4px 24px rgba(0, 0, 0, 0.2);
+  border-color: var(--accent-secondary);
+  box-shadow: 0 4px 20px rgba(59, 40, 246, 0.1);
+}
+
+/* Serif heading override for docket titles */
+.docket-post h3,
+.docket-post a.text-lg {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 /* ─── Agency Avatar ─── */
@@ -132,8 +157,8 @@ html {
 /* ─── Document List ─── */
 .document-list {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 2px solid var(--border);
+  border-radius: 16px;
   padding: 1.25rem;
 }
 
@@ -141,7 +166,8 @@ html {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.9375rem;
+  font-family: var(--font-heading);
+  font-size: 1.125rem;
   font-weight: 600;
   color: var(--foreground);
   margin-bottom: 1rem;
@@ -151,8 +177,8 @@ html {
 
 .document-card {
   padding: 0.875rem 1rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
   border-left: 3px solid var(--accent-primary);
   background: var(--surface);
   transition: border-color 0.15s ease, background 0.15s ease;
@@ -205,8 +231,8 @@ html {
   border-radius: 9999px;
   font-size: 0.8125rem;
   font-weight: 500;
-  border: 1px solid var(--border);
-  background: transparent;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
   color: var(--muted);
   cursor: pointer;
   transition: all 0.15s ease;
@@ -219,9 +245,9 @@ html {
 }
 
 .filter-chip-active {
-  background: rgba(99, 102, 241, 0.15);
+  background: var(--accent-primary);
   border-color: var(--accent-primary);
-  color: var(--accent-primary);
+  color: white;
 }
 
 /* ─── Attachment Link ─── */
@@ -230,9 +256,9 @@ html {
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  background: var(--background);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  background: var(--surface-elevated);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
   font-size: 0.8125rem;
   color: var(--foreground);
   transition: all 0.15s ease;
@@ -242,7 +268,7 @@ html {
 
 .attachment-link:hover {
   border-color: var(--accent-primary);
-  background: rgba(99, 102, 241, 0.05);
+  background: rgba(59, 40, 246, 0.05);
 }
 
 /* ─── Metadata Pill ─── */
@@ -269,7 +295,7 @@ html {
   align-items: center;
   gap: 0.375rem;
   padding: 0.375rem 0.75rem;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--muted);
@@ -281,13 +307,13 @@ html {
 
 .action-btn:hover {
   background: var(--surface-elevated);
-  color: var(--foreground);
+  color: var(--accent-primary);
 }
 
 /* ─── Agency Banner ─── */
 .agency-banner {
   height: 120px;
-  border-radius: 12px 12px 0 0;
+  border-radius: 16px 16px 0 0;
   position: relative;
   overflow: hidden;
 }
@@ -301,22 +327,23 @@ html {
 
 /* ─── Button Styles ─── */
 .btn-primary {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  background: var(--accent-primary);
   color: white;
   font-weight: 500;
   padding: 0.625rem 1.25rem;
-  border-radius: 8px;
+  border-radius: 10px;
   transition: all 0.2s;
 }
 
 .btn-primary:hover {
-  opacity: 0.9;
+  background: var(--accent-secondary);
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 40, 246, 0.25);
 }
 
 /* ─── Glow Effect ─── */
 .glow {
-  box-shadow: 0 0 40px rgba(99, 102, 241, 0.15);
+  box-shadow: 0 0 40px rgba(59, 40, 246, 0.08);
 }
 
 /* ─── Reduced Motion ─── */

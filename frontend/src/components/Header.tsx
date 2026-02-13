@@ -31,7 +31,7 @@ export function Header() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-1.5 flex-shrink-0">
             <Flame size={22} className="text-[var(--accent-primary)]" />
-            <span className="text-lg font-bold gradient-text hidden sm:inline">
+            <span className="text-lg font-bold gradient-text font-serif hidden sm:inline">
               Spicy Regs
             </span>
           </Link>
