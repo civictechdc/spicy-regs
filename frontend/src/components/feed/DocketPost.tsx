@@ -69,11 +69,21 @@ export function DocketPost({
   const docketType = stripQuotes(item.docket_type) || attrs.docketType || '';
   const modifyDate = stripQuotes(item.modify_date) || attrs.modifyDate;
 
-  // Comment period
-  const commentEndDate = attrs.commentEndDate;
+  // Comment period — use enriched docket data directly
+  const commentEndDate = stripQuotes(item.comment_end_date);
   const isOpenForComment = commentEndDate
     ? new Date(commentEndDate) > new Date()
     : false;
+
+  // Urgency color for comment deadline
+  const getDeadlineUrgency = (endDate: string) => {
+    const daysLeft = Math.ceil(
+      (new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+    );
+    if (daysLeft < 3) return { color: 'var(--accent-red, #dc2626)', label: `${daysLeft}d left` };
+    if (daysLeft < 14) return { color: 'var(--accent-amber, #d97706)', label: `${daysLeft}d left` };
+    return { color: 'var(--accent-green)', label: `${daysLeft}d left` };
+  };
 
   // Attachments from documents
   const attachments = useMemo(() => {
@@ -132,17 +142,18 @@ export function DocketPost({
                   {docketType}
                 </span>
               )}
-              {isOpenForComment && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium status-open bg-[rgba(34,197,94,0.1)]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-green)]" />
-                  Open for Comment
-                  {commentEndDate && (
-                    <span className="text-[var(--muted)] ml-1">
-                      · Ends {new Date(commentEndDate).toLocaleDateString()}
-                    </span>
-                  )}
-                </span>
-              )}
+              {isOpenForComment && commentEndDate && (() => {
+                const urgency = getDeadlineUrgency(commentEndDate);
+                return (
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
+                    style={{ backgroundColor: `${urgency.color}15`, color: urgency.color }}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: urgency.color }} />
+                    Open for Comment · {urgency.label}
+                  </span>
+                );
+              })()}
             </div>
           </div>
         </div>

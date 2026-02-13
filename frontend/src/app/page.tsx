@@ -171,7 +171,8 @@ function DocketFeed() {
                     item={item}
                     isBookmarked={isBookmarked}
                     onToggleBookmark={() => handleToggleBookmark(docketId)}
-                    commentCount={commentCounts[docketId.toUpperCase()] || 0}
+                    commentCount={Number(item.comment_count || 0) || commentCounts[docketId.toUpperCase()] || 0}
+                    documentCount={Number(item.document_count || 0)}
                   />
                 </div>
               );

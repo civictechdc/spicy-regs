@@ -178,8 +178,8 @@ export function useDuckDBService() {
 
   /**
    * Get recent dockets with comment counts in a single query.
-   * Uses LEFT JOIN to combine dockets + comments, avoiding a second Parquet fetch.
-   * Returns { dockets, commentCounts } so the page doesn't need a separate call.
+   * Uses enriched dockets.parquet which already has document_count, comment_count,
+   * comment_end_date, and comment_start_date columns.
    */
   const getRecentDocketsWithCounts = useCallback(
     async (
@@ -192,24 +192,29 @@ export function useDuckDBService() {
 
       const conditions: string[] = [];
       if (agencyCode) {
-        conditions.push(`d.agency_code = '${agencyCode.toUpperCase()}'`);
+        conditions.push(`agency_code = '${agencyCode.toUpperCase()}'`);
+      }
+      if (sortBy === 'open') {
+        conditions.push(`comment_end_date > CURRENT_TIMESTAMP`);
       }
 
       const whereClause =
         conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-      let orderClause = 'ORDER BY d.modify_date DESC';
+      let orderClause = 'ORDER BY modify_date DESC';
       if (sortBy === 'popular') {
-        orderClause = 'ORDER BY comment_count DESC, d.modify_date DESC';
+        orderClause = 'ORDER BY comment_count DESC, modify_date DESC';
+      } else if (sortBy === 'open') {
+        orderClause = 'ORDER BY comment_end_date ASC';
       }
 
-      const cols = 'd.docket_id, d.agency_code, d.title, d.abstract, d.docket_type, d.modify_date';
-      const commentCountsRef = `read_parquet('${R2_BASE_URL}/comment_counts.parquet')`;
+      const cols = `docket_id, agency_code, title, abstract, docket_type, modify_date,
+        COALESCE(document_count, 0) AS document_count,
+        COALESCE(comment_count, 0) AS comment_count,
+        comment_end_date, comment_start_date`;
       const query = `
-        SELECT ${cols}, COALESCE(c.comment_count, 0) AS comment_count
-        FROM ${parquetRef("dockets" as RegulationsDataTypes)} d
-        LEFT JOIN ${commentCountsRef} c
-          ON REPLACE(d.docket_id, '"', '') = c.docket_id
+        SELECT ${cols}
+        FROM ${parquetRef("dockets" as RegulationsDataTypes)}
         ${whereClause} ${orderClause}
         LIMIT ${limit} OFFSET ${offset}
       `;
@@ -220,8 +225,7 @@ export function useDuckDBService() {
       const dockets = rows.map((row: any) => {
         const id = String(row.docket_id).replace(/^"|"$/g, '').toUpperCase();
         commentCounts[id] = Number(row.comment_count || 0);
-        const { comment_count, ...docket } = row;
-        return docket;
+        return row;
       });
 
       return { dockets, commentCounts };
@@ -293,6 +297,31 @@ export function useDuckDBService() {
       }
 
       const query = `SELECT * FROM ${commentsSource} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
+      return runQuery(query);
+    },
+    [runQuery, isReady]
+  );
+
+  /**
+   * Get documents for a specific docket.
+   * Reads from documents.parquet (~57MB) with a docket_id filter.
+   */
+  const getDocumentsForDocket = useCallback(
+    async (
+      docketId: string,
+      limit: number = 50
+    ): Promise<any[]> => {
+      if (!isReady) throw new Error("DuckDB not ready");
+
+      const cleanId = docketId.replace(/^"|"$/g, '').toUpperCase();
+      const query = `
+        SELECT document_id, title, document_type, posted_date,
+               comment_start_date, comment_end_date, file_url
+        FROM ${parquetRef("documents" as RegulationsDataTypes)}
+        WHERE REPLACE(docket_id, '"', '') = '${cleanId}'
+        ORDER BY posted_date DESC
+        LIMIT ${limit}
+      `;
       return runQuery(query);
     },
     [runQuery, isReady]
@@ -399,6 +428,7 @@ export function useDuckDBService() {
     getRecentDockets,
     getRecentDocketsWithCounts,
     getCommentsForDocket,
+    getDocumentsForDocket,
     getCommentCounts,
     getAgencyStats,
     getPopularAgencies,

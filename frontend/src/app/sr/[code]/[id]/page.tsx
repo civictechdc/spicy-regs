@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { DocketPost } from '@/components/feed/DocketPost';
+import { DocumentList } from '@/components/feed/DocumentList';
 import { ThreadedComments } from '@/components/feed/ThreadedComments';
 import { AgencySidebar } from '@/components/feed/AgencySidebar';
 import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
@@ -40,10 +41,12 @@ export default function DocketDetailPage() {
   const rawId = params.id as string || '';
   const docketId = decodeURIComponent(rawId).toUpperCase();
 
-  const { getDocketById, getAgencyStats, isReady } = useDuckDBService();
+  const { getDocketById, getAgencyStats, getDocumentsForDocket, isReady } = useDuckDBService();
   const [docket, setDocket] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>();
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [docsLoading, setDocsLoading] = useState(true);
 
   // Bookmarks
   const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
@@ -79,6 +82,21 @@ export default function DocketDetailPage() {
     if (!isReady || !agencyCode) return;
     getAgencyStats(agencyCode).then(setStats).catch(console.error);
   }, [isReady, agencyCode, getAgencyStats]);
+
+  // Load documents for this docket
+  useEffect(() => {
+    if (!isReady || !docketId) return;
+    setDocsLoading(true);
+    getDocumentsForDocket(docketId)
+      .then(docs => {
+        setDocuments(docs);
+        setDocsLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to load documents:', err);
+        setDocsLoading(false);
+      });
+  }, [isReady, docketId, getDocumentsForDocket]);
 
   if (loading) {
     return (
@@ -127,11 +145,19 @@ export default function DocketDetailPage() {
               item={docket}
               isBookmarked={bookmarks.has(docketId)}
               onToggleBookmark={handleToggleBookmark}
+              commentCount={Number(docket.comment_count || 0)}
+              documentCount={Number(docket.document_count || 0)}
+              isDetailView={true}
               showComments={true}
             />
 
+            {/* Documents */}
+            <div className="mt-4">
+              <DocumentList documents={documents} loading={docsLoading} />
+            </div>
+
             {/* Comments */}
-            <div className="mt-0 rounded-b-xl overflow-hidden border border-t-0 border-[var(--border)]">
+            <div className="mt-4 rounded-xl overflow-hidden border border-[var(--border)]">
               <ThreadedComments docketId={docketId} modifyDate={stripQuotes(docket?.modify_date)} />
             </div>
           </div>

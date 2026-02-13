@@ -129,6 +129,40 @@ html {
   font-size: 1.25rem;
 }
 
+/* ─── Document List ─── */
+.document-list {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.document-list .section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--foreground);
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--accent-primary);
+}
+
+.document-card {
+  padding: 0.875rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-primary);
+  background: var(--surface);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.document-card:hover {
+  border-color: var(--accent-primary);
+  background: var(--surface-elevated);
+}
+
 /* ─── Comment Thread ─── */
 .comment-thread {
   position: relative;

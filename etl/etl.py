@@ -460,6 +460,82 @@ def optimize_parquet(output_dir: Path):
 
         print(f"  ✓ comments: {total_written:,} total rows across {len(valid_years) + (1 if other_years else 0)} partitions")
 
+    # --- Enrich dockets with aggregate stats from documents and comments ---
+    dockets_file = output_dir / "dockets.parquet"
+    documents_file = output_dir / "documents.parquet"
+    comments_file = output_dir / "comments.parquet"
+
+    if dockets_file.exists():
+        print("\n  Enriching dockets with aggregate stats...")
+        import duckdb
+        con = duckdb.connect()
+
+        # Build the enrichment query using DuckDB for efficient joins
+        query_parts = ["SELECT d.*"]
+        join_parts = []
+        has_docs = documents_file.exists()
+        has_comments = comments_file.exists()
+
+        if has_docs:
+            query_parts[0] += """,
+                COALESCE(doc_stats.document_count, 0) AS document_count,
+                doc_stats.comment_end_date,
+                doc_stats.comment_start_date"""
+            join_parts.append(f"""
+            LEFT JOIN (
+                SELECT
+                    docket_id,
+                    COUNT(*) AS document_count,
+                    MAX(comment_end_date) AS comment_end_date,
+                    MIN(comment_start_date) AS comment_start_date
+                FROM read_parquet('{documents_file}')
+                GROUP BY docket_id
+            ) doc_stats ON d.docket_id = doc_stats.docket_id""")
+
+        if has_comments:
+            query_parts[0] += """,
+                COALESCE(comment_stats.comment_count, 0) AS comment_count"""
+            join_parts.append(f"""
+            LEFT JOIN (
+                SELECT docket_id, COUNT(*) AS comment_count
+                FROM read_parquet('{comments_file}')
+                GROUP BY docket_id
+            ) comment_stats ON d.docket_id = comment_stats.docket_id""")
+
+        query = query_parts[0] + f"\n            FROM read_parquet('{dockets_file}') d" + "".join(join_parts)
+
+        enriched = con.execute(query).arrow()
+
+        # Write enriched dockets
+        enriched = enriched.sort_by([("agency_code", "ascending"), ("modify_date", "ascending")])
+        pq.write_table(
+            enriched, dockets_file,
+            compression="zstd",
+            row_group_size=100_000,
+            write_statistics=True,
+        )
+        meta = pq.read_metadata(dockets_file)
+        print(f"  ✓ enriched dockets: {meta.num_rows:,} rows, columns: {enriched.column_names}")
+
+        # Also write comment_counts.parquet for backward compatibility
+        if has_comments:
+            counts_file = output_dir / "comment_counts.parquet"
+            counts = con.execute(f"""
+                SELECT docket_id, COUNT(*) AS comment_count
+                FROM read_parquet('{comments_file}')
+                GROUP BY docket_id
+            """).arrow()
+            pq.write_table(
+                counts, counts_file,
+                compression="zstd",
+                write_statistics=True,
+            )
+            print(f"  ✓ comment_counts: {counts.num_rows:,} rows")
+            del counts
+
+        del enriched
+        con.close()
+
     print(f"\n{'='*60}")
     print("Optimization complete!")
 
