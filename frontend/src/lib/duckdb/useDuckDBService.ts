@@ -195,7 +195,7 @@ export function useDuckDBService() {
         conditions.push(`agency_code = '${agencyCode.toUpperCase()}'`);
       }
       if (sortBy === 'open') {
-        conditions.push(`comment_end_date > CURRENT_TIMESTAMP`);
+        conditions.push(`TRY_CAST(comment_end_date AS TIMESTAMP) > CURRENT_TIMESTAMP`);
       }
 
       const whereClause =
@@ -205,7 +205,7 @@ export function useDuckDBService() {
       if (sortBy === 'popular') {
         orderClause = 'ORDER BY comment_count DESC, modify_date DESC';
       } else if (sortBy === 'open') {
-        orderClause = 'ORDER BY comment_end_date ASC';
+        orderClause = 'ORDER BY TRY_CAST(comment_end_date AS TIMESTAMP) ASC';
       }
 
       const cols = `docket_id, agency_code, title, abstract, docket_type, modify_date,
