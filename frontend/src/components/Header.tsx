@@ -7,6 +7,7 @@ import { Flame, Search } from 'lucide-react';
 
 const NAV_ITEMS = [
   { href: "/", label: "Home" },
+  { href: "/feed", label: "Feed" },
   { href: "/agencies", label: "Agencies" },
   { href: "/analysis", label: "Analysis" },
   { href: "/bookmarks", label: "Bookmarks" },
@@ -57,7 +58,7 @@ export function Header() {
           <nav className="flex items-center gap-0.5">
             {NAV_ITEMS.map((item) => {
               const isActive =
-                pathname === item.href ||
+                (item.href === '/' ? pathname === '/' : pathname === item.href) ||
                 (item.href === '/agencies' && pathname?.startsWith('/sr'));
               return (
                 <Link
