@@ -161,21 +161,21 @@ def generate_embeddings(
     model: SentenceTransformer,
     batch_size: int = 512,
 ) -> list[list[float]]:
-    """Generate normalized embeddings in batches."""
-    print(f"Generating embeddings (batch_size={batch_size})...")
-    embeddings = []
+    """Generate normalized embeddings in batches. Returns list of float lists for LanceDB."""
+    print(f"Generating embeddings (batch_size={batch_size}, {len(texts):,} texts)...")
+    results = []
 
-    for i in tqdm(range(0, len(texts), batch_size), desc="Batches"):
+    for i in tqdm(range(0, len(texts), batch_size), desc="Embedding"):
         batch = texts[i:i + batch_size]
-        batch_embeddings = model.encode(
+        arr = model.encode(
             batch,
             show_progress_bar=False,
             convert_to_numpy=True,
             normalize_embeddings=True,
         )
-        embeddings.extend(batch_embeddings.tolist())
+        results.extend(row.tolist() for row in arr)
 
-    return embeddings
+    return results
 
 
 def embed_parquet(
@@ -236,32 +236,15 @@ def embed_parquet(
     return len(embeddings_df)
 
 
-def embed_to_lancedb(
-    input_dir: Path,
-    lance_uri: str,
-    table_name: str,
+def _build_lance_rows(
+    records: list[dict],
     data_type: str,
+    id_field: str,
+    metadata_fields: list[str],
     model: SentenceTransformer,
-    batch_size: int = 512,
-    sample: int | None = None,
-    year_filter: tuple[int, int] | None = None,
-) -> int:
-    """
-    Read Parquet data, generate embeddings, and write to a LanceDB table.
-
-    The table stores vectors alongside metadata for hybrid search (vector ANN + BM25 FTS).
-
-    Returns number of records processed.
-    """
-    import lancedb
-
-    df = read_input_data(input_dir, data_type, sample, year_filter)
-
-    id_field = ID_FIELDS[data_type]
-    metadata_fields = METADATA_FIELDS[data_type]
-    records = df.to_dicts()
-
-    # Build rows with text + metadata
+    batch_size: int,
+) -> list[dict]:
+    """Convert raw records to LanceDB rows with embeddings."""
     texts = []
     rows = []
     for row in records:
@@ -277,14 +260,43 @@ def embed_to_lancedb(
                 lance_row[field] = strip_quotes(row.get(field))
         rows.append(lance_row)
 
-    # Generate embeddings
     embeddings = generate_embeddings(texts, model, batch_size)
-
-    # Attach vectors to rows
     for i, emb in enumerate(embeddings):
         rows[i]["vector"] = emb
 
-    # Write to LanceDB
+    return rows
+
+
+# How many records to embed + write per chunk (keeps RAM under ~4GB)
+CHUNK_SIZE = 100_000
+
+
+def embed_to_lancedb(
+    input_dir: Path,
+    lance_uri: str,
+    table_name: str,
+    data_type: str,
+    model: SentenceTransformer,
+    batch_size: int = 512,
+    sample: int | None = None,
+    year_filter: tuple[int, int] | None = None,
+) -> int:
+    """
+    Read Parquet data, generate embeddings, and write to a LanceDB table.
+
+    Processes data in chunks to keep memory usage bounded.
+    The table stores vectors alongside metadata for hybrid search (vector ANN + BM25 FTS).
+
+    Returns number of records processed.
+    """
+    import lancedb
+
+    df = read_input_data(input_dir, data_type, sample, year_filter)
+    total_rows = len(df)
+
+    id_field = ID_FIELDS[data_type]
+    metadata_fields = METADATA_FIELDS[data_type]
+
     print(f"\nConnecting to LanceDB at {lance_uri}...")
     db = lancedb.connect(lance_uri)
 
@@ -292,13 +304,37 @@ def embed_to_lancedb(
         print(f"Dropping existing table '{table_name}'...")
         db.drop_table(table_name)
 
-    print(f"Creating table '{table_name}' with {len(rows):,} rows...")
-    table = db.create_table(table_name, data=rows)
+    table = None
+    total_written = 0
+    num_chunks = (total_rows + CHUNK_SIZE - 1) // CHUNK_SIZE
 
-    # Build IVF-PQ vector index for ANN search
-    num_rows = len(rows)
-    if num_rows >= 256:
-        num_partitions = min(256, max(1, int(num_rows ** 0.5)))
+    for chunk_idx in range(num_chunks):
+        start = chunk_idx * CHUNK_SIZE
+        end = min(start + CHUNK_SIZE, total_rows)
+        chunk_df = df.slice(start, end - start)
+        records = chunk_df.to_dicts()
+
+        print(f"\n--- Chunk {chunk_idx + 1}/{num_chunks} ({start:,}-{end:,} of {total_rows:,}) ---")
+
+        rows = _build_lance_rows(records, data_type, id_field, metadata_fields, model, batch_size)
+
+        if table is None:
+            print(f"Creating table '{table_name}'...")
+            table = db.create_table(table_name, data=rows)
+        else:
+            table.add(rows)
+
+        total_written += len(rows)
+        print(f"  Written so far: {total_written:,}/{total_rows:,}")
+
+        # Free chunk memory
+        del records, rows, chunk_df
+
+    # Build indexes after all data is written
+    print(f"\nAll {total_written:,} rows written. Building indexes...")
+
+    if total_written >= 256:
+        num_partitions = min(256, max(1, int(total_written ** 0.5)))
         print(f"Creating IVF-PQ vector index (num_partitions={num_partitions})...")
         table.create_index(
             metric="cosine",
@@ -315,10 +351,10 @@ def embed_to_lancedb(
     table.create_fts_index("text", use_tantivy=False)
 
     print(f"  Table: {table_name}")
-    print(f"  Rows:  {num_rows:,}")
+    print(f"  Rows:  {total_written:,}")
     print(f"  URI:   {lance_uri}")
 
-    return num_rows
+    return total_written
 
 
 def parse_year_filter(value: str) -> tuple[int, int]:

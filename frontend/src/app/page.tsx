@@ -1,9 +1,13 @@
+'use client';
+
 import Link from 'next/link';
 import { Flame, Rss, Building2, BarChart3, Search, Bookmark, ExternalLink } from 'lucide-react';
+import { Header } from '@/components/Header';
 
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-[var(--background)]">
+      <Header />
       {/* Hero */}
       <section className="relative overflow-hidden">
         <div className="max-w-4xl mx-auto px-6 pt-20 pb-16 text-center">
