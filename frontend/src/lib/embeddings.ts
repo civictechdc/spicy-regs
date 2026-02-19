@@ -8,6 +8,7 @@ let embedder: FeatureExtractionPipeline | null = null;
 
 async function getEmbedder(): Promise<FeatureExtractionPipeline> {
   if (!embedder) {
+    // @ts-ignore - pipeline return type is too complex for TypeScript to represent
     embedder = await pipeline("feature-extraction", "Xenova/bge-base-en-v1.5");
   }
   return embedder;
