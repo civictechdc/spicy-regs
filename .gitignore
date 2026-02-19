@@ -14,3 +14,4 @@ output
 
 node_modules
 .wrangler
+lance-data

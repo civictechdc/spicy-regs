@@ -1,90 +1,193 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { CommentCard } from '@/components/data-viewer/CommentCard';
-import { DocketOrDocumentCard } from '@/components/data-viewer/DocketOrDocumentCard';
-import { SearchBar } from '@/components/SearchBar';
 import { Header } from '@/components/Header';
 import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
 
-const BOOKMARKS_KEY = 'spicy-regs-bookmarks';
+type SearchMode = 'hybrid' | 'keyword';
 
-function getStoredBookmarks(): Set<string> {
-  if (typeof window === 'undefined') return new Set();
-  try {
-    const stored = localStorage.getItem(BOOKMARKS_KEY);
-    return stored ? new Set(JSON.parse(stored)) : new Set();
-  } catch {
-    return new Set();
-  }
+interface SearchResult {
+  id: string;
+  title: string;
+  text?: string;
+  comment?: string;
+  docket_id: string;
+  agency_code: string;
+  posted_date?: string;
+  score?: number;
+  type?: string;
 }
 
-function saveBookmarks(bookmarks: Set<string>) {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(BOOKMARKS_KEY, JSON.stringify([...bookmarks]));
-  } catch (e) {
-    console.error('Failed to save bookmarks', e);
-  }
+function stripQuotes(s: any): string {
+  if (!s) return '';
+  return String(s).replace(/^"|"$/g, '');
+}
+
+function ResultCard({ result }: { result: SearchResult }) {
+  const regsUrl = result.id
+    ? `https://www.regulations.gov/comment/${result.id}`
+    : undefined;
+  const docketUrl = result.agency_code && result.docket_id
+    ? `/sr/${result.agency_code}/${result.docket_id}`
+    : undefined;
+  const commentText = result.comment || result.text || '';
+
+  return (
+    <div className="card p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            {result.agency_code && (
+              <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-[var(--surface-raised)] text-[var(--muted)]">
+                {result.agency_code}
+              </span>
+            )}
+            {result.type && (
+              <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--surface-raised)] text-[var(--muted)]">
+                {result.type}
+              </span>
+            )}
+            {result.score != null && (
+              <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]">
+                {(result.score * 100).toFixed(0)}% match
+              </span>
+            )}
+          </div>
+          <h3 className="text-sm font-medium text-[var(--foreground)] mb-1 line-clamp-2">
+            {result.title || 'Untitled'}
+          </h3>
+          {commentText && (
+            <p className="text-xs text-[var(--muted)] line-clamp-3 mb-2">
+              {commentText}
+            </p>
+          )}
+          <div className="flex items-center gap-3 text-xs text-[var(--muted)]">
+            {result.posted_date && (
+              <span>{new Date(result.posted_date).toLocaleDateString()}</span>
+            )}
+            {docketUrl && (
+              <a
+                href={docketUrl}
+                className="hover:text-[var(--accent-primary)] transition-colors"
+              >
+                {result.docket_id}
+              </a>
+            )}
+            {regsUrl && (
+              <a
+                href={regsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-[var(--accent-primary)] transition-colors"
+              >
+                regulations.gov
+              </a>
+            )}
+            {result.id && (
+              <a
+                href={`/search?similar=${encodeURIComponent(result.id)}`}
+                className="hover:text-[var(--accent-primary)] transition-colors"
+              >
+                Find similar
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function normalizeKeywordResult(result: any): SearchResult {
+  return {
+    id: stripQuotes(result.comment_id) || stripQuotes(result.document_id) || stripQuotes(result.docket_id) || '',
+    title: stripQuotes(result.title) || '',
+    comment: stripQuotes(result.comment) || '',
+    docket_id: stripQuotes(result.docket_id) || '',
+    agency_code: stripQuotes(result.agency_code) || '',
+    posted_date: stripQuotes(result.posted_date) || '',
+    type: result.type || '',
+  };
 }
 
 function SearchResults() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q');
-  const [results, setResults] = useState<any[]>([]);
+  const similarId = searchParams.get('similar');
+  const modeParam = searchParams.get('mode');
+
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
-  
+  const [searchMode, setSearchMode] = useState<SearchMode>(
+    modeParam === 'keyword' ? 'keyword' : 'hybrid'
+  );
+
   const { searchResources } = useDuckDBService();
 
+  const performHybridSearch = useCallback(async (q: string) => {
+    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    if (!res.ok) throw new Error(`Search API returned ${res.status}`);
+    const data = await res.json();
+    return data.results as SearchResult[];
+  }, []);
+
+  const performSimilarSearch = useCallback(async (id: string) => {
+    const res = await fetch(`/api/search/similar?id=${encodeURIComponent(id)}`);
+    if (!res.ok) throw new Error(`Similar API returned ${res.status}`);
+    const data = await res.json();
+    return data.results as SearchResult[];
+  }, []);
+
+  // Handle similar comment lookup
   useEffect(() => {
-    async function performSearch() {
-      if (!query) return;
-      
+    if (!similarId) return;
+
+    async function fetchSimilar() {
       try {
         setLoading(true);
-        const searchResults = await searchResources(query);
-        setResults(searchResults);
+        setSearchMode('hybrid');
+        const similar = await performSimilarSearch(similarId!);
+        setResults(similar);
       } catch (e) {
-        console.error("Search failed", e);
+        console.error('Similar search failed', e);
+        setResults([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchSimilar();
+  }, [similarId, performSimilarSearch]);
+
+  // Handle query-based search
+  useEffect(() => {
+    if (!query || similarId) return;
+
+    async function performSearch() {
+      try {
+        setLoading(true);
+        if (searchMode === 'hybrid') {
+          const hybridResults = await performHybridSearch(query!);
+          setResults(hybridResults);
+        } else {
+          const keywordResults = await searchResources(query!);
+          setResults(keywordResults.map(normalizeKeywordResult));
+        }
+      } catch (e) {
+        console.error('Search failed', e);
       } finally {
         setLoading(false);
       }
     }
     performSearch();
-  }, [query, searchResources]);
+  }, [query, searchMode, similarId, searchResources, performHybridSearch]);
 
-  const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
-  
-  useEffect(() => {
-    setBookmarks(getStoredBookmarks());
-  }, []);
+  const hasQuery = query || similarId;
 
-  const handleToggleBookmark = (item: any) => {
-    let resourceId = item.docket_id;
-    if (item.type === 'comments') {
-      try {
-        const parsed = typeof item.raw_json === 'string' ? JSON.parse(item.raw_json) : item.raw_json;
-        resourceId = parsed.data.id;
-      } catch {}
-    }
-
-    if (!resourceId) return;
-
-    const newBookmarks = new Set(bookmarks);
-    if (bookmarks.has(resourceId)) {
-      newBookmarks.delete(resourceId);
-    } else {
-      newBookmarks.add(resourceId);
-    }
-    setBookmarks(newBookmarks);
-    saveBookmarks(newBookmarks);
-  };
-
-  if (!query) {
+  if (!hasQuery) {
     return (
       <div className="text-center py-12 text-[var(--muted)]">
-        Enter a search term to find regulations.
+        Use the search bar above to find regulations.
       </div>
     );
   }
@@ -97,53 +200,58 @@ function SearchResults() {
     );
   }
 
-  if (results.length === 0) {
-    return (
-      <div className="text-center py-12 text-[var(--muted)]">
-        No results found for "{query}". <br/>
-        Try indexing an agency first by visiting its page.
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold">
-        Results for "<span className="gradient-text">{query}</span>"
-      </h2>
-      <div className="space-y-4">
-        {results.map((result, idx) => {
-          const isComment = result.type === 'comments';
-          let key = result.docket_id;
-          try {
-            if (isComment) {
-              const parsed = typeof result.raw_json === 'string' ? JSON.parse(result.raw_json) : result.raw_json;
-              key = parsed.data.id; 
-            }
-          } catch {}
-          
-          const isBookmarked = bookmarks.has(key);
+      {/* Search mode toggle (only show for query-based search, not similar) */}
+      {query && !similarId && (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSearchMode('hybrid')}
+            className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+              searchMode === 'hybrid'
+                ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]'
+                : 'border-[var(--border)] text-[var(--muted)] hover:border-[var(--accent-primary)]/50'
+            }`}
+          >
+            Hybrid Search
+          </button>
+          <button
+            onClick={() => setSearchMode('keyword')}
+            className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+              searchMode === 'keyword'
+                ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]'
+                : 'border-[var(--border)] text-[var(--muted)] hover:border-[var(--accent-primary)]/50'
+            }`}
+          >
+            Keyword Only
+          </button>
+        </div>
+      )}
 
-          return (
-            <div key={`${key}-${idx}`}>
-              {isComment ? (
-                <CommentCard 
-                  item={result} 
-                  isBookmarked={isBookmarked} 
-                  onToggleBookmark={() => handleToggleBookmark(result)} 
-                />
-              ) : (
-                <DocketOrDocumentCard 
-                  item={result} 
-                  dataType={result.type === 'dockets' ? 'dockets' : 'documents'} 
-                  isBookmarked={isBookmarked} 
-                  onToggleBookmark={() => handleToggleBookmark(result)} 
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
+      <h2 className="text-xl font-semibold">
+        {similarId ? (
+          <>Similar comments to <span className="gradient-text font-mono text-base">{similarId}</span></>
+        ) : (
+          <>Results for "<span className="gradient-text">{query}</span>"</>
+        )}
+      </h2>
+
+      {results.length === 0 && (
+        <div className="text-center py-12 text-[var(--muted)]">
+          No results found.{' '}
+          {searchMode === 'hybrid' && (
+            <>Try <button onClick={() => setSearchMode('keyword')} className="underline">keyword search</button> instead.</>
+          )}
+        </div>
+      )}
+
+      {results.length > 0 && (
+        <div className="space-y-4">
+          {results.map((result, idx) => (
+            <ResultCard key={`${result.id}-${idx}`} result={result} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -153,10 +261,6 @@ export default function SearchPage() {
     <div className="min-h-screen bg-[var(--background)]">
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <SearchBar />
-        </div>
-
         <Suspense fallback={
           <div className="flex justify-center p-12">
             <div className="animate-spin h-8 w-8 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full" />

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { Link2, ChevronDown, Loader2, FileText, Download } from 'lucide-react';
+import { Link2, ChevronDown, Loader2, FileText, Download, Sparkles } from 'lucide-react';
 import { stringToColor, getInitials, timeAgo } from '@/lib/agencyMetadata';
 import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
 
@@ -182,6 +182,15 @@ function CommentItem({ data }: { data: CommentItemData }) {
               <Link2 size={12} />
               Link
             </a>
+            {data.commentId && (
+              <a
+                href={`/search?similar=${encodeURIComponent(data.commentId)}`}
+                className="action-btn !px-1 !py-0.5 text-xs"
+              >
+                <Sparkles size={12} />
+                Similar
+              </a>
+            )}
           </div>
         </div>
       </div>

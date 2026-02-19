@@ -1,7 +1,7 @@
 // Headers for cross-origin isolation mode, required when you're using @motherduck/wasm-client
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: ["pino", "apache-arrow", "@duckdb/duckdb-wasm"],
+  serverExternalPackages: ["pino", "apache-arrow", "@duckdb/duckdb-wasm", "@lancedb/lancedb"],
   async headers() {
     return [
       {
