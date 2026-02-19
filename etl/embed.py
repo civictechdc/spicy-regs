@@ -29,7 +29,9 @@ Usage:
 import argparse
 from pathlib import Path
 
+import numpy as np
 import polars as pl
+import pyarrow as pa
 from tqdm import tqdm
 
 try:
@@ -93,23 +95,6 @@ METADATA_FIELDS = {
 }
 
 
-def get_text_for_embedding(row: dict, data_type: str) -> str:
-    """Combine relevant text fields for embedding."""
-    fields = TEXT_FIELDS[data_type]
-    parts = []
-    for field in fields:
-        value = row.get(field)
-        if value and isinstance(value, str) and value.strip():
-            parts.append(value.strip())
-    return " ".join(parts)
-
-
-def strip_quotes(value: str | None) -> str:
-    """Strip surrounding double quotes from Parquet string values."""
-    if not value or not isinstance(value, str):
-        return value or ""
-    return value.strip('"')
-
 
 def read_input_data(
     input_dir: Path,
@@ -156,26 +141,38 @@ def read_input_data(
     return df
 
 
+ENCODE_CHUNK = 10_000  # texts per encode() call to avoid tokenization overhead
+
+
 def generate_embeddings(
     texts: list[str],
     model: SentenceTransformer,
-    batch_size: int = 512,
-) -> list[list[float]]:
-    """Generate normalized embeddings in batches. Returns list of float lists for LanceDB."""
+    batch_size: int = 256,
+) -> np.ndarray:
+    """Generate normalized embeddings in chunks. Returns numpy array of shape (N, dims)."""
     print(f"Generating embeddings (batch_size={batch_size}, {len(texts):,} texts)...")
-    results = []
 
-    for i in tqdm(range(0, len(texts), batch_size), desc="Embedding"):
-        batch = texts[i:i + batch_size]
-        arr = model.encode(
-            batch,
+    if len(texts) <= ENCODE_CHUNK:
+        return model.encode(
+            texts,
+            batch_size=batch_size,
+            show_progress_bar=True,
+            convert_to_numpy=True,
+            normalize_embeddings=True,
+        )
+
+    # Process in chunks to avoid sentence-transformers tokenizing/sorting the full list
+    chunks = []
+    for i in tqdm(range(0, len(texts), ENCODE_CHUNK), desc="Encoding"):
+        chunk = model.encode(
+            texts[i:i + ENCODE_CHUNK],
+            batch_size=batch_size,
             show_progress_bar=False,
             convert_to_numpy=True,
             normalize_embeddings=True,
         )
-        results.extend(row.tolist() for row in arr)
-
-    return results
+        chunks.append(chunk)
+    return np.vstack(chunks)
 
 
 def embed_parquet(
@@ -203,24 +200,22 @@ def embed_parquet(
 
     print(f"Processing {len(df):,} records...")
 
-    # Extract text for embedding
+    # Extract text for embedding using Polars (no Python loops)
     id_field = ID_FIELDS[data_type]
-    records = df.to_dicts()
-
-    ids = []
-    texts = []
-    for row in records:
-        ids.append(row[id_field])
-        text = get_text_for_embedding(row, data_type)
-        texts.append(text if text else "")
+    df = _prepare_text_column(df, data_type)
+    texts = df["text"].to_list()
 
     embeddings = generate_embeddings(texts, model, batch_size)
 
-    # Create embeddings-only DataFrame (id + embedding only)
-    embeddings_df = pl.DataFrame({
-        id_field: ids,
-        "embedding": embeddings,
+    # Create embeddings-only table via PyArrow (avoids slow .tolist() conversion)
+    arrow_table = pa.table({
+        id_field: df[id_field].to_arrow(),
+        "embedding": pa.FixedSizeListArray.from_arrays(
+            pa.array(embeddings.ravel(), type=pa.float32()),
+            list_size=embeddings.shape[1],
+        ),
     })
+    embeddings_df = pl.from_arrow(arrow_table)
 
     # Write output
     print(f"Writing to {output_path}...")
@@ -236,35 +231,43 @@ def embed_parquet(
     return len(embeddings_df)
 
 
-def _build_lance_rows(
-    records: list[dict],
+def _prepare_text_column(df: pl.DataFrame, data_type: str) -> pl.DataFrame:
+    """Add a 'text' column by concatenating text fields in Polars (no Python loops)."""
+    fields = TEXT_FIELDS[data_type]
+    # Fill nulls with empty string, strip whitespace, then concatenate with space separator
+    exprs = [pl.col(f).fill_null("").str.strip_chars() for f in fields]
+    return df.with_columns(
+        pl.concat_str(exprs, separator=" ").str.strip_chars().alias("text"),
+    )
+
+
+def _build_lance_table(
+    df: pl.DataFrame,
     data_type: str,
     id_field: str,
     metadata_fields: list[str],
-    model: SentenceTransformer,
-    batch_size: int,
-) -> list[dict]:
-    """Convert raw records to LanceDB rows with embeddings."""
-    texts = []
-    rows = []
-    for row in records:
-        text = get_text_for_embedding(row, data_type)
-        texts.append(text if text else "")
+    embeddings: np.ndarray,
+) -> pa.Table:
+    """Build a PyArrow table for LanceDB from Polars DataFrame + numpy embeddings."""
+    # Strip surrounding quotes from string columns
+    strip_cols = [id_field] + [f for f in metadata_fields if f != id_field]
+    df = df.with_columns([
+        pl.col(c).fill_null("").str.strip_chars('"').alias(c) for c in strip_cols if c in df.columns
+    ])
 
-        lance_row = {
-            "id": strip_quotes(row[id_field]),
-            "text": text if text else "",
-        }
-        for field in metadata_fields:
-            if field != id_field:
-                lance_row[field] = strip_quotes(row.get(field))
-        rows.append(lance_row)
+    # Build the output columns: id, text, metadata, vector
+    out_cols = {"id": df[id_field].to_arrow(), "text": df["text"].to_arrow()}
+    for field in metadata_fields:
+        if field != id_field and field in df.columns:
+            out_cols[field] = df[field].to_arrow()
 
-    embeddings = generate_embeddings(texts, model, batch_size)
-    for i, emb in enumerate(embeddings):
-        rows[i]["vector"] = emb
+    # Add embeddings as a fixed-size list column directly from numpy
+    out_cols["vector"] = pa.FixedSizeListArray.from_arrays(
+        pa.array(embeddings.ravel(), type=pa.float32()),
+        list_size=embeddings.shape[1],
+    )
 
-    return rows
+    return pa.table(out_cols)
 
 
 # How many records to embed + write per chunk (keeps RAM under ~4GB)
@@ -304,6 +307,9 @@ def embed_to_lancedb(
         print(f"Dropping existing table '{table_name}'...")
         db.drop_table(table_name)
 
+    # Pre-compute text column once for the entire DataFrame
+    df = _prepare_text_column(df, data_type)
+
     table = None
     total_written = 0
     num_chunks = (total_rows + CHUNK_SIZE - 1) // CHUNK_SIZE
@@ -312,23 +318,24 @@ def embed_to_lancedb(
         start = chunk_idx * CHUNK_SIZE
         end = min(start + CHUNK_SIZE, total_rows)
         chunk_df = df.slice(start, end - start)
-        records = chunk_df.to_dicts()
 
         print(f"\n--- Chunk {chunk_idx + 1}/{num_chunks} ({start:,}-{end:,} of {total_rows:,}) ---")
 
-        rows = _build_lance_rows(records, data_type, id_field, metadata_fields, model, batch_size)
+        texts = chunk_df["text"].to_list()
+        embeddings = generate_embeddings(texts, model, batch_size)
+        arrow_table = _build_lance_table(chunk_df, data_type, id_field, metadata_fields, embeddings)
 
         if table is None:
             print(f"Creating table '{table_name}'...")
-            table = db.create_table(table_name, data=rows)
+            table = db.create_table(table_name, data=arrow_table)
         else:
-            table.add(rows)
+            table.add(arrow_table)
 
-        total_written += len(rows)
+        total_written += len(chunk_df)
         print(f"  Written so far: {total_written:,}/{total_rows:,}")
 
         # Free chunk memory
-        del records, rows, chunk_df
+        del texts, embeddings, arrow_table, chunk_df
 
     # Build indexes after all data is written
     print(f"\nAll {total_written:,} rows written. Building indexes...")
@@ -457,8 +464,8 @@ Examples:
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=512,
-        help="Batch size for embedding (default: 512)",
+        default=256,
+        help="Batch size for embedding (default: 256)",
     )
     parser.add_argument(
         "--sample",
@@ -485,6 +492,11 @@ Examples:
     print(f"Loading model: {model_name}")
     print(f"Device: {args.device}")
     model = SentenceTransformer(model_name, device=args.device)
+
+    # Use fp16 on GPU for ~2x faster inference with negligible quality loss
+    if args.device in ("cuda", "mps"):
+        model.half()
+        print("Using fp16 precision")
 
     # Get embedding dimensions
     dims = model.get_sentence_embedding_dimension()
