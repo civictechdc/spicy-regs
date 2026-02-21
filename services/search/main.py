@@ -3,7 +3,6 @@ import logging
 
 import httpx
 import lancedb
-import pyarrow as pa
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -85,6 +84,16 @@ def get_table():
     return _table
 
 
+def arrow_to_dicts(table) -> list[dict]:
+    """Convert a PyArrow table to a list of dicts without pandas."""
+    columns = table.column_names
+    arrays = {col: table.column(col).to_pylist() for col in columns}
+    return [
+        {col: arrays[col][i] for col in columns}
+        for i in range(table.num_rows)
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Embeddings via Cloudflare Workers AI
 # ---------------------------------------------------------------------------
@@ -138,7 +147,7 @@ async def hybrid_search(
         query_vector = await get_embedding(q)
         table = get_table()
 
-        results = (
+        search = (
             table.search(query_type="hybrid")
             .vector(query_vector)
             .text(q)
@@ -148,24 +157,24 @@ async def hybrid_search(
 
         if agency:
             safe_agency = agency.replace("'", "")
-            results = results.where(f"agency_code = '{safe_agency}'")
+            search = search.where(f"agency_code = '{safe_agency}'")
 
-        rows = results.to_pandas()
+        rows = arrow_to_dicts(search.to_arrow())
 
         return {
             "query": q,
             "results": [
                 {
-                    "id": row.get("id"),
-                    "title": row.get("title"),
-                    "text": row.get("text"),
-                    "comment": row.get("comment"),
-                    "docket_id": row.get("docket_id"),
-                    "agency_code": row.get("agency_code"),
-                    "posted_date": row.get("posted_date"),
+                    "id": row["id"],
+                    "title": row["title"],
+                    "text": row["text"],
+                    "comment": row["comment"],
+                    "docket_id": row["docket_id"],
+                    "agency_code": row["agency_code"],
+                    "posted_date": row["posted_date"],
                     "score": float(row.get("_relevance_score", 0)),
                 }
-                for _, row in rows.iterrows()
+                for row in rows
             ],
         }
     except Exception as e:
@@ -183,37 +192,45 @@ async def similar_search(
         safe_id = id.replace("'", "")
 
         # Look up the source comment's vector
-        source = table.search().where(f"id = '{safe_id}'").select(SELECT_COLUMNS + ["vector"]).limit(1).to_pandas()
+        source_arrow = (
+            table.search()
+            .where(f"id = '{safe_id}'")
+            .select(SELECT_COLUMNS + ["vector"])
+            .limit(1)
+            .to_arrow()
+        )
 
-        if source.empty:
-            raise HTTPException(status_code=404, detail="Comment not found in vector index")
+        if source_arrow.num_rows == 0:
+            raise HTTPException(
+                status_code=404, detail="Comment not found in vector index"
+            )
 
-        source_vector = source.iloc[0]["vector"].tolist()
+        source_vector = source_arrow.column("vector")[0].as_py()
 
         # Find nearest neighbors
-        rows = (
+        rows = arrow_to_dicts(
             table.search(source_vector)
             .select(SELECT_COLUMNS)
             .where(f"id != '{safe_id}'")
             .limit(limit)
-            .to_pandas()
+            .to_arrow()
         )
 
         return {
             "source_id": id,
             "results": [
                 {
-                    "id": row.get("id"),
-                    "title": row.get("title"),
-                    "text": row.get("text"),
-                    "comment": row.get("comment"),
-                    "docket_id": row.get("docket_id"),
-                    "agency_code": row.get("agency_code"),
-                    "posted_date": row.get("posted_date"),
+                    "id": row["id"],
+                    "title": row["title"],
+                    "text": row["text"],
+                    "comment": row["comment"],
+                    "docket_id": row["docket_id"],
+                    "agency_code": row["agency_code"],
+                    "posted_date": row["posted_date"],
                     "score": float(row.get("_distance", 0)),
                     "rank": idx + 1,
                 }
-                for idx, (_, row) in enumerate(rows.iterrows())
+                for idx, row in enumerate(rows)
             ],
         }
     except HTTPException:
