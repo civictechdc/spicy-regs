@@ -283,9 +283,13 @@ def embed_to_lancedb(
     batch_size: int = 512,
     sample: int | None = None,
     year_filter: tuple[int, int] | None = None,
+    rebuild: bool = False,
 ) -> int:
     """
     Read Parquet data, generate embeddings, and write to a LanceDB table.
+
+    Runs incrementally by default — skips records already in the table.
+    Use rebuild=True to drop and recreate from scratch.
 
     Processes data in chunks to keep memory usage bounded.
     The table stores vectors alongside metadata for hybrid search (vector ANN + BM25 FTS).
@@ -295,7 +299,6 @@ def embed_to_lancedb(
     import lancedb
 
     df = read_input_data(input_dir, data_type, sample, year_filter)
-    total_rows = len(df)
 
     id_field = ID_FIELDS[data_type]
     metadata_fields = METADATA_FIELDS[data_type]
@@ -303,14 +306,31 @@ def embed_to_lancedb(
     print(f"\nConnecting to LanceDB at {lance_uri}...")
     db = lancedb.connect(lance_uri)
 
+    table = None
     if table_name in db.table_names():
-        print(f"Dropping existing table '{table_name}'...")
-        db.drop_table(table_name)
+        if rebuild:
+            print(f"Dropping existing table '{table_name}' (--rebuild)...")
+            db.drop_table(table_name)
+        else:
+            table = db.open_table(table_name)
+            existing_ids = set(
+                table.to_lance_dataset()
+                .to_table(columns=["id"])
+                .column("id")
+                .to_pylist()
+            )
+            print(f"Found existing table with {len(existing_ids):,} rows")
+            df = df.filter(~pl.col(id_field).str.strip_chars('"').is_in(existing_ids))
+            del existing_ids
+            print(f"  {len(df):,} new records to embed")
+            if len(df) == 0:
+                print("No new records to process.")
+                return 0
 
     # Pre-compute text column once for the entire DataFrame
     df = _prepare_text_column(df, data_type)
 
-    table = None
+    total_rows = len(df)
     total_written = 0
     num_chunks = (total_rows + CHUNK_SIZE - 1) // CHUNK_SIZE
 
@@ -473,6 +493,11 @@ Examples:
         default=None,
         help="Only process N random samples (for testing)",
     )
+    parser.add_argument(
+        "--rebuild",
+        action="store_true",
+        help="Drop and rebuild LanceDB table from scratch (default: incremental)",
+    )
     args = parser.parse_args()
 
     # Resolve model from preset or custom
@@ -513,6 +538,7 @@ Examples:
             batch_size=args.batch_size,
             sample=args.sample,
             year_filter=args.year_filter,
+            rebuild=args.rebuild,
         )
         print(f"\n Done! Embedded {count:,} {args.data_type} records to LanceDB")
         print(f"  URI: {args.lance_uri}")

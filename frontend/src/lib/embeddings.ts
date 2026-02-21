@@ -1,21 +1,43 @@
-import { pipeline, env, type FeatureExtractionPipeline } from "@huggingface/transformers";
+const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
+const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
 
-// Disable local model check — always fetch from HuggingFace Hub
-env.allowLocalModels = false;
-
-// Cache the pipeline singleton across warm Vercel invocations
-let embedder: FeatureExtractionPipeline | null = null;
-
-async function getEmbedder(): Promise<FeatureExtractionPipeline> {
-  if (!embedder) {
-    // @ts-ignore - pipeline return type is too complex for TypeScript to represent
-    embedder = await pipeline("feature-extraction", "Xenova/bge-base-en-v1.5");
-  }
-  return embedder;
+interface CloudflareAIResponse {
+  result: {
+    shape: number[];
+    data: number[][];
+  };
+  success: boolean;
+  errors: string[];
 }
 
 export async function getEmbedding(text: string): Promise<number[]> {
-  const model = await getEmbedder();
-  const output = await model(text, { pooling: "mean", normalize: true });
-  return Array.from(output.data as Float32Array);
+  if (!CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_API_TOKEN) {
+    throw new Error(
+      "Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN for embedding generation"
+    );
+  }
+
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/run/@cf/baai/bge-base-en-v1.5`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ text: [text] }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Cloudflare AI API error: ${response.status} ${response.statusText}`);
+  }
+
+  const data = (await response.json()) as CloudflareAIResponse;
+
+  if (!data.success || !data.result?.data?.[0]) {
+    throw new Error(`Cloudflare AI returned no embeddings: ${JSON.stringify(data.errors)}`);
+  }
+
+  return data.result.data[0];
 }

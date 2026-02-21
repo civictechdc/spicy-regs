@@ -20,8 +20,7 @@
     "react-dom": "^19.2.1",
     "react-virtuoso": "^4.17.0",
     "zod": "^4.1.13",
-    "@lancedb/lancedb": "^0.26.2",
-    "@huggingface/transformers": "^3.0.0"
+    "@lancedb/lancedb": "^0.26.2"
   },
   "devDependencies": {
     "@mapbox/node-pre-gyp": "^2.0.3",
