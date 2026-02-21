@@ -125,19 +125,21 @@ function SearchResults() {
 
   const { searchResources } = useDuckDBService();
 
+  const SEARCH_API = process.env.NEXT_PUBLIC_SEARCH_API_URL || '/api/search';
+
   const performHybridSearch = useCallback(async (q: string) => {
-    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    const res = await fetch(`${SEARCH_API}?q=${encodeURIComponent(q)}`);
     if (!res.ok) throw new Error(`Search API returned ${res.status}`);
     const data = await res.json();
     return data.results as SearchResult[];
-  }, []);
+  }, [SEARCH_API]);
 
   const performSimilarSearch = useCallback(async (id: string) => {
-    const res = await fetch(`/api/search/similar?id=${encodeURIComponent(id)}`);
+    const res = await fetch(`${SEARCH_API}/similar?id=${encodeURIComponent(id)}`);
     if (!res.ok) throw new Error(`Similar API returned ${res.status}`);
     const data = await res.json();
     return data.results as SearchResult[];
-  }, []);
+  }, [SEARCH_API]);
 
   // Handle similar comment lookup
   useEffect(() => {

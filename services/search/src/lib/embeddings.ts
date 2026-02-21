@@ -30,13 +30,17 @@ export async function getEmbedding(text: string): Promise<number[]> {
   );
 
   if (!response.ok) {
-    throw new Error(`Cloudflare AI API error: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `Cloudflare AI API error: ${response.status} ${response.statusText}`
+    );
   }
 
   const data = (await response.json()) as CloudflareAIResponse;
 
   if (!data.success || !data.result?.data?.[0]) {
-    throw new Error(`Cloudflare AI returned no embeddings: ${JSON.stringify(data.errors)}`);
+    throw new Error(
+      `Cloudflare AI returned no embeddings: ${JSON.stringify(data.errors)}`
+    );
   }
 
   return data.result.data[0];

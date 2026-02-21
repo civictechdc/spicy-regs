@@ -5,7 +5,6 @@ let db: Awaited<ReturnType<typeof lancedb.connect>> | null = null;
 export async function getLanceDB() {
   if (db) return db;
 
-  // Support explicit LANCE_DB_URI override, otherwise build from R2_BUCKET_NAME
   const uri =
     process.env.LANCE_DB_URI ||
     (process.env.R2_BUCKET_NAME

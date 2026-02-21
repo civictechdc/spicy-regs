@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getLanceDB } from "@/lib/lancedb";
+import { Hono } from "hono";
+import { getLanceDB } from "../lib/lancedb.js";
 
 const SELECT_COLUMNS = [
   "id",
@@ -11,37 +11,33 @@ const SELECT_COLUMNS = [
   "posted_date",
 ];
 
-export async function GET(request: NextRequest) {
-  const commentId = request.nextUrl.searchParams.get("id");
-  const limit = Math.min(
-    Number(request.nextUrl.searchParams.get("limit") || 10),
-    30
-  );
+const app = new Hono();
+
+app.get("/", async (c) => {
+  const commentId = c.req.query("id");
+  const limit = Math.min(Number(c.req.query("limit") || 10), 30);
 
   if (!commentId) {
-    return NextResponse.json(
-      { error: "Missing id parameter" },
-      { status: 400 }
-    );
+    return c.json({ error: "Missing id parameter" }, 400);
   }
 
   try {
     const db = await getLanceDB();
     const table = await db.openTable("comments");
 
+    // Sanitize ID to prevent injection
+    const safeId = commentId.replace(/'/g, "");
+
     // Look up the source comment's vector
     const source = await table
       .query()
-      .where(`id = '${commentId}'`)
+      .where(`id = '${safeId}'`)
       .select([...SELECT_COLUMNS, "vector"])
       .limit(1)
       .toArray();
 
     if (source.length === 0) {
-      return NextResponse.json(
-        { error: "Comment not found in vector index" },
-        { status: 404 }
-      );
+      return c.json({ error: "Comment not found in vector index" }, 404);
     }
 
     const sourceVector = source[0].vector as number[];
@@ -50,11 +46,11 @@ export async function GET(request: NextRequest) {
     const results = await table
       .search(sourceVector)
       .select(SELECT_COLUMNS)
-      .where(`id != '${commentId}'`)
+      .where(`id != '${safeId}'`)
       .limit(limit)
       .toArray();
 
-    return NextResponse.json({
+    return c.json({
       source_id: commentId,
       results: results.map((r, rank) => ({
         id: r.id,
@@ -70,9 +66,11 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Similar search failed:", error);
-    return NextResponse.json(
+    return c.json(
       { error: "Similar search failed", details: String(error) },
-      { status: 500 }
+      500
     );
   }
-}
+});
+
+export default app;

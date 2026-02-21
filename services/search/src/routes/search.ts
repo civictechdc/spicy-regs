@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { Hono } from "hono";
 import * as lancedb from "@lancedb/lancedb";
-import { getLanceDB } from "@/lib/lancedb";
-import { getEmbedding } from "@/lib/embeddings";
+import { getLanceDB } from "../lib/lancedb.js";
+import { getEmbedding } from "../lib/embeddings.js";
 
 const SELECT_COLUMNS = [
   "id",
@@ -13,19 +13,15 @@ const SELECT_COLUMNS = [
   "posted_date",
 ];
 
-export async function GET(request: NextRequest) {
-  const query = request.nextUrl.searchParams.get("q");
-  const limit = Math.min(
-    Number(request.nextUrl.searchParams.get("limit") || 20),
-    50
-  );
-  const agency = request.nextUrl.searchParams.get("agency");
+const app = new Hono();
+
+app.get("/", async (c) => {
+  const query = c.req.query("q");
+  const limit = Math.min(Number(c.req.query("limit") || 20), 50);
+  const agency = c.req.query("agency");
 
   if (!query) {
-    return NextResponse.json(
-      { error: "Missing q parameter" },
-      { status: 400 }
-    );
+    return c.json({ error: "Missing q parameter" }, 400);
   }
 
   try {
@@ -33,7 +29,6 @@ export async function GET(request: NextRequest) {
     const db = await getLanceDB();
     const table = await db.openTable("comments");
 
-    // Hybrid search: combine vector ANN + BM25 FTS with RRF reranking
     const reranker = await lancedb.rerankers.RRFReranker.create();
 
     let search = table
@@ -45,12 +40,14 @@ export async function GET(request: NextRequest) {
       .limit(limit);
 
     if (agency) {
-      search = search.where(`agency_code = '${agency}'`);
+      // Sanitize agency code to prevent injection
+      const safeAgency = agency.replace(/'/g, "");
+      search = search.where(`agency_code = '${safeAgency}'`);
     }
 
     const results = await search.toArray();
 
-    return NextResponse.json({
+    return c.json({
       query,
       results: results.map((r) => ({
         id: r.id,
@@ -65,9 +62,11 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Hybrid search failed:", error);
-    return NextResponse.json(
+    return c.json(
       { error: "Search failed", details: String(error) },
-      { status: 500 }
+      500
     );
   }
-}
+});
+
+export default app;

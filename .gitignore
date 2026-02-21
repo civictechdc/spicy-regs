@@ -16,3 +16,4 @@ node_modules
 .wrangler
 lance-data
 .DS_Store
+.claude
