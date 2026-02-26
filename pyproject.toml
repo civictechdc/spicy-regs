@@ -1,0 +1,52 @@
+[project]
+name = "spicy-regs"
+version = "0.1.0"
+description = "Regulations Data Analysis Tools"
+requires-python = ">=3.10"
+dependencies = [
+    "boto3",
+    "python-dotenv",
+    "polars",
+    "pyarrow",
+    "tqdm",
+    "httpx",
+    "sentence-transformers",
+    "duckdb",
+    "pandas",
+    "prefect",
+    "cyclopts",
+    "loguru",
+]
+
+[project.optional-dependencies]
+embed = [
+    "torch",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel",
+    "pyrefly",
+    "ruff",
+]
+
+[project.scripts]
+etl = "spicy_regs.pipeline.pipeline:app"
+embed = "spicy_regs.vectordb.embed:main"
+spicy-regs = "spicy_regs.cli:main"
+
+[build-system]
+requires = ["uv_build"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+exclude = [
+    "notebooks"
+]
+
+[tool.pyrefly]
+project-includes = [
+    "**/*.py*"
+]
