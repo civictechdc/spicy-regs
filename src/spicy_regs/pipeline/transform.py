@@ -8,6 +8,7 @@ from pathlib import Path
 
 import polars as pl
 import pyarrow as pa
+import pyarrow.compute
 import pyarrow.parquet as pq
 from loguru import logger
 
@@ -93,3 +94,57 @@ def merge_staging_files(
         temp_output.rename(output_file)
 
         logger.info("{}: merged {:,} total rows", data_type, total_rows)
+
+
+def partition_comments(output_dir: Path) -> Path:
+    """Partition comments.parquet by agency_code into Hive-style directory.
+
+    Reads the merged comments.parquet, groups by agency_code, and writes
+    sorted partitions to comments/agency/agency_code={X}/part-0.parquet.
+
+    Returns the partition output directory.
+    """
+    comments_file = output_dir / "comments.parquet"
+    if not comments_file.exists():
+        raise FileNotFoundError(f"comments.parquet not found in {output_dir}")
+
+    partition_dir = output_dir / "comments" / "agency"
+    partition_dir.mkdir(parents=True, exist_ok=True)
+
+    logger.info("Reading comments.parquet for partitioning...")
+    table = pq.read_table(comments_file)
+    total_rows = table.num_rows
+    logger.info("Read {:,} rows, partitioning by agency_code...", total_rows)
+
+    # Get unique agency codes
+    agency_col = table.column("agency_code")
+    agencies = sorted(set(agency_col.to_pylist()))
+    agencies = [a for a in agencies if a is not None]
+
+    for agency in agencies:
+        mask = pa.compute.equal(agency_col, agency)
+        agency_table = table.filter(mask)
+
+        # Sort by docket_id, posted_date within partition
+        sort_indices = pa.compute.sort_indices(
+            agency_table,
+            sort_keys=[("docket_id", "ascending"), ("posted_date", "ascending")],
+        )
+        agency_table = agency_table.take(sort_indices)
+
+        agency_dir = partition_dir / f"agency_code={agency}"
+        agency_dir.mkdir(parents=True, exist_ok=True)
+        out_path = agency_dir / "part-0.parquet"
+
+        pq.write_table(
+            agency_table,
+            out_path,
+            compression="zstd",
+            row_group_size=500_000,
+        )
+        logger.info("  {}: {:,} rows", agency, agency_table.num_rows)
+        del agency_table
+
+    del table
+    logger.info("Partitioned {:,} rows into {} agencies", total_rows, len(agencies))
+    return partition_dir
