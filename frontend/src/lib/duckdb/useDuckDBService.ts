@@ -7,25 +7,21 @@ import { RegulationsDataTypes } from "@/lib/db/models";
 /** Default row limit to prevent OOM in the browser */
 const DEFAULT_LIMIT = 1000;
 
-/** Years covered by the comments_optimized partitions */
-const COMMENT_YEARS = [
-  2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009,
-  2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
-  2020, 2021, 2022, 2023, 2024, 2025, 2026,
-];
-const COMMENT_PARTITION_URLS = COMMENT_YEARS
-  .map(y => `'${R2_BASE_URL}/comments_optimized/year=${y}/part-0.parquet'`)
-  .join(', ');
-
 /**
  * Build a read_parquet() reference for a given data type.
- * Comments use the optimized year-partitioned files for faster reads.
+ * For comments, uses the flat comments.parquet (best for full scans).
+ * For agency-scoped comment queries, use commentsForAgency() instead.
  */
 const parquetRef = (dataType: RegulationsDataTypes) => {
-  if (dataType === 'comments') {
-    return `read_parquet([${COMMENT_PARTITION_URLS}], hive_partitioning = true)`;
-  }
   return `read_parquet('${R2_BASE_URL}/${dataType}.parquet')`;
+};
+
+/**
+ * Build a read_parquet() reference for a single agency's comment partition.
+ * Uses agency-based Hive partitioning: comments/agency/agency_code={X}/part-0.parquet
+ */
+const commentsForAgency = (agencyCode: string) => {
+  return `read_parquet('${R2_BASE_URL}/comments/agency/agency_code=${agencyCode}/part-0.parquet')`;
 };
 
 /**
@@ -53,8 +49,9 @@ export function useDuckDBService() {
       if (!isReady) throw new Error("DuckDB not ready");
 
       const conditions: string[] = [];
-      if (agencyCode) {
-        conditions.push(`agency_code = '${agencyCode.toUpperCase()}'`);
+      const upperAgency = agencyCode?.toUpperCase();
+      if (upperAgency) {
+        conditions.push(`agency_code = '${upperAgency}'`);
       }
       if (docketId) {
         conditions.push(`docket_id = '${docketId.toUpperCase()}'`);
@@ -64,7 +61,12 @@ export function useDuckDBService() {
         conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
       const effectiveLimit = limit ?? DEFAULT_LIMIT;
 
-      let query = `SELECT * FROM ${parquetRef(dataType)} ${whereClause} LIMIT ${effectiveLimit}`;
+      // Use agency partition for comment queries filtered by agency
+      const source = dataType === 'comments' && upperAgency
+        ? commentsForAgency(upperAgency)
+        : parquetRef(dataType);
+
+      let query = `SELECT * FROM ${source} ${whereClause} LIMIT ${effectiveLimit}`;
       if (offset !== undefined) query += ` OFFSET ${offset}`;
 
       return runQuery(query);
@@ -83,9 +85,10 @@ export function useDuckDBService() {
     ): Promise<number> => {
       if (!isReady) throw new Error("DuckDB not ready");
 
+      const upperAgency = agencyCode?.toUpperCase();
       const conditions: string[] = [];
-      if (agencyCode) {
-        conditions.push(`agency_code = '${agencyCode.toUpperCase()}'`);
+      if (upperAgency) {
+        conditions.push(`agency_code = '${upperAgency}'`);
       }
       if (docketId) {
         conditions.push(`docket_id = '${docketId.toUpperCase()}'`);
@@ -94,7 +97,12 @@ export function useDuckDBService() {
       const whereClause =
         conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-      const query = `SELECT COUNT(*) as count FROM ${parquetRef(dataType)} ${whereClause}`;
+      // Use agency partition for comment queries filtered by agency
+      const source = dataType === 'comments' && upperAgency
+        ? commentsForAgency(upperAgency)
+        : parquetRef(dataType);
+
+      const query = `SELECT COUNT(*) as count FROM ${source} ${whereClause}`;
       const result = await runQuery<{ count: number }>(query);
       return Number(result[0]?.count ?? 0);
     },
@@ -111,18 +119,23 @@ export function useDuckDBService() {
       const escapedQuery = searchQuery.replace(/'/g, "''");
       const tables = ["dockets", "documents", "comments"] as const;
 
+      const upperAgency = agencyCode?.toUpperCase();
       const unionQueries = tables.map((table) => {
         let where = `title ILIKE '%${escapedQuery}%'`;
-        if (agencyCode) {
-          where += ` AND agency_code = '${agencyCode}'`;
+        if (upperAgency) {
+          where += ` AND agency_code = '${upperAgency}'`;
         }
+        // Use agency partition for comments when filtered by agency
+        const source = table === 'comments' && upperAgency
+          ? commentsForAgency(upperAgency)
+          : parquetRef(table as RegulationsDataTypes);
         return `
-          SELECT 
+          SELECT
             '${table}' as type,
-            title, 
-            docket_id, 
+            title,
+            docket_id,
             agency_code
-          FROM ${parquetRef(table as RegulationsDataTypes)}
+          FROM ${source}
           WHERE ${where}
         `;
       });
@@ -261,8 +274,8 @@ export function useDuckDBService() {
 
   /**
    * Get comments for a specific docket.
-   * When modifyDate is provided, reads only the relevant year partition(s)
-   * instead of scanning all 27 partitions (~2.9GB total).
+   * Extracts agency code from docket_id prefix to read only that agency's
+   * partition file instead of scanning the full 3GB+ comments dataset.
    */
   const getCommentsForDocket = useCallback(
     async (
@@ -280,21 +293,11 @@ export function useDuckDBService() {
         : 'ORDER BY posted_date DESC';
       const whereClause = `WHERE REPLACE(docket_id, '"', '') = '${cleanId}'`;
 
-      // If we have a modify_date, only read the relevant year partition(s)
-      let commentsSource: string;
-      if (modifyDate) {
-        const year = new Date(modifyDate).getFullYear();
-        // Read the docket's year ± 1 to catch comments spanning year boundaries
-        const years = [year - 1, year, year + 1].filter(
-          y => y >= 2000 && y <= 2026
-        );
-        const urls = years
-          .map(y => `'${R2_BASE_URL}/comments_optimized/year=${y}/part-0.parquet'`)
-          .join(', ');
-        commentsSource = `read_parquet([${urls}], hive_partitioning = true)`;
-      } else {
-        commentsSource = parquetRef("comments" as RegulationsDataTypes);
-      }
+      // Extract agency code from docket_id (e.g. "EPA" from "EPA-HQ-OAR-2021-0317")
+      const agency = cleanId.split('-')[0];
+      const commentsSource = agency
+        ? commentsForAgency(agency)
+        : parquetRef("comments" as RegulationsDataTypes);
 
       const query = `SELECT * FROM ${commentsSource} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
       return runQuery(query);
@@ -329,6 +332,7 @@ export function useDuckDBService() {
 
   /**
    * Get comment counts for a batch of docket IDs.
+   * Uses the enriched dockets.parquet (~20MB) instead of scanning comments (3GB+).
    */
   const getCommentCounts = useCallback(
     async (docketIds: string[]): Promise<Record<string, number>> => {
@@ -336,7 +340,7 @@ export function useDuckDBService() {
 
       const cleanIds = docketIds.map(id => id.replace(/^"|"$/g, '').toUpperCase());
       const inClause = cleanIds.map(id => `'${id}'`).join(',');
-      const query = `SELECT REPLACE(docket_id, '"', '') as did, COUNT(*) as cnt FROM ${parquetRef("comments" as RegulationsDataTypes)} WHERE REPLACE(docket_id, '"', '') IN (${inClause}) GROUP BY did`;
+      const query = `SELECT REPLACE(docket_id, '"', '') as did, COALESCE(comment_count, 0) as cnt FROM ${parquetRef("dockets" as RegulationsDataTypes)} WHERE REPLACE(docket_id, '"', '') IN (${inClause})`;
 
       const rows = await runQuery<{ did: string; cnt: number }>(query);
       const result: Record<string, number> = {};
@@ -350,25 +354,28 @@ export function useDuckDBService() {
 
   /**
    * Get aggregate stats for an agency (docket, document, comment counts).
+   * Uses dockets.parquet for docket + comment counts (pre-computed comment_count),
+   * and documents.parquet for document count. Avoids scanning comments entirely.
    */
   const getAgencyStats = useCallback(
     async (agencyCode: string): Promise<{ docketCount: number; documentCount: number; commentCount: number }> => {
       if (!isReady) throw new Error("DuckDB not ready");
 
       const upper = agencyCode.toUpperCase();
-      const tables = ["dockets", "documents", "comments"] as const;
-      const counts: number[] = [];
 
-      for (const table of tables) {
-        const query = `SELECT COUNT(*) as count FROM ${parquetRef(table as RegulationsDataTypes)} WHERE agency_code = '${upper}'`;
-        const result = await runQuery<{ count: number }>(query);
-        counts.push(Number(result[0]?.count ?? 0));
-      }
+      const [docketResult, docResult] = await Promise.all([
+        runQuery<{ docket_count: number; comment_count: number }>(`
+          SELECT COUNT(*) as docket_count, SUM(COALESCE(comment_count, 0)) as comment_count
+          FROM ${parquetRef("dockets" as RegulationsDataTypes)}
+          WHERE agency_code = '${upper}'
+        `),
+        runQuery<{ count: number }>(`SELECT COUNT(*) as count FROM ${parquetRef("documents" as RegulationsDataTypes)} WHERE agency_code = '${upper}'`),
+      ]);
 
       return {
-        docketCount: counts[0],
-        documentCount: counts[1],
-        commentCount: counts[2],
+        docketCount: Number(docketResult[0]?.docket_count ?? 0),
+        documentCount: Number(docResult[0]?.count ?? 0),
+        commentCount: Number(docketResult[0]?.comment_count ?? 0),
       };
     },
     [runQuery, isReady]
@@ -389,29 +396,29 @@ export function useDuckDBService() {
 
   /**
    * Get docket and comment counts for all agencies in one batch.
+   * Uses dockets.parquet (~20MB) which has pre-computed comment_count per docket,
+   * avoiding a full scan of comments.parquet (3GB+).
    */
   const getAllAgencyCounts = useCallback(
     async (): Promise<Record<string, { dockets: number; comments: number }>> => {
       if (!isReady) throw new Error("DuckDB not ready");
 
-      const docketQ = `SELECT agency_code, COUNT(*) as cnt FROM ${parquetRef("dockets" as RegulationsDataTypes)} GROUP BY agency_code`;
-      const commentQ = `SELECT agency_code, COUNT(*) as cnt FROM ${parquetRef("comments" as RegulationsDataTypes)} GROUP BY agency_code`;
+      const query = `
+        SELECT agency_code,
+               COUNT(*) as docket_cnt,
+               SUM(COALESCE(comment_count, 0)) as comment_cnt
+        FROM ${parquetRef("dockets" as RegulationsDataTypes)}
+        GROUP BY agency_code
+      `;
 
-      const [docketRows, commentRows] = await Promise.all([
-        runQuery<{ agency_code: string; cnt: number }>(docketQ),
-        runQuery<{ agency_code: string; cnt: number }>(commentQ),
-      ]);
-
+      const rows = await runQuery<{ agency_code: string; docket_cnt: number; comment_cnt: number }>(query);
       const result: Record<string, { dockets: number; comments: number }> = {};
-      for (const r of docketRows) {
+      for (const r of rows) {
         const code = r.agency_code?.replace(/^"|"$/g, '') || '';
-        if (!result[code]) result[code] = { dockets: 0, comments: 0 };
-        result[code].dockets = Number(r.cnt);
-      }
-      for (const r of commentRows) {
-        const code = r.agency_code?.replace(/^"|"$/g, '') || '';
-        if (!result[code]) result[code] = { dockets: 0, comments: 0 };
-        result[code].comments = Number(r.cnt);
+        result[code] = {
+          dockets: Number(r.docket_cnt),
+          comments: Number(r.comment_cnt),
+        };
       }
       return result;
     },
