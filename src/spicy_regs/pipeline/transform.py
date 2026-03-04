@@ -10,10 +10,8 @@ import polars as pl
 import pyarrow as pa
 import pyarrow.parquet as pq
 from loguru import logger
-from prefect import task
 
 
-@task(name="write-staging")
 def write_staging(
     agency: str,
     data_type: str,
@@ -34,7 +32,6 @@ def write_staging(
     return len(records)
 
 
-@task(name="merge-staging-files")
 def merge_staging_files(
     staging_dir: Path,
     output_dir: Path,
@@ -86,6 +83,7 @@ def merge_staging_files(
                         table = table.append_column(col, null_array)
 
                 table = table.select(target_columns)
+                table = table.cast(target_schema)
                 writer.write_table(table)
                 total_rows += table.num_rows
                 del table

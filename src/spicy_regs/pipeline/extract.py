@@ -9,12 +9,13 @@ from typing import Any, Callable
 import polars as pl
 from loguru import logger
 from prefect import task
+from prefect.cache_policies import NO_CACHE
 from tqdm import tqdm
 
 from spicy_regs.pipeline.download_r2 import download_from_r2
 
 
-@task(name="get-agencies", retries=3, retry_delay_seconds=5)
+@task(name="get-agencies", retries=3, retry_delay_seconds=5, cache_policy=NO_CACHE)
 def get_agencies(s3_client: Any, bucket_name: str, prefix: str) -> list[str]:
     """Get list of all agencies from S3 bucket.
 
@@ -34,36 +35,38 @@ def get_agencies(s3_client: Any, bucket_name: str, prefix: str) -> list[str]:
     return sorted(agencies)
 
 
-@task(name="load-manifest", retries=3, retry_delay_seconds=5)
-def load_manifest(output_dir: Path) -> set[str]:
-    """Load processed keys from manifest Parquet file."""
+@task(name="load-manifest", retries=3, retry_delay_seconds=5, cache_policy=NO_CACHE)
+def load_manifest(output_dir: Path) -> None:
+    """Load processed keys from manifest into the module-level PROCESSED_KEYS set.
+
+    Writes directly to pipeline.PROCESSED_KEYS to avoid Prefect serializing
+    a 27M-item set as a task result.
+    """
+    import spicy_regs.pipeline.pipeline as _pipeline
+
     manifest_file = output_dir / "manifest.parquet"
 
     if manifest_file.exists():
         df = pl.read_parquet(manifest_file)
-        keys = set(df["key"].to_list())
-        logger.info("Loaded manifest: {:,} processed keys", len(keys))
-        return keys
+        _pipeline.PROCESSED_KEYS = set(df["key"].to_list())
+        logger.info("Loaded manifest: {:,} processed keys", len(_pipeline.PROCESSED_KEYS))
+        return
 
     if download_from_r2("manifest.parquet", manifest_file):
         df = pl.read_parquet(manifest_file)
-        keys = set(df["key"].to_list())
-        logger.info("Downloaded manifest from R2: {:,} processed keys", len(keys))
-        return keys
+        _pipeline.PROCESSED_KEYS = set(df["key"].to_list())
+        logger.info("Downloaded manifest from R2: {:,} processed keys", len(_pipeline.PROCESSED_KEYS))
+        return
 
     logger.info("No manifest found, starting fresh")
-    return set()
 
 
-@task(name="download-existing-parquet", retries=3, retry_delay_seconds=5)
+@task(name="download-existing-parquet", retries=3, retry_delay_seconds=5, cache_policy=NO_CACHE)
 def download_existing_parquet(
     output_dir: Path,
-    processed_keys: set[str],
     data_type_names: list[str],
 ) -> None:
     """Download existing Parquet files from R2 for incremental append."""
-    if not processed_keys:
-        return
     logger.info("Downloading existing Parquet files from R2...")
     for data_type in data_type_names:
         local_file = output_dir / f"{data_type}.parquet"
@@ -75,7 +78,6 @@ def download_existing_parquet(
                 logger.warning("{}.parquet not found in R2", data_type)
 
 
-@task(name="list-json-files", retries=3, retry_delay_seconds=5)
 def list_json_files(
     s3_resource: Any,
     bucket_name: str,
@@ -107,7 +109,6 @@ def list_json_files(
     return files
 
 
-@task(name="download-and-parse", retries=3, retry_delay_seconds=2)
 def download_and_parse(
     s3_resource: Any,
     bucket_name: str,
@@ -115,10 +116,10 @@ def download_and_parse(
     extract_fn: Callable[[dict], dict],
 ) -> dict | None:
     """Download a single JSON file from S3 and parse it with the given extractor."""
-    obj = s3_resource.Object(bucket_name, key)
-    content = obj.get()["Body"].read()
-    data = loads(content)
     try:
+        obj = s3_resource.Object(bucket_name, key)
+        content = obj.get()["Body"].read()
+        data = loads(content)
         return extract_fn(data)
     except Exception:
         return None
