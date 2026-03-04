@@ -1,14 +1,28 @@
 # ETL Pipeline
 
-Converts Mirrulations S3 JSON data to optimized Parquet files on Cloudflare R2.
+Converts Mirrulations S3 JSON data to Parquet files on Cloudflare R2.
+
+```text
+Step 1 (parallel)            Step 2                Step 3        Step 4         Step 5
+┌──────────────────┐
+│ load_manifest    │
+├──────────────────┤         ┌───────────────┐    ┌──────────┐  ┌────────────┐  ┌─────────────┐
+│ download_parquet │───────▶ │ process_agency│──▶ │  merge   │─▶│save_manifest│─▶│upload_to_r2 │
+├──────────────────┤         │  × N agencies │    │ staging  │  └────────────┘  └─────────────┘
+│ get_agencies     │         └───────────────┘    └──────────┘
+└──────────────────┘
+```
+
+- **Step 1**: Load manifest, download existing parquet, discover agencies (parallel, skipped on `--full-refresh`)
+- **Step 2**: For each agency: list S3 files → download JSONs → write staging parquet
+- **Step 3**: Merge per-agency staging files into `dockets.parquet`, `documents.parquet`, `comments.parquet`
+- **Step 4**: Save updated manifest with all processed S3 keys
+- **Step 5**: Upload parquet files + manifest to R2 (parallel)
 
 ## Setup
 
 ```bash
-cd etl
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .
+uv sync
 cp .env.example .env  # Then fill in your credentials
 ```
 
@@ -16,35 +30,28 @@ cp .env.example .env  # Then fill in your credentials
 
 ### Full ETL (all agencies)
 ```bash
-python etl.py --output-dir ./output
+uv run etl --output-dir ./output
 ```
 
 ### Single agency
 ```bash
-python etl.py --agency EPA --output-dir ./output
+uv run etl --agency EPA --output-dir ./output
 ```
 
 ### Skip/isolate comments (large dataset)
 ```bash
-python etl.py --skip-comments --output-dir ./output   # Dockets & documents only
-python etl.py --only-comments --output-dir ./output   # Comments only
+uv run etl --skip-comments --output-dir ./output   # Dockets & documents only
+uv run etl --only-comments --output-dir ./output   # Comments only
 ```
 
 ### Batched processing
 ```bash
-python etl.py --batch-number 0 --batch-size 45 --output-dir ./output  # First 45 agencies
+uv run etl --batch-number 0 --batch-size 45 --output-dir ./output  # First 45 agencies
 ```
 
 ### Merge staging files only
 ```bash
-python etl.py --merge-only --output-dir ./output
-```
-
-### Optimize Parquet files for read performance
-```bash
-python etl.py --optimize-only --output-dir ./output            # Optimize only (no ETL)
-python etl.py --optimize --output-dir ./output                 # Full ETL + optimize
-python etl.py --optimize-only --skip-upload --output-dir ./output  # Optimize without uploading
+uv run etl --merge-only --output-dir ./output
 ```
 
 ### CLI flags reference
@@ -57,14 +64,11 @@ python etl.py --optimize-only --skip-upload --output-dir ./output  # Optimize wi
 | `--full-refresh` | Ignore manifest, reprocess everything |
 | `--skip-comments` | Process dockets and documents only |
 | `--only-comments` | Process comments only |
-| `--workers N` | Parallel download workers per agency (default: 10) |
-| `--parallel-agencies N` | Concurrent agency processing (default: 5) |
+| `--parallel-agencies N` | Concurrent agency processing (default: 1) |
 | `--batch-number N` | Batch index for batched runs (0-indexed) |
 | `--batch-size N` | Agencies per batch (default: 45) |
 | `--verbose, -v` | Verbose logging |
 | `--merge-only` | Only merge staging files |
-| `--optimize` | Run Parquet optimization after ETL merge |
-| `--optimize-only` | Only optimize existing Parquet files (skip ETL) |
 
 ## Data Schema
 
@@ -163,11 +167,10 @@ SELECT * FROM read_parquet(
 
 ## Architecture
 
-1. **S3 ingestion**: Lists and downloads JSON files from the public `mirrulations` S3 bucket via boto3
-2. **Staging**: Writes per-agency Parquet files to `output/staging/{data_type}/{AGENCY}.parquet`
+1. **Init (parallel)**: Load manifest, download existing parquet from R2, discover agencies from S3
+2. **Process agencies**: For each agency, list S3 JSON files, download and parse, write staging parquet
 3. **Merge**: Streams staging files into aggregate output using PyArrow (memory-efficient)
-4. **Optimize** (optional): Sorts, tunes row groups, and Hive-partitions the merged files
-5. **Upload**: Sends final files to Cloudflare R2
+4. **Upload**: Saves manifest and uploads final parquet files to R2 (parallel)
 
 ### Incremental Updates
 
