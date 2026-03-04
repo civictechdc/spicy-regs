@@ -64,11 +64,12 @@ uv run etl --merge-only --output-dir ./output
 | `--full-refresh` | Ignore manifest, reprocess everything |
 | `--skip-comments` | Process dockets and documents only |
 | `--only-comments` | Process comments only |
-| `--parallel-agencies N` | Concurrent agency processing (default: 1) |
 | `--batch-number N` | Batch index for batched runs (0-indexed) |
 | `--batch-size N` | Agencies per batch (default: 45) |
 | `--verbose, -v` | Verbose logging |
 | `--merge-only` | Only merge staging files |
+| `--upload-only` | Only upload to R2 |
+| `--partition-only` | Partition comments by agency and upload |
 
 ## Data Schema
 
@@ -120,13 +121,11 @@ All columns are stored as strings (`large_string` in PyArrow).
 s3://spicy-regs/
 ├── dockets.parquet                           # Single file, sorted by agency_code, modify_date
 ├── documents.parquet                         # Single file, sorted by agency_code, posted_date
-├── comments.parquet                          # Flat file (legacy, used by frontend fallback)
-├── comments_optimized/                       # Hive-partitioned, sorted within each partition
-│   ├── year=2000/part-0.parquet
-│   ├── year=2001/part-0.parquet
-│   ├── ...
-│   ├── year=2026/part-0.parquet
-│   └── year=other/part-0.parquet             # Dirty/null dates
+├── comments.parquet                          # Flat file (used for full-scan analytics)
+├── comments/agency/                          # Hive-partitioned by agency, sorted within each
+│   ├── agency_code=EPA/part-0.parquet
+│   ├── agency_code=FDA/part-0.parquet
+│   └── ...
 ├── manifest.parquet                          # Tracks processed S3 keys
 ├── statistics.json                           # Pre-computed analytics
 ├── campaigns.json
@@ -143,14 +142,14 @@ s3://spicy-regs/
 |---|---|---|---|---|
 | Dockets | zstd | `agency_code`, `modify_date` | 100,000 rows | None |
 | Documents | zstd | `agency_code`, `posted_date` | 100,000 rows | None |
-| Comments | zstd | `agency_code`, `docket_id`, `posted_date` | 500,000 rows | Hive by `year` |
+| Comments | zstd | `docket_id`, `posted_date` | 500,000 rows | Hive by `agency_code` |
 
 **Why these settings?**
 
 - **zstd compression**: Best ratio for text-heavy data
 - **Sorting**: Clusters related data for better compression and enables min/max statistics skipping
 - **Row group sizes**: Balance metadata overhead vs. scan granularity (~128MB target per group)
-- **Hive partitioning (comments)**: Allows DuckDB to skip entire year partitions when filtering by date
+- **Hive partitioning (comments)**: Partitioned by `agency_code` so DuckDB reads only the relevant agency's file when querying by docket_id
 
 ### Querying the Optimized Files
 
@@ -159,10 +158,10 @@ s3://spicy-regs/
 SELECT * FROM read_parquet('https://pub-5fc11ad134984edf8d9af452dd1849d6.r2.dev/dockets.parquet')
 WHERE agency_code = 'EPA';
 
--- Comments: Hive-partitioned query (reads only year=2024 partition)
+-- Comments: agency-partitioned query (reads only EPA partition)
 SELECT * FROM read_parquet(
-  'https://pub-5fc11ad134984edf8d9af452dd1849d6.r2.dev/comments_optimized/year=2024/part-0.parquet'
-) WHERE agency_code = 'EPA';
+  'https://pub-5fc11ad134984edf8d9af452dd1849d6.r2.dev/comments/agency/agency_code=EPA/part-0.parquet'
+) WHERE docket_id = 'EPA-HQ-OAR-2021-0317';
 ```
 
 ## Architecture

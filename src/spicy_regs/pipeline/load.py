@@ -7,7 +7,10 @@ from pathlib import Path
 
 import polars as pl
 from loguru import logger
-from spicy_regs.pipeline.upload_r2 import upload_to_r2 as _upload_to_r2
+from spicy_regs.pipeline.upload_r2 import (
+    upload_directory_to_r2 as _upload_directory_to_r2,
+    upload_to_r2 as _upload_to_r2,
+)
 
 
 def save_manifest(output_dir: Path, processed_keys: set[str]) -> None:
@@ -32,3 +35,9 @@ def upload_to_r2(output_dir: Path, data_type_names: list[str]) -> None:
 
     with ThreadPoolExecutor(max_workers=len(files_to_upload)) as executor:
         executor.map(_upload_to_r2, files_to_upload)
+
+
+def upload_partitioned_comments(partition_dir: Path) -> None:
+    """Upload partitioned comments directory to R2."""
+    _upload_directory_to_r2(partition_dir, remote_prefix="comments/agency")
+

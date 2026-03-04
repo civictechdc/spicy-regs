@@ -32,8 +32,12 @@ from spicy_regs.pipeline.extract import (
     list_json_files,
     load_manifest,
 )
-from spicy_regs.pipeline.load import save_manifest, upload_to_r2
-from spicy_regs.pipeline.transform import merge_staging_files, write_staging
+from spicy_regs.pipeline.load import (
+    save_manifest,
+    upload_partitioned_comments,
+    upload_to_r2,
+)
+from spicy_regs.pipeline.transform import merge_staging_files, partition_comments, write_staging
 
 load_dotenv()
 
@@ -225,6 +229,18 @@ def upload_to_r2_task(output_dir: Path, data_type_names: list[str]) -> None:
     upload_to_r2(output_dir, data_type_names)
 
 
+@task(name="partition-comments", cache_policy=NO_CACHE)
+def partition_comments_task(output_dir: Path) -> Path:
+    """Partition comments.parquet by agency_code."""
+    return partition_comments(output_dir)
+
+
+@task(name="upload-partitioned-comments", cache_policy=NO_CACHE)
+def upload_partitioned_comments_task(partition_dir: Path) -> None:
+    """Upload partitioned comments directory to R2."""
+    upload_partitioned_comments(partition_dir)
+
+
 app = App(name="spicy-regs-pipeline", help="Spicy Regs Mirrulations ETL Pipeline")
 
 
@@ -242,6 +258,7 @@ def pipeline(
     verbose: Annotated[bool, Parameter(name=["--verbose", "-v"], help="Verbose logging")] = False,
     merge_only: Annotated[bool, Parameter(help="Only merge staging files")] = False,
     upload_only: Annotated[bool, Parameter(help="Only upload to R2")] = False,
+    partition_only: Annotated[bool, Parameter(help="Only partition comments by agency and upload")] = False,
 ) -> None:
     """Mirrulations S3 → Parquet on R2."""
 
@@ -262,6 +279,14 @@ def pipeline(
         data_type_names = [dt for dt in DATA_TYPES if dt != "comments"]
     elif only_comments:
         data_type_names = [dt for dt in DATA_TYPES if dt == "comments"]
+
+    # Partition-only mode
+    if partition_only:
+        logger.info("Partition-only mode - partitioning comments by agency...")
+        partition_dir = partition_comments_task(output_dir)
+        upload_partitioned_comments_task(partition_dir)
+        logger.info("Partition complete!")
+        return
 
     # Upload-only mode
     if upload_only:
