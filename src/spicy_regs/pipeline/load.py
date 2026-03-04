@@ -2,16 +2,14 @@
 Load tasks: persist manifest and upload final Parquet files to R2.
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import polars as pl
 from loguru import logger
-from prefect import task
-
 from spicy_regs.pipeline.upload_r2 import upload_to_r2 as _upload_to_r2
 
 
-@task(name="save-manifest")
 def save_manifest(output_dir: Path, processed_keys: set[str]) -> None:
     """Save processed keys to manifest Parquet file."""
     manifest_file = output_dir / "manifest.parquet"
@@ -20,14 +18,17 @@ def save_manifest(output_dir: Path, processed_keys: set[str]) -> None:
     logger.info("Saved manifest: {:,} keys", len(processed_keys))
 
 
-@task(name="upload-to-r2")
 def upload_to_r2(output_dir: Path, data_type_names: list[str]) -> None:
-    """Upload all Parquet files and manifest to R2."""
+    """Upload all Parquet files and manifest to R2 in parallel."""
+    files_to_upload = []
     for data_type in data_type_names:
         pf = output_dir / f"{data_type}.parquet"
         if pf.exists():
-            _upload_to_r2(pf)
+            files_to_upload.append(pf)
 
     manifest_file = output_dir / "manifest.parquet"
     if manifest_file.exists():
-        _upload_to_r2(manifest_file)
+        files_to_upload.append(manifest_file)
+
+    with ThreadPoolExecutor(max_workers=len(files_to_upload)) as executor:
+        executor.map(_upload_to_r2, files_to_upload)
