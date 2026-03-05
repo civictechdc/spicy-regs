@@ -9,8 +9,6 @@ const NAV_ITEMS = [
   { href: "/", label: "Home" },
   { href: "/feed", label: "Feed" },
   { href: "/agencies", label: "Agencies" },
-  { href: "/analysis", label: "Analysis" },
-  { href: "/bookmarks", label: "Bookmarks" },
 ];
 
 export function Header() {
