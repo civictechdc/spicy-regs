@@ -9,6 +9,7 @@ import { DocumentList } from '@/components/feed/DocumentList';
 import { ThreadedComments } from '@/components/feed/ThreadedComments';
 import { AgencySidebar } from '@/components/feed/AgencySidebar';
 import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
+import { ExportButton } from '@/components/ExportButton';
 import { Loader2, ArrowLeft } from 'lucide-react';
 
 const BOOKMARKS_KEY = 'spicy-regs-bookmarks';
@@ -128,14 +129,24 @@ export default function DocketDetailPage() {
     <div className="min-h-screen bg-[var(--background)]">
       <Header />
       <main className="max-w-5xl mx-auto px-4 py-6">
-        {/* Back button */}
-        <Link
-          href={`/sr/${agencyCode}`}
-          className="inline-flex items-center gap-1.5 text-sm text-[var(--muted)] hover:text-[var(--foreground)] mb-4 transition-colors"
-        >
-          <ArrowLeft size={14} />
-          sr/{agencyCode}
-        </Link>
+        {/* Back button + Export */}
+        <div className="flex items-center justify-between mb-4">
+          <Link
+            href={`/sr/${agencyCode}`}
+            className="inline-flex items-center gap-1.5 text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
+          >
+            <ArrowLeft size={14} />
+            sr/{agencyCode}
+          </Link>
+          {docket && (
+            <ExportButton
+              docketId={docketId}
+              agencyCode={agencyCode}
+              docket={docket}
+              documents={documents}
+            />
+          )}
+        </div>
 
         <div className="flex gap-6">
           {/* Main content */}

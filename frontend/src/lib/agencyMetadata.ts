@@ -1,7 +1,11 @@
 /**
  * Static metadata for federal agencies.
  * Maps agency codes to display info, accent colors, and links.
+ *
+ * Agency data loaded from generated agencies.json (scripts/generate_agencies.py).
  */
+
+import agenciesData from './data/agencies.json';
 
 export interface AgencyInfo {
   code: string;
@@ -9,16 +13,15 @@ export interface AgencyInfo {
   shortName: string;
   description: string;
   color: string;
+  website: string | null;
+  favicon: string | null;
   relatedAgencies: string[];
   links: { label: string; url: string }[];
 }
 
-const AGENCY_MAP: Record<string, AgencyInfo> = {
+/** Extra curated metadata for major agencies (colors, related, links) */
+const CURATED_EXTRAS: Record<string, Partial<AgencyInfo>> = {
   EPA: {
-    code: 'EPA',
-    name: 'Environmental Protection Agency',
-    shortName: 'EPA',
-    description: 'Protecting human health and the environment through regulations on air quality, water, chemicals, and waste.',
     color: 'var(--agency-epa)',
     relatedAgencies: ['DOE', 'DOT', 'USDA', 'NOAA'],
     links: [
@@ -28,10 +31,6 @@ const AGENCY_MAP: Record<string, AgencyInfo> = {
     ],
   },
   FDA: {
-    code: 'FDA',
-    name: 'Food and Drug Administration',
-    shortName: 'FDA',
-    description: 'Ensuring the safety of food, drugs, medical devices, cosmetics, and tobacco products.',
     color: 'var(--agency-fda)',
     relatedAgencies: ['HHS', 'USDA', 'EPA'],
     links: [
@@ -40,10 +39,6 @@ const AGENCY_MAP: Record<string, AgencyInfo> = {
     ],
   },
   FCC: {
-    code: 'FCC',
-    name: 'Federal Communications Commission',
-    shortName: 'FCC',
-    description: 'Regulating interstate and international communications by radio, television, wire, satellite, and cable.',
     color: 'var(--agency-fcc)',
     relatedAgencies: ['FTC', 'DOJ'],
     links: [
@@ -52,10 +47,6 @@ const AGENCY_MAP: Record<string, AgencyInfo> = {
     ],
   },
   DOT: {
-    code: 'DOT',
-    name: 'Department of Transportation',
-    shortName: 'DOT',
-    description: 'Ensuring a fast, safe, efficient, accessible, and convenient transportation system.',
     color: 'var(--agency-dot)',
     relatedAgencies: ['EPA', 'DOE', 'DHS'],
     links: [
@@ -64,10 +55,6 @@ const AGENCY_MAP: Record<string, AgencyInfo> = {
     ],
   },
   SEC: {
-    code: 'SEC',
-    name: 'Securities and Exchange Commission',
-    shortName: 'SEC',
-    description: 'Protecting investors and maintaining fair, orderly, and efficient markets.',
     color: 'var(--agency-sec)',
     relatedAgencies: ['CFTC', 'FTC', 'DOJ'],
     links: [
@@ -76,10 +63,6 @@ const AGENCY_MAP: Record<string, AgencyInfo> = {
     ],
   },
   USDA: {
-    code: 'USDA',
-    name: 'U.S. Department of Agriculture',
-    shortName: 'USDA',
-    description: 'Providing leadership on food, agriculture, natural resources, and related issues.',
     color: 'var(--agency-usda)',
     relatedAgencies: ['EPA', 'FDA', 'DOI'],
     links: [
@@ -88,10 +71,6 @@ const AGENCY_MAP: Record<string, AgencyInfo> = {
     ],
   },
   DOE: {
-    code: 'DOE',
-    name: 'Department of Energy',
-    shortName: 'DOE',
-    description: 'Addressing energy, environmental, and nuclear challenges through science and technology.',
     color: 'var(--agency-doe)',
     relatedAgencies: ['EPA', 'DOT', 'NRC'],
     links: [
@@ -100,10 +79,6 @@ const AGENCY_MAP: Record<string, AgencyInfo> = {
     ],
   },
   HHS: {
-    code: 'HHS',
-    name: 'Department of Health and Human Services',
-    shortName: 'HHS',
-    description: 'Enhancing the health and well-being of all Americans through effective health and human services.',
     color: 'var(--agency-hhs)',
     relatedAgencies: ['FDA', 'CMS', 'CDC'],
     links: [
@@ -112,10 +87,6 @@ const AGENCY_MAP: Record<string, AgencyInfo> = {
     ],
   },
   DHS: {
-    code: 'DHS',
-    name: 'Department of Homeland Security',
-    shortName: 'DHS',
-    description: 'Safeguarding the American people, the homeland, and our values.',
     color: 'var(--agency-dhs)',
     relatedAgencies: ['DOJ', 'DOD', 'DOT'],
     links: [
@@ -124,10 +95,6 @@ const AGENCY_MAP: Record<string, AgencyInfo> = {
     ],
   },
   DOJ: {
-    code: 'DOJ',
-    name: 'Department of Justice',
-    shortName: 'DOJ',
-    description: 'Enforcing the law and defending the interests of the United States.',
     color: 'var(--agency-doj)',
     relatedAgencies: ['DHS', 'FTC', 'SEC'],
     links: [
@@ -136,10 +103,6 @@ const AGENCY_MAP: Record<string, AgencyInfo> = {
     ],
   },
   DOD: {
-    code: 'DOD',
-    name: 'Department of Defense',
-    shortName: 'DOD',
-    description: 'Providing military forces needed to deter war and ensure national security.',
     color: 'var(--agency-dod)',
     relatedAgencies: ['DHS', 'DOE', 'VA'],
     links: [
@@ -148,10 +111,6 @@ const AGENCY_MAP: Record<string, AgencyInfo> = {
     ],
   },
   HUD: {
-    code: 'HUD',
-    name: 'Department of Housing and Urban Development',
-    shortName: 'HUD',
-    description: 'Creating strong, sustainable, inclusive communities and quality affordable homes for all.',
     color: 'var(--agency-hud)',
     relatedAgencies: ['EPA', 'DOT', 'ED'],
     links: [
@@ -160,10 +119,6 @@ const AGENCY_MAP: Record<string, AgencyInfo> = {
     ],
   },
   ED: {
-    code: 'ED',
-    name: 'Department of Education',
-    shortName: 'ED',
-    description: 'Promoting student achievement and preparation for global competitiveness.',
     color: 'var(--agency-ed)',
     relatedAgencies: ['HHS', 'HUD'],
     links: [
@@ -172,10 +127,6 @@ const AGENCY_MAP: Record<string, AgencyInfo> = {
     ],
   },
   NOAA: {
-    code: 'NOAA',
-    name: 'National Oceanic and Atmospheric Administration',
-    shortName: 'NOAA',
-    description: 'Understanding and predicting changes in climate, weather, oceans, and coasts.',
     color: 'var(--agency-noaa)',
     relatedAgencies: ['EPA', 'USDA', 'DOI'],
     links: [
@@ -185,20 +136,50 @@ const AGENCY_MAP: Record<string, AgencyInfo> = {
   },
 };
 
+interface AgencyJson {
+  code: string;
+  name: string;
+  description: string | null;
+  website: string | null;
+  favicon: string | null;
+}
+
+/** Build lookup map from agencies.json */
+const AGENCY_MAP = new Map<string, AgencyInfo>();
+for (const entry of agenciesData as AgencyJson[]) {
+  const extras = CURATED_EXTRAS[entry.code] || {};
+  AGENCY_MAP.set(entry.code, {
+    code: entry.code,
+    name: entry.name,
+    shortName: entry.code,
+    description: entry.description || 'Federal regulatory agency.',
+    color: extras.color || 'var(--agency-default)',
+    website: entry.website,
+    favicon: entry.favicon,
+    relatedAgencies: extras.relatedAgencies || [],
+    links: extras.links || [
+      { label: 'regulations.gov', url: 'https://www.regulations.gov' },
+    ],
+  });
+}
+
 /**
  * Get metadata for an agency by code.
  * Returns a sensible fallback for unknown agencies.
  */
 export function getAgencyInfo(code: string): AgencyInfo {
   const upper = code.toUpperCase();
-  if (AGENCY_MAP[upper]) return AGENCY_MAP[upper];
+  const info = AGENCY_MAP.get(upper);
+  if (info) return info;
 
   return {
     code: upper,
     name: upper,
     shortName: upper,
-    description: `Federal regulatory agency.`,
+    description: 'Federal regulatory agency.',
     color: 'var(--agency-default)',
+    website: null,
+    favicon: null,
     relatedAgencies: [],
     links: [
       { label: 'regulations.gov', url: 'https://www.regulations.gov' },
@@ -208,7 +189,7 @@ export function getAgencyInfo(code: string): AgencyInfo {
 
 /** Get all known agencies sorted by name */
 export function getAllKnownAgencies(): AgencyInfo[] {
-  return Object.values(AGENCY_MAP).sort((a, b) => a.name.localeCompare(b.name));
+  return Array.from(AGENCY_MAP.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** Generate a deterministic color for avatars based on a string */
