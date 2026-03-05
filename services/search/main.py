@@ -6,6 +6,8 @@ import lancedb
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from query import router as query_router, startup as query_startup
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -14,6 +16,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 app = FastAPI(title="Spicy Regs Search API")
+app.include_router(query_router)
 
 allowed_origins = os.environ.get(
     "ALLOWED_ORIGINS", "https://app.spicy-regs.dev,http://localhost:3000"
@@ -22,7 +25,7 @@ allowed_origins = os.environ.get(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
     expose_headers=["Cross-Origin-Resource-Policy"],
 )
@@ -252,3 +255,5 @@ async def warmup():
         logger.info("LanceDB connection ready")
     except Exception as e:
         logger.error(f"LanceDB warmup failed: {e}")
+
+    await query_startup()
