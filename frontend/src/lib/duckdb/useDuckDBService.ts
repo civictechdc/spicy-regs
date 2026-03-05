@@ -190,47 +190,124 @@ export function useDuckDBService() {
   );
 
   /**
-   * Get recent dockets with comment counts in a single query.
-   * Uses enriched dockets.parquet which already has document_count, comment_count,
-   * comment_end_date, and comment_start_date columns.
+   * Get recent dockets with comment counts.
+   * dockets.parquet only has: docket_id, agency_code, title, docket_type, modify_date, abstract.
+   * For 'popular' sort: JOINs with comments to compute counts.
+   * For 'open' sort: JOINs with documents to find dockets with open comment periods.
    */
   const getRecentDocketsWithCounts = useCallback(
     async (
       limit: number = 20,
       offset: number = 0,
       agencyCode?: string,
-      sortBy: 'recent' | 'popular' | 'open' = 'recent'
+      sortBy: 'recent' | 'popular' | 'open' = 'recent',
+      dateRange?: '7d' | '30d' | '90d' | '365d'
     ): Promise<{ dockets: any[]; commentCounts: Record<string, number> }> => {
       if (!isReady) throw new Error("DuckDB not ready");
 
-      const conditions: string[] = [];
-      if (agencyCode) {
-        conditions.push(`agency_code = '${agencyCode.toUpperCase()}'`);
-      }
-      if (sortBy === 'open') {
-        conditions.push(`TRY_CAST(comment_end_date AS TIMESTAMP) > CURRENT_TIMESTAMP`);
-      }
+      const upperAgency = agencyCode?.toUpperCase();
+      const docketsSource = parquetRef("dockets" as RegulationsDataTypes);
 
-      const whereClause =
-        conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+      // Build date filter condition
+      const dateMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90, '365d': 365 };
+      const dateDays = dateRange ? dateMap[dateRange] : undefined;
+      const dateCondition = dateDays
+        ? `TRY_CAST(d.modify_date AS TIMESTAMP) >= CAST(NOW() AS TIMESTAMP) - INTERVAL '${dateDays}' DAY`
+        : '';
 
-      let orderClause = 'ORDER BY modify_date DESC';
+      let query: string;
+
       if (sortBy === 'popular') {
-        orderClause = 'ORDER BY comment_count DESC, modify_date DESC';
+        // JOIN with comments to sort by comment count
+        // DuckDB column pruning reads only docket_id from comments.parquet for the GROUP BY
+        const commentsSource = parquetRef("comments" as RegulationsDataTypes);
+        const docsSource = parquetRef("documents" as RegulationsDataTypes);
+        const conditions: string[] = [];
+        if (upperAgency) conditions.push(`d.agency_code = '${upperAgency}'`);
+        if (dateCondition) conditions.push(dateCondition);
+        const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+        query = `
+          WITH comment_counts AS (
+            SELECT REPLACE(docket_id, '"', '') as did, COUNT(*) as cnt
+            FROM ${commentsSource}
+            GROUP BY did
+          ),
+          comment_periods AS (
+            SELECT REPLACE(docket_id, '"', '') as did,
+                   MAX(TRY_CAST(comment_end_date AS TIMESTAMP)) as end_date
+            FROM ${docsSource}
+            WHERE comment_end_date IS NOT NULL
+            GROUP BY did
+          )
+          SELECT d.*, COALESCE(cc.cnt, 0) as comment_count, CAST(cp.end_date AS VARCHAR) as comment_end_date
+          FROM ${docketsSource} d
+          LEFT JOIN comment_counts cc ON REPLACE(d.docket_id, '"', '') = cc.did
+          LEFT JOIN comment_periods cp ON REPLACE(d.docket_id, '"', '') = cp.did
+          ${whereClause}
+          ORDER BY comment_count DESC, d.modify_date DESC
+          LIMIT ${limit} OFFSET ${offset}
+        `;
       } else if (sortBy === 'open') {
-        orderClause = 'ORDER BY TRY_CAST(comment_end_date AS TIMESTAMP) ASC';
+        // JOIN with documents for comment_end_date + comments for counts
+        const docsSource = parquetRef("documents" as RegulationsDataTypes);
+        const commentsSource = parquetRef("comments" as RegulationsDataTypes);
+        const conditions: string[] = [];
+        if (upperAgency) conditions.push(`d.agency_code = '${upperAgency}'`);
+        if (dateCondition) conditions.push(dateCondition);
+        const whereClause = conditions.length > 0
+          ? 'AND ' + conditions.join(' AND ')
+          : '';
+        query = `
+          WITH open_periods AS (
+            SELECT REPLACE(docket_id, '"', '') as did,
+                   MAX(TRY_CAST(comment_end_date AS TIMESTAMP)) as end_date
+            FROM ${docsSource}
+            WHERE TRY_CAST(comment_end_date AS TIMESTAMP) > CAST(NOW() AS TIMESTAMP)
+            GROUP BY did
+          ),
+          comment_counts AS (
+            SELECT REPLACE(docket_id, '"', '') as did, COUNT(*) as cnt
+            FROM ${commentsSource}
+            GROUP BY did
+          )
+          SELECT d.*, CAST(op.end_date AS VARCHAR) as comment_end_date, COALESCE(cc.cnt, 0) as comment_count
+          FROM ${docketsSource} d
+          INNER JOIN open_periods op ON REPLACE(d.docket_id, '"', '') = op.did
+          LEFT JOIN comment_counts cc ON REPLACE(d.docket_id, '"', '') = cc.did
+          WHERE 1=1 ${whereClause}
+          ORDER BY op.end_date ASC
+          LIMIT ${limit} OFFSET ${offset}
+        `;
+      } else {
+        // 'recent' — LEFT JOIN with documents for comment_end_date + comments for counts
+        const docsSource = parquetRef("documents" as RegulationsDataTypes);
+        const commentsSource = parquetRef("comments" as RegulationsDataTypes);
+        const conditions: string[] = [];
+        if (upperAgency) conditions.push(`d.agency_code = '${upperAgency}'`);
+        if (dateCondition) conditions.push(dateCondition);
+        const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+        query = `
+          WITH comment_periods AS (
+            SELECT REPLACE(docket_id, '"', '') as did,
+                   MAX(TRY_CAST(comment_end_date AS TIMESTAMP)) as end_date
+            FROM ${docsSource}
+            WHERE comment_end_date IS NOT NULL
+            GROUP BY did
+          ),
+          comment_counts AS (
+            SELECT REPLACE(docket_id, '"', '') as did, COUNT(*) as cnt
+            FROM ${commentsSource}
+            GROUP BY did
+          )
+          SELECT d.*, CAST(cp.end_date AS VARCHAR) as comment_end_date, COALESCE(cc.cnt, 0) as comment_count
+          FROM ${docketsSource} d
+          LEFT JOIN comment_periods cp ON REPLACE(d.docket_id, '"', '') = cp.did
+          LEFT JOIN comment_counts cc ON REPLACE(d.docket_id, '"', '') = cc.did
+          ${whereClause}
+          ORDER BY d.modify_date DESC
+          LIMIT ${limit} OFFSET ${offset}
+        `;
       }
-
-      const cols = `docket_id, agency_code, title, abstract, docket_type, modify_date,
-        COALESCE(document_count, 0) AS document_count,
-        COALESCE(comment_count, 0) AS comment_count,
-        comment_end_date, comment_start_date`;
-      const query = `
-        SELECT ${cols}
-        FROM ${parquetRef("dockets" as RegulationsDataTypes)}
-        ${whereClause} ${orderClause}
-        LIMIT ${limit} OFFSET ${offset}
-      `;
 
       const rows = await runQuery<any>(query);
 
@@ -332,20 +409,38 @@ export function useDuckDBService() {
 
   /**
    * Get comment counts for a batch of docket IDs.
-   * Uses the enriched dockets.parquet (~20MB) instead of scanning comments (3GB+).
+   * Groups docket IDs by agency prefix and queries each agency's comment partition.
    */
   const getCommentCounts = useCallback(
     async (docketIds: string[]): Promise<Record<string, number>> => {
       if (!isReady || docketIds.length === 0) return {};
 
       const cleanIds = docketIds.map(id => id.replace(/^"|"$/g, '').toUpperCase());
-      const inClause = cleanIds.map(id => `'${id}'`).join(',');
-      const query = `SELECT REPLACE(docket_id, '"', '') as did, COALESCE(comment_count, 0) as cnt FROM ${parquetRef("dockets" as RegulationsDataTypes)} WHERE REPLACE(docket_id, '"', '') IN (${inClause})`;
 
-      const rows = await runQuery<{ did: string; cnt: number }>(query);
+      // Group docket IDs by agency prefix (e.g. "EPA" from "EPA-HQ-OAR-2021-0317")
+      const byAgency: Record<string, string[]> = {};
+      for (const id of cleanIds) {
+        const agency = id.split('-')[0];
+        if (!byAgency[agency]) byAgency[agency] = [];
+        byAgency[agency].push(id);
+      }
+
+      // Query each agency's comment partition in parallel
+      const promises = Object.entries(byAgency).map(async ([agency, ids]) => {
+        const inClause = ids.map(id => `'${id}'`).join(',');
+        const source = commentsForAgency(agency);
+        const query = `SELECT REPLACE(docket_id, '"', '') as did, COUNT(*) as cnt FROM ${source} WHERE REPLACE(docket_id, '"', '') IN (${inClause}) GROUP BY did`;
+        return runQuery<{ did: string; cnt: number }>(query);
+      });
+
+      const results = await Promise.all(promises);
       const result: Record<string, number> = {};
-      for (const r of rows) {
-        result[r.did] = Number(r.cnt);
+      // Initialize all requested IDs to 0
+      for (const id of cleanIds) result[id] = 0;
+      for (const rows of results) {
+        for (const r of rows) {
+          result[r.did] = Number(r.cnt);
+        }
       }
       return result;
     },
@@ -354,8 +449,7 @@ export function useDuckDBService() {
 
   /**
    * Get aggregate stats for an agency (docket, document, comment counts).
-   * Uses dockets.parquet for docket + comment counts (pre-computed comment_count),
-   * and documents.parquet for document count. Avoids scanning comments entirely.
+   * Queries each parquet source separately: dockets, documents, and the agency comment partition.
    */
   const getAgencyStats = useCallback(
     async (agencyCode: string): Promise<{ docketCount: number; documentCount: number; commentCount: number }> => {
@@ -363,19 +457,20 @@ export function useDuckDBService() {
 
       const upper = agencyCode.toUpperCase();
 
-      const [docketResult, docResult] = await Promise.all([
-        runQuery<{ docket_count: number; comment_count: number }>(`
-          SELECT COUNT(*) as docket_count, SUM(COALESCE(comment_count, 0)) as comment_count
+      const [docketResult, docResult, commentResult] = await Promise.all([
+        runQuery<{ count: number }>(`
+          SELECT COUNT(*) as count
           FROM ${parquetRef("dockets" as RegulationsDataTypes)}
           WHERE agency_code = '${upper}'
         `),
         runQuery<{ count: number }>(`SELECT COUNT(*) as count FROM ${parquetRef("documents" as RegulationsDataTypes)} WHERE agency_code = '${upper}'`),
+        runQuery<{ count: number }>(`SELECT COUNT(*) as count FROM ${commentsForAgency(upper)}`),
       ]);
 
       return {
-        docketCount: Number(docketResult[0]?.docket_count ?? 0),
+        docketCount: Number(docketResult[0]?.count ?? 0),
         documentCount: Number(docResult[0]?.count ?? 0),
-        commentCount: Number(docketResult[0]?.comment_count ?? 0),
+        commentCount: Number(commentResult[0]?.count ?? 0),
       };
     },
     [runQuery, isReady]
@@ -395,32 +490,49 @@ export function useDuckDBService() {
   );
 
   /**
-   * Get docket and comment counts for all agencies in one batch.
-   * Uses dockets.parquet (~20MB) which has pre-computed comment_count per docket,
-   * avoiding a full scan of comments.parquet (3GB+).
+   * Get docket counts for all agencies.
+   * Only counts dockets (from dockets.parquet). Comment counts are omitted
+   * since they'd require scanning 3GB+ of comment partitions.
    */
   const getAllAgencyCounts = useCallback(
     async (): Promise<Record<string, { dockets: number; comments: number }>> => {
       if (!isReady) throw new Error("DuckDB not ready");
 
       const query = `
-        SELECT agency_code,
-               COUNT(*) as docket_cnt,
-               SUM(COALESCE(comment_count, 0)) as comment_cnt
+        SELECT agency_code, COUNT(*) as docket_cnt
         FROM ${parquetRef("dockets" as RegulationsDataTypes)}
         GROUP BY agency_code
       `;
 
-      const rows = await runQuery<{ agency_code: string; docket_cnt: number; comment_cnt: number }>(query);
+      const rows = await runQuery<{ agency_code: string; docket_cnt: number }>(query);
       const result: Record<string, { dockets: number; comments: number }> = {};
       for (const r of rows) {
         const code = r.agency_code?.replace(/^"|"$/g, '') || '';
         result[code] = {
           dockets: Number(r.docket_cnt),
-          comments: Number(r.comment_cnt),
+          comments: 0,
         };
       }
       return result;
+    },
+    [runQuery, isReady]
+  );
+
+  /**
+   * Get ALL comments for a docket (for export). No pagination, capped at 50k rows.
+   */
+  const getAllCommentsForDocket = useCallback(
+    async (docketId: string): Promise<any[]> => {
+      if (!isReady) throw new Error("DuckDB not ready");
+
+      const cleanId = docketId.replace(/^"|"$/g, '').toUpperCase();
+      const agency = cleanId.split('-')[0];
+      const commentsSource = agency
+        ? commentsForAgency(agency)
+        : parquetRef("comments" as RegulationsDataTypes);
+
+      const query = `SELECT * FROM ${commentsSource} WHERE REPLACE(docket_id, '"', '') = '${cleanId}' ORDER BY posted_date DESC LIMIT 50000`;
+      return runQuery(query);
     },
     [runQuery, isReady]
   );
@@ -435,6 +547,7 @@ export function useDuckDBService() {
     getRecentDockets,
     getRecentDocketsWithCounts,
     getCommentsForDocket,
+    getAllCommentsForDocket,
     getDocumentsForDocket,
     getCommentCounts,
     getAgencyStats,

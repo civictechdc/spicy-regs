@@ -56,6 +56,14 @@ function DocketFeed() {
       return 'recent';
     }
   });
+  const [dateRange, setDateRange] = useState<'' | '7d' | '30d' | '90d' | '365d'>(() => {
+    if (typeof window === 'undefined') return '';
+    try {
+      return (localStorage.getItem('spicy-regs-date-preference') as any) || '';
+    } catch {
+      return '';
+    }
+  });
 
   // Bookmarks
   const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
@@ -82,7 +90,7 @@ function DocketFeed() {
       setLoading(true);
       const newOffset = reset ? 0 : offset;
       const { dockets: results, commentCounts: counts } = await getRecentDocketsWithCounts(
-        PAGE_SIZE, newOffset, selectedAgency || undefined, sortBy
+        PAGE_SIZE, newOffset, selectedAgency || undefined, sortBy, dateRange || undefined
       );
 
       if (reset) {
@@ -102,7 +110,7 @@ function DocketFeed() {
       setLoading(false);
       setInitialLoading(false);
     }
-  }, [isReady, loading, offset, selectedAgency, sortBy, getRecentDocketsWithCounts]);
+  }, [isReady, loading, offset, selectedAgency, sortBy, dateRange, getRecentDocketsWithCounts]);
 
   // Initial load and filter change
   useEffect(() => {
@@ -110,7 +118,7 @@ function DocketFeed() {
       setInitialLoading(true);
       loadDockets(true);
     }
-  }, [isReady, selectedAgency, sortBy]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isReady, selectedAgency, sortBy, dateRange]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Deduplicate
   const uniqueDockets = useMemo(() => {
@@ -123,29 +131,27 @@ function DocketFeed() {
     });
   }, [dockets]);
 
-  if (initialLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-24 gap-4">
-        <Loader2 size={32} className="animate-spin text-[var(--accent-primary)]" />
-        <p className="text-[var(--muted)] text-sm">Loading feed...</p>
-      </div>
-    );
-  }
-
   return (
     <div>
-      {/* Filter Bar */}
+      {/* Filter Bar — always visible */}
       <div className="mb-6 p-4 bg-[var(--surface)] rounded-xl border border-[var(--border)]">
         <FeedFilters
           selectedAgency={selectedAgency}
           onAgencyChange={(a) => { setSelectedAgency(a); }}
           sortBy={sortBy}
           onSortChange={(s) => { setSortBy(s); }}
+          dateRange={dateRange}
+          onDateRangeChange={(d) => { setDateRange(d); }}
         />
       </div>
 
       {/* Feed */}
-      {uniqueDockets.length === 0 && !loading ? (
+      {initialLoading ? (
+        <div className="flex flex-col items-center justify-center py-24 gap-4">
+          <Loader2 size={32} className="animate-spin text-[var(--accent-primary)]" />
+          <p className="text-[var(--muted)] text-sm">Loading feed...</p>
+        </div>
+      ) : uniqueDockets.length === 0 && !loading ? (
         <div className="text-center py-16">
           <p className="text-lg text-[var(--muted)]">No dockets found.</p>
           <p className="text-sm text-[var(--muted-foreground)] mt-1">

@@ -8,6 +8,7 @@ import { DocketPost } from '@/components/feed/DocketPost';
 import { AgencySidebar } from '@/components/feed/AgencySidebar';
 import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
 import { getAgencyInfo } from '@/lib/agencyMetadata';
+import { AgencyAvatar } from '@/components/feed/AgencyAvatar';
 import { Loader2 } from 'lucide-react';
 
 const BOOKMARKS_KEY = 'spicy-regs-bookmarks';
@@ -146,12 +147,7 @@ export default function AgencyPage() {
       {/* Agency Header */}
       <div className="max-w-5xl mx-auto px-4 -mt-10 relative z-10 mb-6">
         <div className="flex items-end gap-4">
-          <div
-            className="agency-avatar agency-avatar-lg border-4 border-[var(--background)]"
-            style={{ backgroundColor: agency.color }}
-          >
-            {agency.shortName}
-          </div>
+          <AgencyAvatar agency={agency} size="lg" className="border-4 border-[var(--background)]" />
           <div className="pb-1">
             <h1 className="text-2xl font-bold text-[var(--foreground)]">
               {agency.name}
