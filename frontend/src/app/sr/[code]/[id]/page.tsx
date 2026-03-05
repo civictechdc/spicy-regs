@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '@/components/Header';
@@ -11,25 +11,6 @@ import { AgencySidebar } from '@/components/feed/AgencySidebar';
 import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
 import { ExportButton } from '@/components/ExportButton';
 import { Loader2, ArrowLeft } from 'lucide-react';
-
-const BOOKMARKS_KEY = 'spicy-regs-bookmarks';
-
-function getStoredBookmarks(): Set<string> {
-  if (typeof window === 'undefined') return new Set();
-  try {
-    const stored = localStorage.getItem(BOOKMARKS_KEY);
-    return stored ? new Set(JSON.parse(stored)) : new Set();
-  } catch {
-    return new Set();
-  }
-}
-
-function saveBookmarks(bookmarks: Set<string>) {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(BOOKMARKS_KEY, JSON.stringify([...bookmarks]));
-  } catch {}
-}
 
 function stripQuotes(s: any): string {
   if (!s) return '';
@@ -48,22 +29,6 @@ export default function DocketDetailPage() {
   const [stats, setStats] = useState<any>();
   const [documents, setDocuments] = useState<any[]>([]);
   const [docsLoading, setDocsLoading] = useState(true);
-
-  // Bookmarks
-  const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
-  useEffect(() => { setBookmarks(getStoredBookmarks()); }, []);
-
-  const handleToggleBookmark = useCallback(() => {
-    setBookmarks(prev => {
-      const next = new Set(prev);
-      if (next.has(docketId)) next.delete(docketId);
-      else next.add(docketId);
-      saveBookmarks(next);
-      return next;
-    });
-  }, [docketId]);
-
-
 
   useEffect(() => {
     if (!isReady || !docketId) return;
@@ -154,8 +119,6 @@ export default function DocketDetailPage() {
             {/* Docket Post */}
             <DocketPost
               item={docket}
-              isBookmarked={bookmarks.has(docketId)}
-              onToggleBookmark={handleToggleBookmark}
               commentCount={Number(docket.comment_count || 0)}
               documentCount={Number(docket.document_count || 0)}
               isDetailView={true}

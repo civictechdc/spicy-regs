@@ -12,25 +12,7 @@ import { getAgencyInfo } from '@/lib/agencyMetadata';
 import { AgencyAvatar } from '@/components/feed/AgencyAvatar';
 import { Loader2 } from 'lucide-react';
 
-const BOOKMARKS_KEY = 'spicy-regs-bookmarks';
 const PAGE_SIZE = 20;
-
-function getStoredBookmarks(): Set<string> {
-  if (typeof window === 'undefined') return new Set();
-  try {
-    const stored = localStorage.getItem(BOOKMARKS_KEY);
-    return stored ? new Set(JSON.parse(stored)) : new Set();
-  } catch {
-    return new Set();
-  }
-}
-
-function saveBookmarks(bookmarks: Set<string>) {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(BOOKMARKS_KEY, JSON.stringify([...bookmarks]));
-  } catch {}
-}
 
 function stripQuotes(s: any): string {
   if (!s) return '';
@@ -175,7 +157,6 @@ export default function AgencyPage() {
                   overscan={400}
                   itemContent={(index, item) => {
                     const docketId = stripQuotes(item.docket_id);
-                    const isBookmarked = bookmarks.has(docketId);
 
                     return (
                       <div className="pb-3">

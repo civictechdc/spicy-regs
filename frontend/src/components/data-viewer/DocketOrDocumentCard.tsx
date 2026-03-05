@@ -1,20 +1,15 @@
 import { useState } from 'react';
 import { RegulationData, DataType } from '@/lib/api';
 import { stripQuotes, formatDate, parseRawJson } from './utils';
-import { BookmarkButton } from './BookmarkButton';
 
 interface DocketOrDocumentCardProps {
   item: RegulationData;
   dataType: DataType;
-  isBookmarked: boolean;
-  onToggleBookmark: () => void;
 }
 
-export function DocketOrDocumentCard({ 
-  item, 
+export function DocketOrDocumentCard({
+  item,
   dataType,
-  isBookmarked,
-  onToggleBookmark
 }: DocketOrDocumentCardProps) {
   const [expanded, setExpanded] = useState(false);
   const parsedJson = parseRawJson(item.raw_json);
@@ -69,11 +64,6 @@ export function DocketOrDocumentCard({
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex-1">
               {title || docketId}
             </h3>
-            <BookmarkButton 
-              isBookmarked={isBookmarked} 
-              onToggle={onToggleBookmark} 
-              loading={false} 
-            />
             {(docketType || documentType) && (
               <span className="flex-shrink-0 ml-2 text-xs px-2.5 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded-full font-medium">
                 {documentType || docketType}

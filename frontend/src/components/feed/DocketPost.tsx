@@ -3,7 +3,6 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import {
-  Bookmark,
   ExternalLink,
   MessageSquare,
   FileText,
@@ -17,8 +16,6 @@ import { getAgencyInfo, timeAgo, formatCount } from '@/lib/agencyMetadata';
 
 interface DocketPostProps {
   item: Record<string, any>;
-  isBookmarked: boolean;
-  onToggleBookmark: () => void;
   commentCount?: number;
   documentCount?: number;
   /** If true, we're on the detail page — don't render title as link */
@@ -49,8 +46,6 @@ function parseRawJson(item: Record<string, any>) {
 
 export function DocketPost({
   item,
-  isBookmarked,
-  onToggleBookmark,
   commentCount = 0,
   documentCount = 0,
   isDetailView = false,
@@ -223,14 +218,6 @@ export function DocketPost({
 
         {/* Action Bar */}
         <div className="flex items-center gap-1 mt-3 pt-3 border-t border-[var(--border)]">
-          <button
-            onClick={onToggleBookmark}
-            className={`action-btn ${isBookmarked ? 'text-[var(--accent-primary)]' : ''}`}
-          >
-            <Bookmark size={16} fill={isBookmarked ? 'currentColor' : 'none'} />
-            {isBookmarked ? 'Saved' : 'Save'}
-          </button>
-
           {!isDetailView && (
             <Link
               href={`/sr/${agencyCode}/${encodeURIComponent(docketId)}`}
