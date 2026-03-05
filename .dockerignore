@@ -1,0 +1,14 @@
+.venv/
+node_modules/
+.git/
+.github/
+output/
+spicy-regs-data/
+notebooks/
+sample-data/
+*.pyc
+__pycache__/
+.vercel/
+.claude/
+.vscode/
+.agent/
