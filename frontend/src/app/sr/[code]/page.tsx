@@ -11,25 +11,7 @@ import { getAgencyInfo } from '@/lib/agencyMetadata';
 import { AgencyAvatar } from '@/components/feed/AgencyAvatar';
 import { Loader2 } from 'lucide-react';
 
-const BOOKMARKS_KEY = 'spicy-regs-bookmarks';
 const PAGE_SIZE = 20;
-
-function getStoredBookmarks(): Set<string> {
-  if (typeof window === 'undefined') return new Set();
-  try {
-    const stored = localStorage.getItem(BOOKMARKS_KEY);
-    return stored ? new Set(JSON.parse(stored)) : new Set();
-  } catch {
-    return new Set();
-  }
-}
-
-function saveBookmarks(bookmarks: Set<string>) {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(BOOKMARKS_KEY, JSON.stringify([...bookmarks]));
-  } catch {}
-}
 
 function stripQuotes(s: any): string {
   if (!s) return '';
@@ -53,20 +35,6 @@ export default function AgencyPage() {
   const [activeTab, setActiveTab] = useState<SortTab>('new');
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [stats, setStats] = useState<{ docketCount: number; documentCount: number; commentCount: number } | undefined>();
-
-  // Bookmarks
-  const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
-  useEffect(() => { setBookmarks(getStoredBookmarks()); }, []);
-
-  const handleToggleBookmark = useCallback((docketId: string) => {
-    setBookmarks(prev => {
-      const next = new Set(prev);
-      if (next.has(docketId)) next.delete(docketId);
-      else next.add(docketId);
-      saveBookmarks(next);
-      return next;
-    });
-  }, []);
 
   // Load stats
   useEffect(() => {
@@ -207,14 +175,11 @@ export default function AgencyPage() {
                   overscan={400}
                   itemContent={(index, item) => {
                     const docketId = stripQuotes(item.docket_id);
-                    const isBookmarked = bookmarks.has(docketId);
 
                     return (
                       <div className="pb-3">
                         <DocketPost
                           item={item}
-                          isBookmarked={isBookmarked}
-                          onToggleBookmark={() => handleToggleBookmark(docketId)}
                           commentCount={commentCounts[docketId.toUpperCase()] || 0}
                         />
                       </div>

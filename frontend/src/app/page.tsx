@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Flame, Rss, Building2, BarChart3, Search, Bookmark, ExternalLink } from 'lucide-react';
+import { Flame, Rss, Building2, Search, ExternalLink } from 'lucide-react';
 import { Header } from '@/components/Header';
 
 export default function HomePage() {
@@ -68,22 +68,10 @@ export default function HomePage() {
             href="/agencies"
           />
           <FeatureCard
-            icon={<BarChart3 size={22} />}
-            title="Analysis Dashboard"
-            description="Pre-computed analyses that surface trends across agencies, comment volumes, and regulatory activity."
-            href="/analysis"
-          />
-          <FeatureCard
             icon={<Search size={22} />}
             title="Full-Text Search"
             description="Search across regulations, dockets, and documents using DuckDB-powered queries — all inside your browser."
             href="/search"
-          />
-          <FeatureCard
-            icon={<Bookmark size={22} />}
-            title="Bookmarks"
-            description="Save dockets you care about for quick access later. Everything stays local in your browser — no account needed."
-            href="/bookmarks"
           />
           <FeatureCard
             icon={<ExternalLink size={22} />}
