@@ -1,106 +1,70 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { X, ChevronDown } from 'lucide-react';
-import { getAllKnownAgencies } from '@/lib/agencyMetadata';
+import { useEffect } from 'react';
+import { ChevronDown } from 'lucide-react';
 
 type SortOption = 'recent' | 'popular' | 'open';
+type DateRange = '' | '7d' | '30d' | '90d' | '365d';
 
 interface FeedFiltersProps {
   selectedAgency: string;
   onAgencyChange: (agency: string) => void;
   sortBy: SortOption;
   onSortChange: (sort: SortOption) => void;
+  dateRange: DateRange;
+  onDateRangeChange: (range: DateRange) => void;
 }
 
 const PREFS_SORT_KEY = 'spicy-regs-sort-preference';
+const PREFS_DATE_KEY = 'spicy-regs-date-preference';
+
+const dateOptions: { key: DateRange; label: string }[] = [
+  { key: '', label: 'All Time' },
+  { key: '7d', label: 'Last 7 Days' },
+  { key: '30d', label: 'Last Month' },
+  { key: '90d', label: 'Last Quarter' },
+  { key: '365d', label: 'Last Year' },
+];
 
 export function FeedFilters({
   selectedAgency,
   onAgencyChange,
   sortBy,
   onSortChange,
+  dateRange,
+  onDateRangeChange,
 }: FeedFiltersProps) {
-  const allAgencies = useMemo(() => getAllKnownAgencies(), []);
-  const [showAgencyDropdown, setShowAgencyDropdown] = useState(false);
-  const [agencySearch, setAgencySearch] = useState('');
-
-  // Persist sort preference
+  // Persist preferences
   useEffect(() => {
-    try {
-      localStorage.setItem(PREFS_SORT_KEY, sortBy);
-    } catch {}
+    try { localStorage.setItem(PREFS_SORT_KEY, sortBy); } catch {}
   }, [sortBy]);
 
-  const filteredAgencies = useMemo(() => {
-    if (!agencySearch) return allAgencies;
-    const q = agencySearch.toLowerCase();
-    return allAgencies.filter(a =>
-      a.code.toLowerCase().includes(q) ||
-      a.name.toLowerCase().includes(q)
-    );
-  }, [allAgencies, agencySearch]);
+  useEffect(() => {
+    try { localStorage.setItem(PREFS_DATE_KEY, dateRange); } catch {}
+  }, [dateRange]);
 
   const sortOptions: { key: SortOption; label: string }[] = [
-    { key: 'recent', label: 'Recent' },
+    { key: 'recent', label: 'New' },
     { key: 'popular', label: 'Popular' },
     { key: 'open', label: 'Open for Comment' },
   ];
 
   return (
     <div className="flex items-center gap-3 flex-wrap">
-      {/* Agency Dropdown */}
+      {/* Date Range Dropdown */}
       <div className="relative">
-        <button
-          onClick={() => setShowAgencyDropdown(!showAgencyDropdown)}
-          className="filter-chip flex items-center gap-1.5"
-        >
-          {selectedAgency || 'All Agencies'}
-          <ChevronDown size={14} />
-        </button>
-
-        {showAgencyDropdown && (
-          <>
-            <div
-              className="fixed inset-0 z-40"
-              onClick={() => setShowAgencyDropdown(false)}
-            />
-            <div className="absolute top-full mt-1 left-0 z-50 w-64 bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-xl overflow-hidden">
-              <div className="p-2">
-                <input
-                  type="text"
-                  placeholder="Search agencies..."
-                  value={agencySearch}
-                  onChange={e => setAgencySearch(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm bg-[var(--background)] border border-[var(--border)] rounded-md text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:border-[var(--accent-primary)]"
-                  autoFocus
-                />
-              </div>
-              <div className="max-h-60 overflow-y-auto">
-                <button
-                  onClick={() => { onAgencyChange(''); setShowAgencyDropdown(false); setAgencySearch(''); }}
-                  className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--surface-elevated)] transition-colors ${
-                    !selectedAgency ? 'text-[var(--accent-primary)] font-medium' : 'text-[var(--foreground)]'
-                  }`}
-                >
-                  All Agencies
-                </button>
-                {filteredAgencies.map(a => (
-                  <button
-                    key={a.code}
-                    onClick={() => { onAgencyChange(a.code); setShowAgencyDropdown(false); setAgencySearch(''); }}
-                    className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--surface-elevated)] transition-colors ${
-                      selectedAgency === a.code ? 'text-[var(--accent-primary)] font-medium' : 'text-[var(--foreground)]'
-                    }`}
-                  >
-                    <span className="font-medium">{a.code}</span>
-                    <span className="text-[var(--muted)] ml-1.5">{a.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
+        <div className="flex items-center gap-1.5">
+          <ChevronDown size={14} className="text-[var(--muted)] pointer-events-none absolute right-2" />
+          <select
+            value={dateRange}
+            onChange={e => onDateRangeChange(e.target.value as DateRange)}
+            className="filter-chip appearance-none pr-7 cursor-pointer bg-[var(--surface)] text-[var(--foreground)] border-none focus:outline-none"
+          >
+            {dateOptions.map(opt => (
+              <option key={opt.key} value={opt.key}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Sort Chips */}
@@ -115,17 +79,6 @@ export function FeedFilters({
           </button>
         ))}
       </div>
-
-      {/* Active Filter Indicator */}
-      {selectedAgency && (
-        <button
-          onClick={() => onAgencyChange('')}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-[rgba(99,102,241,0.1)] text-[var(--accent-primary)] hover:bg-[rgba(99,102,241,0.2)] transition-colors"
-        >
-          sr/{selectedAgency}
-          <X size={12} />
-        </button>
-      )}
     </div>
   );
 }
