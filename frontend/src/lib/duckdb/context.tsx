@@ -122,5 +122,14 @@ export function useDuckDB() {
   return context;
 }
 
+/**
+ * Hook that returns the raw DuckDB instance and connection for advanced operations
+ * like COPY TO parquet via virtual filesystem.
+ */
+export function useDuckDBRaw() {
+  const { db, conn, isReady } = useDuckDB();
+  return { db, conn, isReady };
+}
+
 // Export R2 URL for use in queries
 export { R2_BASE_URL };

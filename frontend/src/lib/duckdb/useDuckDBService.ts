@@ -425,6 +425,25 @@ export function useDuckDBService() {
     [runQuery, isReady]
   );
 
+  /**
+   * Get ALL comments for a docket (for export). No pagination, capped at 50k rows.
+   */
+  const getAllCommentsForDocket = useCallback(
+    async (docketId: string): Promise<any[]> => {
+      if (!isReady) throw new Error("DuckDB not ready");
+
+      const cleanId = docketId.replace(/^"|"$/g, '').toUpperCase();
+      const agency = cleanId.split('-')[0];
+      const commentsSource = agency
+        ? commentsForAgency(agency)
+        : parquetRef("comments" as RegulationsDataTypes);
+
+      const query = `SELECT * FROM ${commentsSource} WHERE REPLACE(docket_id, '"', '') = '${cleanId}' ORDER BY posted_date DESC LIMIT 50000`;
+      return runQuery(query);
+    },
+    [runQuery, isReady]
+  );
+
   return {
     getData,
     getDataCount,
@@ -435,6 +454,7 @@ export function useDuckDBService() {
     getRecentDockets,
     getRecentDocketsWithCounts,
     getCommentsForDocket,
+    getAllCommentsForDocket,
     getDocumentsForDocket,
     getCommentCounts,
     getAgencyStats,

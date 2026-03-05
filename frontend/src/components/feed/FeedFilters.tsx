@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { X, ChevronDown } from 'lucide-react';
-import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
+import { getAllKnownAgencies } from '@/lib/agencyMetadata';
 
 type SortOption = 'recent' | 'popular' | 'open';
 
@@ -21,15 +21,9 @@ export function FeedFilters({
   sortBy,
   onSortChange,
 }: FeedFiltersProps) {
-  const { getAgencies, isReady } = useDuckDBService();
-  const [agencies, setAgencies] = useState<string[]>([]);
+  const allAgencies = useMemo(() => getAllKnownAgencies(), []);
   const [showAgencyDropdown, setShowAgencyDropdown] = useState(false);
   const [agencySearch, setAgencySearch] = useState('');
-
-  useEffect(() => {
-    if (!isReady) return;
-    getAgencies().then(setAgencies).catch(console.error);
-  }, [isReady, getAgencies]);
 
   // Persist sort preference
   useEffect(() => {
@@ -39,10 +33,13 @@ export function FeedFilters({
   }, [sortBy]);
 
   const filteredAgencies = useMemo(() => {
-    if (!agencySearch) return agencies;
+    if (!agencySearch) return allAgencies;
     const q = agencySearch.toLowerCase();
-    return agencies.filter(a => a.toLowerCase().includes(q));
-  }, [agencies, agencySearch]);
+    return allAgencies.filter(a =>
+      a.code.toLowerCase().includes(q) ||
+      a.name.toLowerCase().includes(q)
+    );
+  }, [allAgencies, agencySearch]);
 
   const sortOptions: { key: SortOption; label: string }[] = [
     { key: 'recent', label: 'Recent' },
@@ -68,7 +65,7 @@ export function FeedFilters({
               className="fixed inset-0 z-40"
               onClick={() => setShowAgencyDropdown(false)}
             />
-            <div className="absolute top-full mt-1 left-0 z-50 w-56 bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-xl overflow-hidden">
+            <div className="absolute top-full mt-1 left-0 z-50 w-64 bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-xl overflow-hidden">
               <div className="p-2">
                 <input
                   type="text"
@@ -90,13 +87,14 @@ export function FeedFilters({
                 </button>
                 {filteredAgencies.map(a => (
                   <button
-                    key={a}
-                    onClick={() => { onAgencyChange(a); setShowAgencyDropdown(false); setAgencySearch(''); }}
+                    key={a.code}
+                    onClick={() => { onAgencyChange(a.code); setShowAgencyDropdown(false); setAgencySearch(''); }}
                     className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--surface-elevated)] transition-colors ${
-                      selectedAgency === a ? 'text-[var(--accent-primary)] font-medium' : 'text-[var(--foreground)]'
+                      selectedAgency === a.code ? 'text-[var(--accent-primary)] font-medium' : 'text-[var(--foreground)]'
                     }`}
                   >
-                    {a}
+                    <span className="font-medium">{a.code}</span>
+                    <span className="text-[var(--muted)] ml-1.5">{a.name}</span>
                   </button>
                 ))}
               </div>
