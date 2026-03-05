@@ -55,14 +55,12 @@ export default function AgencyPage() {
 
   // Bookmarks
   const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
-  useEffect(() => { setBookmarks(getStoredBookmarks()); }, []);
 
   const handleToggleBookmark = useCallback((docketId: string) => {
     setBookmarks(prev => {
       const next = new Set(prev);
       if (next.has(docketId)) next.delete(docketId);
       else next.add(docketId);
-      saveBookmarks(next);
       return next;
     });
   }, []);
@@ -162,8 +160,6 @@ export default function AgencyPage() {
                       <div className="pb-3">
                         <DocketPost
                           item={item}
-                          isBookmarked={isBookmarked}
-                          onToggleBookmark={() => handleToggleBookmark(docketId)}
                           commentCount={Number(item.comment_count || 0) || commentCounts[docketId.toUpperCase()] || 0}
                         />
                       </div>
