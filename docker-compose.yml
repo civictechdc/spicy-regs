@@ -1,0 +1,30 @@
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    env_file: .env
+    environment:
+      - NEXT_PUBLIC_PARQUET_URL=${R2_PUBLIC_URL}
+    depends_on:
+      search-api:
+        condition: service_healthy
+
+  search-api:
+    build: ./services/search
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./services/search:/app
+    env_file: .env
+    environment:
+      - ALLOWED_ORIGINS=http://localhost:3000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
