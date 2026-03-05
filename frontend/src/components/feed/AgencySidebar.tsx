@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import Link from 'next/link';
 import { ExternalLink, Scale, BookOpen } from 'lucide-react';
 import { getAgencyInfo, formatCount } from '@/lib/agencyMetadata';
+import { AgencyAvatar } from './AgencyAvatar';
 
 interface AgencySidebarProps {
   agencyCode: string;
@@ -31,12 +32,7 @@ export function AgencySidebar({ agencyCode, stats }: AgencySidebarProps) {
 
         <div className="p-4 -mt-6">
           <div className="flex items-center gap-3 mb-3">
-            <div
-              className="agency-avatar agency-avatar-md border-2 border-[var(--surface)]"
-              style={{ backgroundColor: agency.color }}
-            >
-              {agency.shortName}
-            </div>
+            <AgencyAvatar agency={agency} size="md" className="border-2 border-[var(--surface)]" />
             <div>
               <h3 className="font-semibold text-sm text-[var(--foreground)]">
                 About sr/{agencyCode}
