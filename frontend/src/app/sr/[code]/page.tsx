@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { Virtuoso } from 'react-virtuoso';
 import { Header } from '@/components/Header';
 import { DocketPost } from '@/components/feed/DocketPost';
+import { FeedFilters } from '@/components/feed/FeedFilters';
 import { AgencySidebar } from '@/components/feed/AgencySidebar';
 import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
 import { getAgencyInfo } from '@/lib/agencyMetadata';
@@ -36,23 +37,39 @@ function stripQuotes(s: any): string {
   return String(s).replace(/^"|"$/g, '');
 }
 
-type SortTab = 'new' | 'hot' | 'open' | 'top';
-
 export default function AgencyPage() {
   const params = useParams();
   const agencyCode = (params.code as string || '').toUpperCase();
   const agency = useMemo(() => getAgencyInfo(agencyCode), [agencyCode]);
 
-  const { getRecentDockets, getCommentCounts, getAgencyStats, isReady } = useDuckDBService();
+  const { getRecentDocketsWithCounts, getAgencyStats, isReady } = useDuckDBService();
 
   const [dockets, setDockets] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const [activeTab, setActiveTab] = useState<SortTab>('new');
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [stats, setStats] = useState<{ docketCount: number; documentCount: number; commentCount: number } | undefined>();
+
+  // Filters (same as feed)
+  const [selectedAgency, setSelectedAgency] = useState('');
+  const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'open'>(() => {
+    if (typeof window === 'undefined') return 'recent';
+    try {
+      return (localStorage.getItem('spicy-regs-sort-preference') as any) || 'recent';
+    } catch {
+      return 'recent';
+    }
+  });
+  const [dateRange, setDateRange] = useState<'' | '7d' | '30d' | '90d' | '365d'>(() => {
+    if (typeof window === 'undefined') return '';
+    try {
+      return (localStorage.getItem('spicy-regs-date-preference') as any) || '';
+    } catch {
+      return '';
+    }
+  });
 
   // Bookmarks
   const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
@@ -74,19 +91,23 @@ export default function AgencyPage() {
     getAgencyStats(agencyCode).then(setStats).catch(console.error);
   }, [isReady, agencyCode, getAgencyStats]);
 
-  // Load dockets
+  // Load dockets (with comment counts in a single query, same as feed)
   const loadDockets = useCallback(async (reset = false) => {
     if (!isReady || loading) return;
     try {
       setLoading(true);
       const newOffset = reset ? 0 : offset;
-      const results = await getRecentDockets(PAGE_SIZE, newOffset, agencyCode, 'recent');
+      const { dockets: results, commentCounts: counts } = await getRecentDocketsWithCounts(
+        PAGE_SIZE, newOffset, agencyCode, sortBy, dateRange || undefined
+      );
 
       if (reset) {
         setDockets(results);
+        setCommentCounts(counts);
         setOffset(PAGE_SIZE);
       } else {
         setDockets(prev => [...prev, ...results]);
+        setCommentCounts(prev => ({ ...prev, ...counts }));
         setOffset(prev => prev + PAGE_SIZE);
       }
       setHasMore(results.length === PAGE_SIZE);
@@ -96,23 +117,14 @@ export default function AgencyPage() {
       setLoading(false);
       setInitialLoading(false);
     }
-  }, [isReady, loading, offset, agencyCode, getRecentDockets]);
+  }, [isReady, loading, offset, agencyCode, sortBy, dateRange, getRecentDocketsWithCounts]);
 
   useEffect(() => {
     if (isReady && agencyCode) {
       setInitialLoading(true);
       loadDockets(true);
     }
-  }, [isReady, agencyCode, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Fetch comment counts
-  useEffect(() => {
-    if (dockets.length === 0) return;
-    const ids = dockets.map(d => stripQuotes(d.docket_id));
-    getCommentCounts(ids)
-      .then(counts => setCommentCounts(prev => ({ ...prev, ...counts })))
-      .catch(console.error);
-  }, [dockets, getCommentCounts]);
+  }, [isReady, agencyCode, sortBy, dateRange]); // eslint-disable-line react-hooks/exhaustive-deps
   const uniqueDockets = useMemo(() => {
     const seen = new Set<string>();
     return dockets.filter(d => {
@@ -123,71 +135,27 @@ export default function AgencyPage() {
     });
   }, [dockets]);
 
-  const tabs: { key: SortTab; label: string }[] = [
-    { key: 'hot', label: 'Hot' },
-    { key: 'new', label: 'New' },
-    { key: 'open', label: 'Open for Comment' },
-    { key: 'top', label: 'Top' },
-  ];
-
   return (
     <div className="min-h-screen bg-[var(--background)]">
       <Header />
 
-      {/* Banner */}
-      <div
-        className="h-32 relative"
-        style={{
-          background: `linear-gradient(135deg, ${agency.color}44, ${agency.color}11, var(--background))`,
-        }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[var(--background)]" />
-      </div>
-
-      {/* Agency Header */}
-      <div className="max-w-5xl mx-auto px-4 -mt-10 relative z-10 mb-6">
-        <div className="flex items-end gap-4">
-          <AgencyAvatar agency={agency} size="lg" className="border-4 border-[var(--background)]" />
-          <div className="pb-1">
-            <h1 className="text-2xl font-bold text-[var(--foreground)]">
-              {agency.name}
-            </h1>
-            <span className="text-sm text-[var(--muted)]">sr/{agencyCode}</span>
-          </div>
-        </div>
-
-        {/* Stats */}
-        {stats && (
-          <div className="flex items-center gap-4 mt-3 text-sm text-[var(--muted)]">
-            <span>{stats.docketCount.toLocaleString()} dockets</span>
-            <span>·</span>
-            <span>{stats.commentCount.toLocaleString()} comments</span>
-            <span>·</span>
-            <span>{stats.documentCount.toLocaleString()} documents</span>
-          </div>
-        )}
-
-        <p className="text-sm text-[var(--muted)] mt-2 max-w-2xl">
-          {agency.description}
-        </p>
-      </div>
+          
 
       {/* Content */}
-      <div className="max-w-5xl mx-auto px-4">
+      <div className="max-w-5xl mx-auto p-4 pb-12">
         <div className="flex gap-6">
           {/* Feed */}
           <div className="flex-1 min-w-0">
-            {/* Sort Tabs */}
-            <div className="flex items-center gap-1 mb-4 p-1 bg-[var(--surface)] rounded-xl border border-[var(--border)]">
-              {tabs.map(tab => (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`filter-chip !rounded-lg ${activeTab === tab.key ? 'filter-chip-active' : ''}`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+            {/* Filters */}
+            <div className="mb-4 p-3 bg-[var(--surface)] rounded-xl border border-[var(--border)]">
+              <FeedFilters
+                selectedAgency={selectedAgency}
+                onAgencyChange={setSelectedAgency}
+                sortBy={sortBy}
+                onSortChange={setSortBy}
+                dateRange={dateRange}
+                onDateRangeChange={setDateRange}
+              />
             </div>
 
             {initialLoading ? (
@@ -199,7 +167,7 @@ export default function AgencyPage() {
                 <p className="text-lg text-[var(--muted)]">No dockets found for this agency.</p>
               </div>
             ) : (
-              <div style={{ height: '70vh' }}>
+              <div style={{ height: 'calc(100vh - 180px)' }}>
                 <Virtuoso
                   style={{ height: '100%' }}
                   data={uniqueDockets}
@@ -215,7 +183,7 @@ export default function AgencyPage() {
                           item={item}
                           isBookmarked={isBookmarked}
                           onToggleBookmark={() => handleToggleBookmark(docketId)}
-                          commentCount={commentCounts[docketId.toUpperCase()] || 0}
+                          commentCount={Number(item.comment_count || 0) || commentCounts[docketId.toUpperCase()] || 0}
                         />
                       </div>
                     );
