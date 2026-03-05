@@ -24,7 +24,7 @@ export function AgencySidebar({ agencyCode, stats }: AgencySidebarProps) {
       <div className="card-gradient overflow-hidden">
         {/* Header */}
         <div
-          className="h-16 relative"
+          className="h-8 relative"
           style={{
             background: `linear-gradient(135deg, ${agency.color}33, ${agency.color}11)`,
           }}

@@ -22,7 +22,7 @@ const dateOptions: { key: DateRange; label: string }[] = [
   { key: '', label: 'All Time' },
   { key: '7d', label: 'Last 7 Days' },
   { key: '30d', label: 'Last Month' },
-  { key: '90d', label: 'Last Quarter' },
+  { key: '90d', label: 'Last 3 Months' },
   { key: '365d', label: 'Last Year' },
 ];
 
@@ -53,7 +53,7 @@ export function FeedFilters({
     <div className="flex items-center gap-3 flex-wrap">
       {/* Date Range Dropdown */}
       <div className="relative">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 px-1.5">
           <ChevronDown size={14} className="text-[var(--muted)] pointer-events-none absolute right-2" />
           <select
             value={dateRange}
