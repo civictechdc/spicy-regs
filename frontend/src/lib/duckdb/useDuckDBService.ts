@@ -215,13 +215,15 @@ export function useDuckDBService() {
         ? `TRY_CAST(d.modify_date AS TIMESTAMP) >= CAST(NOW() AS TIMESTAMP) - INTERVAL '${dateDays}' DAY`
         : '';
 
+      // Use agency partition for comments when filtered by agency (MBs vs 3GB)
+      const commentsSource = upperAgency
+        ? commentsForAgency(upperAgency)
+        : parquetRef("comments" as RegulationsDataTypes);
+      const docsSource = parquetRef("documents" as RegulationsDataTypes);
+
       let query: string;
 
       if (sortBy === 'popular') {
-        // JOIN with comments to sort by comment count
-        // DuckDB column pruning reads only docket_id from comments.parquet for the GROUP BY
-        const commentsSource = parquetRef("comments" as RegulationsDataTypes);
-        const docsSource = parquetRef("documents" as RegulationsDataTypes);
         const conditions: string[] = [];
         if (upperAgency) conditions.push(`d.agency_code = '${upperAgency}'`);
         if (dateCondition) conditions.push(dateCondition);
@@ -248,9 +250,6 @@ export function useDuckDBService() {
           LIMIT ${limit} OFFSET ${offset}
         `;
       } else if (sortBy === 'open') {
-        // JOIN with documents for comment_end_date + comments for counts
-        const docsSource = parquetRef("documents" as RegulationsDataTypes);
-        const commentsSource = parquetRef("comments" as RegulationsDataTypes);
         const conditions: string[] = [];
         if (upperAgency) conditions.push(`d.agency_code = '${upperAgency}'`);
         if (dateCondition) conditions.push(dateCondition);
@@ -279,9 +278,6 @@ export function useDuckDBService() {
           LIMIT ${limit} OFFSET ${offset}
         `;
       } else {
-        // 'recent' — LEFT JOIN with documents for comment_end_date + comments for counts
-        const docsSource = parquetRef("documents" as RegulationsDataTypes);
-        const commentsSource = parquetRef("comments" as RegulationsDataTypes);
         const conditions: string[] = [];
         if (upperAgency) conditions.push(`d.agency_code = '${upperAgency}'`);
         if (dateCondition) conditions.push(dateCondition);
