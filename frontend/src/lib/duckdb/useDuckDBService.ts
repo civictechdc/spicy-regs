@@ -308,7 +308,7 @@ export function useDuckDBService() {
       const orderClause = sortBy === 'oldest'
         ? 'ORDER BY posted_date ASC'
         : 'ORDER BY posted_date DESC';
-      const whereClause = `WHERE REPLACE(docket_id, '"', '') = '${cleanId}'`;
+      const whereClause = `WHERE docket_id = '${cleanId}'`;
 
       // Extract agency code from docket_id (e.g. "EPA" from "EPA-HQ-OAR-2021-0317")
       const agency = cleanId.split('-')[0];
@@ -338,7 +338,7 @@ export function useDuckDBService() {
         SELECT document_id, title, document_type, posted_date,
                comment_start_date, comment_end_date, file_url
         FROM ${parquetRef("documents" as RegulationsDataTypes)}
-        WHERE REPLACE(docket_id, '"', '') = '${cleanId}'
+        WHERE docket_id = '${cleanId}'
         ORDER BY posted_date DESC
         LIMIT ${limit}
       `;
@@ -369,7 +369,7 @@ export function useDuckDBService() {
       const promises = Object.entries(byAgency).map(async ([agency, ids]) => {
         const inClause = ids.map(id => `'${id}'`).join(',');
         const source = commentsForAgency(agency);
-        const query = `SELECT REPLACE(docket_id, '"', '') as did, COUNT(*) as cnt FROM ${source} WHERE REPLACE(docket_id, '"', '') IN (${inClause}) GROUP BY did`;
+        const query = `SELECT docket_id as did, COUNT(*) as cnt FROM ${source} WHERE docket_id IN (${inClause}) GROUP BY docket_id`;
         return runQuery<{ did: string; cnt: number }>(query);
       });
 
@@ -471,7 +471,7 @@ export function useDuckDBService() {
         ? commentsForAgency(agency)
         : parquetRef("comments" as RegulationsDataTypes);
 
-      const query = `SELECT * FROM ${commentsSource} WHERE REPLACE(docket_id, '"', '') = '${cleanId}' ORDER BY posted_date DESC LIMIT 50000`;
+      const query = `SELECT * FROM ${commentsSource} WHERE docket_id = '${cleanId}' ORDER BY posted_date DESC LIMIT 50000`;
       return runQuery(query);
     },
     [runQuery, isReady]
