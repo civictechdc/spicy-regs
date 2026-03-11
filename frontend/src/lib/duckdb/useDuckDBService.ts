@@ -74,7 +74,11 @@ export function useDuckDBService() {
         ? commentsForAgency(upperAgency)
         : parquetRef(dataType);
 
-      let query = `SELECT * FROM ${source} ${whereClause} LIMIT ${effectiveLimit}`;
+      const cols = dataType === 'dockets'
+        ? 'docket_id, agency_code, title, abstract, docket_type, modify_date'
+        : '*';
+
+      let query = `SELECT ${cols} FROM ${source} ${whereClause} LIMIT ${effectiveLimit}`;
       if (offset !== undefined) query += ` OFFSET ${offset}`;
 
       return runQuery(query);
@@ -316,7 +320,7 @@ export function useDuckDBService() {
         ? commentsForAgency(agency)
         : parquetRef("comments" as RegulationsDataTypes);
 
-      const query = `SELECT * FROM ${commentsSource} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
+      const query = `SELECT comment_id, docket_id, agency_code, title, comment, posted_date, modify_date FROM ${commentsSource} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
       return runQuery(query);
     },
     [runQuery, isReady]
