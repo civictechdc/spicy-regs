@@ -25,6 +25,14 @@ const commentsForAgency = (agencyCode: string) => {
 };
 
 /**
+ * Build a read_parquet() reference for the pre-computed feed summary.
+ * Contains dockets with pre-joined comment_count and comment_end_date.
+ */
+const feedSummaryRef = () => {
+  return `read_parquet('${R2_BASE_URL}/feed_summary.parquet')`;
+};
+
+/**
  * Hook that provides data fetching via DuckDB-WASM + Parquet on R2.
  */
 export function useDuckDBService() {
@@ -191,9 +199,7 @@ export function useDuckDBService() {
 
   /**
    * Get recent dockets with comment counts.
-   * dockets.parquet only has: docket_id, agency_code, title, docket_type, modify_date, abstract.
-   * For 'popular' sort: JOINs with comments to compute counts.
-   * For 'open' sort: JOINs with documents to find dockets with open comment periods.
+   * Uses pre-computed feed_summary.parquet — no JOINs needed.
    */
   const getRecentDocketsWithCounts = useCallback(
     async (
@@ -205,111 +211,49 @@ export function useDuckDBService() {
     ): Promise<{ dockets: any[]; commentCounts: Record<string, number> }> => {
       if (!isReady) throw new Error("DuckDB not ready");
 
+      const source = feedSummaryRef();
       const upperAgency = agencyCode?.toUpperCase();
-      const docketsSource = parquetRef("dockets" as RegulationsDataTypes);
 
-      // Build date filter condition
+      // Build conditions
+      const conditions: string[] = [];
+      if (upperAgency) conditions.push(`agency_code = '${upperAgency}'`);
+
       const dateMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90, '365d': 365 };
       const dateDays = dateRange ? dateMap[dateRange] : undefined;
-      const dateCondition = dateDays
-        ? `TRY_CAST(d.modify_date AS TIMESTAMP) >= CAST(NOW() AS TIMESTAMP) - INTERVAL '${dateDays}' DAY`
-        : '';
+      if (dateDays) {
+        conditions.push(`TRY_CAST(modify_date AS TIMESTAMP) >= CAST(NOW() AS TIMESTAMP) - INTERVAL '${dateDays}' DAY`);
+      }
 
-      // Use agency partition for comments when filtered by agency (MBs vs 3GB)
-      const commentsSource = upperAgency
-        ? commentsForAgency(upperAgency)
-        : parquetRef("comments" as RegulationsDataTypes);
-      const docsSource = parquetRef("documents" as RegulationsDataTypes);
-
-      let query: string;
+      // Sort + filter logic
+      let orderClause: string;
+      let extraCondition = '';
 
       if (sortBy === 'popular') {
-        const conditions: string[] = [];
-        if (upperAgency) conditions.push(`d.agency_code = '${upperAgency}'`);
-        if (dateCondition) conditions.push(dateCondition);
-        const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-        query = `
-          WITH comment_counts AS (
-            SELECT REPLACE(docket_id, '"', '') as did, COUNT(*) as cnt
-            FROM ${commentsSource}
-            GROUP BY did
-          ),
-          comment_periods AS (
-            SELECT REPLACE(docket_id, '"', '') as did,
-                   MAX(TRY_CAST(comment_end_date AS TIMESTAMP)) as end_date
-            FROM ${docsSource}
-            WHERE comment_end_date IS NOT NULL
-            GROUP BY did
-          )
-          SELECT d.*, COALESCE(cc.cnt, 0) as comment_count, CAST(cp.end_date AS VARCHAR) as comment_end_date
-          FROM ${docketsSource} d
-          LEFT JOIN comment_counts cc ON REPLACE(d.docket_id, '"', '') = cc.did
-          LEFT JOIN comment_periods cp ON REPLACE(d.docket_id, '"', '') = cp.did
-          ${whereClause}
-          ORDER BY comment_count DESC, d.modify_date DESC
-          LIMIT ${limit} OFFSET ${offset}
-        `;
+        orderClause = 'ORDER BY comment_count DESC, modify_date DESC';
       } else if (sortBy === 'open') {
-        const conditions: string[] = [];
-        if (upperAgency) conditions.push(`d.agency_code = '${upperAgency}'`);
-        if (dateCondition) conditions.push(dateCondition);
-        const whereClause = conditions.length > 0
-          ? 'AND ' + conditions.join(' AND ')
-          : '';
-        query = `
-          WITH open_periods AS (
-            SELECT REPLACE(docket_id, '"', '') as did,
-                   MAX(TRY_CAST(comment_end_date AS TIMESTAMP)) as end_date
-            FROM ${docsSource}
-            WHERE TRY_CAST(comment_end_date AS TIMESTAMP) > CAST(NOW() AS TIMESTAMP)
-            GROUP BY did
-          ),
-          comment_counts AS (
-            SELECT REPLACE(docket_id, '"', '') as did, COUNT(*) as cnt
-            FROM ${commentsSource}
-            GROUP BY did
-          )
-          SELECT d.*, CAST(op.end_date AS VARCHAR) as comment_end_date, COALESCE(cc.cnt, 0) as comment_count
-          FROM ${docketsSource} d
-          INNER JOIN open_periods op ON REPLACE(d.docket_id, '"', '') = op.did
-          LEFT JOIN comment_counts cc ON REPLACE(d.docket_id, '"', '') = cc.did
-          WHERE 1=1 ${whereClause}
-          ORDER BY op.end_date ASC
-          LIMIT ${limit} OFFSET ${offset}
-        `;
+        extraCondition = `TRY_CAST(comment_end_date AS TIMESTAMP) > CAST(NOW() AS TIMESTAMP)`;
+        orderClause = 'ORDER BY comment_end_date ASC';
       } else {
-        const conditions: string[] = [];
-        if (upperAgency) conditions.push(`d.agency_code = '${upperAgency}'`);
-        if (dateCondition) conditions.push(dateCondition);
-        const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-        query = `
-          WITH comment_periods AS (
-            SELECT REPLACE(docket_id, '"', '') as did,
-                   MAX(TRY_CAST(comment_end_date AS TIMESTAMP)) as end_date
-            FROM ${docsSource}
-            WHERE comment_end_date IS NOT NULL
-            GROUP BY did
-          ),
-          comment_counts AS (
-            SELECT REPLACE(docket_id, '"', '') as did, COUNT(*) as cnt
-            FROM ${commentsSource}
-            GROUP BY did
-          )
-          SELECT d.*, CAST(cp.end_date AS VARCHAR) as comment_end_date, COALESCE(cc.cnt, 0) as comment_count
-          FROM ${docketsSource} d
-          LEFT JOIN comment_periods cp ON REPLACE(d.docket_id, '"', '') = cp.did
-          LEFT JOIN comment_counts cc ON REPLACE(d.docket_id, '"', '') = cc.did
-          ${whereClause}
-          ORDER BY d.modify_date DESC
-          LIMIT ${limit} OFFSET ${offset}
-        `;
+        orderClause = 'ORDER BY modify_date DESC';
       }
+
+      if (extraCondition) conditions.push(extraCondition);
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+      const query = `
+        SELECT docket_id, agency_code, title, abstract, docket_type, modify_date,
+               comment_count, comment_end_date
+        FROM ${source}
+        ${whereClause}
+        ${orderClause}
+        LIMIT ${limit} OFFSET ${offset}
+      `;
 
       const rows = await runQuery<any>(query);
 
       const commentCounts: Record<string, number> = {};
       const dockets = rows.map((row: any) => {
-        const id = String(row.docket_id).replace(/^"|"$/g, '').toUpperCase();
+        const id = String(row.docket_id).toUpperCase();
         commentCounts[id] = Number(row.comment_count || 0);
         return row;
       });
