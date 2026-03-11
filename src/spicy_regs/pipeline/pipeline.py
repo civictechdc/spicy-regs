@@ -74,7 +74,7 @@ DATA_TYPES = {
             "abstract": pl.Utf8,
         },
         "extract": lambda d: {
-            "docket_id": d.get("data", {}).get("id"),
+            "docket_id": (v.strip('"') if (v := d.get("data", {}).get("id")) else v),
             "agency_code": d.get("data", {}).get("attributes", {}).get("agencyId"),
             "title": d.get("data", {}).get("attributes", {}).get("title"),
             "docket_type": d.get("data", {}).get("attributes", {}).get("docketType"),
@@ -98,7 +98,7 @@ DATA_TYPES = {
         },
         "extract": lambda d: {
             "document_id": d.get("data", {}).get("id"),
-            "docket_id": d.get("data", {}).get("attributes", {}).get("docketId"),
+            "docket_id": (v.strip('"') if (v := d.get("data", {}).get("attributes", {}).get("docketId")) else v),
             "agency_code": d.get("data", {}).get("attributes", {}).get("agencyId"),
             "title": d.get("data", {}).get("attributes", {}).get("title"),
             "document_type": d.get("data", {}).get("attributes", {}).get("documentType"),
@@ -124,7 +124,7 @@ DATA_TYPES = {
         },
         "extract": lambda d: {
             "comment_id": d.get("data", {}).get("id"),
-            "docket_id": d.get("data", {}).get("attributes", {}).get("docketId"),
+            "docket_id": (v.strip('"') if (v := d.get("data", {}).get("attributes", {}).get("docketId")) else v),
             "agency_code": d.get("data", {}).get("attributes", {}).get("agencyId"),
             "title": d.get("data", {}).get("attributes", {}).get("title"),
             "comment": d.get("data", {}).get("attributes", {}).get("comment"),
