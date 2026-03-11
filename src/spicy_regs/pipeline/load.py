@@ -29,6 +29,11 @@ def upload_to_r2(output_dir: Path, data_type_names: list[str]) -> None:
         if pf.exists():
             files_to_upload.append(pf)
 
+    # Always include feed summary if it exists
+    feed_summary = output_dir / "feed_summary.parquet"
+    if feed_summary.exists():
+        files_to_upload.append(feed_summary)
+
     manifest_file = output_dir / "manifest.parquet"
     if manifest_file.exists():
         files_to_upload.append(manifest_file)

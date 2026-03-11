@@ -37,7 +37,7 @@ from spicy_regs.pipeline.load import (
     upload_partitioned_comments,
     upload_to_r2,
 )
-from spicy_regs.pipeline.transform import merge_staging_files, partition_comments, write_staging
+from spicy_regs.pipeline.transform import merge_staging_files, partition_comments, write_staging, build_feed_summary
 
 load_dotenv()
 
@@ -229,6 +229,12 @@ def upload_to_r2_task(output_dir: Path, data_type_names: list[str]) -> None:
     upload_to_r2(output_dir, data_type_names)
 
 
+@task(name="build-feed-summary", cache_policy=NO_CACHE)
+def build_feed_summary_task(output_dir: Path) -> Path:
+    """Build pre-computed feed summary parquet."""
+    return build_feed_summary(output_dir)
+
+
 @task(name="partition-comments", cache_policy=NO_CACHE)
 def partition_comments_task(output_dir: Path) -> Path:
     """Partition comments.parquet by agency_code."""
@@ -299,6 +305,7 @@ def pipeline(
     if merge_only:
         logger.info("Merge-only mode - merging existing staging files...")
         merge_staging_task(staging_dir, output_dir, data_type_names)
+        build_feed_summary_task(output_dir)
         logger.info("Merge complete!")
         return
 
@@ -367,6 +374,10 @@ def pipeline(
         merge_staging_task(staging_dir, output_dir, data_type_names)
         rmtree(staging_dir)
         logger.info("Cleaned up staging directory")
+
+    # --- Step 3b: Build feed summary ---
+    logger.info("Building feed summary...")
+    build_feed_summary_task(output_dir)
 
     # --- Summary ---
     logger.info("Summary:")
