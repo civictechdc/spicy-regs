@@ -43,6 +43,7 @@ afterAll(async () => {
 const parquetRef = (type: string) => `read_parquet('${R2}/${type}.parquet')`;
 const commentsForAgency = (code: string) =>
   `read_parquet('${R2}/comments/agency/agency_code=${code}/part-0.parquet')`;
+const feedSummaryRef = () => `read_parquet('${R2}/feed_summary.parquet')`;
 
 describe('dockets.parquet schema', () => {
   it('has required columns', async () => {
@@ -77,6 +78,27 @@ describe('comments partition schema', () => {
     expect(row).toHaveProperty('comment_id');
     expect(row).toHaveProperty('docket_id');
     expect(row).toHaveProperty('posted_date');
+  });
+});
+
+describe('feed_summary.parquet schema', () => {
+  it('has required columns', async () => {
+    const rows = await runQuery(`SELECT * FROM ${feedSummaryRef()} LIMIT 1`);
+    expect(rows.length).toBe(1);
+    const row = rows[0] as Record<string, unknown>;
+    expect(row).toHaveProperty('docket_id');
+    expect(row).toHaveProperty('agency_code');
+    expect(row).toHaveProperty('title');
+    expect(row).toHaveProperty('modify_date');
+    expect(row).toHaveProperty('comment_count');
+    expect(row).toHaveProperty('comment_end_date');
+  });
+
+  it('has non-negative comment counts', async () => {
+    const rows = await runQuery<{ comment_count: number }>(
+      `SELECT comment_count FROM ${feedSummaryRef()} WHERE comment_count < 0 LIMIT 1`
+    );
+    expect(rows.length).toBe(0);
   });
 });
 
@@ -145,26 +167,57 @@ describe('getDocketById query', () => {
   });
 });
 
-describe('getRecentDocketsWithCounts query', () => {
-  it('executes SELECT * with alias and ORDER BY', async () => {
+describe('getRecentDocketsWithCounts query (feed_summary)', () => {
+  it('queries feed summary with ORDER BY and LIMIT', async () => {
     const rows = await runQuery(`
-      SELECT *
-      FROM ${parquetRef('dockets')} d
-      ORDER BY d.modify_date DESC
+      SELECT docket_id, agency_code, title, abstract, docket_type, modify_date,
+             comment_count, comment_end_date
+      FROM ${feedSummaryRef()}
+      ORDER BY modify_date DESC
       LIMIT 5 OFFSET 0
     `);
     expect(rows.length).toBeGreaterThan(0);
+    const row = rows[0] as Record<string, unknown>;
+    expect(row).toHaveProperty('comment_count');
+    expect(row).toHaveProperty('comment_end_date');
   });
 
-  it('filters by agency with table alias', async () => {
+  it('filters by agency', async () => {
     const rows = await runQuery(`
-      SELECT *
-      FROM ${parquetRef('dockets')} d
-      WHERE d.agency_code = 'EPA'
-      ORDER BY d.modify_date DESC
-      LIMIT 5 OFFSET 0
+      SELECT docket_id, agency_code, title, comment_count
+      FROM ${feedSummaryRef()}
+      WHERE agency_code = 'EPA'
+      ORDER BY modify_date DESC
+      LIMIT 5
     `);
     expect(rows.length).toBeGreaterThan(0);
+    rows.forEach((row: any) => {
+      expect(String(row.agency_code).replace(/^"|"$/g, '')).toBe('EPA');
+    });
+  });
+
+  it('sorts by popular (comment_count DESC)', async () => {
+    const rows = await runQuery<{ comment_count: number }>(`
+      SELECT comment_count
+      FROM ${feedSummaryRef()}
+      ORDER BY comment_count DESC
+      LIMIT 5
+    `);
+    for (let i = 1; i < rows.length; i++) {
+      expect(Number(rows[i - 1].comment_count)).toBeGreaterThanOrEqual(Number(rows[i].comment_count));
+    }
+  });
+
+  it('filters open comment periods', async () => {
+    const rows = await runQuery(`
+      SELECT docket_id, comment_end_date
+      FROM ${feedSummaryRef()}
+      WHERE TRY_CAST(comment_end_date AS TIMESTAMP) > CAST(NOW() AS TIMESTAMP)
+      ORDER BY comment_end_date ASC
+      LIMIT 5
+    `);
+    // May be empty if no dockets currently have open comment periods
+    expect(Array.isArray(rows)).toBe(true);
   });
 });
 
@@ -176,7 +229,7 @@ describe('getCommentsForDocket query', () => {
     const docketId = String(sample.docket_id).replace(/^"|"$/g, '');
 
     const rows = await runQuery(
-      `SELECT * FROM ${commentsForAgency('EPA')} WHERE REPLACE(docket_id, '"', '') = '${docketId}' ORDER BY posted_date DESC LIMIT 10 OFFSET 0`
+      `SELECT * FROM ${commentsForAgency('EPA')} WHERE docket_id = '${docketId}' ORDER BY posted_date DESC LIMIT 10 OFFSET 0`
     );
     expect(rows.length).toBeGreaterThan(0);
   });
@@ -190,7 +243,7 @@ describe('getAllCommentsForDocket query (export)', () => {
     const docketId = String(sample.docket_id).replace(/^"|"$/g, '');
 
     const rows = await runQuery(
-      `SELECT * FROM ${commentsForAgency('EPA')} WHERE REPLACE(docket_id, '"', '') = '${docketId}' ORDER BY posted_date DESC LIMIT 50000`
+      `SELECT * FROM ${commentsForAgency('EPA')} WHERE docket_id = '${docketId}' ORDER BY posted_date DESC LIMIT 50000`
     );
     expect(rows.length).toBeGreaterThan(0);
   });
@@ -208,7 +261,7 @@ describe('getDocumentsForDocket query', () => {
       SELECT document_id, title, document_type, posted_date,
              comment_start_date, comment_end_date, file_url
       FROM ${parquetRef('documents')}
-      WHERE REPLACE(docket_id, '"', '') = '${docketId}'
+      WHERE docket_id = '${docketId}'
       ORDER BY posted_date DESC
       LIMIT 50
     `);
@@ -258,7 +311,7 @@ describe('COPY TO parquet (export)', () => {
     await conn.run(`
       COPY (
         SELECT * FROM ${commentsForAgency('EPA')}
-        WHERE REPLACE(docket_id, '"', '') = '${docketId}'
+        WHERE docket_id = '${docketId}'
         ORDER BY posted_date DESC
         LIMIT 10
       ) TO '${exportPath}' (FORMAT PARQUET)
