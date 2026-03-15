@@ -182,26 +182,31 @@ def build_feed_summary(output_dir: Path) -> Path:
         del comments
         logger.info("  Comment counts: {:,} dockets", len(comment_counts))
 
-    # Compute max comment_end_date per docket from documents
-    comment_periods = pl.DataFrame({"docket_id": [], "comment_end_date": []}, schema={"docket_id": pl.Utf8, "comment_end_date": pl.Utf8})
+    # Compute max comment_end_date and earliest posted_date per docket from documents
+    doc_aggs = pl.DataFrame(
+        {"docket_id": [], "comment_end_date": [], "date_created": []},
+        schema={"docket_id": pl.Utf8, "comment_end_date": pl.Utf8, "date_created": pl.Utf8},
+    )
     if documents_file.exists():
-        docs = pl.read_parquet(documents_file, columns=["docket_id", "comment_end_date"])
-        comment_periods = (
+        docs = pl.read_parquet(documents_file, columns=["docket_id", "comment_end_date", "posted_date"])
+        docs = docs.with_columns(pl.col("docket_id").str.strip_chars('"'))
+        doc_aggs = (
             docs
-            .filter(pl.col("comment_end_date").is_not_null())
-            .with_columns(pl.col("docket_id").str.strip_chars('"'))
             .group_by("docket_id")
-            .agg(pl.col("comment_end_date").max().alias("comment_end_date"))
+            .agg(
+                pl.col("comment_end_date").drop_nulls().max().alias("comment_end_date"),
+                pl.col("posted_date").drop_nulls().min().alias("date_created"),
+            )
         )
         del docs
-        logger.info("  Comment periods: {:,} dockets", len(comment_periods))
+        logger.info("  Document aggregates: {:,} dockets", len(doc_aggs))
 
     # Join everything
     summary = (
         dockets
         .with_columns(pl.col("docket_id").str.strip_chars('"'))
         .join(comment_counts, on="docket_id", how="left")
-        .join(comment_periods, on="docket_id", how="left")
+        .join(doc_aggs, on="docket_id", how="left")
         .with_columns(pl.col("comment_count").fill_null(0))
         .sort("modify_date", descending=True)
     )

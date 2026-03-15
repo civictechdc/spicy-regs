@@ -225,7 +225,7 @@ export function useDuckDBService() {
       const dateMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90, '365d': 365 };
       const dateDays = dateRange ? dateMap[dateRange] : undefined;
       if (dateDays) {
-        conditions.push(`TRY_CAST(modify_date AS TIMESTAMP) >= CAST(NOW() AS TIMESTAMP) - INTERVAL '${dateDays}' DAY`);
+        conditions.push(`TRY_CAST(COALESCE(date_created, modify_date) AS TIMESTAMP) >= CAST(NOW() AS TIMESTAMP) - INTERVAL '${dateDays}' DAY`);
       }
 
       // Sort + filter logic
@@ -246,7 +246,7 @@ export function useDuckDBService() {
 
       const query = `
         SELECT docket_id, agency_code, title, abstract, docket_type, modify_date,
-               comment_count, comment_end_date
+               date_created, comment_count, comment_end_date
         FROM ${source}
         ${whereClause}
         ${orderClause}
@@ -320,7 +320,7 @@ export function useDuckDBService() {
         ? commentsForAgency(agency)
         : parquetRef("comments" as RegulationsDataTypes);
 
-      const query = `SELECT comment_id, docket_id, agency_code, title, comment, posted_date, modify_date FROM ${commentsSource} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
+      const query = `SELECT comment_id, docket_id, agency_code, title, comment, posted_date, modify_date, attachments_json FROM ${commentsSource} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
       return runQuery(query);
     },
     [runQuery, isReady]

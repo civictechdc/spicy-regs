@@ -23,52 +23,42 @@ function decodeHtml(s: string): string {
 }
 
 function parseCommentData(item: Record<string, any>) {
-  let attrs: Record<string, any> = {};
-  let included: any[] = [];
-  try {
-    const raw = typeof item.raw_json === 'string' ? JSON.parse(item.raw_json) : item.raw_json;
-    attrs = raw?.data?.attributes || {};
-    included = raw?.included || [];
-  } catch {
-    // raw_json parsing failed, use top-level columns only
-  }
+  const comment = decodeHtml(stripQuotes(item.comment) || '');
 
-  // Comment text: prefer direct column, then raw_json attribute
-  const comment = decodeHtml(stripQuotes(item.comment) || attrs.comment || '');
-
-  // Attachments: from included array or file_url column
+  // Attachments: parse from attachments_json column
   const attachments: { name: string; url: string; format: string }[] = [];
-  for (const inc of included) {
-    if (inc?.type === 'attachments') {
-      const formats = inc?.attributes?.fileFormats || [];
-      for (const f of formats) {
-        if (f?.fileUrl) {
-          const fileName = f.fileUrl.split('/').pop() || 'Attachment';
-          attachments.push({ name: inc?.attributes?.title || fileName, url: f.fileUrl, format: (f.format || 'file').toUpperCase() });
+  if (item.attachments_json) {
+    try {
+      const parsed = typeof item.attachments_json === 'string'
+        ? JSON.parse(item.attachments_json)
+        : item.attachments_json;
+      for (const att of parsed) {
+        for (const f of att.formats || []) {
+          if (f.url) {
+            const fileName = f.url.split('/').pop() || 'Attachment';
+            attachments.push({
+              name: att.title || fileName,
+              url: f.url,
+              format: (f.format || 'file').toUpperCase(),
+            });
+          }
         }
       }
-    }
-  }
-  // Fallback: use file_url column if no attachments found from raw_json
-  if (attachments.length === 0) {
-    const fileUrl = stripQuotes(item.file_url);
-    if (fileUrl) {
-      const fileName = fileUrl.split('/').pop() || 'Attachment';
-      const ext = fileName.split('.').pop()?.toUpperCase() || 'FILE';
-      attachments.push({ name: fileName, url: fileUrl, format: ext });
+    } catch {
+      // attachments_json parsing failed, skip
     }
   }
 
   return {
-    commentId: stripQuotes(item.comment_id) || attrs.id || '',
-    title: decodeHtml(stripQuotes(item.title) || attrs.title || 'Untitled Comment'),
+    commentId: stripQuotes(item.comment_id) || '',
+    title: decodeHtml(stripQuotes(item.title) || 'Untitled Comment'),
     comment,
-    firstName: attrs.firstName || stripQuotes(item.first_name) || '',
-    lastName: attrs.lastName || stripQuotes(item.last_name) || '',
-    organization: attrs.organization || stripQuotes(item.organization) || '',
-    submitterType: attrs.submitterType || '',
-    postedDate: attrs.postedDate || stripQuotes(item.posted_date) || '',
-    documentSubtype: attrs.documentSubtype || stripQuotes(item.document_subtype) || '',
+    firstName: stripQuotes(item.first_name) || '',
+    lastName: stripQuotes(item.last_name) || '',
+    organization: stripQuotes(item.organization) || '',
+    submitterType: '',
+    postedDate: stripQuotes(item.posted_date) || '',
+    documentSubtype: stripQuotes(item.document_subtype) || '',
     attachments,
   };
 }

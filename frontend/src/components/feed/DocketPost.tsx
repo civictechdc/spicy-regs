@@ -63,6 +63,7 @@ export function DocketPost({
   const abstract = decodeHtml(stripQuotes(item.abstract) || attrs.abstract || '');
   const docketType = stripQuotes(item.docket_type) || attrs.docketType || '';
   const modifyDate = stripQuotes(item.modify_date) || attrs.modifyDate;
+  const dateCreated = stripQuotes(item.date_created);
 
   // Comment period — use enriched docket data directly
   const commentEndDate = stripQuotes(item.comment_end_date);
@@ -109,10 +110,12 @@ export function DocketPost({
               </Link>
               <span className="text-[var(--muted)]">·</span>
               <span className="font-mono-id text-[var(--muted)]">{docketId}</span>
-              {modifyDate && (
+              {(dateCreated || modifyDate) && (
                 <>
                   <span className="text-[var(--muted)]">·</span>
-                  <span className="text-[var(--muted)] text-xs">{timeAgo(modifyDate)}</span>
+                  <span className="text-[var(--muted)] text-xs">
+                    {dateCreated ? timeAgo(dateCreated) : timeAgo(modifyDate)}
+                  </span>
                 </>
               )}
             </div>
@@ -206,6 +209,12 @@ export function DocketPost({
             <span className="metadata-pill">
               <MessageSquare size={12} />
               {formatCount(commentCount)} comments
+            </span>
+          )}
+          {dateCreated && (
+            <span className="metadata-pill">
+              <Clock size={12} />
+              Created {timeAgo(dateCreated)}
             </span>
           )}
           {modifyDate && (

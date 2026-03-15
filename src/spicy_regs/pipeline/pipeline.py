@@ -7,6 +7,7 @@ All configuration lives here and is passed down via function parameters.
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+from json import dumps as json_dumps
 from os import getenv
 from pathlib import Path
 from shutil import rmtree
@@ -61,6 +62,36 @@ PREFIX = "raw-data"
 # Module-level state — kept out of Prefect task boundaries to avoid
 # serializing a 27M-item set on every .submit() call.
 PROCESSED_KEYS: set[str] = set()
+
+def _extract_comment(d: dict) -> dict:
+    attrs = d.get("data", {}).get("attributes", {})
+
+    # Build compact attachments JSON from the included array
+    attachments = []
+    for inc in d.get("included", []):
+        if inc.get("type") == "attachments":
+            inc_attrs = inc.get("attributes", {})
+            formats = [
+                {"url": f["fileUrl"], "format": f.get("format"), "size": f.get("size")}
+                for f in inc_attrs.get("fileFormats") or []
+                if f.get("fileUrl")
+            ]
+            if formats:
+                attachments.append({"title": inc_attrs.get("title", ""), "formats": formats})
+
+    return {
+        "comment_id": d.get("data", {}).get("id"),
+        "docket_id": (v.strip('"') if (v := attrs.get("docketId")) else v),
+        "agency_code": attrs.get("agencyId"),
+        "title": attrs.get("title"),
+        "comment": attrs.get("comment"),
+        "document_type": attrs.get("documentType"),
+        "posted_date": attrs.get("postedDate"),
+        "modify_date": attrs.get("modifyDate"),
+        "receive_date": attrs.get("receiveDate"),
+        "attachments_json": json_dumps(attachments) if attachments else None,
+    }
+
 
 DATA_TYPES = {
     "dockets": {
@@ -121,18 +152,9 @@ DATA_TYPES = {
             "posted_date": pl.Utf8,
             "modify_date": pl.Utf8,
             "receive_date": pl.Utf8,
+            "attachments_json": pl.Utf8,
         },
-        "extract": lambda d: {
-            "comment_id": d.get("data", {}).get("id"),
-            "docket_id": (v.strip('"') if (v := d.get("data", {}).get("attributes", {}).get("docketId")) else v),
-            "agency_code": d.get("data", {}).get("attributes", {}).get("agencyId"),
-            "title": d.get("data", {}).get("attributes", {}).get("title"),
-            "comment": d.get("data", {}).get("attributes", {}).get("comment"),
-            "document_type": d.get("data", {}).get("attributes", {}).get("documentType"),
-            "posted_date": d.get("data", {}).get("attributes", {}).get("postedDate"),
-            "modify_date": d.get("data", {}).get("attributes", {}).get("modifyDate"),
-            "receive_date": d.get("data", {}).get("attributes", {}).get("receiveDate"),
-        },
+        "extract": _extract_comment,
     },
 }
 
