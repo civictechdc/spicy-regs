@@ -320,7 +320,7 @@ export function useDuckDBService() {
         ? commentsForAgency(agency)
         : parquetRef("comments" as RegulationsDataTypes);
 
-      const query = `SELECT comment_id, docket_id, agency_code, title, comment, posted_date, modify_date, attachments_json FROM ${commentsSource} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
+      const query = `SELECT comment_id, docket_id, agency_code, title, comment, posted_date, modify_date FROM ${commentsSource} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
       return runQuery(query);
     },
     [runQuery, isReady]

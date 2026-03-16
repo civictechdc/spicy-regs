@@ -87,10 +87,17 @@ def list_json_files(
     path_pattern: str,
     processed_keys: set[str] | None = None,
     verbose: bool = False,
+    since_year: int | None = None,
 ) -> list[str]:
     """List all JSON files for an agency and data type, excluding already processed."""
+    import re
+
+    # Match year from docket ID in path: raw-data/{agency}/{agency}-{YYYY}-...
+    year_pattern = re.compile(rf"{re.escape(prefix)}/{re.escape(agency)}/{re.escape(agency)}-(\d{{4}})-")
+
     files = []
     skipped = 0
+    filtered_by_year = 0
     total_scanned = 0
     bucket = s3_resource.Bucket(bucket_name)
 
@@ -98,13 +105,19 @@ def list_json_files(
         key = obj.key
         if "/text-" in key and path_pattern in key and key.endswith(".json"):
             total_scanned += 1
+            if since_year:
+                m = year_pattern.search(key)
+                if m and int(m.group(1)) < since_year:
+                    filtered_by_year += 1
+                    continue
             if processed_keys and key in processed_keys:
                 skipped += 1
                 continue
             files.append(key)
 
     if verbose:
-        tqdm.write(f"    [{agency}] {data_type}: scanned {total_scanned}, skipped {skipped}, new {len(files)}")
+        year_msg = f", filtered_by_year {filtered_by_year}" if since_year else ""
+        tqdm.write(f"    [{agency}] {data_type}: scanned {total_scanned}, skipped {skipped}{year_msg}, new {len(files)}")
 
     return files
 

@@ -170,6 +170,7 @@ def process_agency(
     staging_dir: Path,
     data_type_names: list[str] | None = None,
     verbose: bool = False,
+    since_year: int | None = None,
 ) -> tuple[dict[str, int], list[str]]:
     """Process a single agency: list files, download, parse, and write staging."""
     logger.info("[{}] Starting", agency)
@@ -193,6 +194,7 @@ def process_agency(
                 DATA_TYPES[dt_name]["path_pattern"],
                 PROCESSED_KEYS,
                 verbose,
+                since_year,
             ): dt_name
             for dt_name in types_to_process
         }
@@ -287,6 +289,7 @@ def pipeline(
     merge_only: Annotated[bool, Parameter(help="Only merge staging files")] = False,
     upload_only: Annotated[bool, Parameter(help="Only upload to R2")] = False,
     partition_only: Annotated[bool, Parameter(help="Only partition comments by agency and upload")] = False,
+    since_year: Annotated[int | None, Parameter(help="Only process dockets from this year onward (e.g. 2025)")] = None,
 ) -> None:
     """Mirrulations S3 → Parquet on R2."""
 
@@ -375,7 +378,7 @@ def pipeline(
 
     # --- Step 2: Process each agency ---
     futures = [
-        process_agency.submit(a, staging_dir, data_type_names, verbose)
+        process_agency.submit(a, staging_dir, data_type_names, verbose, since_year)
         for a in agencies
     ]
 
