@@ -26,8 +26,12 @@ embed = [
 [dependency-groups]
 dev = [
     "ipykernel",
+    "matplotlib",
     "pyrefly",
     "ruff",
+    "scikit-learn",
+    "seaborn",
+    "textblob",
 ]
 
 [project.scripts]
