@@ -11,7 +11,7 @@ from json import dumps as json_dumps
 from os import getenv
 from pathlib import Path
 from shutil import rmtree
-from tempfile import mkdtemp
+
 from typing import Annotated
 
 from botocore import UNSIGNED
@@ -295,7 +295,7 @@ def pipeline(
 
     # Setup directories
     if output_dir is None:
-        output_dir = Path(mkdtemp(prefix="spicy-regs-etl-"))
+        output_dir = Path.cwd() / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     staging_dir = output_dir / "staging"
@@ -404,6 +404,12 @@ def pipeline(
     logger.info("Building feed summary...")
     build_feed_summary_task(output_dir)
 
+    # --- Step 3c: Partition comments by agency ---
+    partition_dir = None
+    if "comments" in data_type_names:
+        logger.info("Partitioning comments by agency...")
+        partition_dir = partition_comments_task(output_dir)
+
     # --- Summary ---
     logger.info("Summary:")
     for dt, count in total_rows.items():
@@ -420,6 +426,8 @@ def pipeline(
     if skip_upload is False:
         logger.info("Uploading to R2...")
         upload_to_r2_task(output_dir, data_type_names)
+        if partition_dir is not None:
+            upload_partitioned_comments_task(partition_dir)
 
     logger.info("Done!")
 
