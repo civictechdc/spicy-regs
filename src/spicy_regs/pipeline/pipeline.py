@@ -60,8 +60,14 @@ S3_RESOURCE = boto3.resource(
 PREFIX = "raw-data"
 
 # Module-level state — kept out of Prefect task boundaries to avoid
-# serializing a 27M-item set on every .submit() call.
-PROCESSED_KEYS: set[str] = set()
+# serializing large objects on every .submit() call.
+#
+# PROCESSED_KEYS: BloomFilter or empty set — used for `key in PROCESSED_KEYS`
+# lookups during extraction.  Loaded from manifest by load_manifest().
+# NEW_KEYS: plain set that tracks keys added during this run, used to
+# append to the manifest on save.
+PROCESSED_KEYS: object = set()  # BloomFilter after load_manifest()
+NEW_KEYS: set[str] = set()
 
 def _extract_comment(d: dict) -> dict:
     attrs = d.get("data", {}).get("attributes", {})
@@ -243,8 +249,8 @@ def merge_staging_task(staging_dir: Path, output_dir: Path, data_type_names: lis
 
 @task(name="save-manifest", cache_policy=NO_CACHE)
 def save_manifest_task(output_dir: Path) -> None:
-    """Step 4: Save manifest with all processed S3 keys."""
-    save_manifest(output_dir, PROCESSED_KEYS)
+    """Step 4: Append new S3 keys to the manifest."""
+    save_manifest(output_dir, NEW_KEYS)
 
 
 @task(name="upload-to-r2", cache_policy=NO_CACHE)
@@ -289,6 +295,7 @@ def pipeline(
     merge_only: Annotated[bool, Parameter(help="Only merge staging files")] = False,
     upload_only: Annotated[bool, Parameter(help="Only upload to R2")] = False,
     partition_only: Annotated[bool, Parameter(help="Only partition comments by agency and upload")] = False,
+    skip_post_process: Annotated[bool, Parameter(help="Skip feed summary + comment partitioning (for intermediate batches)")] = False,
     since_year: Annotated[int | None, Parameter(help="Only process dockets from this year onward (e.g. 2025)")] = None,
 ) -> None:
     """Mirrulations S3 → Parquet on R2."""
@@ -335,7 +342,8 @@ def pipeline(
         return
 
     # --- Step 1: Load manifest, download existing data, discover agencies (parallel) ---
-    global PROCESSED_KEYS
+    global PROCESSED_KEYS, NEW_KEYS
+    NEW_KEYS = set()
     if full_refresh:
         logger.info("Full refresh mode - ignoring manifest")
         PROCESSED_KEYS = set()
@@ -385,13 +393,11 @@ def pipeline(
     wait(futures)
 
     total_rows: dict[str, int] = {dt: 0 for dt in DATA_TYPES}
-    all_new_keys: list[str] = []
     for future in futures:
         results, new_keys = future.result()
         for dt, count in results.items():
             total_rows[dt] += count
-        all_new_keys.extend(new_keys)
-        PROCESSED_KEYS.update(new_keys)
+        NEW_KEYS.update(new_keys)
 
     # --- Step 3: Merge staging into final Parquet ---
     if any(total_rows.values()):
@@ -401,25 +407,28 @@ def pipeline(
         logger.info("Cleaned up staging directory")
 
     # --- Step 3b: Build feed summary ---
-    logger.info("Building feed summary...")
-    build_feed_summary_task(output_dir)
-
-    # --- Step 3c: Partition comments by agency ---
     partition_dir = None
-    if "comments" in data_type_names:
-        logger.info("Partitioning comments by agency...")
-        partition_dir = partition_comments_task(output_dir)
+    if skip_post_process:
+        logger.info("Skipping feed summary + comment partitioning (--skip-post-process)")
+    else:
+        logger.info("Building feed summary...")
+        build_feed_summary_task(output_dir)
+
+        # --- Step 3c: Partition comments by agency ---
+        if "comments" in data_type_names:
+            logger.info("Partitioning comments by agency...")
+            partition_dir = partition_comments_task(output_dir)
 
     # --- Summary ---
     logger.info("Summary:")
     for dt, count in total_rows.items():
         logger.info("  {}: {:,} rows", dt, count)
-    logger.info("  New files processed: {:,}", len(all_new_keys))
+    logger.info("  New files processed: {:,}", len(NEW_KEYS))
     elapsed = datetime.now(timezone.utc) - start_time
     logger.info("ETL completed in {}", elapsed)
 
-    # --- Step 4: Save manifest ---
-    if all_new_keys:
+    # --- Step 4: Save manifest (append new keys to existing) ---
+    if NEW_KEYS:
         save_manifest_task(output_dir)
 
     # --- Step 5: Upload to R2 ---

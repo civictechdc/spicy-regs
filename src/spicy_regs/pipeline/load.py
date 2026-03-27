@@ -5,7 +5,6 @@ Load tasks: persist manifest and upload final Parquet files to R2.
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-import polars as pl
 from loguru import logger
 from spicy_regs.pipeline.upload_r2 import (
     upload_directory_to_r2 as _upload_directory_to_r2,
@@ -13,12 +12,40 @@ from spicy_regs.pipeline.upload_r2 import (
 )
 
 
-def save_manifest(output_dir: Path, processed_keys: set[str]) -> None:
-    """Save processed keys to manifest Parquet file."""
+def save_manifest(output_dir: Path, new_keys: set[str]) -> None:
+    """Append new keys to the existing manifest Parquet file.
+
+    Reads the old manifest (if any) in streaming batches, writes those
+    plus the new keys to a temp file, then replaces the original.
+    This avoids loading the full 27M-key manifest into memory.
+    """
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
     manifest_file = output_dir / "manifest.parquet"
-    df = pl.DataFrame({"key": list(processed_keys)})
-    df.write_parquet(manifest_file, compression="zstd")
-    logger.info("Saved manifest: {:,} keys", len(processed_keys))
+    temp_file = output_dir / "manifest_new.parquet"
+    schema = pa.schema([("key", pa.large_string())])
+
+    existing_rows = 0
+    with pq.ParquetWriter(temp_file, schema, compression="zstd") as writer:
+        # Stream existing manifest rows
+        if manifest_file.exists():
+            pf = pq.ParquetFile(manifest_file)
+            for batch in pf.iter_batches(batch_size=500_000, columns=["key"]):
+                table = pa.Table.from_batches([batch]).cast(schema)
+                writer.write_table(table)
+                existing_rows += batch.num_rows
+
+        # Append new keys
+        new_table = pa.table({"key": list(new_keys)}).cast(schema)
+        writer.write_table(new_table)
+
+    if manifest_file.exists():
+        manifest_file.unlink()
+    temp_file.rename(manifest_file)
+
+    total = existing_rows + len(new_keys)
+    logger.info("Saved manifest: {:,} keys ({:,} existing + {:,} new)", total, existing_rows, len(new_keys))
 
 
 def upload_to_r2(output_dir: Path, data_type_names: list[str]) -> None:

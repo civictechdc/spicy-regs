@@ -28,6 +28,7 @@ dev = [
     "ipykernel",
     "matplotlib",
     "pyrefly",
+    "pytest",
     "ruff",
     "scikit-learn",
     "seaborn",

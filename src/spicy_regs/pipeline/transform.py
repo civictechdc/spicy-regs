@@ -99,9 +99,14 @@ def merge_staging_files(
 def partition_comments(output_dir: Path) -> Path:
     """Partition comments.parquet by agency_code into Hive-style directory.
 
-    Reads the merged comments.parquet, groups by agency_code, and writes
-    sorted partitions to comments/agency/agency_code={X}/part-0.parquet.
+    Streams the file in batches, groups each batch by agency_code, and
+    appends to per-agency Parquet files.  After all batches, each file is
+    re-read, sorted by (docket_id, posted_date), and rewritten.
 
+    Peak memory ≈ batch_size rows + largest single-agency file during the
+    final sort pass, rather than the full 24.7M-row table.
+
+    Output: comments/agency/agency_code={X}/part-0.parquet
     Returns the partition output directory.
     """
     comments_file = output_dir / "comments.parquet"
@@ -111,51 +116,92 @@ def partition_comments(output_dir: Path) -> Path:
     partition_dir = output_dir / "comments" / "agency"
     partition_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info("Reading comments.parquet for partitioning...")
-    table = pq.read_table(comments_file)
-    total_rows = table.num_rows
-    logger.info("Read {:,} rows, partitioning by agency_code...", total_rows)
+    pf = pq.ParquetFile(comments_file)
+    total_rows = pf.metadata.num_rows
+    logger.info("Partitioning {:,} rows by agency_code (streaming)...", total_rows)
 
-    # Get unique agency codes
-    agency_col = table.column("agency_code")
-    agencies = sorted(set(agency_col.to_pylist()))
-    agencies = [a for a in agencies if a is not None]
+    # --- Pass 1: Stream batches and append to per-agency files ---
+    # Track per-agency ParquetWriters so we can append across batches.
+    writers: dict[str, pq.ParquetWriter] = {}
+    # Schema without the agency_code column (it's in the directory name)
+    target_schema = None
+    agency_row_counts: dict[str, int] = {}
+    processed = 0
 
-    for agency in agencies:
-        mask = pa.compute.equal(agency_col, agency)
-        agency_table = table.filter(mask)
+    for batch in pf.iter_batches(batch_size=500_000):
+        table = pa.Table.from_batches([batch])
+        if target_schema is None:
+            target_schema = pa.schema(
+                [f for f in table.schema if f.name != "agency_code"]
+            )
 
-        # Sort by docket_id, posted_date within partition
+        # Group by agency_code
+        agencies = table.column("agency_code").to_pylist()
+        unique_agencies = set(a for a in agencies if a is not None)
+
+        for agency in unique_agencies:
+            mask = pa.compute.equal(table.column("agency_code"), agency)
+            agency_table = table.filter(mask).drop(["agency_code"])
+            agency_table = agency_table.cast(target_schema)
+
+            if agency not in writers:
+                agency_dir = partition_dir / f"agency_code={agency}"
+                agency_dir.mkdir(parents=True, exist_ok=True)
+                out_path = agency_dir / "part-0.parquet"
+                writers[agency] = pq.ParquetWriter(
+                    out_path, target_schema, compression="zstd"
+                )
+                agency_row_counts[agency] = 0
+
+            writers[agency].write_table(agency_table)
+            agency_row_counts[agency] += agency_table.num_rows
+            del agency_table
+
+        processed += table.num_rows
+        del table
+        logger.info("  partitioned {:,}/{:,} rows", processed, total_rows)
+
+    # Close all writers
+    for w in writers.values():
+        w.close()
+    writers.clear()
+
+    # --- Pass 2: Sort each per-agency file by (docket_id, posted_date) ---
+    logger.info("Sorting {} agency partitions...", len(agency_row_counts))
+    for agency in sorted(agency_row_counts):
+        part_path = partition_dir / f"agency_code={agency}" / "part-0.parquet"
+        # Read via ParquetFile to avoid pq.read_table inferring hive partitions
+        # (which would re-add agency_code as a column).
+        table = pq.ParquetFile(part_path).read()
         sort_indices = pa.compute.sort_indices(
-            agency_table,
+            table,
             sort_keys=[("docket_id", "ascending"), ("posted_date", "ascending")],
         )
-        agency_table = agency_table.take(sort_indices)
+        table = table.take(sort_indices)
+        pq.write_table(table, part_path, compression="zstd", row_group_size=500_000)
+        del table, sort_indices
 
-        agency_dir = partition_dir / f"agency_code={agency}"
-        agency_dir.mkdir(parents=True, exist_ok=True)
-        out_path = agency_dir / "part-0.parquet"
-
-        pq.write_table(
-            agency_table,
-            out_path,
-            compression="zstd",
-            row_group_size=500_000,
-        )
-        logger.info("  {}: {:,} rows", agency, agency_table.num_rows)
-        del agency_table
-
-    del table
-    logger.info("Partitioned {:,} rows into {} agencies", total_rows, len(agencies))
+    logger.info(
+        "Partitioned {:,} rows into {} agencies in {}",
+        total_rows,
+        len(agency_row_counts),
+        partition_dir,
+    )
     return partition_dir
 
 
 def build_feed_summary(output_dir: Path) -> Path:
     """Build pre-computed feed summary with docket info, comment counts, and comment end dates.
 
+    Uses DuckDB to query the Parquet files directly on disk instead of
+    loading them into memory.  The comments table (24.7M rows, 3 GB+) is
+    never materialised — DuckDB streams the aggregation.
+
     Joins dockets + comments (counts) + documents (max comment_end_date)
-    into a single small parquet file sorted by modify_date DESC.
+    into a single small Parquet file sorted by modify_date DESC.
     """
+    import duckdb
+
     dockets_file = output_dir / "dockets.parquet"
     comments_file = output_dir / "comments.parquet"
     documents_file = output_dir / "documents.parquet"
@@ -163,59 +209,70 @@ def build_feed_summary(output_dir: Path) -> Path:
     if not dockets_file.exists():
         raise FileNotFoundError(f"dockets.parquet not found in {output_dir}")
 
-    logger.info("Building feed summary...")
-
-    # Read dockets
-    dockets = pl.read_parquet(dockets_file)
-    logger.info("  Dockets: {:,} rows", len(dockets))
-
-    # Compute comment counts per docket
-    comment_counts = pl.DataFrame({"docket_id": [], "comment_count": []}, schema={"docket_id": pl.Utf8, "comment_count": pl.Int64})
-    if comments_file.exists():
-        comments = pl.read_parquet(comments_file, columns=["docket_id"])
-        comment_counts = (
-            comments
-            .with_columns(pl.col("docket_id").str.strip_chars('"'))
-            .group_by("docket_id")
-            .agg(pl.len().alias("comment_count"))
-        )
-        del comments
-        logger.info("  Comment counts: {:,} dockets", len(comment_counts))
-
-    # Compute max comment_end_date and earliest posted_date per docket from documents
-    doc_aggs = pl.DataFrame(
-        {"docket_id": [], "comment_end_date": [], "date_created": []},
-        schema={"docket_id": pl.Utf8, "comment_end_date": pl.Utf8, "date_created": pl.Utf8},
-    )
-    if documents_file.exists():
-        docs = pl.read_parquet(documents_file, columns=["docket_id", "comment_end_date", "posted_date"])
-        docs = docs.with_columns(pl.col("docket_id").str.strip_chars('"'))
-        doc_aggs = (
-            docs
-            .group_by("docket_id")
-            .agg(
-                pl.col("comment_end_date").drop_nulls().max().alias("comment_end_date"),
-                pl.col("posted_date").drop_nulls().min().alias("date_created"),
-            )
-        )
-        del docs
-        logger.info("  Document aggregates: {:,} dockets", len(doc_aggs))
-
-    # Join everything
-    summary = (
-        dockets
-        .with_columns(pl.col("docket_id").str.strip_chars('"'))
-        .join(comment_counts, on="docket_id", how="left")
-        .join(doc_aggs, on="docket_id", how="left")
-        .with_columns(pl.col("comment_count").fill_null(0))
-        .sort("modify_date", descending=True)
-    )
-    del dockets
+    logger.info("Building feed summary via DuckDB...")
 
     summary_file = output_dir / "feed_summary.parquet"
-    summary.write_parquet(summary_file, compression="zstd", row_group_size=50_000)
+
+    con = duckdb.connect()
+
+    # Build the query dynamically based on which files exist
+    comment_join = ""
+    comment_col = "0 AS comment_count,"
+    if comments_file.exists():
+        comment_join = f"""
+        LEFT JOIN (
+            SELECT
+                TRIM(docket_id, '"') AS docket_id,
+                COUNT(*) AS comment_count
+            FROM read_parquet('{comments_file}')
+            GROUP BY TRIM(docket_id, '"')
+        ) cc ON cc.docket_id = d.docket_id
+        """
+        comment_col = "COALESCE(cc.comment_count, 0) AS comment_count,"
+
+    doc_join = ""
+    doc_cols = "NULL AS comment_end_date, NULL AS date_created,"
+    if documents_file.exists():
+        doc_join = f"""
+        LEFT JOIN (
+            SELECT
+                TRIM(docket_id, '"') AS docket_id,
+                MAX(comment_end_date) AS comment_end_date,
+                MIN(posted_date) AS date_created
+            FROM read_parquet('{documents_file}')
+            GROUP BY TRIM(docket_id, '"')
+        ) da ON da.docket_id = d.docket_id
+        """
+        doc_cols = "da.comment_end_date, da.date_created,"
+
+    query = f"""
+    COPY (
+        SELECT
+            d.docket_id,
+            d.agency_code,
+            d.title,
+            d.docket_type,
+            d.modify_date,
+            d.abstract,
+            {comment_col}
+            {doc_cols}
+        FROM (
+            SELECT * REPLACE (TRIM(docket_id, '"') AS docket_id)
+            FROM read_parquet('{dockets_file}')
+        ) d
+        {comment_join}
+        {doc_join}
+        ORDER BY d.modify_date DESC
+    ) TO '{summary_file}' (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 50000);
+    """
+
+    con.execute(query)
+    con.close()
 
     file_size = summary_file.stat().st_size / (1024 * 1024)
-    logger.info("Feed summary: {:,} rows, {:.1f} MB", len(summary), file_size)
+
+    # Get row count for logging
+    row_count = pq.ParquetFile(summary_file).metadata.num_rows
+    logger.info("Feed summary: {:,} rows, {:.1f} MB", row_count, file_size)
 
     return summary_file
