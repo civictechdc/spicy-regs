@@ -10,7 +10,6 @@ dependencies = [
     "pyarrow",
     "tqdm",
     "httpx",
-    "sentence-transformers",
     "duckdb",
     "pandas",
     "prefect",
@@ -20,6 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 embed = [
+    "sentence-transformers",
     "torch",
 ]
 
