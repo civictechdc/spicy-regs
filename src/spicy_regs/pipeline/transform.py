@@ -75,19 +75,21 @@ def merge_staging_files(
         total_rows = 0
         with pq.ParquetWriter(temp_output, target_schema, compression="zstd") as writer:
             for file_path in files_to_merge:
-                table = pq.read_table(file_path)
+                pf = pq.ParquetFile(file_path)
+                for batch in pf.iter_batches(batch_size=500_000):
+                    table = pa.Table.from_batches([batch])
 
-                existing_cols = set(table.column_names)
-                for col in target_columns:
-                    if col not in existing_cols:
-                        null_array = pa.nulls(table.num_rows, type=pa.large_string())
-                        table = table.append_column(col, null_array)
+                    existing_cols = set(table.column_names)
+                    for col in target_columns:
+                        if col not in existing_cols:
+                            null_array = pa.nulls(table.num_rows, type=pa.large_string())
+                            table = table.append_column(col, null_array)
 
-                table = table.select(target_columns)
-                table = table.cast(target_schema)
-                writer.write_table(table)
-                total_rows += table.num_rows
-                del table
+                    table = table.select(target_columns)
+                    table = table.cast(target_schema)
+                    writer.write_table(table)
+                    total_rows += table.num_rows
+                    del table
 
         if output_file.exists():
             output_file.unlink()
