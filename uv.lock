@@ -4303,12 +4303,12 @@ dependencies = [
     { name = "prefect" },
     { name = "pyarrow" },
     { name = "python-dotenv" },
-    { name = "sentence-transformers" },
     { name = "tqdm" },
 ]
 
 [package.optional-dependencies]
 embed = [
+    { name = "sentence-transformers" },
     { name = "torch" },
 ]
 
@@ -4337,7 +4337,7 @@ requires-dist = [
     { name = "prefect" },
     { name = "pyarrow" },
     { name = "python-dotenv" },
-    { name = "sentence-transformers" },
+    { name = "sentence-transformers", marker = "extra == 'embed'" },
     { name = "torch", marker = "extra == 'embed'" },
     { name = "tqdm" },
 ]

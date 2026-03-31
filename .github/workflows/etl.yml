@@ -43,7 +43,7 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "schedule" ]; then
             HOUR=$(date -u +%H)
-            BATCH=$((HOUR - 6))
+            BATCH=$((10#$HOUR - 6))
             echo "number=$BATCH" >> $GITHUB_OUTPUT
             echo "Running scheduled batch $BATCH (hour $HOUR UTC)"
           elif [ -n "${{ inputs.batch_number }}" ]; then

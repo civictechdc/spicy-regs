@@ -75,7 +75,14 @@ def merge_staging_files(
         total_rows = 0
         with pq.ParquetWriter(temp_output, target_schema, compression="zstd") as writer:
             for file_path in files_to_merge:
-                pf = pq.ParquetFile(file_path)
+                try:
+                    pf = pq.ParquetFile(file_path)
+                except Exception as e:
+                    logger.warning(
+                        "{}: skipping corrupt file {}: {}",
+                        data_type, file_path.name, e,
+                    )
+                    continue
                 for batch in pf.iter_batches(batch_size=500_000):
                     table = pa.Table.from_batches([batch])
 
