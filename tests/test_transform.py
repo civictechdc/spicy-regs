@@ -55,7 +55,8 @@ class TestMergeStagingFiles:
         write_staging("FDA", "dockets", fda, staging, DOCKET_SCHEMA)
 
         schemas = {"dockets": DOCKET_SCHEMA}
-        merge_staging_files(staging, output, ["dockets"], schemas)
+        dedup_keys = {"dockets": "docket_id"}
+        merge_staging_files(staging, output, ["dockets"], schemas, dedup_keys)
 
         merged = pl.read_parquet(output / "dockets.parquet")
         assert len(merged) == 3
@@ -74,7 +75,8 @@ class TestMergeStagingFiles:
         write_staging("FDA", "dockets", fda, staging, DOCKET_SCHEMA)
 
         schemas = {"dockets": DOCKET_SCHEMA}
-        merge_staging_files(staging, output, ["dockets"], schemas)
+        dedup_keys = {"dockets": "docket_id"}
+        merge_staging_files(staging, output, ["dockets"], schemas, dedup_keys)
 
         merged = pl.read_parquet(output / "dockets.parquet")
         assert len(merged) == 3
@@ -95,7 +97,8 @@ class TestMergeStagingFiles:
         write_staging("NEW", "dockets", new_records, staging, DOCKET_SCHEMA)
 
         schemas = {"dockets": DOCKET_SCHEMA}
-        merge_staging_files(staging, output, ["dockets"], schemas)
+        dedup_keys = {"dockets": "docket_id"}
+        merge_staging_files(staging, output, ["dockets"], schemas, dedup_keys)
 
         merged = pl.read_parquet(output / "dockets.parquet")
         assert len(merged) == 2
@@ -109,8 +112,174 @@ class TestMergeStagingFiles:
         output = tmp_path / "output"
         output.mkdir()
         # staging/dockets doesn't exist — should silently skip
-        merge_staging_files(staging, output, ["dockets"], {"dockets": DOCKET_SCHEMA})
+        merge_staging_files(
+            staging, output, ["dockets"], {"dockets": DOCKET_SCHEMA}, {"dockets": "docket_id"}
+        )
         assert not (output / "dockets.parquet").exists()
+
+    def test_deduplicates_dockets_keeping_latest_modify_date(self, tmp_path):
+        """Merging should collapse repeated docket_ids, keeping the row
+        with the most recent modify_date (and its associated title/abstract)."""
+        staging = tmp_path / "staging"
+        output = tmp_path / "output"
+        output.mkdir()
+
+        # Existing output: stale version of the same docket
+        existing = [{
+            "docket_id": "EPA-2024-0001",
+            "agency_code": "EPA",
+            "title": "Stale Title",
+            "docket_type": "Rulemaking",
+            "modify_date": "2024-01-01T00:00:00Z",
+            "abstract": "old",
+        }]
+        write_parquet_from_dicts(output / "dockets.parquet", existing, DOCKET_SCHEMA)
+
+        # New staging: updated version of the same docket
+        updated = [{
+            "docket_id": "EPA-2024-0001",
+            "agency_code": "EPA",
+            "title": "Fresh Title",
+            "docket_type": "Rulemaking",
+            "modify_date": "2024-06-15T00:00:00Z",
+            "abstract": "new",
+        }]
+        write_staging("EPA", "dockets", updated, staging, DOCKET_SCHEMA)
+
+        merge_staging_files(
+            staging, output, ["dockets"], {"dockets": DOCKET_SCHEMA}, {"dockets": "docket_id"}
+        )
+
+        merged = pl.read_parquet(output / "dockets.parquet")
+        assert len(merged) == 1
+        row = merged.row(0, named=True)
+        assert row["docket_id"] == "EPA-2024-0001"
+        assert row["modify_date"] == "2024-06-15T00:00:00Z"
+        assert row["title"] == "Fresh Title"
+        assert row["abstract"] == "new"
+
+    def test_deduplicates_dockets_within_single_merge(self, tmp_path):
+        """Duplicates inside a single staging file should also be collapsed."""
+        staging = tmp_path / "staging"
+        output = tmp_path / "output"
+        output.mkdir()
+
+        # Multiple copies of the same docket in a single staging file —
+        # mirrors what happens when the same JSON key is re-downloaded.
+        records = [
+            {"docket_id": "FDA-2015-N-0030", "agency_code": "FDA", "title": "v1",
+             "docket_type": "Rulemaking", "modify_date": "2023-05-31T12:53:19Z", "abstract": None},
+            {"docket_id": "FDA-2015-N-0030", "agency_code": "FDA", "title": "v2",
+             "docket_type": "Rulemaking", "modify_date": "2024-04-30T14:51:09Z", "abstract": None},
+            {"docket_id": "FDA-2015-N-0030", "agency_code": "FDA", "title": "v3",
+             "docket_type": "Rulemaking", "modify_date": "2025-12-18T15:39:35Z", "abstract": None},
+        ]
+        write_staging("FDA", "dockets", records, staging, DOCKET_SCHEMA)
+
+        merge_staging_files(
+            staging, output, ["dockets"], {"dockets": DOCKET_SCHEMA}, {"dockets": "docket_id"}
+        )
+
+        merged = pl.read_parquet(output / "dockets.parquet")
+        assert len(merged) == 1
+        assert merged["modify_date"][0] == "2025-12-18T15:39:35Z"
+        assert merged["title"][0] == "v3"
+
+    def test_deduplicates_documents_keeping_latest_modify_date(self, tmp_path):
+        """Documents should dedupe on document_id, keeping latest modify_date."""
+        staging = tmp_path / "staging"
+        output = tmp_path / "output"
+        output.mkdir()
+
+        existing = [{
+            "document_id": "D-001", "docket_id": "EPA-2024-0001", "agency_code": "EPA",
+            "title": "old", "document_type": "Proposed Rule",
+            "posted_date": "2024-06-01", "modify_date": "2024-06-01",
+            "comment_start_date": "2024-06-01", "comment_end_date": "2024-07-01",
+            "file_url": None,
+        }]
+        write_parquet_from_dicts(output / "documents.parquet", existing, DOCUMENT_SCHEMA)
+
+        updated = [{
+            "document_id": "D-001", "docket_id": "EPA-2024-0001", "agency_code": "EPA",
+            "title": "new", "document_type": "Proposed Rule",
+            "posted_date": "2024-06-01", "modify_date": "2024-09-15",
+            "comment_start_date": "2024-06-01", "comment_end_date": "2024-07-01",
+            "file_url": None,
+        }]
+        write_staging("EPA", "documents", updated, staging, DOCUMENT_SCHEMA)
+
+        merge_staging_files(
+            staging, output, ["documents"],
+            {"documents": DOCUMENT_SCHEMA},
+            {"documents": "document_id"},
+        )
+
+        merged = pl.read_parquet(output / "documents.parquet")
+        assert len(merged) == 1
+        assert merged["modify_date"][0] == "2024-09-15"
+        assert merged["title"][0] == "new"
+
+    def test_deduplicates_comments_keeping_latest_modify_date(self, tmp_path):
+        """Comments should dedupe on comment_id, keeping latest modify_date."""
+        staging = tmp_path / "staging"
+        output = tmp_path / "output"
+        output.mkdir()
+
+        existing = [{
+            "comment_id": "C-001", "docket_id": "EPA-2024-0001", "agency_code": "EPA",
+            "title": "old", "comment": "old body", "document_type": "Public Comment",
+            "posted_date": "2024-06-20", "modify_date": "2024-06-20",
+            "receive_date": "2024-06-20", "attachments_json": None,
+        }]
+        write_parquet_from_dicts(output / "comments.parquet", existing, COMMENT_SCHEMA)
+
+        updated = [{
+            "comment_id": "C-001", "docket_id": "EPA-2024-0001", "agency_code": "EPA",
+            "title": "updated", "comment": "new body", "document_type": "Public Comment",
+            "posted_date": "2024-06-20", "modify_date": "2024-08-01",
+            "receive_date": "2024-06-20", "attachments_json": None,
+        }]
+        write_staging("EPA", "comments", updated, staging, COMMENT_SCHEMA)
+
+        merge_staging_files(
+            staging, output, ["comments"],
+            {"comments": COMMENT_SCHEMA},
+            {"comments": "comment_id"},
+        )
+
+        merged = pl.read_parquet(output / "comments.parquet")
+        assert len(merged) == 1
+        assert merged["modify_date"][0] == "2024-08-01"
+        assert merged["comment"][0] == "new body"
+
+    def test_dedup_preserves_unrelated_rows(self, tmp_path):
+        """Dedup must not drop rows with different ids."""
+        staging = tmp_path / "staging"
+        output = tmp_path / "output"
+        output.mkdir()
+
+        records = [
+            {"docket_id": "EPA-2024-0001", "agency_code": "EPA", "title": "a",
+             "docket_type": "Rulemaking", "modify_date": "2024-01-01", "abstract": None},
+            {"docket_id": "EPA-2024-0001", "agency_code": "EPA", "title": "a2",
+             "docket_type": "Rulemaking", "modify_date": "2024-06-01", "abstract": None},
+            {"docket_id": "EPA-2024-0002", "agency_code": "EPA", "title": "b",
+             "docket_type": "Rulemaking", "modify_date": "2024-02-01", "abstract": None},
+            {"docket_id": "FDA-2024-0010", "agency_code": "FDA", "title": "c",
+             "docket_type": "Rulemaking", "modify_date": "2024-03-01", "abstract": None},
+        ]
+        write_staging("MIX", "dockets", records, staging, DOCKET_SCHEMA)
+
+        merge_staging_files(
+            staging, output, ["dockets"], {"dockets": DOCKET_SCHEMA}, {"dockets": "docket_id"}
+        )
+
+        merged = pl.read_parquet(output / "dockets.parquet").sort("docket_id")
+        assert merged["docket_id"].to_list() == ["EPA-2024-0001", "EPA-2024-0002", "FDA-2024-0010"]
+        epa1 = merged.filter(pl.col("docket_id") == "EPA-2024-0001")
+        assert epa1["modify_date"][0] == "2024-06-01"
+        assert epa1["title"][0] == "a2"
 
 
 class TestPartitionComments:

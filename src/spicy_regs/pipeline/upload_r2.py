@@ -22,8 +22,72 @@ def get_r2_client():
     )
 
 
+def _get_remote_size(client, bucket: str, remote_key: str) -> int | None:
+    """Return the existing R2 object size in bytes, or None if absent.
+
+    Any other error (permissions, transient 5xx) propagates — callers
+    must not guess at whether the remote object exists, since the
+    upload guard depends on a correct answer to decide if a shrink is
+    catastrophic.
+    """
+    from botocore.exceptions import ClientError
+
+    try:
+        resp = client.head_object(Bucket=bucket, Key=remote_key)
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        if code in ("404", "NoSuchKey", "NotFound"):
+            return None
+        raise
+    return int(resp["ContentLength"])
+
+
+def _assert_upload_safe(
+    local_size: int,
+    remote_size: int | None,
+    remote_key: str,
+) -> None:
+    """Abort if the new upload would catastrophically shrink the remote.
+
+    Controlled by ``R2_MIN_SIZE_RATIO`` (default ``0.5``) — the new file
+    must be at least that fraction of the existing remote file. Set
+    ``R2_ALLOW_SHRINK=1`` to bypass (used by recovery scripts).
+    """
+    if remote_size is None or remote_size == 0:
+        return
+    if getenv("R2_ALLOW_SHRINK") == "1":
+        logger.warning(
+            "R2_ALLOW_SHRINK=1: bypassing shrink guard for {}", remote_key
+        )
+        return
+
+    ratio_env = getenv("R2_MIN_SIZE_RATIO", "0.5")
+    try:
+        min_ratio = float(ratio_env)
+    except ValueError:
+        raise RuntimeError(
+            f"Invalid R2_MIN_SIZE_RATIO={ratio_env!r}; expected a float"
+        )
+
+    ratio = local_size / remote_size
+    if ratio < min_ratio:
+        raise RuntimeError(
+            f"Refusing to upload {remote_key}: new file would shrink remote "
+            f"from {remote_size / 1024 / 1024:.1f} MB to "
+            f"{local_size / 1024 / 1024:.1f} MB (ratio {ratio:.3f} < "
+            f"threshold {min_ratio}). Set R2_ALLOW_SHRINK=1 to override."
+        )
+
+
 def upload_to_r2(local_path: Path, remote_key: str = None):
-    """Upload a file to R2 bucket."""
+    """Upload a file to R2 bucket.
+
+    Before overwriting an existing remote object, checks the current
+    size and refuses to proceed if the new file is much smaller (see
+    ``_assert_upload_safe``).  This guards against the failure mode
+    where an upstream error produces a near-empty local file that
+    would otherwise silently wipe production data.
+    """
     bucket = getenv("R2_BUCKET_NAME", "spicy-regs")
 
     if not getenv("R2_ACCESS_KEY_ID"):
@@ -35,8 +99,12 @@ def upload_to_r2(local_path: Path, remote_key: str = None):
 
     client = get_r2_client()
 
-    file_size = local_path.stat().st_size / (1024 * 1024)
+    local_size_bytes = local_path.stat().st_size
+    file_size = local_size_bytes / (1024 * 1024)
     logger.info("Uploading {} ({:.1f} MB) to R2...", local_path.name, file_size)
+
+    remote_size = _get_remote_size(client, bucket, remote_key)
+    _assert_upload_safe(local_size_bytes, remote_size, remote_key)
 
     client.upload_file(
         str(local_path),

@@ -120,16 +120,24 @@ def download_existing_parquet(
     output_dir: Path,
     data_type_names: list[str],
 ) -> None:
-    """Download existing Parquet files from R2 for incremental append."""
+    """Download existing Parquet files from R2 for incremental append.
+
+    If a file exists on R2 but the download fails (network error, 5xx,
+    truncated stream), ``download_from_r2`` will raise and this task will
+    fail — Prefect will retry, and if retries are exhausted the whole
+    pipeline aborts before the overwrite-on-upload step.  Only a clean
+    HTTP 404 is treated as "fine, first run".
+    """
     logger.info("Downloading existing Parquet files from R2...")
     for data_type in data_type_names:
         local_file = output_dir / f"{data_type}.parquet"
-        if not local_file.exists():
-            if download_from_r2(f"{data_type}.parquet", local_file):
-                size_mb = local_file.stat().st_size / (1024 * 1024)
-                logger.info("{}.parquet ({:.1f} MB)", data_type, size_mb)
-            else:
-                logger.warning("{}.parquet not found in R2", data_type)
+        if local_file.exists():
+            continue
+        if download_from_r2(f"{data_type}.parquet", local_file):
+            size_mb = local_file.stat().st_size / (1024 * 1024)
+            logger.info("{}.parquet ({:.1f} MB)", data_type, size_mb)
+        else:
+            logger.info("{}.parquet not yet on R2 (first run)", data_type)
 
 
 def list_json_files(

@@ -3,7 +3,6 @@ Transform tasks: convert raw records to Parquet staging files and
 merge staging into final output with schema evolution.
 """
 
-from shutil import move
 from pathlib import Path
 
 import polars as pl
@@ -38,13 +37,24 @@ def merge_staging_files(
     output_dir: Path,
     data_types_to_merge: list[str],
     schemas: dict[str, dict],
+    dedup_keys: dict[str, str],
 ) -> None:
     """
-    Merge staging files into final output using PyArrow streaming.
-    Handles schema evolution by adding missing columns with nulls.
+    Merge staging files into final output using DuckDB streaming.
 
-    schemas: mapping of data_type name -> {column_name: polars_type}
+    Handles schema evolution via ``union_by_name=true`` (missing columns
+    become NULL) and deduplicates by primary key, keeping the row with the
+    most recent ``modify_date`` per key.  This prevents incremental ETL
+    runs from accumulating duplicate rows when the same source JSON is
+    re-downloaded with an updated ``modifyDate``.
+
+    schemas:    mapping of data_type name -> {column_name: polars_type}
+    dedup_keys: mapping of data_type name -> primary-key column name
+                (e.g. ``"dockets": "docket_id"``).  Dedup is by
+                (primary key) keeping ``MAX(modify_date)``.
     """
+    import duckdb
+
     for data_type in data_types_to_merge:
         staging_type_dir = staging_dir / data_type
         output_file = output_dir / f"{data_type}.parquet"
@@ -58,51 +68,72 @@ def merge_staging_files(
 
         logger.info("Merging {} staging files for {}...", len(staging_files), data_type)
 
-        files_to_merge = []
+        files_to_merge: list[Path] = []
         if output_file.exists():
             files_to_merge.append(output_file)
         files_to_merge.extend(staging_files)
 
-        if len(files_to_merge) == 1 and not output_file.exists():
-            move(files_to_merge[0], output_file)
-            logger.info("{}: moved single file", data_type)
+        # Drop corrupt files so DuckDB doesn't abort the whole merge.
+        valid_files: list[Path] = []
+        for file_path in files_to_merge:
+            try:
+                pq.ParquetFile(file_path)
+            except Exception as e:
+                logger.warning(
+                    "{}: skipping corrupt file {}: {}",
+                    data_type, file_path.name, e,
+                )
+                continue
+            valid_files.append(file_path)
+
+        if not valid_files:
             continue
 
-        temp_output = output_dir / f"{data_type}_merged.parquet"
         target_columns = list(schemas[data_type].keys())
-        target_schema = pa.schema([(col, pa.large_string()) for col in target_columns])
+        key_col = dedup_keys.get(data_type)
+        if key_col is None:
+            raise ValueError(
+                f"merge_staging_files: no dedup key configured for '{data_type}'"
+            )
+        if key_col not in target_columns or "modify_date" not in target_columns:
+            raise ValueError(
+                f"merge_staging_files: schema for '{data_type}' must include "
+                f"'{key_col}' and 'modify_date'"
+            )
 
-        total_rows = 0
-        with pq.ParquetWriter(temp_output, target_schema, compression="zstd") as writer:
-            for file_path in files_to_merge:
-                try:
-                    pf = pq.ParquetFile(file_path)
-                except Exception as e:
-                    logger.warning(
-                        "{}: skipping corrupt file {}: {}",
-                        data_type, file_path.name, e,
-                    )
-                    continue
-                for batch in pf.iter_batches(batch_size=500_000):
-                    table = pa.Table.from_batches([batch])
+        temp_output = output_dir / f"{data_type}_merged.parquet"
 
-                    existing_cols = set(table.column_names)
-                    for col in target_columns:
-                        if col not in existing_cols:
-                            null_array = pa.nulls(table.num_rows, type=pa.large_string())
-                            table = table.append_column(col, null_array)
+        # Escape single quotes in paths for inline SQL.
+        files_sql = ", ".join(f"'{str(p).replace(chr(39), chr(39) * 2)}'" for p in valid_files)
+        col_select = ", ".join(f'CAST("{c}" AS VARCHAR) AS "{c}"' for c in target_columns)
 
-                    table = table.select(target_columns)
-                    table = table.cast(target_schema)
-                    writer.write_table(table)
-                    total_rows += table.num_rows
-                    del table
+        query = f"""
+        COPY (
+            SELECT {col_select}
+            FROM read_parquet([{files_sql}], union_by_name=true)
+            QUALIFY ROW_NUMBER() OVER (
+                PARTITION BY "{key_col}"
+                ORDER BY modify_date DESC NULLS LAST
+            ) = 1
+        ) TO '{str(temp_output).replace(chr(39), chr(39) * 2)}'
+        (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 500000);
+        """
+
+        con = duckdb.connect()
+        try:
+            con.execute(query)
+        finally:
+            con.close()
 
         if output_file.exists():
             output_file.unlink()
         temp_output.rename(output_file)
 
-        logger.info("{}: merged {:,} total rows", data_type, total_rows)
+        total_rows = pq.ParquetFile(output_file).metadata.num_rows
+        logger.info(
+            "{}: merged {:,} deduped rows (key={})",
+            data_type, total_rows, key_col,
+        )
 
 
 def partition_comments(output_dir: Path) -> Path:
@@ -176,19 +207,54 @@ def partition_comments(output_dir: Path) -> Path:
     writers.clear()
 
     # --- Pass 2: Sort each per-agency file by (docket_id, posted_date) ---
+    #
+    # Uses DuckDB (not PyArrow) because PyArrow's default ``string`` type
+    # has 32-bit offsets — concatenating chunks during ``take()`` over a
+    # multi-million-row agency with long ``comment`` bodies overflows the
+    # 2 GB per-column limit (``offset overflow while concatenating``).
+    # DuckDB handles variable-width strings without that cap.
+    import duckdb
+
     logger.info("Sorting {} agency partitions...", len(agency_row_counts))
+    # Column list without agency_code — we pass this explicitly to the
+    # SELECT so DuckDB doesn't re-infer the hive partition column and
+    # bake it back into the file.
+    select_cols = ", ".join(
+        f'"{f.name}"' for f in target_schema if f.name != "agency_code"
+    )
+    # Allow DuckDB to spill to disk when a single agency's decompressed
+    # string columns exceed RAM.  Reuse partition_dir as the spill area
+    # so temp files land on the same volume as the output.
+    spill_dir = partition_dir / ".duckdb_tmp"
+    spill_dir.mkdir(exist_ok=True)
+
     for agency in sorted(agency_row_counts):
         part_path = partition_dir / f"agency_code={agency}" / "part-0.parquet"
-        # Read via ParquetFile to avoid pq.read_table inferring hive partitions
-        # (which would re-add agency_code as a column).
-        table = pq.ParquetFile(part_path).read()
-        sort_indices = pa.compute.sort_indices(
-            table,
-            sort_keys=[("docket_id", "ascending"), ("posted_date", "ascending")],
-        )
-        table = table.take(sort_indices)
-        pq.write_table(table, part_path, compression="zstd", row_group_size=500_000)
-        del table, sort_indices
+        tmp_path = part_path.with_suffix(".sorted.parquet")
+        # Fresh connection per agency so memory is fully released between
+        # large partitions (CEQ / FWS / CFPB can each exceed RAM once
+        # string columns are decompressed).
+        con = duckdb.connect()
+        try:
+            con.execute("SET memory_limit='16GB'")
+            con.execute("SET preserve_insertion_order=false")
+            con.execute("SET threads=2")
+            con.execute(f"SET temp_directory='{spill_dir}'")
+            con.execute(f"""
+            COPY (
+                SELECT {select_cols} FROM read_parquet('{part_path}', hive_partitioning=false)
+                ORDER BY docket_id, posted_date
+            ) TO '{tmp_path}' (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 500000);
+            """)
+        finally:
+            con.close()
+        tmp_path.replace(part_path)
+
+    # Clean up spill directory
+    if spill_dir.exists():
+        for p in spill_dir.glob("*"):
+            p.unlink()
+        spill_dir.rmdir()
 
     logger.info(
         "Partitioned {:,} rows into {} agencies in {}",

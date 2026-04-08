@@ -99,6 +99,13 @@ def _extract_comment(d: dict) -> dict:
     }
 
 
+DEDUP_KEYS: dict[str, str] = {
+    "dockets": "docket_id",
+    "documents": "document_id",
+    "comments": "comment_id",
+}
+
+
 DATA_TYPES = {
     "dockets": {
         "path_pattern": "/docket/",
@@ -244,7 +251,8 @@ def process_agency(
 def merge_staging_task(staging_dir: Path, output_dir: Path, data_type_names: list[str]) -> None:
     """Step 3: Merge per-agency staging files into final Parquet."""
     schemas = {dtype: DATA_TYPES[dtype]["schema"] for dtype in data_type_names}
-    merge_staging_files(staging_dir, output_dir, data_type_names, schemas)
+    dedup_keys = {dtype: DEDUP_KEYS[dtype] for dtype in data_type_names}
+    merge_staging_files(staging_dir, output_dir, data_type_names, schemas, dedup_keys)
 
 
 @task(name="save-manifest", cache_policy=NO_CACHE)
