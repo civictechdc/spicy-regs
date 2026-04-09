@@ -20,3 +20,4 @@ lance-data
 scripts
 docs
 recovery
+.env.local
