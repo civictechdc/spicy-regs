@@ -119,8 +119,14 @@ def merge_staging_files(
         (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 500000);
         """
 
+        spill_dir = output_dir / ".duckdb_tmp"
+        spill_dir.mkdir(exist_ok=True)
+
         con = duckdb.connect()
         try:
+            con.execute("SET preserve_insertion_order=false")
+            con.execute("SET threads=2")
+            con.execute(f"SET temp_directory='{spill_dir}'")
             con.execute(query)
         finally:
             con.close()
