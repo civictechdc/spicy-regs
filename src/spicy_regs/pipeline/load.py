@@ -69,7 +69,22 @@ def upload_to_r2(output_dir: Path, data_type_names: list[str]) -> None:
         executor.map(_upload_to_r2, files_to_upload)
 
 
+def upload_comment_partitions(output_dir: Path, changed_files: list[Path]) -> None:
+    """Upload changed comment partition files and the comments index to R2."""
+    # Upload each changed partition file.
+    for local_path in changed_files:
+        remote_key = str(local_path.relative_to(output_dir))
+        _upload_to_r2(local_path, remote_key=remote_key)
+
+    # Upload the comments index.
+    index_file = output_dir / "comments_index.parquet"
+    if index_file.exists():
+        _upload_to_r2(index_file, remote_key="comments_index.parquet")
+
+    logger.info("Uploaded {} comment partitions + index", len(changed_files))
+
+
 def upload_partitioned_comments(partition_dir: Path) -> None:
-    """Upload partitioned comments directory to R2."""
+    """Upload partitioned comments directory to R2 (legacy agency-level partitioning)."""
     _upload_directory_to_r2(partition_dir, remote_prefix="comments/agency")
 

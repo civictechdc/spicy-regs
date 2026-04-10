@@ -124,6 +124,7 @@ def merge_staging_files(
 
         con = duckdb.connect()
         try:
+            con.execute("SET memory_limit='4GB'")
             con.execute("SET preserve_insertion_order=false")
             con.execute("SET threads=2")
             con.execute(f"SET temp_directory='{spill_dir}'")
@@ -140,6 +141,217 @@ def merge_staging_files(
             "{}: merged {:,} deduped rows (key={})",
             data_type, total_rows, key_col,
         )
+
+
+def merge_comments_partitioned(
+    staging_dir: Path,
+    output_dir: Path,
+    schema: dict,
+    dedup_key: str,
+) -> list[Path]:
+    """Merge staging comments into partitioned output by agency/docket/year/month.
+
+    Instead of merging all 24.7M comments into one monolithic file (which
+    OOM's on CI runners), this writes each batch's comments directly into
+    small Hive-partitioned files::
+
+        comments/agency_code={A}/docket_id={D}/year={Y}/month={M}/part-0.parquet
+
+    For each affected partition, the existing partition file is downloaded
+    from R2 (if it exists), merged with the new staging data, deduplicated
+    by ``dedup_key`` (keeping the latest ``modify_date``), and written back.
+
+    Returns the list of changed partition file paths.
+    """
+    import duckdb
+
+    from spicy_regs.pipeline.download_r2 import download_from_r2
+
+    staging_type_dir = staging_dir / "comments"
+    if not staging_type_dir.exists():
+        return []
+
+    staging_files = list(staging_type_dir.glob("*.parquet"))
+    if not staging_files:
+        return []
+
+    comments_dir = output_dir / "comments"
+    target_columns = list(schema.keys())
+
+    # Escape single quotes in paths for SQL.
+    def sql_path(p: Path) -> str:
+        return str(p).replace("'", "''")
+
+    files_sql = ", ".join(f"'{sql_path(p)}'" for p in staging_files)
+    col_select = ", ".join(f'CAST("{c}" AS VARCHAR) AS "{c}"' for c in target_columns)
+
+    logger.info("Processing {} comment staging files into partitions...", len(staging_files))
+
+    # Load staging into a temp table for efficient per-partition queries.
+    con = duckdb.connect()
+    con.execute("SET memory_limit='4GB'")
+    con.execute("SET preserve_insertion_order=false")
+
+    con.execute(f"""
+        CREATE TABLE _staging AS
+        SELECT {col_select},
+            TRIM(docket_id, '"') AS _clean_docket,
+            EXTRACT(YEAR FROM CAST(posted_date AS TIMESTAMP))::INT AS _year,
+            EXTRACT(MONTH FROM CAST(posted_date AS TIMESTAMP))::INT AS _month
+        FROM read_parquet([{files_sql}], union_by_name=true)
+        WHERE posted_date IS NOT NULL
+          AND agency_code IS NOT NULL
+          AND docket_id IS NOT NULL
+    """)
+
+    partitions = con.execute("""
+        SELECT DISTINCT agency_code, _clean_docket, _year, _month
+        FROM _staging
+    """).fetchall()
+
+    if not partitions:
+        con.close()
+        return []
+
+    logger.info("Found {} affected comment partitions", len(partitions))
+
+    # Download existing partitions from R2 for dedup.
+    for agency, docket, year, month in partitions:
+        partition_file = (
+            comments_dir
+            / f"agency_code={agency}"
+            / f"docket_id={docket}"
+            / f"year={year}"
+            / f"month={month}"
+            / "part-0.parquet"
+        )
+        if not partition_file.exists():
+            partition_file.parent.mkdir(parents=True, exist_ok=True)
+            r2_key = str(partition_file.relative_to(output_dir))
+            download_from_r2(r2_key, partition_file)
+
+    # Merge each partition: staging rows + existing → dedup → write.
+    col_select_plain = ", ".join(f'"{c}"' for c in target_columns)
+    changed: list[Path] = []
+
+    for agency, docket, year, month in partitions:
+        partition_file = (
+            comments_dir
+            / f"agency_code={agency}"
+            / f"docket_id={docket}"
+            / f"year={year}"
+            / f"month={month}"
+            / "part-0.parquet"
+        )
+        temp_file = partition_file.with_suffix(".tmp.parquet")
+        docket_escaped = str(docket).replace("'", "''")
+
+        staging_sql = f"""
+            SELECT {col_select_plain} FROM _staging
+            WHERE agency_code = '{agency}'
+              AND _clean_docket = '{docket_escaped}'
+              AND _year = {year} AND _month = {month}
+        """
+
+        if partition_file.exists():
+            existing_sql = f"""
+                UNION ALL
+                SELECT {col_select_plain}
+                FROM read_parquet('{sql_path(partition_file)}')
+            """
+        else:
+            existing_sql = ""
+
+        con.execute(f"""
+            COPY (
+                SELECT {col_select_plain} FROM (
+                    {staging_sql}
+                    {existing_sql}
+                )
+                QUALIFY ROW_NUMBER() OVER (
+                    PARTITION BY "{dedup_key}"
+                    ORDER BY modify_date DESC NULLS LAST
+                ) = 1
+                ORDER BY posted_date
+            ) TO '{sql_path(temp_file)}'
+            (FORMAT PARQUET, COMPRESSION ZSTD);
+        """)
+
+        temp_file.replace(partition_file)
+        changed.append(partition_file)
+
+    con.close()
+    logger.info("Updated {} comment partitions", len(changed))
+    return changed
+
+
+def update_comments_index(output_dir: Path, changed_files: list[Path]) -> Path:
+    """Update the comments index with changed partition files.
+
+    The index (``comments_index.parquet``) maps each partition to its
+    row count so the frontend can discover partition files and compute
+    comment counts without scanning the actual data.
+    """
+    comments_dir = output_dir / "comments"
+    index_file = output_dir / "comments_index.parquet"
+
+    # Build set of changed partition keys for fast lookup.
+    changed_keys: set[tuple[str, str, int, int]] = set()
+    new_rows: list[dict] = []
+
+    for pf in changed_files:
+        parts = pf.relative_to(comments_dir).parts
+        vals: dict[str, str] = {}
+        for part in parts[:-1]:  # skip "part-0.parquet"
+            if "=" in part:
+                k, v = part.split("=", 1)
+                vals[k] = v
+
+        key = (
+            vals["agency_code"],
+            vals["docket_id"],
+            int(vals["year"]),
+            int(vals["month"]),
+        )
+        changed_keys.add(key)
+        row_count = pq.ParquetFile(pf).metadata.num_rows
+        new_rows.append(
+            {
+                "agency_code": key[0],
+                "docket_id": key[1],
+                "year": key[2],
+                "month": key[3],
+                "row_count": row_count,
+            }
+        )
+
+    # Keep existing rows that weren't changed.
+    kept_rows: list[dict] = []
+    if index_file.exists():
+        existing_df = pl.read_parquet(index_file)
+        for row in existing_df.iter_rows(named=True):
+            k = (row["agency_code"], row["docket_id"], row["year"], row["month"])
+            if k not in changed_keys:
+                kept_rows.append(row)
+
+    all_rows = kept_rows + new_rows
+    if all_rows:
+        df = pl.DataFrame(all_rows, schema={
+            "agency_code": pl.Utf8,
+            "docket_id": pl.Utf8,
+            "year": pl.Int64,
+            "month": pl.Int64,
+            "row_count": pl.Int64,
+        })
+        df.write_parquet(index_file, compression="zstd")
+
+    total_rows = sum(r["row_count"] for r in all_rows)
+    logger.info(
+        "Comments index: {} partitions, {:,} total rows",
+        len(all_rows),
+        total_rows,
+    )
+    return index_file
 
 
 def partition_comments(output_dir: Path) -> Path:
@@ -274,9 +486,10 @@ def partition_comments(output_dir: Path) -> Path:
 def build_feed_summary(output_dir: Path) -> Path:
     """Build pre-computed feed summary with docket info, comment counts, and comment end dates.
 
-    Uses DuckDB to query the Parquet files directly on disk instead of
-    loading them into memory.  The comments table (24.7M rows, 3 GB+) is
-    never materialised — DuckDB streams the aggregation.
+    Comment counts come from ``comments_index.parquet`` (a tiny file with
+    per-partition row counts) rather than scanning the full 24.7M-row
+    comments dataset.  Falls back to the monolithic ``comments.parquet``
+    if the index doesn't exist yet.
 
     Joins dockets + comments (counts) + documents (max comment_end_date)
     into a single small Parquet file sorted by modify_date DESC.
@@ -284,6 +497,7 @@ def build_feed_summary(output_dir: Path) -> Path:
     import duckdb
 
     dockets_file = output_dir / "dockets.parquet"
+    comments_index_file = output_dir / "comments_index.parquet"
     comments_file = output_dir / "comments.parquet"
     documents_file = output_dir / "documents.parquet"
 
@@ -294,12 +508,29 @@ def build_feed_summary(output_dir: Path) -> Path:
 
     summary_file = output_dir / "feed_summary.parquet"
 
-    con = duckdb.connect()
+    spill_dir = output_dir / ".duckdb_tmp"
+    spill_dir.mkdir(exist_ok=True)
 
-    # Build the query dynamically based on which files exist
+    con = duckdb.connect()
+    con.execute("SET memory_limit='4GB'")
+    con.execute("SET preserve_insertion_order=false")
+    con.execute("SET threads=2")
+    con.execute(f"SET temp_directory='{spill_dir}'")
+
+    # Build the query dynamically based on which files exist.
+    # Prefer the comments index (tiny) over the monolithic comments file.
     comment_join = ""
     comment_col = "0 AS comment_count,"
-    if comments_file.exists():
+    if comments_index_file.exists():
+        comment_join = f"""
+        LEFT JOIN (
+            SELECT docket_id, CAST(SUM(row_count) AS BIGINT) AS comment_count
+            FROM read_parquet('{comments_index_file}')
+            GROUP BY docket_id
+        ) cc ON cc.docket_id = d.docket_id
+        """
+        comment_col = "COALESCE(cc.comment_count, 0) AS comment_count,"
+    elif comments_file.exists():
         comment_join = f"""
         LEFT JOIN (
             SELECT

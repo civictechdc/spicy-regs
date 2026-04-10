@@ -26,6 +26,7 @@ from prefect.cache_policies import NO_CACHE
 from prefect.futures import wait
 from prefect.task_runners import ThreadPoolTaskRunner
 
+from spicy_regs.pipeline.download_r2 import download_from_r2
 from spicy_regs.pipeline.extract import (
     download_and_parse,
     download_existing_parquet,
@@ -35,10 +36,18 @@ from spicy_regs.pipeline.extract import (
 )
 from spicy_regs.pipeline.load import (
     save_manifest,
+    upload_comment_partitions,
     upload_partitioned_comments,
     upload_to_r2,
 )
-from spicy_regs.pipeline.transform import merge_staging_files, partition_comments, write_staging, build_feed_summary
+from spicy_regs.pipeline.transform import (
+    build_feed_summary,
+    merge_comments_partitioned,
+    merge_staging_files,
+    partition_comments,
+    update_comments_index,
+    write_staging,
+)
 
 load_dotenv()
 
@@ -249,10 +258,30 @@ def process_agency(
 
 @task(name="merge-staging", cache_policy=NO_CACHE)
 def merge_staging_task(staging_dir: Path, output_dir: Path, data_type_names: list[str]) -> None:
-    """Step 3: Merge per-agency staging files into final Parquet."""
-    schemas = {dtype: DATA_TYPES[dtype]["schema"] for dtype in data_type_names}
-    dedup_keys = {dtype: DEDUP_KEYS[dtype] for dtype in data_type_names}
-    merge_staging_files(staging_dir, output_dir, data_type_names, schemas, dedup_keys)
+    """Step 3: Merge per-agency staging files into final Parquet (dockets/documents only)."""
+    non_comment_types = [dt for dt in data_type_names if dt != "comments"]
+    if not non_comment_types:
+        return
+    schemas = {dtype: DATA_TYPES[dtype]["schema"] for dtype in non_comment_types}
+    dedup_keys = {dtype: DEDUP_KEYS[dtype] for dtype in non_comment_types}
+    merge_staging_files(staging_dir, output_dir, non_comment_types, schemas, dedup_keys)
+
+
+@task(name="merge-comments-partitioned", cache_policy=NO_CACHE)
+def merge_comments_partitioned_task(staging_dir: Path, output_dir: Path) -> list[Path]:
+    """Step 3b: Merge comment staging into partitioned output."""
+    return merge_comments_partitioned(
+        staging_dir,
+        output_dir,
+        schema=DATA_TYPES["comments"]["schema"],
+        dedup_key=DEDUP_KEYS["comments"],
+    )
+
+
+@task(name="update-comments-index", cache_policy=NO_CACHE)
+def update_comments_index_task(output_dir: Path, changed_files: list[Path]) -> Path:
+    """Update the comments partition index."""
+    return update_comments_index(output_dir, changed_files)
 
 
 @task(name="save-manifest", cache_policy=NO_CACHE)
@@ -357,7 +386,10 @@ def pipeline(
         PROCESSED_KEYS = set()
     else:
         manifest_future = load_manifest.submit(output_dir)
-        parquet_future = download_existing_parquet.submit(output_dir, data_type_names)
+        # Download existing dockets/documents (not monolithic comments —
+        # comment partitions are downloaded on demand during merge).
+        download_types = [dt for dt in data_type_names if dt != "comments"]
+        parquet_future = download_existing_parquet.submit(output_dir, download_types)
 
     if agency is not None:
         agencies = [agency]
@@ -371,6 +403,12 @@ def pipeline(
     if not full_refresh:
         manifest_future.wait()
         parquet_future.wait()
+        # Download existing comments index (for incremental index updates
+        # and feed_summary comment counts).
+        if "comments" in data_type_names:
+            index_path = output_dir / "comments_index.parquet"
+            if not index_path.exists():
+                download_from_r2("comments_index.parquet", index_path)
 
     # Batch filtering
     if batch_number is not None:
@@ -408,24 +446,29 @@ def pipeline(
         NEW_KEYS.update(new_keys)
 
     # --- Step 3: Merge staging into final Parquet ---
+    changed_comment_partitions: list[Path] = []
     if any(total_rows.values()):
         logger.info("Merging staging files...")
         merge_staging_task(staging_dir, output_dir, data_type_names)
+
+        # Merge comments into partitioned output (separate from monolithic merge).
+        if "comments" in data_type_names and total_rows.get("comments", 0) > 0:
+            logger.info("Merging comments into partitions...")
+            changed_comment_partitions = merge_comments_partitioned_task(staging_dir, output_dir)
+
+            if changed_comment_partitions:
+                logger.info("Updating comments index...")
+                update_comments_index_task(output_dir, changed_comment_partitions)
+
         rmtree(staging_dir)
         logger.info("Cleaned up staging directory")
 
     # --- Step 3b: Build feed summary ---
-    partition_dir = None
     if skip_post_process:
-        logger.info("Skipping feed summary + comment partitioning (--skip-post-process)")
+        logger.info("Skipping feed summary (--skip-post-process)")
     else:
         logger.info("Building feed summary...")
         build_feed_summary_task(output_dir)
-
-        # --- Step 3c: Partition comments by agency ---
-        if "comments" in data_type_names:
-            logger.info("Partitioning comments by agency...")
-            partition_dir = partition_comments_task(output_dir)
 
     # --- Summary ---
     logger.info("Summary:")
@@ -442,9 +485,12 @@ def pipeline(
     # --- Step 5: Upload to R2 ---
     if skip_upload is False:
         logger.info("Uploading to R2...")
-        upload_to_r2_task(output_dir, data_type_names)
-        if partition_dir is not None:
-            upload_partitioned_comments_task(partition_dir)
+        # Upload dockets/documents/manifest/feed_summary (skip monolithic comments)
+        upload_types = [dt for dt in data_type_names if dt != "comments"]
+        upload_to_r2_task(output_dir, upload_types)
+        # Upload changed comment partitions + index
+        if changed_comment_partitions:
+            upload_comment_partitions(output_dir, changed_comment_partitions)
 
     logger.info("Done!")
 

@@ -1,6 +1,6 @@
 """Tests for transform module: staging, merging, partitioning, feed summary."""
 
-from pathlib import Path
+from unittest.mock import patch
 
 import polars as pl
 import pyarrow.parquet as pq
@@ -8,8 +8,10 @@ import pytest
 
 from spicy_regs.pipeline.transform import (
     build_feed_summary,
+    merge_comments_partitioned,
     merge_staging_files,
     partition_comments,
+    update_comments_index,
     write_staging,
 )
 from tests.conftest import (
@@ -433,3 +435,185 @@ class TestBuildFeedSummary:
         summary = pl.read_parquet(build_feed_summary(tmp_output))
         assert len(summary) == 1
         assert summary["comment_count"][0] == 1
+
+    def test_uses_comments_index_over_monolithic(self, tmp_output, sample_dockets, sample_documents):
+        """When comments_index.parquet exists, feed summary should use it for counts."""
+        write_parquet_from_dicts(tmp_output / "dockets.parquet", sample_dockets, DOCKET_SCHEMA)
+        write_parquet_from_dicts(tmp_output / "documents.parquet", sample_documents, DOCUMENT_SCHEMA)
+
+        # Write a comments index (no monolithic comments.parquet)
+        index_data = [
+            {"agency_code": "EPA", "docket_id": "EPA-2024-0001", "year": 2024, "month": 6, "row_count": 2},
+            {"agency_code": "FDA", "docket_id": "FDA-2024-0010", "year": 2024, "month": 5, "row_count": 1},
+            {"agency_code": "EPA", "docket_id": "EPA-2024-0002", "year": 2024, "month": 7, "row_count": 1},
+        ]
+        pl.DataFrame(index_data, schema={
+            "agency_code": pl.Utf8, "docket_id": pl.Utf8,
+            "year": pl.Int64, "month": pl.Int64, "row_count": pl.Int64,
+        }).write_parquet(tmp_output / "comments_index.parquet")
+
+        summary = pl.read_parquet(build_feed_summary(tmp_output))
+        assert len(summary) == 3
+        epa_0001 = summary.filter(pl.col("docket_id") == "EPA-2024-0001")
+        assert epa_0001["comment_count"][0] == 2
+        fda = summary.filter(pl.col("docket_id") == "FDA-2024-0010")
+        assert fda["comment_count"][0] == 1
+
+
+class TestMergeCommentsPartitioned:
+    @patch("spicy_regs.pipeline.download_r2.download_from_r2", return_value=False)
+    def test_partitions_by_agency_docket_year_month(self, mock_dl, tmp_path, sample_comments):
+        staging = tmp_path / "staging"
+        output = tmp_path / "output"
+        output.mkdir()
+
+        write_staging("EPA", "comments", [c for c in sample_comments if c["agency_code"] == "EPA"], staging, COMMENT_SCHEMA)
+        write_staging("FDA", "comments", [c for c in sample_comments if c["agency_code"] == "FDA"], staging, COMMENT_SCHEMA)
+
+        changed = merge_comments_partitioned(staging, output, COMMENT_SCHEMA, "comment_id")
+
+        assert len(changed) > 0
+        # Verify partition structure
+        for p in changed:
+            parts = p.relative_to(output / "comments").parts
+            assert any("agency_code=" in part for part in parts)
+            assert any("docket_id=" in part for part in parts)
+            assert any("year=" in part for part in parts)
+            assert any("month=" in part for part in parts)
+
+    @patch("spicy_regs.pipeline.download_r2.download_from_r2", return_value=False)
+    def test_preserves_all_rows(self, mock_dl, tmp_path, sample_comments):
+        staging = tmp_path / "staging"
+        output = tmp_path / "output"
+        output.mkdir()
+
+        write_staging("ALL", "comments", sample_comments, staging, COMMENT_SCHEMA)
+        changed = merge_comments_partitioned(staging, output, COMMENT_SCHEMA, "comment_id")
+
+        total = sum(pq.ParquetFile(f).metadata.num_rows for f in changed)
+        assert total == len(sample_comments)
+
+    @patch("spicy_regs.pipeline.download_r2.download_from_r2", return_value=False)
+    def test_deduplicates_comments(self, mock_dl, tmp_path):
+        staging = tmp_path / "staging"
+        output = tmp_path / "output"
+        output.mkdir()
+
+        records = [
+            {"comment_id": "C-001", "docket_id": "EPA-2024-0001", "agency_code": "EPA",
+             "title": "old", "comment": "old body", "document_type": "Public Comment",
+             "posted_date": "2024-06-20T00:00:00Z", "modify_date": "2024-06-20",
+             "receive_date": "2024-06-20", "attachments_json": None},
+            {"comment_id": "C-001", "docket_id": "EPA-2024-0001", "agency_code": "EPA",
+             "title": "new", "comment": "new body", "document_type": "Public Comment",
+             "posted_date": "2024-06-20T00:00:00Z", "modify_date": "2024-08-01",
+             "receive_date": "2024-06-20", "attachments_json": None},
+        ]
+        write_staging("EPA", "comments", records, staging, COMMENT_SCHEMA)
+        changed = merge_comments_partitioned(staging, output, COMMENT_SCHEMA, "comment_id")
+
+        assert len(changed) == 1
+        df = pl.read_parquet(changed[0])
+        assert len(df) == 1
+        assert df["modify_date"][0] == "2024-08-01"
+        assert df["comment"][0] == "new body"
+
+    @patch("spicy_regs.pipeline.download_r2.download_from_r2", return_value=False)
+    def test_merges_with_existing_partition(self, mock_dl, tmp_path):
+        """When an existing partition file is present, new data should merge with it."""
+        staging = tmp_path / "staging"
+        output = tmp_path / "output"
+        output.mkdir()
+
+        # Pre-create an existing partition
+        partition_dir = output / "comments" / "agency_code=EPA" / "docket_id=EPA-2024-0001" / "year=2024" / "month=6"
+        partition_dir.mkdir(parents=True)
+        existing = [
+            {"comment_id": "C-EXIST", "docket_id": "EPA-2024-0001", "agency_code": "EPA",
+             "title": "existing", "comment": "already here", "document_type": "Public Comment",
+             "posted_date": "2024-06-15T00:00:00Z", "modify_date": "2024-06-15",
+             "receive_date": "2024-06-15", "attachments_json": None},
+        ]
+        write_parquet_from_dicts(partition_dir / "part-0.parquet", existing, COMMENT_SCHEMA)
+
+        # Stage new comment in the same partition
+        new_comment = [
+            {"comment_id": "C-NEW", "docket_id": "EPA-2024-0001", "agency_code": "EPA",
+             "title": "new", "comment": "just added", "document_type": "Public Comment",
+             "posted_date": "2024-06-20T00:00:00Z", "modify_date": "2024-06-20",
+             "receive_date": "2024-06-20", "attachments_json": None},
+        ]
+        write_staging("EPA", "comments", new_comment, staging, COMMENT_SCHEMA)
+
+        changed = merge_comments_partitioned(staging, output, COMMENT_SCHEMA, "comment_id")
+        assert len(changed) == 1
+
+        df = pl.read_parquet(changed[0])
+        assert len(df) == 2  # existing + new
+        assert set(df["comment_id"].to_list()) == {"C-EXIST", "C-NEW"}
+
+    @patch("spicy_regs.pipeline.download_r2.download_from_r2", return_value=False)
+    def test_returns_empty_for_no_staging(self, mock_dl, tmp_path):
+        staging = tmp_path / "staging"
+        output = tmp_path / "output"
+        output.mkdir()
+
+        result = merge_comments_partitioned(staging, output, COMMENT_SCHEMA, "comment_id")
+        assert result == []
+
+
+class TestUpdateCommentsIndex:
+    def test_builds_index_from_changed_files(self, tmp_path):
+        output = tmp_path / "output"
+        comments_dir = output / "comments"
+
+        # Create partition files
+        for agency, docket, year, month, rows in [
+            ("EPA", "EPA-2024-0001", 2024, 6, 10),
+            ("EPA", "EPA-2024-0002", 2024, 7, 5),
+            ("FDA", "FDA-2024-0010", 2024, 5, 3),
+        ]:
+            pdir = comments_dir / f"agency_code={agency}" / f"docket_id={docket}" / f"year={year}" / f"month={month}"
+            pdir.mkdir(parents=True)
+            records = [{"comment_id": f"C-{i}", "docket_id": docket, "agency_code": agency,
+                        "title": "T", "comment": "C", "document_type": "PC",
+                        "posted_date": f"{year}-{month:02d}-01", "modify_date": f"{year}-{month:02d}-01",
+                        "receive_date": f"{year}-{month:02d}-01", "attachments_json": None}
+                       for i in range(rows)]
+            write_parquet_from_dicts(pdir / "part-0.parquet", records, COMMENT_SCHEMA)
+
+        changed = list(comments_dir.rglob("part-0.parquet"))
+        index_path = update_comments_index(output, changed)
+
+        assert index_path.exists()
+        idx = pl.read_parquet(index_path)
+        assert len(idx) == 3
+        assert idx.filter(pl.col("docket_id") == "EPA-2024-0001")["row_count"][0] == 10
+        assert idx["row_count"].sum() == 18
+
+    def test_incremental_update_preserves_existing(self, tmp_path):
+        output = tmp_path / "output"
+        output.mkdir()
+        comments_dir = output / "comments"
+
+        # Create initial index with one entry
+        pl.DataFrame([
+            {"agency_code": "OLD", "docket_id": "OLD-001", "year": 2023, "month": 1, "row_count": 100},
+        ], schema={"agency_code": pl.Utf8, "docket_id": pl.Utf8, "year": pl.Int64, "month": pl.Int64, "row_count": pl.Int64}).write_parquet(output / "comments_index.parquet")
+
+        # Add a new partition
+        pdir = comments_dir / "agency_code=NEW" / "docket_id=NEW-001" / "year=2024" / "month=1"
+        pdir.mkdir(parents=True)
+        records = [{"comment_id": "C-1", "docket_id": "NEW-001", "agency_code": "NEW",
+                    "title": "T", "comment": "C", "document_type": "PC",
+                    "posted_date": "2024-01-01", "modify_date": "2024-01-01",
+                    "receive_date": "2024-01-01", "attachments_json": None}]
+        write_parquet_from_dicts(pdir / "part-0.parquet", records, COMMENT_SCHEMA)
+
+        changed = [pdir / "part-0.parquet"]
+        index_path = update_comments_index(output, changed)
+
+        idx = pl.read_parquet(index_path)
+        assert len(idx) == 2  # old entry preserved + new entry
+        assert idx.filter(pl.col("docket_id") == "OLD-001")["row_count"][0] == 100
+        assert idx.filter(pl.col("docket_id") == "NEW-001")["row_count"][0] == 1

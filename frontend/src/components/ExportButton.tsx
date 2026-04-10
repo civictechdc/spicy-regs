@@ -123,9 +123,25 @@ export function ExportButton({ docketId, agencyCode, docket, documents }: Export
       const cleanId = docketId.replace(/^"|"$/g, '').toUpperCase();
       const agency = cleanId.split('-')[0];
       const R2_BASE_URL = 'https://pub-5fc11ad134984edf8d9af452dd1849d6.r2.dev';
-      const commentsSource = agency
-        ? `read_parquet('${R2_BASE_URL}/comments/agency/agency_code=${agency}/part-0.parquet')`
-        : `read_parquet('${R2_BASE_URL}/comments.parquet')`;
+
+      // Query the comments index to find partition files for this docket
+      const indexResult = await conn.query(`
+        SELECT agency_code, docket_id, year, month
+        FROM read_parquet('${R2_BASE_URL}/comments_index.parquet')
+        WHERE agency_code = '${agency}' AND docket_id = '${cleanId}'
+      `);
+      const rows = indexResult.toArray().map((r: any) => r.toJSON());
+
+      if (rows.length === 0) {
+        setExporting(null);
+        setOpen(false);
+        return;
+      }
+
+      const urls = rows.map((r: any) =>
+        `'${R2_BASE_URL}/comments/agency_code=${r.agency_code}/docket_id=${r.docket_id}/year=${r.year}/month=${r.month}/part-0.parquet'`
+      );
+      const commentsSource = `read_parquet([${urls.join(', ')}], union_by_name=true)`;
 
       const exportPath = '/tmp/export.parquet';
 

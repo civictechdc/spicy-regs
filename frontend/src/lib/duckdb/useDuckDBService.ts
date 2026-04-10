@@ -17,11 +17,11 @@ const parquetRef = (dataType: RegulationsDataTypes) => {
 };
 
 /**
- * Build a read_parquet() reference for a single agency's comment partition.
- * Uses agency-based Hive partitioning: comments/agency/agency_code={X}/part-0.parquet
+ * Build a read_parquet() reference for the comments index.
+ * Maps each partition (agency/docket/year/month) to its row count.
  */
-const commentsForAgency = (agencyCode: string) => {
-  return `read_parquet('${R2_BASE_URL}/comments/agency/agency_code=${agencyCode}/part-0.parquet')`;
+const commentsIndexRef = () => {
+  return `read_parquet('${R2_BASE_URL}/comments_index.parquet')`;
 };
 
 /**
@@ -40,6 +40,30 @@ export function useDuckDBService() {
 
   /** Cache agency list to avoid re-fetching dockets.parquet just for DISTINCT agency_code */
   const agencyCache = useRef<string[] | null>(null);
+
+  /**
+   * Build a read_parquet() SQL expression for comment partitions by querying the index.
+   * Returns a SQL source expression like read_parquet([url1, url2, ...]).
+   */
+  const buildCommentsSource = useCallback(
+    async (agencyCode: string, docketId?: string): Promise<string | null> => {
+      const conditions = [`agency_code = '${agencyCode}'`];
+      if (docketId) conditions.push(`docket_id = '${docketId}'`);
+
+      const rows = await runQuery<{
+        agency_code: string; docket_id: string; year: number; month: number;
+      }>(`SELECT agency_code, docket_id, year, month FROM ${commentsIndexRef()} WHERE ${conditions.join(' AND ')}`);
+
+      if (rows.length === 0) return null;
+
+      const urls = rows.map(r =>
+        `'${R2_BASE_URL}/comments/agency_code=${r.agency_code}/docket_id=${r.docket_id}/year=${r.year}/month=${r.month}/part-0.parquet'`
+      );
+
+      return `read_parquet([${urls.join(', ')}], union_by_name=true)`;
+    },
+    [runQuery]
+  );
 
   /**
    * Get data with filters and pagination.
@@ -69,10 +93,15 @@ export function useDuckDBService() {
         conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
       const effectiveLimit = limit ?? DEFAULT_LIMIT;
 
-      // Use agency partition for comment queries filtered by agency
-      const source = dataType === 'comments' && upperAgency
-        ? commentsForAgency(upperAgency)
-        : parquetRef(dataType);
+      // For comments, use the partition index to find the right files
+      let source: string;
+      if (dataType === 'comments' && upperAgency) {
+        const commentsSource = await buildCommentsSource(upperAgency, docketId?.toUpperCase());
+        if (!commentsSource) return [];
+        source = commentsSource;
+      } else {
+        source = parquetRef(dataType);
+      }
 
       const cols = dataType === 'dockets'
         ? 'docket_id, agency_code, title, abstract, docket_type, modify_date'
@@ -83,7 +112,7 @@ export function useDuckDBService() {
 
       return runQuery(query);
     },
-    [runQuery, isReady]
+    [runQuery, isReady, buildCommentsSource]
   );
 
   /**
@@ -98,6 +127,16 @@ export function useDuckDBService() {
       if (!isReady) throw new Error("DuckDB not ready");
 
       const upperAgency = agencyCode?.toUpperCase();
+
+      // For comments, use the index for fast counts without reading data files
+      if (dataType === 'comments' && upperAgency) {
+        const conditions = [`agency_code = '${upperAgency}'`];
+        if (docketId) conditions.push(`docket_id = '${docketId.toUpperCase()}'`);
+        const query = `SELECT COALESCE(CAST(SUM(row_count) AS BIGINT), 0) as count FROM ${commentsIndexRef()} WHERE ${conditions.join(' AND ')}`;
+        const result = await runQuery<{ count: number }>(query);
+        return Number(result[0]?.count ?? 0);
+      }
+
       const conditions: string[] = [];
       if (upperAgency) {
         conditions.push(`agency_code = '${upperAgency}'`);
@@ -109,12 +148,7 @@ export function useDuckDBService() {
       const whereClause =
         conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-      // Use agency partition for comment queries filtered by agency
-      const source = dataType === 'comments' && upperAgency
-        ? commentsForAgency(upperAgency)
-        : parquetRef(dataType);
-
-      const query = `SELECT COUNT(*) as count FROM ${source} ${whereClause}`;
+      const query = `SELECT COUNT(*) as count FROM ${parquetRef(dataType)} ${whereClause}`;
       const result = await runQuery<{ count: number }>(query);
       return Number(result[0]?.count ?? 0);
     },
@@ -129,32 +163,30 @@ export function useDuckDBService() {
       if (!isReady) throw new Error("DuckDB not ready");
 
       const escapedQuery = searchQuery.replace(/'/g, "''");
-      const tables = ["dockets", "documents", "comments"] as const;
-
       const upperAgency = agencyCode?.toUpperCase();
-      const unionQueries = tables.map((table) => {
+
+      // Build non-comment union queries
+      const nonCommentTables = ["dockets", "documents"] as const;
+      const unionQueries = nonCommentTables.map((table) => {
         let where = `title ILIKE '%${escapedQuery}%'`;
-        if (upperAgency) {
-          where += ` AND agency_code = '${upperAgency}'`;
-        }
-        // Use agency partition for comments when filtered by agency
-        const source = table === 'comments' && upperAgency
-          ? commentsForAgency(upperAgency)
-          : parquetRef(table as RegulationsDataTypes);
-        return `
-          SELECT
-            '${table}' as type,
-            title,
-            docket_id,
-            agency_code
-          FROM ${source}
-          WHERE ${where}
-        `;
+        if (upperAgency) where += ` AND agency_code = '${upperAgency}'`;
+        return `SELECT '${table}' as type, title, docket_id, agency_code FROM ${parquetRef(table as RegulationsDataTypes)} WHERE ${where}`;
       });
+
+      // Add comments query using partition index
+      if (upperAgency) {
+        const commentsSource = await buildCommentsSource(upperAgency);
+        if (commentsSource) {
+          unionQueries.push(`SELECT 'comments' as type, title, docket_id, agency_code FROM ${commentsSource} WHERE title ILIKE '%${escapedQuery}%' AND agency_code = '${upperAgency}'`);
+        }
+      } else {
+        // Without agency filter, skip comment search (too many partitions)
+        // Fall back to searching dockets and documents only
+      }
 
       return runQuery(unionQueries.join(" UNION ALL ") + " LIMIT 50");
     },
-    [runQuery, isReady]
+    [runQuery, isReady, buildCommentsSource]
   );
 
   /**
@@ -309,21 +341,18 @@ export function useDuckDBService() {
       if (!isReady) throw new Error("DuckDB not ready");
 
       const cleanId = docketId.replace(/^"|"$/g, '').toUpperCase();
+      const agency = cleanId.split('-')[0];
+      const commentsSource = await buildCommentsSource(agency, cleanId);
+      if (!commentsSource) return [];
+
       const orderClause = sortBy === 'oldest'
         ? 'ORDER BY posted_date ASC'
         : 'ORDER BY posted_date DESC';
-      const whereClause = `WHERE docket_id = '${cleanId}'`;
 
-      // Extract agency code from docket_id (e.g. "EPA" from "EPA-HQ-OAR-2021-0317")
-      const agency = cleanId.split('-')[0];
-      const commentsSource = agency
-        ? commentsForAgency(agency)
-        : parquetRef("comments" as RegulationsDataTypes);
-
-      const query = `SELECT comment_id, docket_id, agency_code, title, comment, posted_date, modify_date FROM ${commentsSource} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
+      const query = `SELECT comment_id, docket_id, agency_code, title, comment, posted_date, modify_date FROM ${commentsSource} WHERE docket_id = '${cleanId}' ${orderClause} LIMIT ${limit} OFFSET ${offset}`;
       return runQuery(query);
     },
-    [runQuery, isReady]
+    [runQuery, isReady, buildCommentsSource]
   );
 
   /**
@@ -355,36 +384,28 @@ export function useDuckDBService() {
    * Get comment counts for a batch of docket IDs.
    * Groups docket IDs by agency prefix and queries each agency's comment partition.
    */
+  /**
+   * Get comment counts for a batch of docket IDs.
+   * Uses the comments index directly — no need to read actual data files.
+   */
   const getCommentCounts = useCallback(
     async (docketIds: string[]): Promise<Record<string, number>> => {
       if (!isReady || docketIds.length === 0) return {};
 
       const cleanIds = docketIds.map(id => id.replace(/^"|"$/g, '').toUpperCase());
+      const inClause = cleanIds.map(id => `'${id}'`).join(',');
 
-      // Group docket IDs by agency prefix (e.g. "EPA" from "EPA-HQ-OAR-2021-0317")
-      const byAgency: Record<string, string[]> = {};
-      for (const id of cleanIds) {
-        const agency = id.split('-')[0];
-        if (!byAgency[agency]) byAgency[agency] = [];
-        byAgency[agency].push(id);
-      }
+      const rows = await runQuery<{ did: string; cnt: number }>(`
+        SELECT docket_id as did, CAST(SUM(row_count) AS BIGINT) as cnt
+        FROM ${commentsIndexRef()}
+        WHERE docket_id IN (${inClause})
+        GROUP BY docket_id
+      `);
 
-      // Query each agency's comment partition in parallel
-      const promises = Object.entries(byAgency).map(async ([agency, ids]) => {
-        const inClause = ids.map(id => `'${id}'`).join(',');
-        const source = commentsForAgency(agency);
-        const query = `SELECT docket_id as did, COUNT(*) as cnt FROM ${source} WHERE docket_id IN (${inClause}) GROUP BY docket_id`;
-        return runQuery<{ did: string; cnt: number }>(query);
-      });
-
-      const results = await Promise.all(promises);
       const result: Record<string, number> = {};
-      // Initialize all requested IDs to 0
       for (const id of cleanIds) result[id] = 0;
-      for (const rows of results) {
-        for (const r of rows) {
-          result[r.did] = Number(r.cnt);
-        }
+      for (const r of rows) {
+        result[r.did] = Number(r.cnt);
       }
       return result;
     },
@@ -394,6 +415,10 @@ export function useDuckDBService() {
   /**
    * Get aggregate stats for an agency (docket, document, comment counts).
    * Queries each parquet source separately: dockets, documents, and the agency comment partition.
+   */
+  /**
+   * Get aggregate stats for an agency.
+   * Comment counts come from the index — no need to read data files.
    */
   const getAgencyStats = useCallback(
     async (agencyCode: string): Promise<{ docketCount: number; documentCount: number; commentCount: number }> => {
@@ -408,7 +433,7 @@ export function useDuckDBService() {
           WHERE agency_code = '${upper}'
         `),
         runQuery<{ count: number }>(`SELECT COUNT(*) as count FROM ${parquetRef("documents" as RegulationsDataTypes)} WHERE agency_code = '${upper}'`),
-        runQuery<{ count: number }>(`SELECT COUNT(*) as count FROM ${commentsForAgency(upper)}`),
+        runQuery<{ count: number }>(`SELECT COALESCE(CAST(SUM(row_count) AS BIGINT), 0) as count FROM ${commentsIndexRef()} WHERE agency_code = '${upper}'`),
       ]);
 
       return {
@@ -471,14 +496,13 @@ export function useDuckDBService() {
 
       const cleanId = docketId.replace(/^"|"$/g, '').toUpperCase();
       const agency = cleanId.split('-')[0];
-      const commentsSource = agency
-        ? commentsForAgency(agency)
-        : parquetRef("comments" as RegulationsDataTypes);
+      const commentsSource = await buildCommentsSource(agency, cleanId);
+      if (!commentsSource) return [];
 
       const query = `SELECT * FROM ${commentsSource} WHERE docket_id = '${cleanId}' ORDER BY posted_date DESC LIMIT 50000`;
       return runQuery(query);
     },
-    [runQuery, isReady]
+    [runQuery, isReady, buildCommentsSource]
   );
 
   return {
