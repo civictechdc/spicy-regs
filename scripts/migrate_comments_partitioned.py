@@ -64,7 +64,7 @@ def migrate(output_dir: Path) -> None:
     logger.info("Found {:,} partitions to write", len(partitions))
 
     # Write each partition
-    written = 0
+    written_files: list[Path] = []
 
     for i, (agency, docket, year, month) in enumerate(partitions):
         partition_path = (
@@ -92,20 +92,19 @@ def migrate(output_dir: Path) -> None:
             (FORMAT PARQUET, COMPRESSION ZSTD);
         """)
 
-        written += 1
-        if written % 1000 == 0:
-            logger.info("  written {:,}/{:,} partitions", written, len(partitions))
+        written_files.append(partition_file)
+        if len(written_files) % 1000 == 0:
+            logger.info("  written {:,}/{:,} partitions", len(written_files), len(partitions))
 
     con.close()
 
-    logger.info("Written {:,} partition files", written)
+    logger.info("Written {:,} partition files", len(written_files))
 
     # Build the index
     logger.info("Building comments index...")
     from spicy_regs.pipeline.transform import update_comments_index
 
-    all_partition_files = list(comments_dir.rglob("part-0.parquet"))
-    index_path = update_comments_index(output_dir, all_partition_files)
+    index_path = update_comments_index(output_dir, written_files)
     logger.info("Index written to {}", index_path)
 
     logger.info("Migration complete!")

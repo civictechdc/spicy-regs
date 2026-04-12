@@ -299,6 +299,8 @@ def update_comments_index(output_dir: Path, changed_files: list[Path]) -> Path:
     changed_keys: set[tuple[str, str, int, int]] = set()
     new_rows: list[dict] = []
 
+    required_keys = {"agency_code", "docket_id", "year", "month"}
+
     for pf in changed_files:
         parts = pf.relative_to(comments_dir).parts
         vals: dict[str, str] = {}
@@ -306,6 +308,10 @@ def update_comments_index(output_dir: Path, changed_files: list[Path]) -> Path:
             if "=" in part:
                 k, v = part.split("=", 1)
                 vals[k] = v
+
+        if not required_keys.issubset(vals):
+            logger.warning("Skipping non-conforming partition path: {}", pf)
+            continue
 
         key = (
             vals["agency_code"],
