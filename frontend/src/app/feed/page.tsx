@@ -11,15 +11,19 @@ import {
   DATE_STORAGE_KEY,
   DEFAULT_DATE,
   DEFAULT_SORT,
+  DEFAULT_TOPIC,
   DEFAULT_TYPE,
   SORT_STORAGE_KEY,
+  TOPIC_STORAGE_KEY,
   TYPE_STORAGE_KEY,
   isDateRange,
   isDocketType,
   isSortOption,
+  isTopicKey,
   type DateRange,
   type DocketType,
   type SortOption,
+  type TopicKey,
 } from '@/lib/feedFilters';
 import { Flame, Loader2 } from 'lucide-react';
 
@@ -52,6 +56,9 @@ function DocketFeed() {
   const [docketType, setDocketType] = useFilterState<DocketType>(
     'type', TYPE_STORAGE_KEY, DEFAULT_TYPE, isDocketType,
   );
+  const [topic, setTopic] = useFilterState<TopicKey>(
+    'topic', TOPIC_STORAGE_KEY, DEFAULT_TOPIC, isTopicKey,
+  );
 
   // Load dockets (combined with comment counts in a single query)
   const loadDockets = useCallback(async (reset = false) => {
@@ -61,7 +68,7 @@ function DocketFeed() {
       setLoading(true);
       const newOffset = reset ? 0 : offset;
       const { dockets: results, commentCounts: counts } = await getRecentDocketsWithCounts(
-        PAGE_SIZE, newOffset, selectedAgency || undefined, sortBy, dateRange || undefined, docketType || undefined
+        PAGE_SIZE, newOffset, selectedAgency || undefined, sortBy, dateRange || undefined, docketType || undefined, topic || undefined
       );
 
       if (reset) {
@@ -81,7 +88,7 @@ function DocketFeed() {
       setLoading(false);
       setInitialLoading(false);
     }
-  }, [isReady, loading, offset, selectedAgency, sortBy, dateRange, docketType, getRecentDocketsWithCounts]);
+  }, [isReady, loading, offset, selectedAgency, sortBy, dateRange, docketType, topic, getRecentDocketsWithCounts]);
 
   // Initial load and filter change
   useEffect(() => {
@@ -89,7 +96,7 @@ function DocketFeed() {
       setInitialLoading(true);
       loadDockets(true);
     }
-  }, [isReady, selectedAgency, sortBy, dateRange, docketType]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isReady, selectedAgency, sortBy, dateRange, docketType, topic]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Deduplicate
   const uniqueDockets = useMemo(() => {
@@ -115,6 +122,8 @@ function DocketFeed() {
           onDateRangeChange={(d) => { setDateRange(d); }}
           docketType={docketType}
           onDocketTypeChange={(t) => { setDocketType(t); }}
+          topic={topic}
+          onTopicChange={(t) => { setTopic(t); }}
         />
       </div>
 

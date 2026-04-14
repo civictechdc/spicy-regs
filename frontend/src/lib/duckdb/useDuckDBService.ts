@@ -3,6 +3,7 @@
 import { useCallback, useRef } from "react";
 import { useDuckDB, R2_BASE_URL } from "./context";
 import { RegulationsDataTypes } from "@/lib/db/models";
+import { TOPIC_MAPPINGS, type TopicKey } from "@/lib/feedFilters";
 
 /** Default row limit to prevent OOM in the browser */
 const DEFAULT_LIMIT = 1000;
@@ -210,7 +211,8 @@ export function useDuckDBService() {
       agencyCode?: string,
       sortBy: 'recent' | 'popular' | 'open' | 'closed' = 'recent',
       dateRange?: '7d' | '30d' | '90d' | '365d',
-      docketType?: 'rule' | 'nonrule' | 'other'
+      docketType?: 'rule' | 'nonrule' | 'other',
+      topic?: Exclude<TopicKey, ''>
     ): Promise<{ dockets: any[]; commentCounts: Record<string, number> }> => {
       if (!isReady) throw new Error("DuckDB not ready");
 
@@ -227,6 +229,19 @@ export function useDuckDBService() {
         conditions.push(`docket_type = 'Nonrulemaking'`);
       } else if (docketType === 'other') {
         conditions.push(`(docket_type NOT IN ('Rulemaking','Nonrulemaking') OR docket_type IS NULL)`);
+      }
+
+      // Topic: cross-agency category. Match agency codes OR keywords in title/abstract.
+      // Agencies are an authoritative signal; keywords broaden recall to dockets from
+      // outside the obvious agency set (e.g. an FDA/DEA collab on opioids hitting "drug").
+      if (topic && TOPIC_MAPPINGS[topic]) {
+        const def = TOPIC_MAPPINGS[topic];
+        const agencyList = def.agencies.map(a => `'${a.toUpperCase()}'`).join(',');
+        const keywordClauses = def.keywords
+          .map(k => k.replace(/'/g, "''"))
+          .flatMap(k => [`title ILIKE '%${k}%'`, `abstract ILIKE '%${k}%'`])
+          .join(' OR ');
+        conditions.push(`(agency_code IN (${agencyList}) OR (${keywordClauses}))`);
       }
 
       // Date range target depends on sort: comment-window sorts filter on comment_end_date;

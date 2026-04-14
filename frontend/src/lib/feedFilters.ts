@@ -35,6 +35,28 @@ export const SORT_OPTIONS: { key: SortOption; label: string }[] = [
   { key: 'closed', label: 'Recently Closed' },
 ];
 
+/**
+ * Sort chips shown in the UI. Excludes 'open' and 'closed' — those are now
+ * surfaced through a Status dropdown since they're conceptually status filters
+ * with an implied ordering, not pure sort orders.
+ */
+export const SORT_CHIP_OPTIONS: { key: SortOption; label: string }[] = [
+  { key: 'recent', label: 'New' },
+  { key: 'popular', label: 'Popular' },
+];
+
+/**
+ * Status filter values map directly onto SortOption to avoid duplicating state.
+ * 'all' falls back to the chip-driven sort (recent/popular).
+ */
+export type StatusOption = 'all' | 'open' | 'closed';
+
+export const STATUS_OPTIONS: { key: StatusOption; label: string }[] = [
+  { key: 'all', label: 'All Statuses' },
+  { key: 'open', label: 'Open for Comment' },
+  { key: 'closed', label: 'Recently Closed' },
+];
+
 export const DATE_OPTIONS: { key: DateRange; label: string }[] = [
   { key: '', label: 'All Time' },
   { key: '7d', label: 'Last 7 Days' },
@@ -105,7 +127,15 @@ export const TOPIC_MAPPINGS: Record<Exclude<TopicKey, ''>, TopicDefinition> = {
 };
 
 export const TOPIC_STORAGE_KEY = 'spicy-regs-topic-preference';
+export const DEFAULT_TOPIC: TopicKey = '';
 
 export function isTopicKey(raw: string): raw is TopicKey {
   return raw === '' || Object.keys(TOPIC_MAPPINGS).includes(raw);
 }
+
+export const TOPIC_OPTIONS: { key: TopicKey; label: string; emoji: string }[] = [
+  { key: '', label: 'All Topics', emoji: '✨' },
+  ...(Object.entries(TOPIC_MAPPINGS) as [Exclude<TopicKey, ''>, TopicDefinition][]).map(
+    ([key, def]) => ({ key, label: def.label, emoji: def.emoji }),
+  ),
+];

@@ -8,6 +8,7 @@ import { DocketPost } from '@/components/feed/DocketPost';
 import { DocumentList } from '@/components/feed/DocumentList';
 import { ThreadedComments } from '@/components/feed/ThreadedComments';
 import { AgencySidebar } from '@/components/feed/AgencySidebar';
+import { RelatedDockets } from '@/components/feed/RelatedDockets';
 import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
 import { ExportButton } from '@/components/ExportButton';
 import { Loader2, ArrowLeft } from 'lucide-react';
@@ -123,6 +124,12 @@ export default function DocketDetailPage() {
               documentCount={Number(docket.document_count || 0)}
               isDetailView={true}
               showComments={true}
+            />
+
+            {/* Related Dockets — fail-soft if search index isn't ready */}
+            <RelatedDockets
+              docketId={docketId}
+              title={stripQuotes(docket.title) || ''}
             />
 
             {/* Documents */}
