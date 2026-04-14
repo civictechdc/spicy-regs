@@ -36,7 +36,7 @@ export default function AgencyPage() {
 
   // Filters (same as feed)
   const [selectedAgency, setSelectedAgency] = useState('');
-  const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'open'>(() => {
+  const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'open' | 'closed'>(() => {
     if (typeof window === 'undefined') return 'recent';
     try {
       return (localStorage.getItem('spicy-regs-sort-preference') as any) || 'recent';
@@ -48,6 +48,14 @@ export default function AgencyPage() {
     if (typeof window === 'undefined') return '';
     try {
       return (localStorage.getItem('spicy-regs-date-preference') as any) || '';
+    } catch {
+      return '';
+    }
+  });
+  const [docketType, setDocketType] = useState<'' | 'rule' | 'nonrule' | 'other'>(() => {
+    if (typeof window === 'undefined') return '';
+    try {
+      return (localStorage.getItem('spicy-regs-type-preference') as any) || '';
     } catch {
       return '';
     }
@@ -78,7 +86,7 @@ export default function AgencyPage() {
       setLoading(true);
       const newOffset = reset ? 0 : offset;
       const { dockets: results, commentCounts: counts } = await getRecentDocketsWithCounts(
-        PAGE_SIZE, newOffset, agencyCode, sortBy, dateRange || undefined
+        PAGE_SIZE, newOffset, agencyCode, sortBy, dateRange || undefined, docketType || undefined
       );
 
       if (reset) {
@@ -97,14 +105,14 @@ export default function AgencyPage() {
       setLoading(false);
       setInitialLoading(false);
     }
-  }, [isReady, loading, offset, agencyCode, sortBy, dateRange, getRecentDocketsWithCounts]);
+  }, [isReady, loading, offset, agencyCode, sortBy, dateRange, docketType, getRecentDocketsWithCounts]);
 
   useEffect(() => {
     if (isReady && agencyCode) {
       setInitialLoading(true);
       loadDockets(true);
     }
-  }, [isReady, agencyCode, sortBy, dateRange]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isReady, agencyCode, sortBy, dateRange, docketType]); // eslint-disable-line react-hooks/exhaustive-deps
   const uniqueDockets = useMemo(() => {
     const seen = new Set<string>();
     return dockets.filter(d => {
@@ -135,6 +143,8 @@ export default function AgencyPage() {
                 onSortChange={setSortBy}
                 dateRange={dateRange}
                 onDateRangeChange={setDateRange}
+                docketType={docketType}
+                onDocketTypeChange={setDocketType}
               />
             </div>
 

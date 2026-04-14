@@ -242,8 +242,9 @@ export function useDuckDBService() {
       limit: number = 20,
       offset: number = 0,
       agencyCode?: string,
-      sortBy: 'recent' | 'popular' | 'open' = 'recent',
-      dateRange?: '7d' | '30d' | '90d' | '365d'
+      sortBy: 'recent' | 'popular' | 'open' | 'closed' = 'recent',
+      dateRange?: '7d' | '30d' | '90d' | '365d',
+      docketType?: 'rule' | 'nonrule' | 'other'
     ): Promise<{ dockets: any[]; commentCounts: Record<string, number> }> => {
       if (!isReady) throw new Error("DuckDB not ready");
 
@@ -254,10 +255,23 @@ export function useDuckDBService() {
       const conditions: string[] = [];
       if (upperAgency) conditions.push(`agency_code = '${upperAgency}'`);
 
+      if (docketType === 'rule') {
+        conditions.push(`docket_type = 'Rulemaking'`);
+      } else if (docketType === 'nonrule') {
+        conditions.push(`docket_type = 'Nonrulemaking'`);
+      } else if (docketType === 'other') {
+        conditions.push(`(docket_type NOT IN ('Rulemaking','Nonrulemaking') OR docket_type IS NULL)`);
+      }
+
+      // Date range target depends on sort: comment-window sorts filter on comment_end_date;
+      // recent/popular filter on the docket's modify/create date.
       const dateMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90, '365d': 365 };
       const dateDays = dateRange ? dateMap[dateRange] : undefined;
       if (dateDays) {
-        conditions.push(`TRY_CAST(COALESCE(date_created, modify_date) AS TIMESTAMP) >= CAST(NOW() AS TIMESTAMP) - INTERVAL '${dateDays}' DAY`);
+        const dateCol = (sortBy === 'open' || sortBy === 'closed')
+          ? 'comment_end_date'
+          : 'COALESCE(date_created, modify_date)';
+        conditions.push(`TRY_CAST(${dateCol} AS TIMESTAMP) >= CAST(NOW() AS TIMESTAMP) - INTERVAL '${dateDays}' DAY`);
       }
 
       // Sort + filter logic
@@ -269,6 +283,9 @@ export function useDuckDBService() {
       } else if (sortBy === 'open') {
         extraCondition = `TRY_CAST(comment_end_date AS TIMESTAMP) > CAST(NOW() AS TIMESTAMP)`;
         orderClause = 'ORDER BY comment_end_date ASC';
+      } else if (sortBy === 'closed') {
+        extraCondition = `TRY_CAST(comment_end_date AS TIMESTAMP) < CAST(NOW() AS TIMESTAMP)`;
+        orderClause = 'ORDER BY comment_end_date DESC';
       } else {
         orderClause = 'ORDER BY modify_date DESC';
       }

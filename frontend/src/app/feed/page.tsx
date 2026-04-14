@@ -28,7 +28,7 @@ function DocketFeed() {
 
   // Filters
   const [selectedAgency, setSelectedAgency] = useState('');
-  const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'open'>(() => {
+  const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'open' | 'closed'>(() => {
     if (typeof window === 'undefined') return 'recent';
     try {
       return (localStorage.getItem('spicy-regs-sort-preference') as any) || 'recent';
@@ -44,6 +44,14 @@ function DocketFeed() {
       return '';
     }
   });
+  const [docketType, setDocketType] = useState<'' | 'rule' | 'nonrule' | 'other'>(() => {
+    if (typeof window === 'undefined') return '';
+    try {
+      return (localStorage.getItem('spicy-regs-type-preference') as any) || '';
+    } catch {
+      return '';
+    }
+  });
 
   // Load dockets (combined with comment counts in a single query)
   const loadDockets = useCallback(async (reset = false) => {
@@ -53,7 +61,7 @@ function DocketFeed() {
       setLoading(true);
       const newOffset = reset ? 0 : offset;
       const { dockets: results, commentCounts: counts } = await getRecentDocketsWithCounts(
-        PAGE_SIZE, newOffset, selectedAgency || undefined, sortBy, dateRange || undefined
+        PAGE_SIZE, newOffset, selectedAgency || undefined, sortBy, dateRange || undefined, docketType || undefined
       );
 
       if (reset) {
@@ -73,7 +81,7 @@ function DocketFeed() {
       setLoading(false);
       setInitialLoading(false);
     }
-  }, [isReady, loading, offset, selectedAgency, sortBy, dateRange, getRecentDocketsWithCounts]);
+  }, [isReady, loading, offset, selectedAgency, sortBy, dateRange, docketType, getRecentDocketsWithCounts]);
 
   // Initial load and filter change
   useEffect(() => {
@@ -81,7 +89,7 @@ function DocketFeed() {
       setInitialLoading(true);
       loadDockets(true);
     }
-  }, [isReady, selectedAgency, sortBy, dateRange]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isReady, selectedAgency, sortBy, dateRange, docketType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Deduplicate
   const uniqueDockets = useMemo(() => {
@@ -105,6 +113,8 @@ function DocketFeed() {
           onSortChange={(s) => { setSortBy(s); }}
           dateRange={dateRange}
           onDateRangeChange={(d) => { setDateRange(d); }}
+          docketType={docketType}
+          onDocketTypeChange={(t) => { setDocketType(t); }}
         />
       </div>
 
@@ -167,19 +177,6 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-[var(--background)]">
       <Header />
       <main className="max-w-3xl mx-auto px-4 py-6">
-        {/* Hero */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-3">
-            <Flame size={28} className="text-[var(--accent-primary)]" />
-            <h1 className="text-3xl font-bold">
-              <span className="gradient-text">Spicy Regs</span>
-            </h1>
-          </div>
-          <p className="text-[var(--muted)] text-sm">
-            Explore federal regulations. Dockets as posts, agencies as communities.
-          </p>
-        </div>
-
         <Suspense
           fallback={
             <div className="flex justify-center py-12">
