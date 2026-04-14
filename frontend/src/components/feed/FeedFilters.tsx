@@ -3,8 +3,10 @@
 import { ChevronDown } from 'lucide-react';
 import {
   DATE_OPTIONS,
+  DOCKET_TYPE_OPTIONS,
   SORT_OPTIONS,
   type DateRange,
+  type DocketType,
   type SortOption,
 } from '@/lib/feedFilters';
 
@@ -15,6 +17,8 @@ interface FeedFiltersProps {
   onSortChange: (sort: SortOption) => void;
   dateRange: DateRange;
   onDateRangeChange: (range: DateRange) => void;
+  docketType: DocketType;
+  onDocketTypeChange: (type: DocketType) => void;
 }
 
 export function FeedFilters({
@@ -22,6 +26,8 @@ export function FeedFilters({
   onSortChange,
   dateRange,
   onDateRangeChange,
+  docketType,
+  onDocketTypeChange,
 }: FeedFiltersProps) {
   return (
     <div className="flex items-center gap-3 flex-wrap">
@@ -35,6 +41,22 @@ export function FeedFilters({
             className="filter-chip appearance-none pr-7 cursor-pointer bg-[var(--surface)] text-[var(--foreground)] border-none focus:outline-none"
           >
             {DATE_OPTIONS.map(opt => (
+              <option key={opt.key} value={opt.key}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Docket Type Dropdown */}
+      <div className="relative">
+        <div className="flex items-center gap-1.5 px-1.5">
+          <ChevronDown size={14} className="text-[var(--muted)] pointer-events-none absolute right-2" />
+          <select
+            value={docketType}
+            onChange={e => onDocketTypeChange(e.target.value as DocketType)}
+            className="filter-chip appearance-none pr-7 cursor-pointer bg-[var(--surface)] text-[var(--foreground)] border-none focus:outline-none"
+          >
+            {DOCKET_TYPE_OPTIONS.map(opt => (
               <option key={opt.key} value={opt.key}>{opt.label}</option>
             ))}
           </select>

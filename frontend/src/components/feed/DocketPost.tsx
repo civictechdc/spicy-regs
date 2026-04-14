@@ -67,9 +67,16 @@ export function DocketPost({
 
   // Comment period — use enriched docket data directly
   const commentEndDate = stripQuotes(item.comment_end_date);
-  const isOpenForComment = commentEndDate
-    ? new Date(commentEndDate) > new Date()
-    : false;
+  const commentEndMs = commentEndDate ? new Date(commentEndDate).getTime() : null;
+  const isOpenForComment = commentEndMs !== null && commentEndMs > Date.now();
+
+  // "Recently closed" = closed within the last 30 days
+  const RECENTLY_CLOSED_DAYS = 30;
+  const daysSinceClosed = commentEndMs !== null
+    ? Math.floor((Date.now() - commentEndMs) / (1000 * 60 * 60 * 24))
+    : null;
+  const isRecentlyClosed =
+    daysSinceClosed !== null && daysSinceClosed >= 0 && daysSinceClosed <= RECENTLY_CLOSED_DAYS;
 
   // Urgency color for comment deadline
   const getDeadlineUrgency = (endDate: string) => {
@@ -152,6 +159,14 @@ export function DocketPost({
                   </span>
                 );
               })()}
+              {!isOpenForComment && isRecentlyClosed && daysSinceClosed !== null && (
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-[var(--surface-elevated)] text-[var(--muted)]"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--muted)]" />
+                  Recently Closed · {daysSinceClosed === 0 ? 'today' : `${daysSinceClosed}d ago`}
+                </span>
+              )}
             </div>
           </div>
         </div>

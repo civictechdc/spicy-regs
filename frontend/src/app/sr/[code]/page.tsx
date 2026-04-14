@@ -13,10 +13,14 @@ import {
   DATE_STORAGE_KEY,
   DEFAULT_DATE,
   DEFAULT_SORT,
+  DEFAULT_TYPE,
   SORT_STORAGE_KEY,
+  TYPE_STORAGE_KEY,
   isDateRange,
+  isDocketType,
   isSortOption,
   type DateRange,
+  type DocketType,
   type SortOption,
 } from '@/lib/feedFilters';
 import { getAgencyInfo } from '@/lib/agencyMetadata';
@@ -53,6 +57,9 @@ function AgencyPageInner() {
   const [dateRange, setDateRange] = useFilterState<DateRange>(
     'date', DATE_STORAGE_KEY, DEFAULT_DATE, isDateRange,
   );
+  const [docketType, setDocketType] = useFilterState<DocketType>(
+    'type', TYPE_STORAGE_KEY, DEFAULT_TYPE, isDocketType,
+  );
 
   // Bookmarks
   const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
@@ -79,7 +86,7 @@ function AgencyPageInner() {
       setLoading(true);
       const newOffset = reset ? 0 : offset;
       const { dockets: results, commentCounts: counts } = await getRecentDocketsWithCounts(
-        PAGE_SIZE, newOffset, agencyCode, sortBy, dateRange || undefined
+        PAGE_SIZE, newOffset, agencyCode, sortBy, dateRange || undefined, docketType || undefined
       );
 
       if (reset) {
@@ -98,14 +105,14 @@ function AgencyPageInner() {
       setLoading(false);
       setInitialLoading(false);
     }
-  }, [isReady, loading, offset, agencyCode, sortBy, dateRange, getRecentDocketsWithCounts]);
+  }, [isReady, loading, offset, agencyCode, sortBy, dateRange, docketType, getRecentDocketsWithCounts]);
 
   useEffect(() => {
     if (isReady && agencyCode) {
       setInitialLoading(true);
       loadDockets(true);
     }
-  }, [isReady, agencyCode, sortBy, dateRange]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isReady, agencyCode, sortBy, dateRange, docketType]); // eslint-disable-line react-hooks/exhaustive-deps
   const uniqueDockets = useMemo(() => {
     const seen = new Set<string>();
     return dockets.filter(d => {
@@ -136,6 +143,8 @@ function AgencyPageInner() {
                 onSortChange={setSortBy}
                 dateRange={dateRange}
                 onDateRangeChange={setDateRange}
+                docketType={docketType}
+                onDocketTypeChange={setDocketType}
               />
             </div>
 
