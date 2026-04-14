@@ -49,3 +49,63 @@ export const DOCKET_TYPE_OPTIONS: { key: DocketType; label: string }[] = [
   { key: 'nonrule', label: 'Non-Rulemaking' },
   { key: 'other', label: 'Other' },
 ];
+
+export type TopicKey = 'environment' | 'health' | 'finance' | 'transport' | 'labor' | 'energy' | 'security' | '';
+
+export interface TopicDefinition {
+  label: string;
+  emoji: string;
+  agencies: string[];
+  keywords: string[];
+}
+
+export const TOPIC_MAPPINGS: Record<Exclude<TopicKey, ''>, TopicDefinition> = {
+  environment: {
+    label: 'Environment',
+    emoji: '🌿',
+    agencies: ['EPA', 'NOAA', 'DOI', 'COE', 'CEQ'],
+    keywords: ['air', 'water', 'climate', 'emission', 'wildlife', 'pollution'],
+  },
+  health: {
+    label: 'Health',
+    emoji: '🏥',
+    agencies: ['FDA', 'CDC', 'CMS', 'HHS', 'AHRQ', 'NIH'],
+    keywords: ['drug', 'medicine', 'health', 'patient', 'hospital', 'vaccine'],
+  },
+  finance: {
+    label: 'Finance',
+    emoji: '💰',
+    agencies: ['SEC', 'CFPB', 'OCC', 'FDIC', 'TREAS', 'IRS', 'FTC'],
+    keywords: ['banking', 'credit', 'tax', 'financial', 'stock', 'audit'],
+  },
+  transport: {
+    label: 'Transport',
+    emoji: '✈️',
+    agencies: ['DOT', 'FAA', 'FHWA', 'FRA', 'NHTSA', 'MARAD', 'TSA'],
+    keywords: ['aviation', 'vehicle', 'highway', 'rail', 'bridge', 'safety'],
+  },
+  labor: {
+    label: 'Labor',
+    emoji: '👷',
+    agencies: ['DOL', 'OSHA', 'EBSA', 'ETA', 'MSHA', 'VETS', 'WHD'],
+    keywords: ['work', 'employee', 'wage', 'safety', 'union', 'pension'],
+  },
+  energy: {
+    label: 'Energy',
+    emoji: '⚡',
+    agencies: ['DOE', 'NRC', 'FERC', 'NNSA', 'BOEM', 'BSEE'],
+    keywords: ['nuclear', 'grid', 'energy', 'oil', 'gas', 'renewable'],
+  },
+  security: {
+    label: 'Security',
+    emoji: '🛡️',
+    agencies: ['DHS', 'CISA', 'DOJ', 'FBI', 'ATF', 'DEA'],
+    keywords: ['threat', 'cyber', 'defense', 'police', 'crime', 'border'],
+  },
+};
+
+export const TOPIC_STORAGE_KEY = 'spicy-regs-topic-preference';
+
+export function isTopicKey(raw: string): raw is TopicKey {
+  return raw === '' || Object.keys(TOPIC_MAPPINGS).includes(raw);
+}
