@@ -6,6 +6,17 @@ import { Header } from '@/components/Header';
 import { DocketPost } from '@/components/feed/DocketPost';
 import { FeedFilters } from '@/components/feed/FeedFilters';
 import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
+import { useFilterState } from '@/lib/hooks/useFilterState';
+import {
+  DATE_STORAGE_KEY,
+  DEFAULT_DATE,
+  DEFAULT_SORT,
+  SORT_STORAGE_KEY,
+  isDateRange,
+  isSortOption,
+  type DateRange,
+  type SortOption,
+} from '@/lib/feedFilters';
 import { Flame, Loader2 } from 'lucide-react';
 
 const PAGE_SIZE = 20;
@@ -28,22 +39,12 @@ function DocketFeed() {
 
   // Filters
   const [selectedAgency, setSelectedAgency] = useState('');
-  const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'open'>(() => {
-    if (typeof window === 'undefined') return 'recent';
-    try {
-      return (localStorage.getItem('spicy-regs-sort-preference') as any) || 'recent';
-    } catch {
-      return 'recent';
-    }
-  });
-  const [dateRange, setDateRange] = useState<'' | '7d' | '30d' | '90d' | '365d'>(() => {
-    if (typeof window === 'undefined') return '';
-    try {
-      return (localStorage.getItem('spicy-regs-date-preference') as any) || '';
-    } catch {
-      return '';
-    }
-  });
+  const [sortBy, setSortBy] = useFilterState<SortOption>(
+    'sort', SORT_STORAGE_KEY, DEFAULT_SORT, isSortOption,
+  );
+  const [dateRange, setDateRange] = useFilterState<DateRange>(
+    'date', DATE_STORAGE_KEY, DEFAULT_DATE, isDateRange,
+  );
 
   // Load dockets (combined with comment counts in a single query)
   const loadDockets = useCallback(async (reset = false) => {
