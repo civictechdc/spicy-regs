@@ -21,3 +21,4 @@ scripts
 docs
 recovery
 .env.local
+.env*.local
