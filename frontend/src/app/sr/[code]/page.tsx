@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, Suspense } from 'react';
 import { useParams } from 'next/navigation';
 import { Virtuoso } from 'react-virtuoso';
 import { Header } from '@/components/Header';
@@ -8,6 +8,17 @@ import { DocketPost } from '@/components/feed/DocketPost';
 import { FeedFilters } from '@/components/feed/FeedFilters';
 import { AgencySidebar } from '@/components/feed/AgencySidebar';
 import { useDuckDBService } from '@/lib/duckdb/useDuckDBService';
+import { useFilterState } from '@/lib/hooks/useFilterState';
+import {
+  DATE_STORAGE_KEY,
+  DEFAULT_DATE,
+  DEFAULT_SORT,
+  SORT_STORAGE_KEY,
+  isDateRange,
+  isSortOption,
+  type DateRange,
+  type SortOption,
+} from '@/lib/feedFilters';
 import { getAgencyInfo } from '@/lib/agencyMetadata';
 import { AgencyAvatar } from '@/components/feed/AgencyAvatar';
 import { Loader2 } from 'lucide-react';
@@ -19,7 +30,7 @@ function stripQuotes(s: any): string {
   return String(s).replace(/^"|"$/g, '');
 }
 
-export default function AgencyPage() {
+function AgencyPageInner() {
   const params = useParams();
   const agencyCode = (params.code as string || '').toUpperCase();
   const agency = useMemo(() => getAgencyInfo(agencyCode), [agencyCode]);
@@ -36,22 +47,12 @@ export default function AgencyPage() {
 
   // Filters (same as feed)
   const [selectedAgency, setSelectedAgency] = useState('');
-  const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'open'>(() => {
-    if (typeof window === 'undefined') return 'recent';
-    try {
-      return (localStorage.getItem('spicy-regs-sort-preference') as any) || 'recent';
-    } catch {
-      return 'recent';
-    }
-  });
-  const [dateRange, setDateRange] = useState<'' | '7d' | '30d' | '90d' | '365d'>(() => {
-    if (typeof window === 'undefined') return '';
-    try {
-      return (localStorage.getItem('spicy-regs-date-preference') as any) || '';
-    } catch {
-      return '';
-    }
-  });
+  const [sortBy, setSortBy] = useFilterState<SortOption>(
+    'sort', SORT_STORAGE_KEY, DEFAULT_SORT, isSortOption,
+  );
+  const [dateRange, setDateRange] = useFilterState<DateRange>(
+    'date', DATE_STORAGE_KEY, DEFAULT_DATE, isDateRange,
+  );
 
   // Bookmarks
   const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
@@ -191,5 +192,22 @@ export default function AgencyPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AgencyPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[var(--background)]">
+          <Header />
+          <div className="flex justify-center py-24">
+            <Loader2 size={32} className="animate-spin text-[var(--accent-primary)]" />
+          </div>
+        </div>
+      }
+    >
+      <AgencyPageInner />
+    </Suspense>
   );
 }
