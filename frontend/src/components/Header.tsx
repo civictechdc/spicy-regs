@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from 'react';
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { Flame, Search } from 'lucide-react';
+import { usePathname } from "next/navigation";
+import { Flame } from 'lucide-react';
+
+import { SearchInput } from "./SearchInput";
 
 const NAV_ITEMS = [
   { href: "/", label: "Home" },
@@ -13,15 +14,6 @@ const NAV_ITEMS = [
 
 export function Header() {
   const pathname = usePathname();
-  const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-    }
-  };
 
   return (
     <header className="border-b border-[var(--border)] bg-[var(--surface)]/80 backdrop-blur-xl sticky top-0 z-50">
@@ -36,21 +28,7 @@ export function Header() {
           </Link>
 
           {/* Search */}
-          <form onSubmit={handleSearch} className="flex-1 max-w-md">
-            <div className="relative">
-              <Search
-                size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]"
-              />
-              <input
-                type="text"
-                placeholder="Search regulations..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-sm bg-[var(--background)] border border-[var(--border)] rounded-full text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:border-[var(--accent-primary)] transition-colors"
-              />
-            </div>
-          </form>
+          <SearchInput className="flex-1 max-w-md" />
 
           {/* Navigation */}
           <nav className="flex items-center gap-0.5">

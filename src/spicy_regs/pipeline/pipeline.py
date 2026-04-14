@@ -26,6 +26,7 @@ from prefect.cache_policies import NO_CACHE
 from prefect.futures import wait
 from prefect.task_runners import ThreadPoolTaskRunner
 
+from spicy_regs.pipeline.build_search_index import build_search_index
 from spicy_regs.pipeline.download_r2 import download_from_r2
 from spicy_regs.pipeline.extract import (
     download_and_parse,
@@ -302,6 +303,12 @@ def build_feed_summary_task(output_dir: Path) -> Path:
     return build_feed_summary(output_dir)
 
 
+@task(name="build-search-index", cache_policy=NO_CACHE)
+def build_search_index_task(output_dir: Path) -> Path:
+    """Build docket_search.json.gz for the in-browser search."""
+    return build_search_index(output_dir)
+
+
 @task(name="partition-comments", cache_policy=NO_CACHE)
 def partition_comments_task(output_dir: Path) -> Path:
     """Partition comments.parquet by agency_code."""
@@ -463,12 +470,18 @@ def pipeline(
         rmtree(staging_dir)
         logger.info("Cleaned up staging directory")
 
-    # --- Step 3b: Build feed summary ---
+    # --- Step 3b: Build feed summary + search index ---
     if skip_post_process:
         logger.info("Skipping feed summary (--skip-post-process)")
     else:
         logger.info("Building feed summary...")
         build_feed_summary_task(output_dir)
+        # Only rebuild the search index when dockets changed — it's a
+        # small computation but the resulting file is uploaded and served
+        # from CDN, so avoid churning it needlessly.
+        if total_rows.get("dockets", 0) > 0:
+            logger.info("Building docket search index...")
+            build_search_index_task(output_dir)
 
     # --- Summary ---
     logger.info("Summary:")
@@ -491,6 +504,11 @@ def pipeline(
         # Upload changed comment partitions + index
         if changed_comment_partitions:
             upload_comment_partitions(output_dir, changed_comment_partitions)
+        # Upload search index (if dockets changed, it was rebuilt above)
+        search_index_path = output_dir / "docket_search.json.gz"
+        if search_index_path.exists() and not skip_post_process:
+            from spicy_regs.pipeline.upload_r2 import upload_to_r2 as _upload_r2
+            _upload_r2(search_index_path)
 
     logger.info("Done!")
 

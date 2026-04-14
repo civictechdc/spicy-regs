@@ -156,40 +156,6 @@ export function useDuckDBService() {
   );
 
   /**
-   * Search across all resource types (capped at 50 results).
-   */
-  const searchResources = useCallback(
-    async (searchQuery: string, agencyCode?: string): Promise<any[]> => {
-      if (!isReady) throw new Error("DuckDB not ready");
-
-      const escapedQuery = searchQuery.replace(/'/g, "''");
-      const upperAgency = agencyCode?.toUpperCase();
-
-      // Build non-comment union queries
-      const nonCommentTables = ["dockets", "documents"] as const;
-      const unionQueries = nonCommentTables.map((table) => {
-        let where = `title ILIKE '%${escapedQuery}%'`;
-        if (upperAgency) where += ` AND agency_code = '${upperAgency}'`;
-        return `SELECT '${table}' as type, title, docket_id, agency_code FROM ${parquetRef(table as RegulationsDataTypes)} WHERE ${where}`;
-      });
-
-      // Add comments query using partition index
-      if (upperAgency) {
-        const commentsSource = await buildCommentsSource(upperAgency);
-        if (commentsSource) {
-          unionQueries.push(`SELECT 'comments' as type, title, docket_id, agency_code FROM ${commentsSource} WHERE title ILIKE '%${escapedQuery}%' AND agency_code = '${upperAgency}'`);
-        }
-      } else {
-        // Without agency filter, skip comment search (too many partitions)
-        // Fall back to searching dockets and documents only
-      }
-
-      return runQuery(unionQueries.join(" UNION ALL ") + " LIMIT 50");
-    },
-    [runQuery, isReady, buildCommentsSource]
-  );
-
-  /**
    * Get list of agencies.
    */
   const getAgencies = useCallback(async (): Promise<string[]> => {
@@ -508,7 +474,6 @@ export function useDuckDBService() {
   return {
     getData,
     getDataCount,
-    searchResources,
     getAgencies,
     getDockets,
     getDocketById,
