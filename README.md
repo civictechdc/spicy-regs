@@ -16,15 +16,8 @@ docker compose up
 ```
 
 - **Frontend:** http://localhost:3000
-- **Search API:** http://localhost:8000
 
-To run only the frontend:
-
-```bash
-docker compose up frontend
-```
-
-Source files are volume-mounted for hot reload — edits to `frontend/src/` and `services/search/` reflect immediately.
+Source files are volume-mounted for hot reload — edits to `frontend/src/` reflect immediately.
 
 ## Contact us
 
