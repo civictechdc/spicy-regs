@@ -1,0 +1,20 @@
+{
+  "name": "spicy-regs-local",
+  "interface": {
+    "displayName": "Local Plugins"
+  },
+  "plugins": [
+    {
+      "name": "spicyregs",
+      "source": {
+        "source": "local",
+        "path": "./plugins/spicyregs"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Research"
+    }
+  ]
+}
