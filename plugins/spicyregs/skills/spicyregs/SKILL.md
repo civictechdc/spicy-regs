@@ -28,6 +28,7 @@ Keep this workflow provider-neutral.
   - `uv run --script plugins/spicyregs/skills/spicyregs/scripts/query_spicy_regs.py --source r2 --list-sources`
   - `uv run --script plugins/spicyregs/skills/spicyregs/scripts/query_spicy_regs.py --source r2 --describe dockets`
   - `uv run --script plugins/spicyregs/skills/spicyregs/scripts/query_spicy_regs.py --source r2 --sql "<SQL>"`
+  - `uv run --script plugins/spicyregs/skills/spicyregs/scripts/find_duplicate_regulations.py --source r2 --limit 20`
 - Optional alternate sources, only when explicitly requested:
   - `uv run --script plugins/spicyregs/skills/spicyregs/scripts/query_spicy_regs.py --source local --list-sources`
 - Reference notes:
@@ -71,6 +72,7 @@ Use the helper script's `--describe` output for the exact schema. In this repo, 
 - Questions about public feedback: query `comments` by `docket_id`, date, or keywords in `title` and `comment`
 - Questions about open comment windows: inspect `documents.comment_start_date` and `documents.comment_end_date`
 - Follow notebook-style access patterns from `notebooks/query_data.ipynb` and `notebooks/cross_docket_analysis.ipynb` when the question spans agencies or dockets.
+- Questions about duplicate or coordinated rulemaking across agencies: use `find_duplicate_regulations.py` first, then verify promising clusters with targeted SQL against `dockets` or `documents`.
 
 Keep result sets small while exploring. Add `LIMIT` unless the user explicitly wants a full export.
 

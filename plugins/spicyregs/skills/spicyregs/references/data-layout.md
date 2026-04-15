@@ -82,3 +82,18 @@ GROUP BY docket_id
 ORDER BY comment_count DESC
 LIMIT 20;
 ```
+
+## Duplicate-detection helper
+
+For cross-agency duplicate or coordinated rulemaking, use:
+
+```bash
+uv run --script plugins/spicyregs/skills/spicyregs/scripts/find_duplicate_regulations.py --source r2 --limit 20
+```
+
+Useful flags:
+
+- `--min-year 2020` to focus on recent activity
+- `--min-agencies 3` to require broader cross-agency overlap
+- `--format json` or `--format csv` for downstream analysis
+- `--include-boilerplate` if you intentionally want administrative repeat families like information collections
