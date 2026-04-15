@@ -17,8 +17,9 @@ node_modules
 lance-data
 .DS_Store
 .claude
-scripts
+./scripts
 docs
 recovery
 .env.local
 .env*.local
+__pycache__
