@@ -27,6 +27,7 @@ jupyter notebook
 |----------|-------------|
 | [query_data.ipynb](query_data.ipynb) | Getting started with querying the data |
 | [data_explorer.ipynb](data_explorer.ipynb) | Schema docs, search utilities, export tools |
+| [search_capabilities.ipynb](search_capabilities.ipynb) | Three no-server layers of search: prebuilt docket index, DuckDB metadata, partition-aware comment full-text |
 
 ### Analysis Tracks
 
