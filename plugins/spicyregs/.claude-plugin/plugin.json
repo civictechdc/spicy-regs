@@ -1,0 +1,20 @@
+{
+  "name": "spicyregs",
+  "version": "0.1.0",
+  "description": "Query Spicy Regs regulatory datasets with DuckDB against the public Cloudflare R2 bucket.",
+  "author": {
+    "name": "Civic Tech DC",
+    "email": "opensource@civictechdc.org",
+    "url": "https://github.com/civictechdc/spicy-regs"
+  },
+  "homepage": "https://github.com/civictechdc/spicy-regs",
+  "repository": "https://github.com/civictechdc/spicy-regs",
+  "license": "MIT",
+  "keywords": [
+    "regulations",
+    "regulatory-data",
+    "duckdb",
+    "polars",
+    "spicy-regs"
+  ]
+}
