@@ -1,6 +1,6 @@
 # ETL Pipeline
 
-Converts Mirrulations S3 JSON data to Parquet files on Cloudflare R2.
+Converts Mirrulations S3 JSON and Federal Register API data to Parquet files on Cloudflare R2.
 
 ```text
 Step 1 (parallel)            Step 2                Step 3        Step 4         Step 5
@@ -44,6 +44,18 @@ uv run etl --skip-comments --output-dir ./output   # Dockets & documents only
 uv run etl --only-comments --output-dir ./output   # Comments only
 ```
 
+### Federal Register data
+```bash
+# Backfill 2000 → present (the default fr-since-year). ~1.5–2M docs.
+uv run etl --only-fr --output-dir ./output
+
+# Smoke test: one year only, no upload.
+uv run etl --only-fr --fr-since-year=2024 --fr-until-year=2024 --skip-upload --output-dir ./output
+
+# Skip Federal Register on a normal Mirrulations run.
+uv run etl --skip-fr --output-dir ./output
+```
+
 ### Batched processing
 ```bash
 uv run etl --batch-number 0 --batch-size 45 --output-dir ./output  # First 45 agencies
@@ -70,6 +82,11 @@ uv run etl --merge-only --output-dir ./output
 | `--merge-only` | Only merge staging files |
 | `--upload-only` | Only upload to R2 |
 | `--partition-only` | Partition comments by agency and upload |
+| `--skip-fr` | Skip the Federal Register fetch |
+| `--only-fr` | Only fetch Federal Register data |
+| `--fr-since-year YYYY` | Federal Register backfill start year (default: 2000) |
+| `--fr-until-year YYYY` | Federal Register backfill end year, inclusive (default: current year) |
+| `--fr-workers N` | Concurrent month-fetch workers for the FR API (default: 4) |
 
 ## Data Schema
 
@@ -115,6 +132,33 @@ All columns are stored as strings (`large_string` in PyArrow).
 | `modify_date` | Last modification date |
 | `receive_date` | Date received |
 
+### Federal Register (~1.5–2M rows for 2000 → present)
+
+Sourced directly from the [Federal Register API v1](https://www.federalregister.gov/developers/api/v1) by calendar month. Manifest keys are namespaced as `fr:{document_number}` to coexist with Mirrulations S3 keys in the shared bloom filter.
+
+| Column | Description |
+|---|---|
+| `document_number` | FR document number, e.g. `2024-12345` (primary key) |
+| `title` | Document title |
+| `abstract` | Document abstract |
+| `document_type` | `Rule` / `Proposed Rule` / `Notice` / `Presidential Document` |
+| `publication_date` | Date published in the Federal Register (YYYY-MM-DD) |
+| `effective_on` | Effective date, if present |
+| `comments_close_on` | Public comment close date (proposed rules) |
+| `signing_date` | Signing date (presidential documents) |
+| `agencies_json` | JSON array of full agency objects (`slug`, `name`, `id`, `parent_id`, ...) |
+| `agency_slugs` | Comma-joined agency slugs for cheap filtering |
+| `docket_ids_json` | JSON array of regulations.gov docket IDs (join key to `dockets.parquet`) |
+| `regulation_id_numbers_json` | JSON array of RIN numbers |
+| `cfr_references_json` | JSON array of `{title, part, chapter}` CFR references |
+| `html_url` | federalregister.gov landing page |
+| `pdf_url` | Original PDF URL |
+| `body_html_url` | Rendered HTML body URL |
+| `volume`, `start_page`, `end_page` | FR volume + page range (stored as strings) |
+| `subtype` | Secondary classification, e.g. `Executive Order`, `Memorandum`, `Proclamation` (mostly populated for presidential documents) |
+| `executive_order_number` | EO number, if applicable |
+| `modify_date` | Mirrors `publication_date` so the dedup query keeps the latest version |
+
 ## Output Structure on R2
 
 ```
@@ -126,7 +170,10 @@ s3://spicy-regs/
 │   ├── agency_code=EPA/part-0.parquet
 │   ├── agency_code=FDA/part-0.parquet
 │   └── ...
-├── manifest.parquet                          # Tracks processed S3 keys
+├── federal_register.parquet                  # Single file, sorted by document_number; from federalregister.gov/api/v1
+├── federal_register_search.json.gz           # Client-side MiniSearch payload for FR docs
+├── docket_search.json.gz                     # Client-side MiniSearch payload for dockets
+├── manifest.parquet                          # Tracks processed S3 keys + fr:{document_number} keys
 ├── statistics.json                           # Pre-computed analytics
 ├── campaigns.json
 ├── organizations.json

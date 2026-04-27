@@ -26,8 +26,10 @@ from prefect.cache_policies import NO_CACHE
 from prefect.futures import wait
 from prefect.task_runners import ThreadPoolTaskRunner
 
+from spicy_regs.pipeline.build_fr_search_index import build_fr_search_index
 from spicy_regs.pipeline.build_search_index import build_search_index
 from spicy_regs.pipeline.download_r2 import download_from_r2
+from spicy_regs.pipeline.federal_register import _extract_fr, fetch_federal_register
 from spicy_regs.pipeline.extract import (
     download_and_parse,
     download_existing_parquet,
@@ -113,6 +115,7 @@ DEDUP_KEYS: dict[str, str] = {
     "dockets": "docket_id",
     "documents": "document_id",
     "comments": "comment_id",
+    "federal_register": "document_number",
 }
 
 
@@ -178,6 +181,37 @@ DATA_TYPES = {
             "attachments_json": pl.Utf8,
         },
         "extract": _extract_comment,
+    },
+    "federal_register": {
+        # Not S3-based — fetched directly from the Federal Register API.
+        "path_pattern": None,
+        "schema": {
+            "document_number": pl.Utf8,
+            "title": pl.Utf8,
+            "abstract": pl.Utf8,
+            "document_type": pl.Utf8,
+            "publication_date": pl.Utf8,
+            "effective_on": pl.Utf8,
+            "comments_close_on": pl.Utf8,
+            "signing_date": pl.Utf8,
+            "agencies_json": pl.Utf8,
+            "agency_slugs": pl.Utf8,
+            "docket_ids_json": pl.Utf8,
+            "regulation_id_numbers_json": pl.Utf8,
+            "cfr_references_json": pl.Utf8,
+            "html_url": pl.Utf8,
+            "pdf_url": pl.Utf8,
+            "body_html_url": pl.Utf8,
+            "volume": pl.Utf8,
+            "start_page": pl.Utf8,
+            "end_page": pl.Utf8,
+            "subtype": pl.Utf8,
+            "executive_order_number": pl.Utf8,
+            # Mirrors publication_date so the merge_staging_files dedup
+            # query (ORDER BY modify_date DESC) keeps the latest version.
+            "modify_date": pl.Utf8,
+        },
+        "extract": _extract_fr,
     },
 }
 
@@ -309,6 +343,30 @@ def build_search_index_task(output_dir: Path) -> Path:
     return build_search_index(output_dir)
 
 
+@task(name="build-fr-search-index", cache_policy=NO_CACHE)
+def build_fr_search_index_task(output_dir: Path) -> Path:
+    """Build federal_register_search.json.gz for the in-browser FR search."""
+    return build_fr_search_index(output_dir)
+
+
+@task(name="process-federal-register", cache_policy=NO_CACHE)
+def process_federal_register(
+    staging_dir: Path,
+    since_year: int,
+    until_year: int | None = None,
+    max_workers: int = 4,
+) -> tuple[int, list[str]]:
+    """Fetch Federal Register publications and write staging parquet."""
+    return fetch_federal_register(
+        staging_dir=staging_dir,
+        processed_keys=PROCESSED_KEYS,
+        schema=DATA_TYPES["federal_register"]["schema"],
+        since_year=since_year,
+        until_year=until_year,
+        max_workers=max_workers,
+    )
+
+
 @task(name="partition-comments", cache_policy=NO_CACHE)
 def partition_comments_task(output_dir: Path) -> Path:
     """Partition comments.parquet by agency_code."""
@@ -341,6 +399,11 @@ def pipeline(
     partition_only: Annotated[bool, Parameter(help="Only partition comments by agency and upload")] = False,
     skip_post_process: Annotated[bool, Parameter(help="Skip feed summary + comment partitioning (for intermediate batches)")] = False,
     since_year: Annotated[int | None, Parameter(help="Only process dockets from this year onward (e.g. 2025)")] = None,
+    skip_fr: Annotated[bool, Parameter(help="Skip Federal Register fetch")] = False,
+    only_fr: Annotated[bool, Parameter(help="Only fetch Federal Register data")] = False,
+    fr_since_year: Annotated[int, Parameter(help="Federal Register backfill start year")] = 2000,
+    fr_until_year: Annotated[int | None, Parameter(help="Federal Register backfill end year (inclusive); defaults to current year")] = None,
+    fr_workers: Annotated[int, Parameter(help="Concurrent month-fetch workers for Federal Register API")] = 4,
 ) -> None:
     """Mirrulations S3 → Parquet on R2."""
 
@@ -355,12 +418,25 @@ def pipeline(
     logger.info("Output directory: {}", output_dir)
     logger.info("Staging directory: {}", staging_dir)
 
-    # Determine which data types to process
-    data_type_names: list[str] = list(DATA_TYPES.keys())
-    if skip_comments:
-        data_type_names = [dt for dt in DATA_TYPES if dt != "comments"]
+    # Determine which data types to process.
+    #
+    # "federal_register" is a peer in DATA_TYPES (so it flows through merge
+    # / upload uniformly), but it's fetched via its own non-agency-scoped
+    # task.  `agency_data_types` controls the per-agency Mirrulations loop;
+    # `data_type_names` covers everything for downstream merge/upload.
+    if only_fr:
+        data_type_names = ["federal_register"]
     elif only_comments:
-        data_type_names = [dt for dt in DATA_TYPES if dt == "comments"]
+        data_type_names = ["comments"]
+    else:
+        data_type_names = [dt for dt in DATA_TYPES]
+        if skip_comments:
+            data_type_names = [dt for dt in data_type_names if dt != "comments"]
+        if skip_fr:
+            data_type_names = [dt for dt in data_type_names if dt != "federal_register"]
+
+    agency_data_types = [dt for dt in data_type_names if dt != "federal_register"]
+    fetch_fr = "federal_register" in data_type_names
 
     # Partition-only mode
     if partition_only:
@@ -374,6 +450,12 @@ def pipeline(
     if upload_only:
         logger.info("Upload-only mode - uploading to R2...")
         upload_to_r2_task(output_dir, data_type_names)
+        # Also push any pre-built search indexes that exist on disk.
+        from spicy_regs.pipeline.upload_r2 import upload_to_r2 as _upload_r2
+        for search_file in ("docket_search.json.gz", "federal_register_search.json.gz"):
+            p = output_dir / search_file
+            if p.exists():
+                _upload_r2(p)
         logger.info("Upload complete!")
         return
 
@@ -398,14 +480,17 @@ def pipeline(
         download_types = [dt for dt in data_type_names if dt != "comments"]
         parquet_future = download_existing_parquet.submit(output_dir, download_types)
 
-    if agency is not None:
-        agencies = [agency]
-    elif (agencies_env := getenv("AGENCIES")) is not None:
-        agencies = agencies_env.split(",")
-    else:
-        agencies_future = get_agencies.submit(S3_CLIENT, MIRRULATIONS_BUCKET, PREFIX)
-        agencies = agencies_future.result()
-        logger.info("Found {} agencies", len(agencies))
+    # Agency discovery is only needed for the per-agency Mirrulations loop.
+    agencies: list[str] = []
+    if agency_data_types:
+        if agency is not None:
+            agencies = [agency]
+        elif (agencies_env := getenv("AGENCIES")) is not None:
+            agencies = agencies_env.split(",")
+        else:
+            agencies_future = get_agencies.submit(S3_CLIENT, MIRRULATIONS_BUCKET, PREFIX)
+            agencies = agencies_future.result()
+            logger.info("Found {} agencies", len(agencies))
 
     if not full_refresh:
         manifest_future.wait()
@@ -417,8 +502,8 @@ def pipeline(
             if not index_path.exists():
                 download_from_r2("comments_index.parquet", index_path)
 
-    # Batch filtering
-    if batch_number is not None:
+    # Batch filtering (Mirrulations agencies only).
+    if batch_number is not None and agencies:
         start_idx = batch_number * batch_size
         end_idx = start_idx + batch_size
         agencies = agencies[start_idx:end_idx]
@@ -430,27 +515,41 @@ def pipeline(
             len(agencies),
         )
 
-    if not agencies:
-        logger.warning("No agencies to process!")
+    if not agencies and not fetch_fr:
+        logger.warning("Nothing to process!")
         return
 
-    logger.info("Processing {} agencies", len(agencies))
     start_time = datetime.now(timezone.utc)
-
-    # --- Step 2: Process each agency ---
-    futures = [
-        process_agency.submit(a, staging_dir, data_type_names, verbose, since_year)
-        for a in agencies
-    ]
-
-    wait(futures)
-
     total_rows: dict[str, int] = {dt: 0 for dt in DATA_TYPES}
+
+    # --- Step 2a: Federal Register fetch (independent of Mirrulations agencies) ---
+    fr_future = None
+    if fetch_fr:
+        logger.info("Submitting Federal Register fetch task...")
+        fr_future = process_federal_register.submit(
+            staging_dir, fr_since_year, fr_until_year, fr_workers,
+        )
+
+    # --- Step 2b: Process each Mirrulations agency ---
+    futures = []
+    if agencies and agency_data_types:
+        logger.info("Processing {} agencies", len(agencies))
+        futures = [
+            process_agency.submit(a, staging_dir, agency_data_types, verbose, since_year)
+            for a in agencies
+        ]
+        wait(futures)
+
     for future in futures:
         results, new_keys = future.result()
         for dt, count in results.items():
             total_rows[dt] += count
         NEW_KEYS.update(new_keys)
+
+    if fr_future is not None:
+        fr_rows, fr_keys = fr_future.result()
+        total_rows["federal_register"] = fr_rows
+        NEW_KEYS.update(fr_keys)
 
     # --- Step 3: Merge staging into final Parquet ---
     changed_comment_partitions: list[Path] = []
@@ -470,18 +569,24 @@ def pipeline(
         rmtree(staging_dir)
         logger.info("Cleaned up staging directory")
 
-    # --- Step 3b: Build feed summary + search index ---
+    # --- Step 3b: Build feed summary + search indexes ---
     if skip_post_process:
         logger.info("Skipping feed summary (--skip-post-process)")
     else:
-        logger.info("Building feed summary...")
-        build_feed_summary_task(output_dir)
+        # feed_summary depends on dockets/documents/comments; skip it when
+        # only Federal Register data was processed.
+        if (output_dir / "dockets.parquet").exists():
+            logger.info("Building feed summary...")
+            build_feed_summary_task(output_dir)
         # Only rebuild the search index when dockets changed — it's a
         # small computation but the resulting file is uploaded and served
         # from CDN, so avoid churning it needlessly.
         if total_rows.get("dockets", 0) > 0:
             logger.info("Building docket search index...")
             build_search_index_task(output_dir)
+        if total_rows.get("federal_register", 0) > 0:
+            logger.info("Building Federal Register search index...")
+            build_fr_search_index_task(output_dir)
 
     # --- Summary ---
     logger.info("Summary:")
@@ -498,17 +603,20 @@ def pipeline(
     # --- Step 5: Upload to R2 ---
     if skip_upload is False:
         logger.info("Uploading to R2...")
-        # Upload dockets/documents/manifest/feed_summary (skip monolithic comments)
+        # Upload dockets/documents/federal_register/manifest/feed_summary
+        # (skip monolithic comments — those go via partitions)
         upload_types = [dt for dt in data_type_names if dt != "comments"]
         upload_to_r2_task(output_dir, upload_types)
         # Upload changed comment partitions + index
         if changed_comment_partitions:
             upload_comment_partitions(output_dir, changed_comment_partitions)
-        # Upload search index (if dockets changed, it was rebuilt above)
-        search_index_path = output_dir / "docket_search.json.gz"
-        if search_index_path.exists() and not skip_post_process:
+        # Upload search indexes (rebuilt above when their source changed).
+        if not skip_post_process:
             from spicy_regs.pipeline.upload_r2 import upload_to_r2 as _upload_r2
-            _upload_r2(search_index_path)
+            for search_file in ("docket_search.json.gz", "federal_register_search.json.gz"):
+                p = output_dir / search_file
+                if p.exists():
+                    _upload_r2(p)
 
     logger.info("Done!")
 

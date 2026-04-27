@@ -9,8 +9,9 @@ All notebooks query Parquet files hosted on Cloudflare R2:
 - **dockets.parquet** - 346K+ regulatory dockets
 - **documents.parquet** - 2M+ documents
 - **comments.parquet** - 24M+ public comments
+- **federal_register.parquet** - ~793K Federal Register publications since 2000 (Rules, Proposed Rules, Notices, Presidential Documents)
 
-Data is sourced from the [Mirrulations](https://github.com/MoravianUniversity/mirrulations) project.
+Mirrulations data (dockets/documents/comments) comes from the [Mirrulations](https://github.com/MoravianUniversity/mirrulations) project. Federal Register data comes directly from [federalregister.gov's API](https://www.federalregister.gov/developers/api/v1).
 
 ## Setup
 
@@ -28,6 +29,7 @@ jupyter notebook
 | [query_data.ipynb](query_data.ipynb) | Getting started with querying the data |
 | [data_explorer.ipynb](data_explorer.ipynb) | Schema docs, search utilities, export tools |
 | [search_capabilities.ipynb](search_capabilities.ipynb) | Three no-server layers of search: prebuilt docket index, DuckDB metadata, partition-aware comment full-text |
+| [federal_register.ipynb](federal_register.ipynb) | Tour of `federal_register.parquet` — basic queries, executive orders, joining FR documents to regulations.gov dockets and comment counts |
 
 ### Analysis Tracks
 
