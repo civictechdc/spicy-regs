@@ -15,6 +15,7 @@ dependencies = [
     "prefect",
     "cyclopts",
     "loguru",
+    "mcp>=1.10.0",
 ]
 
 [project.optional-dependencies]
@@ -39,6 +40,7 @@ dev = [
 etl = "spicy_regs.pipeline.pipeline:app"
 embed = "spicy_regs.vectordb.embed:main"
 spicy-regs = "spicy_regs.cli:main"
+spicy-regs-mcp = "spicy_regs.mcp_server:main"
 
 [build-system]
 requires = ["uv_build"]

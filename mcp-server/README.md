@@ -6,8 +6,19 @@ MCP-compatible client — Claude.ai, Claude Code, Cursor, etc. — without
 requiring a local Python install.
 
 Under the hood it runs DuckDB queries against the public Cloudflare R2 parquet
-bucket (`pub-5fc11ad134984edf8d9af452dd1849d6.r2.dev`) and is deployed as a
-Vercel Python serverless function.
+bucket (`pub-5fc11ad134984edf8d9af452dd1849d6.r2.dev`). Two transports are
+shipped:
+
+- **Streamable HTTP** — this directory, deployed as a Vercel Python
+  serverless function. Use for claude.ai, web clients, anything remote.
+- **Stdio (`uvx`)** — via the `spicy-regs-mcp` console script declared in
+  the repo's root `pyproject.toml`. Use for Claude Code, Cursor, Continue,
+  any client that can spawn a local process. No deploy needed.
+
+The canonical FastMCP implementation lives in `src/spicy_regs/mcp_server.py`
+and powers the stdio entry point. This Vercel function keeps its own copy of
+the tool surface so it can deploy without pulling in the parent package's
+ETL dependencies (boto3, polars, prefect, ...) — keep the two in sync.
 
 ## Tools exposed
 
@@ -55,12 +66,27 @@ Requires Pro, Max, Team, or Enterprise.
 
 ## Install in Claude Code
 
+Two transports work. Pick one.
+
+**Remote HTTP (after deploying this directory to Vercel):**
+
 ```bash
 claude mcp add --transport http spicy-regs https://<your-vercel-deploy>.vercel.app/mcp
 ```
 
-Then in any session, the `list_sources`, `describe_table`, and `query_sql`
-tools will be available. Pairs well with the `spicyregs` skill from this
+**Local stdio via `uvx` (no deploy needed):**
+
+```bash
+claude mcp add spicy-regs -- uvx --from "spicy-regs @ git+https://github.com/civictechdc/spicy-regs" spicy-regs-mcp
+```
+
+The `spicy-regs-mcp` console script is declared in the repo's root
+`pyproject.toml` and runs `spicy_regs.mcp_server:main`, which serves the same
+three tools over stdio. Once the package is published to PyPI you can drop the
+`--from` flag: `uvx spicy-regs-mcp`.
+
+Either way, the `list_sources`, `describe_table`, and `query_sql` tools become
+available in any session. Pairs well with the `spicyregs` skill from this
 repo, which adds workflow guidance on top of the raw tools.
 
 ## Local development
