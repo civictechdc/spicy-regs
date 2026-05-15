@@ -22,7 +22,7 @@ from difflib import SequenceMatcher
 from itertools import combinations
 from pathlib import Path
 
-R2_BASE_URL = "https://pub-5fc11ad134984edf8d9af452dd1849d6.r2.dev"
+R2_BASE_URL = "https://r2.spicy-regs.dev"
 
 STOPWORDS = {
     "a",
