@@ -1,58 +1,95 @@
-"""Spicy Regs MCP server.
+"""Spicy Regs MCP server (Vercel ASGI handler).
 
-Exposes the Spicy Regs regulatory dataset to MCP-compatible clients (Claude.ai
-Custom Connectors, Claude Code, Cursor, etc.) by running DuckDB queries against
-the public Cloudflare R2 parquet bucket.
-
-The handler is an ASGI app and is deployed as a Vercel Python serverless
-function. See ../README.md for deploy and install instructions.
+Parallel copy of ``src/spicy_regs/mcp_server.py`` so the Vercel deploy can ship
+without pulling in the parent package's ETL dependencies. The two must keep
+the same tool surface (names, parameters, behavior); the test at
+``tests/test_mcp_server.py::test_vercel_copy_in_sync`` asserts that.
 """
 
 from __future__ import annotations
 
 import os
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 from typing import Any
+from urllib.parse import urlparse
+from uuid import UUID
 
+import duckdb
 from mcp.server.fastmcp import FastMCP
 
-R2_BASE_URL = os.environ.get(
-    "SPICY_REGS_R2_URL",
-    "https://pub-5fc11ad134984edf8d9af452dd1849d6.r2.dev",
-).rstrip("/")
-
+DEFAULT_R2_BASE_URL = "https://pub-5fc11ad134984edf8d9af452dd1849d6.r2.dev"
 TABLES = ("dockets", "documents", "comments", "comments_index", "feed_summary")
+STATEMENT_TIMEOUT = os.environ.get("SPICY_REGS_STATEMENT_TIMEOUT", "30s")
 
-mcp = FastMCP(
-    "spicy-regs",
-    instructions=(
-        "Query the Spicy Regs regulatory dataset (regulations.gov mirror) over "
-        "the public Cloudflare R2 parquet bucket. Use list_sources to discover "
-        "tables, describe_table for schemas, and query_sql for everything else. "
-        "Always LIMIT result sets while exploring. Cite docket IDs, document "
-        "IDs, comment IDs, agency codes, and dates from the rows you return."
-    ),
-    stateless_http=True,
-    streamable_http_path="/mcp",
+INSTRUCTIONS = (
+    "Query the Spicy Regs regulatory dataset (regulations.gov mirror) over "
+    "the public Cloudflare R2 parquet bucket. Use list_sources to discover "
+    "tables, describe_table for schemas, and query_sql for everything else. "
+    "Always LIMIT result sets while exploring. Cite docket IDs, document "
+    "IDs, comment IDs, agency codes, and dates from the rows you return."
 )
 
 
-def _escape_sql_string(value: str) -> str:
-    return value.replace("'", "''")
+def _resolve_r2_base_url() -> str:
+    raw = os.environ.get("SPICY_REGS_R2_URL", DEFAULT_R2_BASE_URL).rstrip("/")
+    parsed = urlparse(raw)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise RuntimeError(
+            f"SPICY_REGS_R2_URL must be an https:// URL, got: {raw!r}"
+        )
+    if any(c in raw for c in ("'", "\\", "\x00", "\n", "\r")):
+        raise RuntimeError(f"SPICY_REGS_R2_URL contains illegal characters: {raw!r}")
+    return raw
 
 
-def _connect():
-    import duckdb
+R2_BASE_URL = _resolve_r2_base_url()
 
+
+def _jsonify(value: Any) -> Any:
+    """Coerce DuckDB row values into JSON-serializable forms."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, (datetime, date, time)):
+        return value.isoformat()
+    if isinstance(value, timedelta):
+        return value.total_seconds()
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        return bytes(value).hex()
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return [_jsonify(v) for v in value]
+    if isinstance(value, dict):
+        return {str(k): _jsonify(v) for k, v in value.items()}
+    return str(value)
+
+
+def _connect() -> duckdb.DuckDBPyConnection:
     con = duckdb.connect()
-    con.execute("SET preserve_insertion_order=false")
     con.execute("INSTALL httpfs")
     con.execute("LOAD httpfs")
+    con.execute("SET preserve_insertion_order=false")
+    con.execute("SET autoinstall_known_extensions=false")
+    con.execute("SET autoload_known_extensions=false")
+    con.execute("SET allow_unsigned_extensions=false")
+    con.execute("SET disabled_filesystems='LocalFileSystem'")
+    con.execute(f"SET statement_timeout='{STATEMENT_TIMEOUT}'")
+    con.execute("SET lock_configuration=true")
     for name in TABLES:
         url = f"{R2_BASE_URL}/{name}.parquet"
-        con.execute(
-            f"CREATE VIEW {name} AS SELECT * FROM read_parquet('{_escape_sql_string(url)}')"
-        )
+        con.execute(f"CREATE VIEW {name} AS SELECT * FROM read_parquet('{url}')")
     return con
+
+
+mcp = FastMCP(
+    "spicy-regs",
+    instructions=INSTRUCTIONS,
+    stateless_http=True,
+    streamable_http_path="/mcp",
+)
 
 
 @mcp.tool()
@@ -109,8 +146,7 @@ def query_sql(sql: str, max_rows: int = 25) -> dict[str, Any]:
     columns = [desc[0] for desc in cursor.description] if cursor.description else []
     rows = cursor.fetchmany(max_rows)
     result_rows = [
-        {col: (val if not hasattr(val, "isoformat") else val.isoformat()) for col, val in zip(columns, row)}
-        for row in rows
+        {col: _jsonify(val) for col, val in zip(columns, row)} for row in rows
     ]
     return {
         "source": "r2",

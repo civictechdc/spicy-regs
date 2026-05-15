@@ -9,22 +9,25 @@ Canonical FastMCP server implementation. Exposed two ways:
 
 The Vercel function at ``mcp-server/api/index.py`` keeps a parallel copy so it
 can deploy without pulling in the parent package's ETL dependencies. Keep the
-tool surface (names, parameters, behavior) in sync between the two files.
+tool surface (names, parameters, behavior) in sync between the two files;
+``tests/test_mcp_server.py::test_vercel_copy_in_sync`` enforces this.
 """
 
 from __future__ import annotations
 
 import os
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 from typing import Any
+from urllib.parse import urlparse
+from uuid import UUID
 
+import duckdb
 from mcp.server.fastmcp import FastMCP
 
-R2_BASE_URL = os.environ.get(
-    "SPICY_REGS_R2_URL",
-    "https://pub-5fc11ad134984edf8d9af452dd1849d6.r2.dev",
-).rstrip("/")
-
+DEFAULT_R2_BASE_URL = "https://pub-5fc11ad134984edf8d9af452dd1849d6.r2.dev"
 TABLES = ("dockets", "documents", "comments", "comments_index", "feed_summary")
+STATEMENT_TIMEOUT = os.environ.get("SPICY_REGS_STATEMENT_TIMEOUT", "30s")
 
 INSTRUCTIONS = (
     "Query the Spicy Regs regulatory dataset (regulations.gov mirror) over "
@@ -35,22 +38,56 @@ INSTRUCTIONS = (
 )
 
 
-def _escape_sql_string(value: str) -> str:
-    return value.replace("'", "''")
+def _resolve_r2_base_url() -> str:
+    raw = os.environ.get("SPICY_REGS_R2_URL", DEFAULT_R2_BASE_URL).rstrip("/")
+    parsed = urlparse(raw)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise RuntimeError(
+            f"SPICY_REGS_R2_URL must be an https:// URL, got: {raw!r}"
+        )
+    if any(c in raw for c in ("'", "\\", "\x00", "\n", "\r")):
+        raise RuntimeError(f"SPICY_REGS_R2_URL contains illegal characters: {raw!r}")
+    return raw
 
 
-def _connect():
-    import duckdb
+R2_BASE_URL = _resolve_r2_base_url()
 
+
+def _jsonify(value: Any) -> Any:
+    """Coerce DuckDB row values into JSON-serializable forms."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, (datetime, date, time)):
+        return value.isoformat()
+    if isinstance(value, timedelta):
+        return value.total_seconds()
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        return bytes(value).hex()
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return [_jsonify(v) for v in value]
+    if isinstance(value, dict):
+        return {str(k): _jsonify(v) for k, v in value.items()}
+    return str(value)
+
+
+def _connect() -> duckdb.DuckDBPyConnection:
     con = duckdb.connect()
-    con.execute("SET preserve_insertion_order=false")
     con.execute("INSTALL httpfs")
     con.execute("LOAD httpfs")
+    con.execute("SET preserve_insertion_order=false")
+    con.execute("SET autoinstall_known_extensions=false")
+    con.execute("SET autoload_known_extensions=false")
+    con.execute("SET allow_unsigned_extensions=false")
+    con.execute("SET disabled_filesystems='LocalFileSystem'")
+    con.execute(f"SET statement_timeout='{STATEMENT_TIMEOUT}'")
+    con.execute("SET lock_configuration=true")
     for name in TABLES:
         url = f"{R2_BASE_URL}/{name}.parquet"
-        con.execute(
-            f"CREATE VIEW {name} AS SELECT * FROM read_parquet('{_escape_sql_string(url)}')"
-        )
+        con.execute(f"CREATE VIEW {name} AS SELECT * FROM read_parquet('{url}')")
     return con
 
 
@@ -107,8 +144,7 @@ def _register_tools(mcp: FastMCP) -> None:
         columns = [desc[0] for desc in cursor.description] if cursor.description else []
         rows = cursor.fetchmany(max_rows)
         result_rows = [
-            {col: (val if not hasattr(val, "isoformat") else val.isoformat()) for col, val in zip(columns, row)}
-            for row in rows
+            {col: _jsonify(val) for col, val in zip(columns, row)} for row in rows
         ]
         return {
             "source": "r2",
@@ -120,20 +156,23 @@ def _register_tools(mcp: FastMCP) -> None:
         }
 
 
-def build_server(*, stateless_http: bool = True, streamable_http_path: str = "/mcp") -> FastMCP:
-    mcp = FastMCP(
-        "spicy-regs",
-        instructions=INSTRUCTIONS,
-        stateless_http=stateless_http,
-        streamable_http_path=streamable_http_path,
-    )
+def build_server() -> FastMCP:
+    """Construct a FastMCP server with the Spicy Regs tools registered."""
+    mcp = FastMCP("spicy-regs", instructions=INSTRUCTIONS)
     _register_tools(mcp)
     return mcp
 
 
 def build_app():
-    """ASGI app for Streamable HTTP transport."""
-    return build_server().streamable_http_app()
+    """ASGI app for Streamable HTTP transport (used by the Vercel function)."""
+    mcp = FastMCP(
+        "spicy-regs",
+        instructions=INSTRUCTIONS,
+        stateless_http=True,
+        streamable_http_path="/mcp",
+    )
+    _register_tools(mcp)
+    return mcp.streamable_http_app()
 
 
 def main() -> None:
