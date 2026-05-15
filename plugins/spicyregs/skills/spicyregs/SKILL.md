@@ -29,6 +29,9 @@ Keep this workflow provider-neutral.
   - `uv run --script plugins/spicyregs/skills/spicyregs/scripts/query_spicy_regs.py --source r2 --describe dockets`
   - `uv run --script plugins/spicyregs/skills/spicyregs/scripts/query_spicy_regs.py --source r2 --sql "<SQL>"`
   - `uv run --script plugins/spicyregs/skills/spicyregs/scripts/find_duplicate_regulations.py --source r2 --limit 20`
+- Remote MCP equivalent (when running without a local Python toolchain, e.g. claude.ai):
+  - `list_sources`, `describe_table`, `query_sql` tools exposed by the Spicy Regs MCP server in `mcp-server/`.
+  - Prefer the MCP tools when the skill is loaded in a chat surface that has the connector attached; prefer the `uv` scripts when running locally where they're faster and cover the duplicate-finder workflow.
 - Optional alternate sources, only when explicitly requested:
   - `uv run --script plugins/spicyregs/skills/spicyregs/scripts/query_spicy_regs.py --source local --list-sources`
 - Reference notes:
