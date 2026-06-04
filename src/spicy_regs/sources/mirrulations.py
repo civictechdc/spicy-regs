@@ -8,12 +8,37 @@ year-filtering, and dedup against already-processed keys are delegated to
 ``download_and_parse``.
 """
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import Any
 
-from spicy_regs.pipeline.extract import download_and_parse, list_json_files
+import boto3
+from botocore import UNSIGNED
+from botocore.config import Config as BotoConfig
+
+from spicy_regs.pipeline.extract import download_and_parse, get_agencies, list_json_files
 from spicy_regs.schemas import RecordType
 from spicy_regs.sources.base import Reader
+
+# Connection details for the public Mirrulations mirror live with the source
+# that uses them, not in the pipeline.
+BUCKET = "mirrulations"
+PREFIX = "raw-data"
+
+
+def s3_resource() -> Any:
+    """A fresh anonymous S3 resource (one per worker keeps threads independent)."""
+    return boto3.resource("s3", region_name="us-east-1", config=BotoConfig(signature_version=UNSIGNED))
+
+
+def s3_client() -> Any:
+    """Anonymous S3 client (used only for agency discovery)."""
+    return boto3.client("s3", region_name="us-east-1", config=BotoConfig(signature_version=UNSIGNED))
+
+
+def discover_agencies() -> list[str]:
+    """List every agency present in the mirror."""
+    return get_agencies(s3_client(), BUCKET, PREFIX)
+
 
 
 class MirrulationsReader(Reader):
@@ -65,3 +90,26 @@ class MirrulationsReader(Reader):
             )
             if record is not None:
                 yield record
+
+
+def reader_factory(
+    *,
+    processed_keys: Any = None,
+    since_year: int | None = None,
+    verbose: bool = False,
+) -> Callable[[str, RecordType], MirrulationsReader]:
+    """Build a ``read(agency, record_type) -> MirrulationsReader`` factory.
+
+    The shared options (manifest membership test, year filter, verbosity) are
+    bound once; the orchestrator just supplies the agency and record type. Each
+    reader gets its own S3 resource so the factory is safe to call from worker
+    threads.
+    """
+
+    def read(agency: str, record_type: RecordType) -> MirrulationsReader:
+        return MirrulationsReader(
+            s3_resource(), BUCKET, PREFIX, agency, record_type,
+            processed_keys=processed_keys, since_year=since_year, verbose=verbose,
+        )
+
+    return read

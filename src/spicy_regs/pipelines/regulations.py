@@ -7,37 +7,29 @@ This is also the run file. Invoke it via the ``run-pipeline`` console script::
 
 ``RegulationsPipeline.run()`` reads top-to-bottom as the data flow:
 
-    1. Prime      — load the incremental Manifest (processed keys) and any
-       existing output Parquet, so the run only does new work.
-    2. Extract → stage  — agencies are processed in parallel; for each
-       (agency, record type) a MirrulationsReader (source, filtered by the
-       Manifest) is pumped into a StagingWriter (sink).
+    1. Prime      — load the incremental Manifest and existing output.
+    2. Extract → stage  — ``stage_agencies`` fans agencies out in parallel,
+       pumping a Mirrulations Reader into a StagingWriter for each record type.
     3. Transform  — per-agency staging Parquet is merged + deduplicated.
     4. Load       — the Manifest is persisted and the dataset published to R2
        (upload is off by default while this path is being vetted).
 
-The incremental Manifest and per-agency parallelism are the same concerns the
-production flow (``spicy_regs.pipeline.pipeline``) handles, here expressed as
-composable pieces: a :class:`~spicy_regs.manifest.Manifest` value threaded
-through the readers, and a thread pool over the per-agency step.
+The reusable pieces live elsewhere: connection details + the reader factory in
+``sources.mirrulations``, the parallel fan-out in ``pipelines.staging``, and the
+processed-key tracking in ``manifest``. This module is just the wiring.
 """
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from os import getenv
 from pathlib import Path
 from shutil import rmtree
 from typing import Annotated, ClassVar
 
-import boto3
-from botocore import UNSIGNED
-from botocore.config import Config as BotoConfig
 from cyclopts import App, Parameter
 from dotenv import load_dotenv
 from loguru import logger
 
 from spicy_regs.manifest import Manifest
 from spicy_regs.pipeline.download_r2 import download_from_r2
-from spicy_regs.pipeline.extract import get_agencies
 from spicy_regs.pipeline.load import upload_to_r2
 from spicy_regs.pipeline.transform import (
     build_feed_summary,
@@ -46,26 +38,11 @@ from spicy_regs.pipeline.transform import (
     update_comments_index,
 )
 from spicy_regs.pipelines.base import Pipeline
+from spicy_regs.pipelines.staging import stage_agencies
 from spicy_regs.schemas import RECORD_TYPES, RecordType
-from spicy_regs.sources import MirrulationsReader, StagingWriter
+from spicy_regs.sources import mirrulations
 
 load_dotenv()
-
-BUCKET = "mirrulations"
-PREFIX = "raw-data"
-
-
-def _s3_resource():
-    """Anonymous S3 resource for the public Mirrulations mirror.
-
-    A fresh resource per caller keeps each worker thread independent.
-    """
-    return boto3.resource("s3", region_name="us-east-1", config=BotoConfig(signature_version=UNSIGNED))
-
-
-def _s3_client():
-    """Anonymous S3 client (used only for agency discovery)."""
-    return boto3.client("s3", region_name="us-east-1", config=BotoConfig(signature_version=UNSIGNED))
 
 
 class RegulationsPipeline(Pipeline):
@@ -118,23 +95,24 @@ class RegulationsPipeline(Pipeline):
             manifest = Manifest.load(output_dir)
             self._download_existing(output_dir, record_types)
 
+        # 2. Extract → stage: fan agencies out, pumping each source into staging.
         logger.info(
             "Processing {} agencies × {} record types ({} workers)",
             len(agencies), len(record_types), self.max_workers,
         )
-
-        # 2. Extract → stage: fan out agencies; each pumps source → sink.
-        staged: dict[str, int] = {rt.name: 0 for rt in record_types}
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = {
-                executor.submit(self._process_agency, agency, record_types, staging_dir, manifest): agency
-                for agency in agencies
-            }
-            for future in as_completed(futures):
-                for name, rows in future.result().items():
-                    staged[name] += rows
+        result = stage_agencies(
+            agencies,
+            record_types,
+            staging_dir,
+            mirrulations.reader_factory(
+                processed_keys=manifest, since_year=self.since_year, verbose=self.verbose
+            ),
+            max_workers=self.max_workers,
+        )
+        manifest.record(result.consumed_keys)
 
         # 3. Transform: merge per-agency staging into the deduplicated dataset.
+        staged = result.rows_by_type
         if any(staged.values()):
             self._merge(staging_dir, output_dir, record_types, staged)
             rmtree(staging_dir, ignore_errors=True)
@@ -154,33 +132,7 @@ class RegulationsPipeline(Pipeline):
 
         logger.info("Done!")
 
-    # -- composition helpers ------------------------------------------------
-
-    def _process_agency(
-        self,
-        agency: str,
-        record_types: list[RecordType],
-        staging_dir: Path,
-        manifest: Manifest,
-    ) -> dict[str, int]:
-        """Stage one agency: read each record type (skipping known keys) into staging.
-
-        Runs in its own thread, so it uses its own S3 resource and records the
-        keys it consumed back into the shared (thread-safe) manifest.
-        """
-        s3 = _s3_resource()
-        staged: dict[str, int] = {}
-        for record_type in record_types:
-            reader = MirrulationsReader(
-                s3, BUCKET, PREFIX, agency, record_type,
-                processed_keys=manifest, since_year=self.since_year, verbose=self.verbose,
-            )
-            writer = StagingWriter(agency, record_type, staging_dir)
-            writer.write(reader.iter_records())
-            manifest.record(reader.last_keys)
-            staged[record_type.name] = writer.rows_written
-            logger.info("[{}] {}: staged {} rows", agency, record_type.name, writer.rows_written)
-        return staged
+    # -- regulations-specific wiring ---------------------------------------
 
     def _record_types(self) -> list[RecordType]:
         """The record types to process, honoring skip/only-comments."""
@@ -198,7 +150,7 @@ class RegulationsPipeline(Pipeline):
         elif (agencies_env := getenv("AGENCIES")) is not None:
             agencies = agencies_env.split(",")
         else:
-            agencies = get_agencies(_s3_client(), BUCKET, PREFIX)
+            agencies = mirrulations.discover_agencies()
 
         if self.batch_number is not None:
             start = self.batch_number * self.batch_size
