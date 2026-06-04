@@ -29,8 +29,6 @@ from dotenv import load_dotenv
 from loguru import logger
 
 from spicy_regs.manifest import Manifest
-from spicy_regs.pipeline.download_r2 import download_from_r2
-from spicy_regs.pipeline.load import upload_to_r2
 from spicy_regs.pipeline.transform import (
     build_feed_summary,
     merge_comments_partitioned,
@@ -40,7 +38,7 @@ from spicy_regs.pipeline.transform import (
 from spicy_regs.pipelines.base import Pipeline
 from spicy_regs.pipelines.staging import stage_agencies
 from spicy_regs.schemas import RECORD_TYPES, RecordType
-from spicy_regs.sources import mirrulations
+from spicy_regs.sources import mirrulations, r2
 
 load_dotenv()
 
@@ -128,7 +126,7 @@ class RegulationsPipeline(Pipeline):
             logger.info("skip_upload=True — output left in {}", output_dir)
         elif any(staged.values()):
             logger.info("Uploading to R2...")
-            upload_to_r2(output_dir, [rt.name for rt in record_types if rt.name != "comments"])
+            r2.upload_dataset(output_dir, [rt.name for rt in record_types if rt.name != "comments"])
 
         logger.info("Done!")
 
@@ -164,7 +162,7 @@ class RegulationsPipeline(Pipeline):
                 continue
             local = output_dir / f"{rt.name}.parquet"
             if not local.exists():
-                download_from_r2(f"{rt.name}.parquet", local)
+                r2.download(f"{rt.name}.parquet", local)
 
     def _merge(
         self,

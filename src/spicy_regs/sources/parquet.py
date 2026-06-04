@@ -2,9 +2,9 @@
 
 Wraps ``write_staging`` so a stream of records for one agency and a single
 :class:`~spicy_regs.schemas.RecordType` is written through the
-:class:`~spicy_regs.sources.base.Writer` interface. Merging staged files into
-the final output and uploading to R2 remain pipeline-level orchestration
-(``transform.py`` / ``load.py``); this connector covers only the staging write.
+:class:`~spicy_regs.sources.base.Writer` interface. This is the "local write"
+stage only — merging staged files is a transform, and publishing to R2 is the
+:mod:`spicy_regs.sources.r2` connector.
 """
 
 from collections.abc import Iterable
