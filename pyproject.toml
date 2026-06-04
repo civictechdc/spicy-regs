@@ -38,6 +38,7 @@ dev = [
 
 [project.scripts]
 etl = "spicy_regs.pipeline.pipeline:app"
+run-pipeline = "spicy_regs.pipelines.run:app"
 embed = "spicy_regs.vectordb.embed:main"
 spicy-regs = "spicy_regs.cli:main"
 spicy-regs-mcp = "spicy_regs.mcp_server:main"
