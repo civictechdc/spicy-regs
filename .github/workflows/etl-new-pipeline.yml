@@ -23,6 +23,11 @@ on:
         required: false
         default: ''
         type: string
+      full_refresh:
+        description: 'Ignore manifest + existing output (reprocess everything)'
+        required: false
+        default: false
+        type: boolean
       skip_upload:
         description: 'Skip R2 upload (recommended while vetting)'
         required: false
@@ -67,6 +72,9 @@ jobs:
           fi
           if [ -n "${{ inputs.batch_number }}" ]; then
             ARGS="$ARGS --batch-number ${{ inputs.batch_number }} --batch-size 21"
+          fi
+          if [ "${{ inputs.full_refresh }}" = "true" ]; then
+            ARGS="$ARGS --full-refresh"
           fi
           if [ "${{ inputs.skip_upload }}" = "true" ]; then
             ARGS="$ARGS --skip-upload"
