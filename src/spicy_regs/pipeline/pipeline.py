@@ -7,6 +7,7 @@ All configuration lives here and is passed down via function parameters.
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+from json import dumps as json_dumps
 from os import getenv
 from pathlib import Path
 from shutil import rmtree
@@ -19,6 +20,7 @@ import boto3
 from cyclopts import App, Parameter
 from dotenv import load_dotenv
 from loguru import logger
+import polars as pl
 from prefect import flow, task
 from prefect.cache_policies import NO_CACHE
 from prefect.futures import wait
@@ -26,7 +28,6 @@ from prefect.task_runners import ThreadPoolTaskRunner
 
 from spicy_regs.pipeline.build_search_index import build_search_index
 from spicy_regs.pipeline.download_r2 import download_from_r2
-from spicy_regs.schemas import RECORD_TYPES
 from spicy_regs.pipeline.extract import (
     download_and_parse,
     download_existing_parquet,
@@ -78,6 +79,109 @@ PREFIX = "raw-data"
 PROCESSED_KEYS: object = set()  # BloomFilter after load_manifest()
 NEW_KEYS: set[str] = set()
 
+def _extract_comment(d: dict) -> dict:
+    attrs = d.get("data", {}).get("attributes", {})
+
+    # Build compact attachments JSON from the included array
+    attachments = []
+    for inc in d.get("included", []):
+        if inc.get("type") == "attachments":
+            inc_attrs = inc.get("attributes", {})
+            formats = [
+                {"url": f["fileUrl"], "format": f.get("format"), "size": f.get("size")}
+                for f in inc_attrs.get("fileFormats") or []
+                if f.get("fileUrl")
+            ]
+            if formats:
+                attachments.append({"title": inc_attrs.get("title", ""), "formats": formats})
+
+    return {
+        "comment_id": d.get("data", {}).get("id"),
+        "docket_id": (v.strip('"') if (v := attrs.get("docketId")) else v),
+        "agency_code": attrs.get("agencyId"),
+        "title": attrs.get("title"),
+        "comment": attrs.get("comment"),
+        "document_type": attrs.get("documentType"),
+        "posted_date": attrs.get("postedDate"),
+        "modify_date": attrs.get("modifyDate"),
+        "receive_date": attrs.get("receiveDate"),
+        "attachments_json": json_dumps(attachments) if attachments else None,
+    }
+
+
+DEDUP_KEYS: dict[str, str] = {
+    "dockets": "docket_id",
+    "documents": "document_id",
+    "comments": "comment_id",
+}
+
+
+DATA_TYPES = {
+    "dockets": {
+        "path_pattern": "/docket/",
+        "schema": {
+            "docket_id": pl.Utf8,
+            "agency_code": pl.Utf8,
+            "title": pl.Utf8,
+            "docket_type": pl.Utf8,
+            "modify_date": pl.Utf8,
+            "abstract": pl.Utf8,
+        },
+        "extract": lambda d: {
+            "docket_id": (v.strip('"') if (v := d.get("data", {}).get("id")) else v),
+            "agency_code": d.get("data", {}).get("attributes", {}).get("agencyId"),
+            "title": d.get("data", {}).get("attributes", {}).get("title"),
+            "docket_type": d.get("data", {}).get("attributes", {}).get("docketType"),
+            "modify_date": d.get("data", {}).get("attributes", {}).get("modifyDate"),
+            "abstract": d.get("data", {}).get("attributes", {}).get("dkAbstract"),
+        },
+    },
+    "documents": {
+        "path_pattern": "/documents/",
+        "schema": {
+            "document_id": pl.Utf8,
+            "docket_id": pl.Utf8,
+            "agency_code": pl.Utf8,
+            "title": pl.Utf8,
+            "document_type": pl.Utf8,
+            "posted_date": pl.Utf8,
+            "modify_date": pl.Utf8,
+            "comment_start_date": pl.Utf8,
+            "comment_end_date": pl.Utf8,
+            "file_url": pl.Utf8,
+        },
+        "extract": lambda d: {
+            "document_id": d.get("data", {}).get("id"),
+            "docket_id": (v.strip('"') if (v := d.get("data", {}).get("attributes", {}).get("docketId")) else v),
+            "agency_code": d.get("data", {}).get("attributes", {}).get("agencyId"),
+            "title": d.get("data", {}).get("attributes", {}).get("title"),
+            "document_type": d.get("data", {}).get("attributes", {}).get("documentType"),
+            "posted_date": d.get("data", {}).get("attributes", {}).get("postedDate"),
+            "modify_date": d.get("data", {}).get("attributes", {}).get("modifyDate"),
+            "comment_start_date": d.get("data", {}).get("attributes", {}).get("commentStartDate"),
+            "comment_end_date": d.get("data", {}).get("attributes", {}).get("commentEndDate"),
+            "file_url": (d.get("data", {}).get("attributes", {}).get("fileFormats") or [{}])[0].get("fileUrl"),
+        },
+    },
+    "comments": {
+        "path_pattern": "/comments/",
+        "schema": {
+            "comment_id": pl.Utf8,
+            "docket_id": pl.Utf8,
+            "agency_code": pl.Utf8,
+            "title": pl.Utf8,
+            "comment": pl.Utf8,
+            "document_type": pl.Utf8,
+            "posted_date": pl.Utf8,
+            "modify_date": pl.Utf8,
+            "receive_date": pl.Utf8,
+            "attachments_json": pl.Utf8,
+        },
+        "extract": _extract_comment,
+    },
+}
+
+
 # ---------------------------------------------------------------------------
 # Flows
 # ---------------------------------------------------------------------------
@@ -96,7 +200,7 @@ def process_agency(
     results: dict[str, int] = {}
     new_keys: list[str] = []
 
-    types_to_process = data_type_names or list(RECORD_TYPES.keys())
+    types_to_process = data_type_names or list(DATA_TYPES.keys())
 
     # List files for all data types in parallel
     logger.info("[{}] Listing files for {} data types...", agency, len(types_to_process))
@@ -110,7 +214,7 @@ def process_agency(
                 PREFIX,
                 agency,
                 dt_name,
-                RECORD_TYPES[dt_name].path_pattern,
+                DATA_TYPES[dt_name]["path_pattern"],
                 PROCESSED_KEYS,
                 verbose,
                 since_year,
@@ -124,7 +228,7 @@ def process_agency(
     # Download and write staging for each data type
     for dt_name in types_to_process:
         keys = keys_by_type[dt_name]
-        record_type = RECORD_TYPES[dt_name]
+        dt_config = DATA_TYPES[dt_name]
 
         if not keys:
             logger.info("[{}] {}: no new files", agency, dt_name)
@@ -132,7 +236,7 @@ def process_agency(
             continue
 
         logger.info("[{}] {}: downloading {} files...", agency, dt_name, len(keys))
-        extract_fn = record_type.extract
+        extract_fn = dt_config["extract"]
 
         with ThreadPoolExecutor(max_workers=10) as executor:
             records = [
@@ -143,7 +247,7 @@ def process_agency(
                 if r is not None
             ]
 
-        row_count = write_staging(agency, dt_name, records, staging_dir, record_type.schema)
+        row_count = write_staging(agency, dt_name, records, staging_dir, dt_config["schema"])
         results[dt_name] = row_count
         new_keys.extend(keys)
 
@@ -159,8 +263,8 @@ def merge_staging_task(staging_dir: Path, output_dir: Path, data_type_names: lis
     non_comment_types = [dt for dt in data_type_names if dt != "comments"]
     if not non_comment_types:
         return
-    schemas = {dtype: RECORD_TYPES[dtype].schema for dtype in non_comment_types}
-    dedup_keys = {dtype: RECORD_TYPES[dtype].dedup_key for dtype in non_comment_types}
+    schemas = {dtype: DATA_TYPES[dtype]["schema"] for dtype in non_comment_types}
+    dedup_keys = {dtype: DEDUP_KEYS[dtype] for dtype in non_comment_types}
     merge_staging_files(staging_dir, output_dir, non_comment_types, schemas, dedup_keys)
 
 
@@ -170,8 +274,8 @@ def merge_comments_partitioned_task(staging_dir: Path, output_dir: Path) -> list
     return merge_comments_partitioned(
         staging_dir,
         output_dir,
-        schema=RECORD_TYPES["comments"].schema,
-        dedup_key=RECORD_TYPES["comments"].dedup_key,
+        schema=DATA_TYPES["comments"]["schema"],
+        dedup_key=DEDUP_KEYS["comments"],
     )
 
 
@@ -252,11 +356,11 @@ def pipeline(
     logger.info("Staging directory: {}", staging_dir)
 
     # Determine which data types to process
-    data_type_names: list[str] = list(RECORD_TYPES.keys())
+    data_type_names: list[str] = list(DATA_TYPES.keys())
     if skip_comments:
-        data_type_names = [dt for dt in RECORD_TYPES if dt != "comments"]
+        data_type_names = [dt for dt in DATA_TYPES if dt != "comments"]
     elif only_comments:
-        data_type_names = [dt for dt in RECORD_TYPES if dt == "comments"]
+        data_type_names = [dt for dt in DATA_TYPES if dt == "comments"]
 
     # Partition-only mode
     if partition_only:
@@ -341,7 +445,7 @@ def pipeline(
 
     wait(futures)
 
-    total_rows: dict[str, int] = {dt: 0 for dt in RECORD_TYPES}
+    total_rows: dict[str, int] = {dt: 0 for dt in DATA_TYPES}
     for future in futures:
         results, new_keys = future.result()
         for dt, count in results.items():
