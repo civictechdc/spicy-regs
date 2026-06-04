@@ -1,11 +1,14 @@
 """Reader connector for the Mirrulations S3 mirror of regulations.gov.
 
-Wraps the existing S3 discovery + download functions so that one agency's
-records of a single :class:`~spicy_regs.schemas.RecordType` are exposed
-through the :class:`~spicy_regs.sources.base.Reader` interface. Listing,
-year-filtering, and dedup against already-processed keys are delegated to
-``list_json_files``; per-file download + parse is delegated to
-``download_and_parse``.
+Wraps the existing S3 discovery + download functions so that one agency's files
+for a single :class:`~spicy_regs.schemas.RecordType` are exposed through the
+:class:`~spicy_regs.sources.base.Reader` interface. Listing, year-filtering, and
+dedup against already-processed keys are delegated to ``list_json_files``;
+per-file download + JSON decode is delegated to ``download_and_parse``.
+
+The reader is a *pure source*: it yields the raw JSON payloads. Flattening them
+into schema-shaped records is the job of the
+:class:`~spicy_regs.transforms.extract.ExtractRecords` transform.
 """
 
 from collections.abc import Callable, Iterator
@@ -40,12 +43,18 @@ def discover_agencies() -> list[str]:
     return get_agencies(s3_client(), BUCKET, PREFIX)
 
 
+def _identity(payload: dict) -> dict:
+    """Decode-only 'extract' — the reader yields raw JSON; flattening is a Transform."""
+    return payload
+
+
 
 class MirrulationsReader(Reader):
     """Reads one agency's records of a single record type from Mirrulations S3.
 
-    The keys discovered during the most recent ``iter_records`` call are kept
-    on ``last_keys`` so the caller can append them to the run manifest.
+    Yields the raw JSON payload for each file; the keys discovered during the
+    most recent ``iter_records`` call are kept on ``last_keys`` so the caller can
+    append them to the run manifest.
     """
 
     def __init__(
@@ -82,14 +91,9 @@ class MirrulationsReader(Reader):
             self.since_year,
         )
         for key in self.last_keys:
-            record = download_and_parse(
-                self.s3_resource,
-                self.bucket,
-                key,
-                self.record_type.extract,
-            )
-            if record is not None:
-                yield record
+            payload = download_and_parse(self.s3_resource, self.bucket, key, _identity)
+            if payload is not None:
+                yield payload
 
 
 def reader_factory(

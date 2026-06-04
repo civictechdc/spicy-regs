@@ -82,13 +82,18 @@ def _make_store() -> dict[str, bytes]:
     }
 
 
-def test_iter_records_yields_parsed_dockets() -> None:
+def _raw_id(payload: dict) -> str:
+    # The reader yields raw JSON; flattening to docket_id is the transform's job.
+    return payload["data"]["id"]
+
+
+def test_iter_records_yields_raw_payloads() -> None:
     reader = MirrulationsReader(_FakeS3Resource(_make_store()), BUCKET, PREFIX, AGENCY, DOCKET)
     records = list(reader.iter_records())
 
-    ids = sorted(r["docket_id"] for r in records)
+    ids = sorted(_raw_id(r) for r in records)
     assert ids == ["EPA-2024-0001", "EPA-2025-0002"]
-    assert all(r["agency_code"] == "EPA" for r in records)
+    assert all(r["data"]["attributes"]["agencyId"] == "EPA" for r in records)
     # last_keys is populated for manifest tracking and matches what was yielded.
     assert len(reader.last_keys) == 2
 
@@ -97,10 +102,10 @@ def test_processed_keys_are_skipped() -> None:
     already = {_docket_key("EPA-2024-0001")}
     reader = MirrulationsReader(_FakeS3Resource(_make_store()), BUCKET, PREFIX, AGENCY, DOCKET, processed_keys=already)
     records = list(reader.iter_records())
-    assert [r["docket_id"] for r in records] == ["EPA-2025-0002"]
+    assert [_raw_id(r) for r in records] == ["EPA-2025-0002"]
 
 
 def test_since_year_filters_older_dockets() -> None:
     reader = MirrulationsReader(_FakeS3Resource(_make_store()), BUCKET, PREFIX, AGENCY, DOCKET, since_year=2025)
     records = list(reader.iter_records())
-    assert [r["docket_id"] for r in records] == ["EPA-2025-0002"]
+    assert [_raw_id(r) for r in records] == ["EPA-2025-0002"]

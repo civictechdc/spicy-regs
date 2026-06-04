@@ -8,14 +8,17 @@ This is also the run file. Invoke it via the ``run-pipeline`` console script::
 ``RegulationsPipeline.run()`` reads top-to-bottom as the data flow:
 
     1. Prime      — load the incremental Manifest and existing output.
-    2. Extract → stage  — ``stage_agencies`` fans agencies out in parallel,
-       pumping a Mirrulations Reader into a StagingWriter for each record type.
-    3. Transform  — per-agency staging Parquet is merged + deduplicated.
+    2. Extract → stage  — ``stage_agencies`` fans agencies out in parallel; each
+       record stream flows Mirrulations Reader (raw JSON) -> ExtractRecords
+       transform (flatten) -> StagingWriter (local Parquet).
+    3. Merge      — per-agency staging Parquet is merged + deduplicated (a bulk,
+       whole-dataset transform).
     4. Load       — the Manifest is persisted and the dataset published to R2
        (upload is off by default while this path is being vetted).
 
 The reusable pieces live elsewhere: connection details + the reader factory in
-``sources.mirrulations``, the parallel fan-out in ``pipelines.staging``, and the
+``sources.mirrulations``, the json→record transform in ``transforms.extract``,
+the parallel fan-out in ``pipelines.staging``, R2 in ``sources.r2``, and
 processed-key tracking in ``manifest``. This module is just the wiring.
 """
 
@@ -39,6 +42,7 @@ from spicy_regs.pipelines.base import Pipeline
 from spicy_regs.pipelines.staging import stage_agencies
 from spicy_regs.schemas import RECORD_TYPES, RecordType
 from spicy_regs.sources import mirrulations, r2
+from spicy_regs.transforms import ExtractRecords
 
 load_dotenv()
 
@@ -105,6 +109,7 @@ class RegulationsPipeline(Pipeline):
             mirrulations.reader_factory(
                 processed_keys=manifest, since_year=self.since_year, verbose=self.verbose
             ),
+            transform_for=ExtractRecords,
             max_workers=self.max_workers,
         )
         manifest.record(result.consumed_keys)
