@@ -1,7 +1,7 @@
 """Writer connector that persists records to a per-agency Parquet staging file.
 
 Wraps ``write_staging`` so a stream of records for one agency and a single
-:class:`~spicy_regs.records.RecordType` is written through the
+:class:`~spicy_regs.schemas.RecordType` is written through the
 :class:`~spicy_regs.sources.base.Writer` interface. Merging staged files into
 the final output and uploading to R2 remain pipeline-level orchestration
 (``transform.py`` / ``load.py``); this connector covers only the staging write.
@@ -11,7 +11,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from spicy_regs.pipeline.transform import write_staging
-from spicy_regs.records import RecordType
+from spicy_regs.schemas import RecordType
 from spicy_regs.sources.base import Writer
 
 

@@ -2,7 +2,7 @@
 
 from json import dumps
 
-from spicy_regs.record_types import DOCKET
+from spicy_regs.schemas import DOCKET
 from spicy_regs.sources import MirrulationsReader
 
 BUCKET = "mirrulations"

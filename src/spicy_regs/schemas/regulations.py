@@ -10,7 +10,7 @@ from json import dumps as json_dumps
 
 import polars as pl
 
-from spicy_regs.records import RecordType
+from spicy_regs.schemas.base import RecordType
 
 
 def _extract_comment(d: dict) -> dict:

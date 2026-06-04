@@ -1,7 +1,7 @@
 """Reader connector for the Mirrulations S3 mirror of regulations.gov.
 
 Wraps the existing S3 discovery + download functions so that one agency's
-records of a single :class:`~spicy_regs.records.RecordType` are exposed
+records of a single :class:`~spicy_regs.schemas.RecordType` are exposed
 through the :class:`~spicy_regs.sources.base.Reader` interface. Listing,
 year-filtering, and dedup against already-processed keys are delegated to
 ``list_json_files``; per-file download + parse is delegated to
@@ -12,7 +12,7 @@ from collections.abc import Iterator
 from typing import Any
 
 from spicy_regs.pipeline.extract import download_and_parse, list_json_files
-from spicy_regs.records import RecordType
+from spicy_regs.schemas import RecordType
 from spicy_regs.sources.base import Reader
 
 

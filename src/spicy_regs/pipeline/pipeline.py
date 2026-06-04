@@ -26,7 +26,7 @@ from prefect.task_runners import ThreadPoolTaskRunner
 
 from spicy_regs.pipeline.build_search_index import build_search_index
 from spicy_regs.pipeline.download_r2 import download_from_r2
-from spicy_regs.record_types import RECORD_TYPES
+from spicy_regs.schemas import RECORD_TYPES
 from spicy_regs.pipeline.extract import (
     download_and_parse,
     download_existing_parquet,

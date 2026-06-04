@@ -4,7 +4,7 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from spicy_regs.records import RecordType
+from spicy_regs.schemas import RecordType
 
 
 def _identity(d: dict) -> dict:

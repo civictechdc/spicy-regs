@@ -1,9 +1,8 @@
-"""Tests for the RecordType registry in spicy_regs.record_types."""
+"""Tests for the RecordType registry in spicy_regs.schemas.regulations."""
 
 from json import loads
 
-from spicy_regs.record_types import COMMENT, DOCKET, DOCUMENT, RECORD_TYPES
-from spicy_regs.records import RecordType
+from spicy_regs.schemas import COMMENT, DOCKET, DOCUMENT, RECORD_TYPES, RecordType
 
 
 def test_registry_keys_and_names_match() -> None:

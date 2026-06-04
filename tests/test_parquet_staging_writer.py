@@ -4,7 +4,7 @@ from pathlib import Path
 
 import polars as pl
 
-from spicy_regs.record_types import DOCKET
+from spicy_regs.schemas import DOCKET
 from spicy_regs.sources import StagingWriter
 
 
