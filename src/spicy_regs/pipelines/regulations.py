@@ -32,17 +32,17 @@ from dotenv import load_dotenv
 from loguru import logger
 
 from spicy_regs.manifest import Manifest
-from spicy_regs.pipeline.transform import (
-    build_feed_summary,
-    merge_comments_partitioned,
-    merge_staging_files,
-    update_comments_index,
-)
 from spicy_regs.pipelines.base import Pipeline
 from spicy_regs.pipelines.staging import stage_agencies
 from spicy_regs.schemas import RECORD_TYPES, RecordType
 from spicy_regs.sources import mirrulations, r2
 from spicy_regs.transforms import ExtractRecords
+from spicy_regs.transforms.merge import (
+    build_feed_summary,
+    merge_comments_partitioned,
+    merge_staging_files,
+    update_comments_index,
+)
 
 load_dotenv()
 
