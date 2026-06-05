@@ -14,13 +14,17 @@ class RecordType:
     record dict matching the schema. Instances are values, not classes —
     contributors add new record shapes by constructing a new RecordType,
     not by subclassing.
+
+    ``path_pattern`` is optional and source-specific: the Mirrulations S3
+    reader uses it to locate this record type's files in the bucket. Sources
+    that don't address records by path (e.g. an HTTP API) can leave it unset.
     """
 
     name: str
-    path_pattern: str
     schema: dict[str, Any]
     dedup_key: str
     extract: Callable[[dict], dict]
+    path_pattern: str | None = None
 
     def __post_init__(self) -> None:
         if self.dedup_key not in self.schema:

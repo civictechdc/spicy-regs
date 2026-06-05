@@ -1,10 +1,15 @@
 """End-to-end reference: one of each base class wired together.
 
-This file is a contributor reference. It implements a minimal pipeline
-that fetches posts from JSONPlaceholder, uppercases their titles, and
-prints them. The test monkeypatches ``urllib.request.urlopen`` with
-canned data so CI stays hermetic — to see the abstractions run against
-the live API, delete the monkeypatch and run ``pytest -s``.
+This file is the contributor reference — copy it when adding your own source,
+transform, or pipeline. It implements a minimal pipeline that fetches posts
+from JSONPlaceholder and uppercases their titles, composed exactly the way the
+real pipeline is:
+
+    Reader (raw JSON)  ->  Transform (shape)  ->  Transform (enrich)  ->  Writer
+
+The test monkeypatches ``urllib.request.urlopen`` with canned data so CI stays
+hermetic — to see it run against the live API, delete the monkeypatch and run
+``pytest -s``.
 """
 
 from collections.abc import Iterable, Iterator
@@ -18,11 +23,13 @@ import pytest
 from spicy_regs.pipelines import Pipeline
 from spicy_regs.schemas import RecordType
 from spicy_regs.sources import Reader, Writer
+from spicy_regs.transforms import ExtractRecords, Transform
 
-
+# A RecordType describes one data shape: its schema, primary key, and how to
+# flatten a raw payload into a row. ``path_pattern`` is S3-specific, so an HTTP
+# source like this one leaves it unset.
 Post = RecordType(
     name="posts",
-    path_pattern="/posts",
     schema={
         "post_id": str,
         "user_id": str,
@@ -42,45 +49,52 @@ Post = RecordType(
 
 
 class JsonPlaceholderReader(Reader):
-    """Reads posts from JSONPlaceholder and yields extracted records."""
+    """A source: fetches posts and yields the *raw* JSON payloads.
 
-    def __init__(self, url: str, record_type: RecordType) -> None:
+    Readers stay pure sources — shaping a payload into a record is the
+    ExtractRecords transform's job, not the reader's.
+    """
+
+    def __init__(self, url: str) -> None:
         self.url = url
-        self.record_type = record_type
 
     def iter_records(self) -> Iterator[dict]:
         with urlopen(self.url) as resp:
-            payload = loads(resp.read())
-        for raw in payload:
-            yield self.record_type.extract(raw)
+            yield from loads(resp.read())
 
 
-def uppercase_titles(records: Iterable[dict]) -> Iterator[dict]:
-    """Convention-only transform: uppercases the ``title`` field."""
-    for r in records:
-        yield {**r, "title": r["title"].upper()}
+class UppercaseTitles(Transform):
+    """A transform: uppercases the ``title`` field of each record."""
+
+    def apply(self, records: Iterable[dict]) -> Iterator[dict]:
+        for record in records:
+            yield {**record, "title": record["title"].upper()}
 
 
 class StdoutWriter(Writer):
-    """Writes records by printing each as a line to stdout."""
+    """A sink: writes records by printing each as a line to stdout."""
 
     def write(self, records: Iterable[dict]) -> None:
-        for r in records:
-            print(r)
+        for record in records:
+            print(record)
 
 
 class ExamplePipeline(Pipeline):
+    """Wires the source, transforms, and sink together."""
+
     name = "example"
 
     def __init__(self) -> None:
-        self.reader = JsonPlaceholderReader(
-            "https://jsonplaceholder.typicode.com/posts",
-            Post,
-        )
+        self.reader = JsonPlaceholderReader("https://jsonplaceholder.typicode.com/posts")
+        self.extract = ExtractRecords(Post)  # built-in transform: raw JSON -> record
+        self.uppercase = UppercaseTitles()  # our own transform
         self.writer = StdoutWriter()
 
     def run(self) -> None:
-        self.writer.write(uppercase_titles(self.reader.iter_records()))
+        records = self.reader.iter_records()
+        records = self.extract.apply(records)
+        records = self.uppercase.apply(records)
+        self.writer.write(records)
 
 
 _CANNED_POSTS = [
