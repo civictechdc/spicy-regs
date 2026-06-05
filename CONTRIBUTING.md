@@ -1,21 +1,97 @@
 # Contributing
 
-Thanks for your interest in contributing to spicy-regs!
+Thanks for your interest in contributing to spicy-regs! This project is
+maintained by [Civic Tech DC](https://civictechdc.org/), and we welcome
+contributors of all experience levels — including first-time open source
+contributors.
 
 If you find this project useful, please consider giving it a star on GitHub — it helps others discover the project and motivates continued development.
 
 ## Getting started
 
-1. Fork and clone the repo.
-2. Create a branch: `git checkout -b my-change`.
-3. Install dependencies and set up your environment (see `README.md`).
+Prerequisites: **Python 3.10+** and [**uv**](https://docs.astral.sh/uv/getting-started/installation/).
+
+1. Fork the repo on GitHub, then clone your fork:
+   ```bash
+   git clone https://github.com/<your-username>/spicy-regs.git
+   cd spicy-regs
+   ```
+2. Create a feature branch:
+   ```bash
+   git checkout -b my-change
+   ```
+3. Install dependencies (creates a `.venv` in the project directory):
+   ```bash
+   uv sync
+   ```
+4. Run the tests to confirm your environment works:
+   ```bash
+   uv run pytest
+   ```
+5. Run the linter:
+   ```bash
+   uv run ruff check .
+   uv run ruff format .   # auto-format
+   ```
+
+You don't need any credentials to run the tests or hack on most of the code.
+A `.env` file (copy from `.env.example`) is only required to talk to live
+Cloudflare R2 storage.
+
+### Stuck?
+
+- Open a [GitHub issue](https://github.com/civictechdc/spicy-regs/issues/new/choose) — we don't bite.
+- Ping us on [Slack](https://civictechdc.slack.com/archives/C09H576E6LU).
 
 ## Making changes
 
 - Keep changes focused and scoped to one concern per PR.
-- Follow existing code style and conventions.
+- Follow existing code style and conventions (ruff handles most of this).
 - Add or update tests for any behavior change.
-- Run the test suite locally before pushing.
+- Run `uv run pytest` and `uv run ruff check .` before pushing.
+
+## Glossary
+
+Some terms you'll see throughout the codebase:
+
+| Term            | What it means |
+|-----------------|---------------|
+| **Regulations.gov** | The U.S. federal government's public docket portal. Our upstream data source. |
+| **Mirrulations** | A public mirror of regulations.gov data hosted on AWS S3 ([repo](https://github.com/MoravianUniversity/mirrulations)). We read from it instead of hitting the regulations.gov API directly. |
+| **R2**          | Cloudflare R2 — S3-compatible object storage. We use it as our processed-data store. |
+| **S3**          | Amazon S3 — where Mirrulations hosts the raw upstream data. |
+| **Staging files** | Intermediate per-agency files written during a pipeline run, before final merge/partition. |
+| **Manifest**    | A small file listing already-processed source keys, used to make ETL runs incremental. |
+| **Bulk transforms** | Whole-dataset operations (dedup, partition, summarize) that need every row at once. Live in `transforms/merge.py` as plain functions. |
+| **Agency**      | A federal agency (EPA, DOL, etc.). Pipelines fan out per-agency. |
+
+## Where things live
+
+```
+src/spicy_regs/
+├── cli.py                # main CLI entrypoint (`spicy-regs` script)
+├── schemas/              # RecordType definitions — one per data shape
+├── sources/              # Reader and Writer subclasses (S3, R2, parquet, …)
+├── transforms/           # Transform subclasses + bulk-transform helpers
+├── pipelines/            # Pipeline subclasses + the `run-pipeline` CLI app
+├── pipeline/             # (alternate pipeline framework — see its README)
+├── manifest.py           # tracks already-processed keys for incremental runs
+├── mcp_server.py         # stdio MCP server (`spicy-regs-mcp` script)
+└── vectordb/             # embedding pipeline (optional `embed` extra)
+
+mcp-server/               # standalone HTTP MCP server (Vercel-deployable)
+notebooks/                # exploratory Jupyter notebooks (Binder-runnable)
+sample-data/              # tiny fixtures used by tests
+scripts/                  # one-off operational scripts
+tests/                    # pytest suite + shared fixtures in conftest.py
+plugins/                  # Claude Code plugin packaging
+```
+
+The CLI entrypoints are defined in `pyproject.toml` under `[project.scripts]`:
+- `spicy-regs` — main CLI
+- `run-pipeline` / `etl` — pipeline runners
+- `spicy-regs-mcp` — stdio MCP server
+- `embed` — vector embedding (requires the `embed` extra)
 
 ## Architecture: the ETL building blocks
 
@@ -80,4 +156,4 @@ not connectors — don't subclass them.
 
 ## Reporting issues
 
-Open a GitHub issue with steps to reproduce, expected vs. actual behavior, and environment details.
+Open a GitHub issue with steps to reproduce, expected vs. actual behavior, and environment details. Pick a template from [the issue chooser](https://github.com/civictechdc/spicy-regs/issues/new/choose).

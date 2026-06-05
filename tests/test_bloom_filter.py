@@ -1,6 +1,5 @@
 """Tests for the BloomFilter used by the manifest loader."""
 
-import pytest
 
 from spicy_regs.pipeline.extract import BloomFilter
 
@@ -52,4 +51,4 @@ class TestBloomFilter:
         processed_keys = bf
         assert processed_keys and "key1" in processed_keys
         assert processed_keys and "key2" in processed_keys
-        assert not ("key3" in processed_keys)
+        assert "key3" not in processed_keys

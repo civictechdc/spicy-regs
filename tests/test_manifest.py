@@ -5,7 +5,6 @@ from pathlib import Path
 import pyarrow as pa
 import pyarrow.parquet as pq
 import polars as pl
-import pytest
 
 from spicy_regs.pipeline.extract import BloomFilter
 from spicy_regs.pipeline.load import save_manifest
