@@ -28,12 +28,14 @@ embed = [
 dev = [
     "ipykernel",
     "matplotlib",
+    "pre-commit",
     "pyrefly",
     "pytest",
     "ruff",
     "scikit-learn",
     "seaborn",
     "textblob",
+    "ty",
 ]
 
 [project.scripts]
