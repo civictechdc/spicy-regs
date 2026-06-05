@@ -1,0 +1,93 @@
+name: ETL (new pipeline – vetting)
+
+# Manual-only workflow that exercises the new Pipeline/Reader/Writer path via
+# the `run-pipeline` CLI (which addresses a pipeline by name and calls run()).
+# It is intentionally NOT scheduled so it can never collide with the production
+# "Daily ETL Refresh" cron. `skip_upload` defaults to true so a vetting run
+# cannot write to production R2 — flip it off deliberately once trusted.
+on:
+  workflow_dispatch:
+    inputs:
+      agency:
+        description: 'Process only this agency (leave empty for all)'
+        required: false
+        default: ''
+        type: string
+      since_year:
+        description: 'Only process dockets from this year onward (e.g. 2025)'
+        required: false
+        default: ''
+        type: string
+      batch_number:
+        description: 'Batch number (0-indexed) or leave empty for all'
+        required: false
+        default: ''
+        type: string
+      full_refresh:
+        description: 'Ignore manifest + existing output (reprocess everything)'
+        required: false
+        default: false
+        type: boolean
+      skip_upload:
+        description: 'Skip R2 upload (recommended while vetting)'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  etl-new:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run new pipeline
+        env:
+          # Only used if skip_upload is turned off; harmless otherwise.
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+        run: |
+          ARGS=""
+          if [ -n "${{ inputs.agency }}" ]; then
+            ARGS="$ARGS --agency ${{ inputs.agency }}"
+          fi
+          if [ -n "${{ inputs.since_year }}" ]; then
+            ARGS="$ARGS --since-year ${{ inputs.since_year }}"
+          fi
+          if [ -n "${{ inputs.batch_number }}" ]; then
+            ARGS="$ARGS --batch-number ${{ inputs.batch_number }} --batch-size 21"
+          fi
+          if [ "${{ inputs.full_refresh }}" = "true" ]; then
+            ARGS="$ARGS --full-refresh"
+          fi
+          if [ "${{ inputs.skip_upload }}" = "true" ]; then
+            ARGS="$ARGS --skip-upload"
+          else
+            ARGS="$ARGS --no-skip-upload"
+          fi
+          echo "Running: uv run run-pipeline $ARGS"
+          uv run run-pipeline $ARGS
+
+      - name: Upload artifacts (for debugging)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: etl-new-pipeline-output
+          path: output/
+          retention-days: 7

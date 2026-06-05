@@ -16,7 +16,7 @@ from urllib.request import urlopen
 import pytest
 
 from spicy_regs.pipelines import Pipeline
-from spicy_regs.records import RecordType
+from spicy_regs.schemas import RecordType
 from spicy_regs.sources import Reader, Writer
 
 
