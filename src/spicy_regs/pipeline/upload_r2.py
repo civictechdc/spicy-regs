@@ -79,7 +79,7 @@ def _assert_upload_safe(
         )
 
 
-def upload_to_r2(local_path: Path, remote_key: str = None):
+def upload_to_r2(local_path: Path, remote_key: str | None = None):
     """Upload a file to R2 bucket.
 
     Before overwriting an existing remote object, checks the current
@@ -117,7 +117,7 @@ def upload_to_r2(local_path: Path, remote_key: str = None):
     logger.info("Uploaded: {}/{}", public_url, remote_key)
 
 
-def upload_directory_to_r2(local_dir: Path, remote_prefix: str = None):
+def upload_directory_to_r2(local_dir: Path, remote_prefix: str | None = None):
     """Recursively upload a directory to R2, preserving relative paths as keys."""
     if not local_dir.is_dir():
         print(f"  Skipping (not a directory): {local_dir}")

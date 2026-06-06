@@ -5,6 +5,7 @@ Top-level flow with per-agency subflows for extract → transform → load.
 All configuration lives here and is passed down via function parameters.
 """
 
+from collections.abc import Callable, Container
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from json import dumps as json_dumps
@@ -12,7 +13,7 @@ from os import getenv
 from pathlib import Path
 from shutil import rmtree
 
-from typing import Annotated
+from typing import Annotated, TypedDict
 
 from botocore import UNSIGNED
 from botocore.config import Config as BotoConfig
@@ -76,7 +77,7 @@ PREFIX = "raw-data"
 # lookups during extraction.  Loaded from manifest by load_manifest().
 # NEW_KEYS: plain set that tracks keys added during this run, used to
 # append to the manifest on save.
-PROCESSED_KEYS: object = set()  # BloomFilter after load_manifest()
+PROCESSED_KEYS: Container[str] = set()  # BloomFilter after load_manifest()
 NEW_KEYS: set[str] = set()
 
 def _extract_comment(d: dict) -> dict:
@@ -116,7 +117,13 @@ DEDUP_KEYS: dict[str, str] = {
 }
 
 
-DATA_TYPES = {
+class _DataTypeConfig(TypedDict):
+    path_pattern: str
+    schema: dict[str, type]
+    extract: Callable[[dict], dict]
+
+
+DATA_TYPES: dict[str, _DataTypeConfig] = {
     "dockets": {
         "path_pattern": "/docket/",
         "schema": {
@@ -325,7 +332,7 @@ app = App(name="spicy-regs-pipeline", help="Spicy Regs Mirrulations ETL Pipeline
 
 
 @app.default
-@flow(name="spicy-regs-etl", log_prints=True, task_runner=ThreadPoolTaskRunner(max_workers=3))
+@flow(name="spicy-regs-etl", log_prints=True, task_runner=ThreadPoolTaskRunner(max_workers=3))  # ty: ignore[no-matching-overload]
 def pipeline(
     agency: Annotated[str | None, Parameter(help="Process only this agency")] = None,
     output_dir: Annotated[Path | None, Parameter(help="Output directory")] = None,

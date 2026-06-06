@@ -23,7 +23,7 @@ def _escape_sql_string(value: str) -> str:
 
 def _import_duckdb():
     try:
-        import duckdb  # type: ignore
+        import duckdb
     except ModuleNotFoundError:
         print(
             json.dumps(

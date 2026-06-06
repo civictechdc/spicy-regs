@@ -404,7 +404,7 @@ def partition_comments(output_dir: Path) -> Path:
         unique_agencies = set(a for a in agencies if a is not None)
 
         for agency in unique_agencies:
-            mask = pa.compute.equal(table.column("agency_code"), agency)
+            mask = pa.compute.equal(table.column("agency_code"), agency)  # ty: ignore[unresolved-attribute]
             agency_table = table.filter(mask).drop(["agency_code"])
             agency_table = agency_table.cast(target_schema)
 
@@ -443,6 +443,7 @@ def partition_comments(output_dir: Path) -> Path:
     # Column list without agency_code — we pass this explicitly to the
     # SELECT so DuckDB doesn't re-infer the hive partition column and
     # bake it back into the file.
+    assert target_schema is not None, "target_schema is populated in the first batch above"
     select_cols = ", ".join(
         f'"{f.name}"' for f in target_schema if f.name != "agency_code"
     )

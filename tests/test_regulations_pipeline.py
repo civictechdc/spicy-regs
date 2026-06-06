@@ -7,6 +7,7 @@ exercises the actual source→transform→sink flow without any network.
 
 from json import dumps
 from pathlib import Path
+from typing import Any
 
 import polars as pl
 import pytest
@@ -147,8 +148,8 @@ def test_run_with_no_records_is_noop(tmp_output: Path, monkeypatch: pytest.Monke
 # --- incremental dedup -----------------------------------------------------
 
 
-def _run(tmp_output: Path, **overrides) -> None:
-    kwargs = dict(
+def _run(tmp_output: Path, **overrides: Any) -> None:
+    kwargs: dict[str, Any] = dict(
         agency=AGENCY, output_dir=tmp_output, skip_comments=True,
         skip_post_process=True, skip_upload=True,
     )

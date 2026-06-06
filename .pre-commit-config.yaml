@@ -20,10 +20,6 @@ repos:
         types_or: [python, pyi]
         require_serial: true
 
-      # ty is currently a manual-stage hook because the codebase has
-      # pre-existing type errors. Run on demand with:
-      #   uv run pre-commit run --hook-stage manual ty --all-files
-      # Once the codebase is clean we can promote this to the default stage.
       - id: ty
         name: ty (type check)
         entry: uv run ty check
@@ -31,4 +27,3 @@ repos:
         types_or: [python, pyi]
         pass_filenames: false
         require_serial: true
-        stages: [manual]

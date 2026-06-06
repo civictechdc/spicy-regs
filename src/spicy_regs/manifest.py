@@ -15,7 +15,7 @@ from R2 when not present locally). A false positive only means a genuinely new
 file is skipped this run and picked up on the next one — never data loss.
 """
 
-from collections.abc import Iterable
+from collections.abc import Container, Iterable
 from pathlib import Path
 from threading import Lock
 
@@ -34,7 +34,7 @@ class Manifest:
     for a loaded manifest, or a set for the empty/bootstrap case).
     """
 
-    def __init__(self, processed: object) -> None:
+    def __init__(self, processed: Container[str]) -> None:
         self._processed = processed
         self._new_keys: set[str] = set()
         self._lock = Lock()

@@ -79,6 +79,11 @@ class MirrulationsReader(Reader):
         self.last_keys: list[str] = []
 
     def iter_records(self) -> Iterator[dict]:
+        if self.record_type.path_pattern is None:
+            raise ValueError(
+                f"MirrulationsReader requires a path-addressable record type, "
+                f"but {self.record_type.name!r} has no path_pattern."
+            )
         self.last_keys = list_json_files(
             self.s3_resource,
             self.bucket,

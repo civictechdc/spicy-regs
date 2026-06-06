@@ -16,7 +16,14 @@ class Reader(ABC):
     Subclasses configure connection details via ``__init__`` and yield
     records (dicts) from ``iter_records``. Pagination, batching, retries,
     and dedup semantics are the subclass's responsibility.
+
+    Subclasses that pull from a keyed source (S3 keys, URLs, file paths)
+    should populate ``last_keys`` during ``iter_records`` so the caller
+    can append the consumed keys to a manifest. Default is an empty list
+    for sources without addressable keys.
     """
+
+    last_keys: list[str] = []
 
     @abstractmethod
     def iter_records(self) -> Iterator[dict]: ...

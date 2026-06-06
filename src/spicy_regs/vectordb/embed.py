@@ -26,7 +26,7 @@ import polars as pl
 from tqdm import tqdm
 
 try:
-    from sentence_transformers import SentenceTransformer
+    from sentence_transformers import SentenceTransformer  # ty: ignore[unresolved-import]
 except ImportError:
     print("Please install sentence-transformers: pip install sentence-transformers torch")
     exit(1)

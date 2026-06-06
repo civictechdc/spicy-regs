@@ -33,17 +33,15 @@ Prerequisites: **Python 3.10+** and [**uv**](https://docs.astral.sh/uv/getting-s
    uv run ruff check .
    uv run ruff format .   # auto-format
    ```
-6. (Recommended) Install the pre-commit hooks so ruff runs automatically
-   on `git commit`:
+6. (Recommended) Install the pre-commit hooks so ruff and ty run
+   automatically on `git commit`:
    ```bash
    uv run pre-commit install
    ```
-   The hooks run `ruff check --fix` and `ruff format` on changed files.
-   A `ty` type-check hook is also configured but lives in the **manual**
-   stage while we work through pre-existing type errors. Run it on
-   demand:
+   The hooks run `ruff check --fix`, `ruff format`, and `ty check`. You
+   can also run them manually:
    ```bash
-   uv run pre-commit run --hook-stage manual ty --all-files
+   uv run pre-commit run --all-files
    ```
 
 You don't need any credentials to run the tests or hack on most of the code.
