@@ -28,12 +28,14 @@ embed = [
 dev = [
     "ipykernel",
     "matplotlib",
+    "pre-commit",
     "pyrefly",
     "pytest",
     "ruff",
     "scikit-learn",
     "seaborn",
     "textblob",
+    "ty",
 ]
 
 [project.scripts]
@@ -57,4 +59,13 @@ exclude = [
 [tool.pyrefly]
 project-includes = [
     "**/*.py*"
+]
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.ty.src]
+exclude = [
+    "notebooks",
+    ".venv",
 ]

@@ -1,6 +1,7 @@
 """Tests for the RecordType dataclass."""
 
 from dataclasses import FrozenInstanceError
+from typing import Any
 
 import pytest
 
@@ -11,8 +12,8 @@ def _identity(d: dict) -> dict:
     return d
 
 
-def _valid_kwargs(**overrides: object) -> dict:
-    base = {
+def _valid_kwargs(**overrides: Any) -> dict[str, Any]:
+    base: dict[str, Any] = {
         "name": "widgets",
         "path_pattern": "/widgets/",
         "schema": {"widget_id": str, "modify_date": str},
@@ -37,7 +38,7 @@ def test_valid_instance_round_trips() -> None:
 def test_is_frozen() -> None:
     rt = RecordType(**_valid_kwargs())
     with pytest.raises(FrozenInstanceError):
-        rt.name = "other"  # type: ignore[misc]
+        rt.name = "other"  # ty: ignore[invalid-assignment]
 
 
 def test_dedup_key_must_be_in_schema() -> None:

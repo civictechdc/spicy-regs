@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from itertools import combinations
 from pathlib import Path
+from typing import Any
 
 R2_BASE_URL = "https://r2.spicy-regs.dev"
 
@@ -104,7 +105,7 @@ def _escape_sql_string(value: str) -> str:
 
 def _import_duckdb():
     try:
-        import duckdb  # type: ignore
+        import duckdb
     except ModuleNotFoundError:
         print(
             json.dumps(
@@ -426,7 +427,7 @@ def cluster_pairs(
     min_score: float,
     min_agencies: int,
     max_dominant_agency_share: float,
-) -> list[dict[str, object]]:
+) -> list[dict[str, Any]]:
     uf = UnionFind(len(records))
     for pair in scored_pairs:
         if pair.score >= min_score:
@@ -441,7 +442,7 @@ def cluster_pairs(
         key = (min(pair.left_idx, pair.right_idx), max(pair.left_idx, pair.right_idx))
         pair_lookup[key] = pair
 
-    clusters: list[dict[str, object]] = []
+    clusters: list[dict[str, Any]] = []
     for member_indexes in members_by_root.values():
         if len(member_indexes) < 2:
             continue
@@ -503,7 +504,7 @@ def cluster_pairs(
     return clusters
 
 
-def format_text_report(clusters: list[dict[str, object]], source: str, total_records: int) -> str:
+def format_text_report(clusters: list[dict[str, Any]], source: str, total_records: int) -> str:
     lines = [
         f"source: {source}",
         f"records_scanned: {total_records}",
@@ -525,7 +526,7 @@ def format_text_report(clusters: list[dict[str, object]], source: str, total_rec
     return "\n".join(lines)
 
 
-def format_csv(clusters: list[dict[str, object]]) -> str:
+def format_csv(clusters: list[dict[str, Any]]) -> str:
     buffer = io.StringIO()
     writer = csv.DictWriter(
         buffer,

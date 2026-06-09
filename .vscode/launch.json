@@ -1,19 +1,46 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: FastAPI",
-            "type": "python",
+            "name": "Python: spicy-regs CLI",
+            "type": "debugpy",
             "request": "launch",
-            "module": "uvicorn",
-            "args": [
-                "api.src.main:app", "--reload"
-            ],
-            "jinja": true,
+            "module": "spicy_regs.cli",
+            "console": "integratedTerminal",
             "justMyCode": true
+        },
+        {
+            "name": "Python: run-pipeline (etl)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "spicy_regs.pipelines.regulations",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Python: spicy-regs MCP server (stdio)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "spicy_regs.mcp_server",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Python: current file",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Python: pytest (current file)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": ["${file}", "-v"],
+            "console": "integratedTerminal",
+            "justMyCode": false
         }
     ]
 }
