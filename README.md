@@ -80,11 +80,12 @@ Next steps:
 
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/civictechdc/spicy-regs/HEAD)
 
-## Use with Claude
+## Use with Claude or any AI assistant
 
 - **Claude Code plugin:** `/plugin marketplace add civictechdc/spicy-regs` then `/plugin install spicyregs@spicy-regs-local`. Bundles the skill in this repo. See `plugins/spicyregs/skills/spicyregs/SKILL.md`.
 - **Claude Code via uvx (stdio MCP):** `claude mcp add spicy-regs -- uvx --from "spicy-regs @ git+https://github.com/civictechdc/spicy-regs" spicy-regs-mcp`. No deploy needed.
 - **Claude.ai or any remote MCP client:** deploy `mcp-server/` to Vercel and add the URL as a Custom Connector. See [`mcp-server/README.md`](mcp-server/README.md).
+- **OpenAI / Cursor / Continue / other providers:** see [`plugins/spicyregs/INSTALL.md`](plugins/spicyregs/INSTALL.md) for the full install matrix across providers, including the provider-agnostic prompt fallback for assistants without MCP or skill support.
 
 ## Contributing
 
