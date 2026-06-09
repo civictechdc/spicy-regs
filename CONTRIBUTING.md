@@ -45,8 +45,41 @@ Prerequisites: **Python 3.10+** and [**uv**](https://docs.astral.sh/uv/getting-s
    ```
 
 You don't need any credentials to run the tests or hack on most of the code.
-A `.env` file (copy from `.env.example`) is only required to talk to live
-Cloudflare R2 storage.
+A `.env` file (copy from `.env.example`) is only required to *upload* to live
+Cloudflare R2 storage — reading from the public Mirrulations mirror and
+downloading our published parquet files both work anonymously.
+
+### Get the data on your machine
+
+Two ways to get real data locally — pick whichever fits your task.
+
+**A. Download the published parquet files (fast, ~minutes).** Pulls our
+processed output from the public R2 bucket:
+
+```bash
+uv run spicy-regs download                       # dockets + documents + comments
+uv run spicy-regs download --types comments      # just comments
+uv run spicy-regs stats                          # sanity-check what you got
+uv run spicy-regs sample comments -n 5           # peek at a few rows
+```
+
+Files default to `./spicy-regs-data/`; override with `-o some/dir`.
+
+**B. Run the ETL pipeline yourself (slower, but it's the real thing).**
+Reads JSON from the Mirrulations S3 mirror, flattens it, writes Parquet to
+`./output/`. Keep the first run tiny so it finishes quickly:
+
+```bash
+# One agency, recent only, comments only — finishes in a few minutes.
+uv run run-pipeline --agency EPA --only-comments --since-year 2025
+```
+
+Outputs land in `./output/` (e.g. `output/comments.parquet`) alongside an
+incremental `manifest.json` — re-running picks up where the last run left
+off. Drop `--only-comments` / `--agency` / `--since-year` to widen the scope;
+add `--full-refresh` to ignore the manifest. `uv run run-pipeline --help`
+lists every flag. Upload to R2 stays off by default (`--skip-upload`); only
+the maintainers publish.
 
 ### Stuck?
 
