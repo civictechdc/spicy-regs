@@ -16,6 +16,7 @@ tool surface (names, parameters, behavior) in sync between the two files;
 from __future__ import annotations
 
 import os
+import tempfile
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
@@ -54,6 +55,27 @@ def _resolve_r2_base_url() -> str:
 R2_BASE_URL = _resolve_r2_base_url()
 
 
+def _resolve_home_directory() -> str:
+    """Pick a writable directory for DuckDB's extension/home cache.
+
+    DuckDB resolves its extension cache under ``$HOME/.duckdb``. Serverless
+    hosts (Vercel/AWS Lambda) frequently have no writable home directory, or
+    none defined at all, so ``INSTALL httpfs`` fails with
+    ``Can't find the home directory at ''``. Defaulting to the platform temp
+    directory keeps the extension fetch working there while staying valid on
+    local stdio installs; ``SPICY_REGS_HOME_DIR`` overrides it.
+    """
+    raw = os.environ.get("SPICY_REGS_HOME_DIR", tempfile.gettempdir())
+    if any(c in raw for c in ("\x00", "\n", "\r")):
+        raise RuntimeError(
+            f"SPICY_REGS_HOME_DIR contains illegal characters: {raw!r}"
+        )
+    return raw
+
+
+HOME_DIRECTORY = _resolve_home_directory()
+
+
 def _jsonify(value: Any) -> Any:
     """Coerce DuckDB row values into JSON-serializable forms."""
     if value is None or isinstance(value, (str, int, float, bool)):
@@ -77,6 +99,10 @@ def _jsonify(value: Any) -> Any:
 
 def _connect() -> duckdb.DuckDBPyConnection:
     con = duckdb.connect()
+    # Must precede INSTALL/LOAD: that step writes the extension under
+    # <home_directory>/.duckdb, and the default home is read-only or undefined
+    # on serverless hosts.
+    con.execute(f"SET home_directory='{HOME_DIRECTORY.replace(chr(39), chr(39) * 2)}'")
     con.execute("INSTALL httpfs")
     con.execute("LOAD httpfs")
     con.execute("SET preserve_insertion_order=false")
