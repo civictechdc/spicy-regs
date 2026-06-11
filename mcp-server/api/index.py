@@ -166,4 +166,22 @@ def query_sql(sql: str, max_rows: int = 25) -> dict[str, Any]:
     }
 
 
-app = mcp.streamable_http_app()
+_asgi_app = mcp.streamable_http_app()
+
+_FUNCTION_PATH = "/api/index"
+
+
+async def app(scope, receive, send):
+    """ASGI entry point for Vercel.
+
+    vercel.json rewrites /mcp to this function. Only the exact function path
+    (/api/index) is routable on the platform, and depending on how rewritten
+    requests are forwarded the ASGI path can arrive as the original (/mcp) or
+    as the function path; normalize the latter onto the transport's /mcp
+    mount so both work.
+    """
+    if scope["type"] == "http" and scope.get("path", "").startswith(_FUNCTION_PATH):
+        suffix = scope["path"][len(_FUNCTION_PATH) :]
+        path = suffix if suffix.startswith("/mcp") else "/mcp"
+        scope = {**scope, "path": path, "raw_path": path.encode()}
+    await _asgi_app(scope, receive, send)
