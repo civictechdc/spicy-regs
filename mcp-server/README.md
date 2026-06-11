@@ -33,18 +33,43 @@ Available views: `dockets`, `documents`, `comments`, `comments_index`,
 
 ## Deploy to Vercel
 
-From this directory:
+The production deployment lives at **`https://mcp.spicy-regs.dev/mcp`** —
+that's the MCP endpoint you give to clients.
+
+Deploys run through GitHub Actions
+([`.github/workflows/deploy-mcp.yml`](../.github/workflows/deploy-mcp.yml))
+rather than the Vercel GitHub App, because the app isn't installed on the
+`civictechdc` org. Any push to `main` that touches `mcp-server/` redeploys
+production; the workflow can also be run manually from the Actions tab.
+
+### One-time setup
+
+1. Create a Vercel access token at **vercel.com → Account Settings →
+   Tokens**, scoped to the team that owns the project.
+2. Add it as a repo secret named `VERCEL_TOKEN` (**repo Settings → Secrets
+   and variables → Actions**).
+3. Run the **Deploy MCP server** workflow once (Actions tab →
+   workflow_dispatch). The first run creates the Vercel project
+   (`spicy-regs-mcp`) if it doesn't exist.
+4. In the Vercel dashboard, under **Project → Settings → Domains**, add
+   `mcp.spicy-regs.dev`. If the `spicy-regs.dev` DNS isn't managed by
+   Vercel, add the CNAME record the dashboard shows you (the same setup
+   already used for `app.spicy-regs.dev`).
+
+The team and project name are pinned in the workflow's `VERCEL_SCOPE` and
+`VERCEL_PROJECT` env vars — edit those if the project moves.
+
+> Note: this is a **separate Vercel project** from the `spicy-regs-ui`
+> frontend project that serves `app.spicy-regs.dev`.
+
+### Manual deploys (optional)
+
+From this directory, with the Vercel CLI authenticated:
 
 ```bash
 cd mcp-server
 npx vercel --prod
 ```
-
-Or set the Vercel project's **Root Directory** to `mcp-server/` in the
-dashboard and let Git pushes deploy automatically.
-
-The deployed URL will look like `https://<project>.vercel.app/mcp` — that's
-the MCP endpoint you give to clients.
 
 ### Environment variables (optional)
 
@@ -60,7 +85,7 @@ Requires Pro, Max, Team, or Enterprise.
 
 1. Open **Settings → Connectors → Add custom connector**.
 2. Name it `Spicy Regs`.
-3. URL: `https://<your-vercel-deploy>.vercel.app/mcp`.
+3. URL: `https://mcp.spicy-regs.dev/mcp`.
 4. Leave authentication as None (the bucket is public).
 5. Save and toggle the connector on in any conversation.
 
@@ -68,10 +93,10 @@ Requires Pro, Max, Team, or Enterprise.
 
 Two transports work. Pick one.
 
-**Remote HTTP (after deploying this directory to Vercel):**
+**Remote HTTP:**
 
 ```bash
-claude mcp add --transport http spicy-regs https://<your-vercel-deploy>.vercel.app/mcp
+claude mcp add --transport http spicy-regs https://mcp.spicy-regs.dev/mcp
 ```
 
 **Local stdio via `uvx` (no deploy needed):**

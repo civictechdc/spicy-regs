@@ -1,0 +1,45 @@
+name: Deploy MCP server
+
+# Deploys mcp-server/ to Vercel without the Vercel GitHub App (which isn't
+# installed on the civictechdc org). Needs one repo secret: VERCEL_TOKEN,
+# a Vercel personal access token with access to the team in VERCEL_SCOPE.
+# The first run creates the Vercel project if it doesn't exist yet.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mcp-server/**'
+      - '.github/workflows/deploy-mcp.yml'
+  workflow_dispatch:
+
+env:
+  VERCEL_SCOPE: kvec
+  VERCEL_PROJECT: spicy-regs-mcp
+
+concurrency:
+  group: deploy-mcp
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Link Vercel project
+        working-directory: mcp-server
+        run: >
+          npx vercel@latest link --yes
+          --scope "$VERCEL_SCOPE"
+          --project "$VERCEL_PROJECT"
+          --token "${{ secrets.VERCEL_TOKEN }}"
+
+      - name: Deploy to Vercel (production)
+        working-directory: mcp-server
+        run: >
+          npx vercel@latest deploy --prod --yes
+          --token "${{ secrets.VERCEL_TOKEN }}"
