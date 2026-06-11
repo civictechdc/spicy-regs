@@ -17,6 +17,7 @@ from uuid import UUID
 
 import duckdb
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 DEFAULT_R2_BASE_URL = "https://pub-5fc11ad134984edf8d9af452dd1849d6.r2.dev"
 TABLES = ("dockets", "documents", "comments", "comments_index", "feed_summary")
@@ -89,6 +90,13 @@ mcp = FastMCP(
     instructions=INSTRUCTIONS,
     stateless_http=True,
     streamable_http_path="/mcp",
+    # The hosted deployment is reached via mcp.spicy-regs.dev and per-deploy
+    # *.vercel.app hosts; FastMCP's default localhost-only DNS-rebinding
+    # allowlist would reject all of them with 421. The server is public,
+    # stateless, and read-only, so rebinding protection buys nothing here.
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=False
+    ),
 )
 
 
