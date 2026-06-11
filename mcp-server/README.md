@@ -36,20 +36,30 @@ Available views: `dockets`, `documents`, `comments`, `comments_index`,
 The production deployment lives at **`https://mcp.spicy-regs.dev/mcp`** —
 that's the MCP endpoint you give to clients.
 
-### One-time project setup (dashboard)
+Deploys run through GitHub Actions
+([`.github/workflows/deploy-mcp.yml`](../.github/workflows/deploy-mcp.yml))
+rather than the Vercel GitHub App, because the app isn't installed on the
+`civictechdc` org. Any push to `main` that touches `mcp-server/` redeploys
+production; the workflow can also be run manually from the Actions tab.
 
-1. In the Vercel dashboard, **Add New → Project** and import this repo
-   (`civictechdc/spicy-regs`).
-2. Name the project (e.g. `spicy-regs-mcp`) and set **Root Directory** to
-   `mcp-server`. Leave Framework Preset as **Other** — `vercel.json` and the
-   `api/` directory drive the build.
-3. Deploy. Pushes to `main` now redeploy production automatically; PRs get
-   preview deployments.
-4. Under **Project → Settings → Domains**, add `mcp.spicy-regs.dev`. If the
-   `spicy-regs.dev` DNS isn't managed by Vercel, add the CNAME record the
-   dashboard shows you (the same setup already used for `app.spicy-regs.dev`).
+### One-time setup
 
-> Note: this must be a **separate Vercel project** from the `spicy-regs-ui`
+1. Create a Vercel access token at **vercel.com → Account Settings →
+   Tokens**, scoped to the team that owns the project.
+2. Add it as a repo secret named `VERCEL_TOKEN` (**repo Settings → Secrets
+   and variables → Actions**).
+3. Run the **Deploy MCP server** workflow once (Actions tab →
+   workflow_dispatch). The first run creates the Vercel project
+   (`spicy-regs-mcp`) if it doesn't exist.
+4. In the Vercel dashboard, under **Project → Settings → Domains**, add
+   `mcp.spicy-regs.dev`. If the `spicy-regs.dev` DNS isn't managed by
+   Vercel, add the CNAME record the dashboard shows you (the same setup
+   already used for `app.spicy-regs.dev`).
+
+The team and project name are pinned in the workflow's `VERCEL_SCOPE` and
+`VERCEL_PROJECT` env vars — edit those if the project moves.
+
+> Note: this is a **separate Vercel project** from the `spicy-regs-ui`
 > frontend project that serves `app.spicy-regs.dev`.
 
 ### Manual deploys (optional)
