@@ -48,6 +48,10 @@ These fields are stable enough to start with, but use `--describe` for the actua
 - `comment_id`
 - `docket_id`
 - `agency_code`
+- `first_name`
+- `last_name`
+- `organization`
+- `category`
 - `title`
 - `comment`
 - `document_type`

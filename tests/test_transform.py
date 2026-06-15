@@ -553,6 +553,54 @@ class TestMergeCommentsPartitioned:
         assert set(df["comment_id"].to_list()) == {"C-EXIST", "C-NEW"}
 
     @patch("spicy_regs.pipeline.download_r2.download_from_r2", return_value=False)
+    def test_merges_existing_partition_missing_new_columns(self, mock_dl, tmp_path):
+        """An existing partition written before submitter columns were added
+        must still merge: its missing columns surface as NULL rather than
+        raising a binder error."""
+        staging = tmp_path / "staging"
+        output = tmp_path / "output"
+        output.mkdir()
+
+        # Existing partition with the OLD schema (no submitter columns).
+        old_schema = {
+            c: t for c, t in COMMENT_SCHEMA.items()
+            if c not in {"first_name", "last_name", "organization", "category"}
+        }
+        partition_dir = output / "comments" / "agency_code=EPA" / "docket_id=EPA-2024-0001" / "year=2024" / "month=6"
+        partition_dir.mkdir(parents=True)
+        existing = [
+            {"comment_id": "C-OLD", "docket_id": "EPA-2024-0001", "agency_code": "EPA",
+             "title": "existing", "comment": "already here", "document_type": "Public Comment",
+             "posted_date": "2024-06-15T00:00:00Z", "modify_date": "2024-06-15",
+             "receive_date": "2024-06-15", "attachments_json": None},
+        ]
+        write_parquet_from_dicts(partition_dir / "part-0.parquet", existing, old_schema)
+
+        # New staging row carrying the full (evolved) schema.
+        new_comment = [
+            {"comment_id": "C-NEW", "docket_id": "EPA-2024-0001", "agency_code": "EPA",
+             "first_name": "Ada", "last_name": "Lovelace", "organization": None, "category": "Individual",
+             "title": "new", "comment": "just added", "document_type": "Public Comment",
+             "posted_date": "2024-06-20T00:00:00Z", "modify_date": "2024-06-20",
+             "receive_date": "2024-06-20", "attachments_json": None},
+        ]
+        write_staging("EPA", "comments", new_comment, staging, COMMENT_SCHEMA)
+
+        changed = merge_comments_partitioned(staging, output, COMMENT_SCHEMA, "comment_id")
+        assert len(changed) == 1
+
+        df = pl.read_parquet(changed[0])
+        assert set(df["comment_id"].to_list()) == {"C-OLD", "C-NEW"}
+        # The old row backfills the new columns as NULL.
+        old_row = df.filter(pl.col("comment_id") == "C-OLD")
+        assert old_row["organization"][0] is None
+        assert old_row["category"][0] is None
+        # The new row keeps its recovered submitter values.
+        new_row = df.filter(pl.col("comment_id") == "C-NEW")
+        assert new_row["first_name"][0] == "Ada"
+        assert new_row["category"][0] == "Individual"
+
+    @patch("spicy_regs.pipeline.download_r2.download_from_r2", return_value=False)
     def test_returns_empty_for_no_staging(self, mock_dl, tmp_path):
         staging = tmp_path / "staging"
         output = tmp_path / "output"

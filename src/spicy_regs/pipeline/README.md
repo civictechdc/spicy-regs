@@ -108,12 +108,17 @@ All columns are stored as strings (`large_string` in PyArrow).
 | `comment_id` | Unique comment identifier |
 | `docket_id` | Parent docket ID |
 | `agency_code` | Agency abbreviation |
+| `first_name` | Submitter first name (often null) |
+| `last_name` | Submitter last name (often null) |
+| `organization` | Submitter organization (often null) |
+| `category` | Submitter type / category (often null) |
 | `title` | Commenter name/title |
 | `comment` | Full comment text body |
 | `document_type` | Type of parent document |
 | `posted_date` | Date posted (ISO 8601) |
 | `modify_date` | Last modification date |
 | `receive_date` | Date received |
+| `attachments_json` | Compact JSON array of comment attachments |
 
 ## Output Structure on R2
 
