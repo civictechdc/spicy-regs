@@ -81,6 +81,10 @@ def test_comment_extract_packs_attachments_json() -> None:
             "attributes": {
                 "docketId": '"EPA-2024-0001"',
                 "agencyId": "EPA",
+                "firstName": "Ada",
+                "lastName": "Lovelace",
+                "organization": "Analytical Society",
+                "category": "Individual",
                 "title": "Support",
                 "comment": "I support this",
                 "documentType": "Public Comment",
@@ -106,6 +110,10 @@ def test_comment_extract_packs_attachments_json() -> None:
     out = COMMENT.extract(raw)
     assert out["comment_id"] == "EPA-2024-0001-0050"
     assert out["docket_id"] == "EPA-2024-0001"
+    assert out["first_name"] == "Ada"
+    assert out["last_name"] == "Lovelace"
+    assert out["organization"] == "Analytical Society"
+    assert out["category"] == "Individual"
     attachments = loads(out["attachments_json"])
     assert attachments == [
         {
@@ -118,3 +126,14 @@ def test_comment_extract_packs_attachments_json() -> None:
 def test_comment_extract_no_attachments_is_none() -> None:
     raw = {"data": {"id": "C-1", "attributes": {"docketId": "D-1"}}}
     assert COMMENT.extract(raw)["attachments_json"] is None
+
+
+def test_comment_extract_missing_submitter_fields_are_none() -> None:
+    # Submitter fields are recovered from the source attributes but are often
+    # absent (e.g. anonymous submissions); they should surface as None, not KeyError.
+    raw = {"data": {"id": "C-1", "attributes": {"docketId": "D-1"}}}
+    out = COMMENT.extract(raw)
+    assert out["first_name"] is None
+    assert out["last_name"] is None
+    assert out["organization"] is None
+    assert out["category"] is None

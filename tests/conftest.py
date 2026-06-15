@@ -47,10 +47,10 @@ def sample_dockets() -> list[dict]:
 @pytest.fixture
 def sample_comments() -> list[dict]:
     return [
-        {"comment_id": "C-001", "docket_id": "EPA-2024-0001", "agency_code": "EPA", "title": "Support", "comment": "I support this", "document_type": "Public Comment", "posted_date": "2024-06-20", "modify_date": "2024-06-20", "receive_date": "2024-06-20", "attachments_json": None},
-        {"comment_id": "C-002", "docket_id": "EPA-2024-0001", "agency_code": "EPA", "title": "Oppose", "comment": "I oppose this", "document_type": "Public Comment", "posted_date": "2024-06-21", "modify_date": "2024-06-21", "receive_date": "2024-06-21", "attachments_json": None},
-        {"comment_id": "C-003", "docket_id": "FDA-2024-0010", "agency_code": "FDA", "title": "Question", "comment": "What about X?", "document_type": "Public Comment", "posted_date": "2024-05-10", "modify_date": "2024-05-10", "receive_date": "2024-05-10", "attachments_json": None},
-        {"comment_id": "C-004", "docket_id": "EPA-2024-0002", "agency_code": "EPA", "title": "Feedback", "comment": "More data needed", "document_type": "Public Comment", "posted_date": "2024-07-25", "modify_date": "2024-07-25", "receive_date": "2024-07-25", "attachments_json": None},
+        {"comment_id": "C-001", "docket_id": "EPA-2024-0001", "agency_code": "EPA", "first_name": "Ada", "last_name": "Lovelace", "organization": None, "category": "Individual", "title": "Support", "comment": "I support this", "document_type": "Public Comment", "posted_date": "2024-06-20", "modify_date": "2024-06-20", "receive_date": "2024-06-20", "attachments_json": None},
+        {"comment_id": "C-002", "docket_id": "EPA-2024-0001", "agency_code": "EPA", "first_name": None, "last_name": None, "organization": "Sierra Club", "category": "Organization", "title": "Oppose", "comment": "I oppose this", "document_type": "Public Comment", "posted_date": "2024-06-21", "modify_date": "2024-06-21", "receive_date": "2024-06-21", "attachments_json": None},
+        {"comment_id": "C-003", "docket_id": "FDA-2024-0010", "agency_code": "FDA", "first_name": "Grace", "last_name": "Hopper", "organization": None, "category": None, "title": "Question", "comment": "What about X?", "document_type": "Public Comment", "posted_date": "2024-05-10", "modify_date": "2024-05-10", "receive_date": "2024-05-10", "attachments_json": None},
+        {"comment_id": "C-004", "docket_id": "EPA-2024-0002", "agency_code": "EPA", "first_name": None, "last_name": None, "organization": None, "category": None, "title": "Feedback", "comment": "More data needed", "document_type": "Public Comment", "posted_date": "2024-07-25", "modify_date": "2024-07-25", "receive_date": "2024-07-25", "attachments_json": None},
     ]
 
 
@@ -75,6 +75,10 @@ COMMENT_SCHEMA = {
     "comment_id": pl.Utf8,
     "docket_id": pl.Utf8,
     "agency_code": pl.Utf8,
+    "first_name": pl.Utf8,
+    "last_name": pl.Utf8,
+    "organization": pl.Utf8,
+    "category": pl.Utf8,
     "title": pl.Utf8,
     "comment": pl.Utf8,
     "document_type": pl.Utf8,
