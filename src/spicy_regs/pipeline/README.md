@@ -85,6 +85,7 @@ All columns are stored as strings (`large_string` in PyArrow).
 | `docket_type` | Type of docket (e.g., `Rulemaking`, `Nonrulemaking`) |
 | `modify_date` | Last modification date (ISO 8601) |
 | `abstract` | Docket description/abstract |
+| `rin` | Regulation Identifier Number for the rulemaking (often null) |
 
 ### Documents (~2.1M rows)
 
@@ -102,6 +103,7 @@ All columns are stored as strings (`large_string` in PyArrow).
 | `file_url` | URL to the original document file |
 | `withdrawn` | Whether the document was withdrawn (`"true"`/`"false"`, often null) |
 | `reason_withdrawn` | Stated reason for withdrawal (often null) |
+| `additional_rins` | JSON array of additional RINs linked to the document (often null) |
 
 ### Comments (~31.6M rows)
 

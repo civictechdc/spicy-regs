@@ -30,6 +30,7 @@ def test_docket_extract() -> None:
                 "docketType": "Rulemaking",
                 "modifyDate": "2024-06-15",
                 "dkAbstract": "Proposed rule",
+                "rin": "2060-AG12",
             },
         }
     }
@@ -40,7 +41,15 @@ def test_docket_extract() -> None:
         "docket_type": "Rulemaking",
         "modify_date": "2024-06-15",
         "abstract": "Proposed rule",
+        "rin": "2060-AG12",
     }
+
+
+def test_docket_extract_missing_rin_is_none() -> None:
+    # rin is the docket-level Regulation Identifier Number; it is often absent
+    # (e.g. nonrulemaking dockets) and should surface as None, not KeyError.
+    raw = {"data": {"id": "X-1", "attributes": {}}}
+    assert DOCKET.extract(raw)["rin"] is None
 
 
 def test_document_extract_takes_first_file_url() -> None:
@@ -62,6 +71,7 @@ def test_document_extract_takes_first_file_url() -> None:
                 ],
                 "withdrawn": True,
                 "reasonWithdrawn": "Superseded by revised proposal",
+                "additionalRins": ["2060-AG12", "2060-AG13"],
             },
         }
     }
@@ -71,6 +81,7 @@ def test_document_extract_takes_first_file_url() -> None:
     assert out["file_url"] == "https://example.gov/a.pdf"
     assert out["withdrawn"] is True
     assert out["reason_withdrawn"] == "Superseded by revised proposal"
+    assert loads(out["additional_rins"]) == ["2060-AG12", "2060-AG13"]
 
 
 def test_document_extract_handles_missing_file_formats() -> None:
@@ -85,6 +96,15 @@ def test_document_extract_missing_withdrawal_fields_are_none() -> None:
     out = DOCUMENT.extract(raw)
     assert out["withdrawn"] is None
     assert out["reason_withdrawn"] is None
+
+
+def test_document_extract_additional_rins_empty_or_missing_is_none() -> None:
+    # additionalRins is a source array exploded into a link table downstream;
+    # both an absent key and an empty list should collapse to None rather than
+    # an empty-JSON string, so nothing is materialized for documents with no RINs.
+    assert DOCUMENT.extract({"data": {"id": "X-1", "attributes": {}}})["additional_rins"] is None
+    raw_empty = {"data": {"id": "X-2", "attributes": {"additionalRins": []}}}
+    assert DOCUMENT.extract(raw_empty)["additional_rins"] is None
 
 
 def test_comment_extract_packs_attachments_json() -> None:

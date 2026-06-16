@@ -137,6 +137,7 @@ DATA_TYPES: dict[str, _DataTypeConfig] = {
             "docket_type": pl.Utf8,
             "modify_date": pl.Utf8,
             "abstract": pl.Utf8,
+            "rin": pl.Utf8,
         },
         "extract": lambda d: {
             "docket_id": (v.strip('"') if (v := d.get("data", {}).get("id")) else v),
@@ -145,6 +146,7 @@ DATA_TYPES: dict[str, _DataTypeConfig] = {
             "docket_type": d.get("data", {}).get("attributes", {}).get("docketType"),
             "modify_date": d.get("data", {}).get("attributes", {}).get("modifyDate"),
             "abstract": d.get("data", {}).get("attributes", {}).get("dkAbstract"),
+            "rin": d.get("data", {}).get("attributes", {}).get("rin"),
         },
     },
     "documents": {
@@ -162,6 +164,7 @@ DATA_TYPES: dict[str, _DataTypeConfig] = {
             "file_url": pl.Utf8,
             "withdrawn": pl.Utf8,
             "reason_withdrawn": pl.Utf8,
+            "additional_rins": pl.Utf8,
         },
         "extract": lambda d: {
             "document_id": d.get("data", {}).get("id"),
@@ -176,6 +179,7 @@ DATA_TYPES: dict[str, _DataTypeConfig] = {
             "file_url": (d.get("data", {}).get("attributes", {}).get("fileFormats") or [{}])[0].get("fileUrl"),
             "withdrawn": d.get("data", {}).get("attributes", {}).get("withdrawn"),
             "reason_withdrawn": d.get("data", {}).get("attributes", {}).get("reasonWithdrawn"),
+            "additional_rins": (json_dumps(rins) if (rins := d.get("data", {}).get("attributes", {}).get("additionalRins")) else None),
         },
     },
     "comments": {

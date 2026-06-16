@@ -29,6 +29,7 @@ These fields are stable enough to start with, but use `--describe` for the actua
 - `docket_type`
 - `modify_date`
 - `abstract`
+- `rin` (Regulation Identifier Number, often null)
 
 ### documents
 
@@ -44,6 +45,7 @@ These fields are stable enough to start with, but use `--describe` for the actua
 - `file_url`
 - `withdrawn` (`"true"`/`"false"`, often null)
 - `reason_withdrawn` (often null)
+- `additional_rins` (JSON array of extra RINs, often null)
 
 ### comments
 
