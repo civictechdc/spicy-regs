@@ -60,6 +60,8 @@ def test_document_extract_takes_first_file_url() -> None:
                     {"fileUrl": "https://example.gov/a.pdf"},
                     {"fileUrl": "https://example.gov/b.pdf"},
                 ],
+                "withdrawn": True,
+                "reasonWithdrawn": "Superseded by revised proposal",
             },
         }
     }
@@ -67,11 +69,22 @@ def test_document_extract_takes_first_file_url() -> None:
     assert out["document_id"] == "EPA-2024-0001-0002"
     assert out["docket_id"] == "EPA-2024-0001"
     assert out["file_url"] == "https://example.gov/a.pdf"
+    assert out["withdrawn"] is True
+    assert out["reason_withdrawn"] == "Superseded by revised proposal"
 
 
 def test_document_extract_handles_missing_file_formats() -> None:
     raw = {"data": {"id": "X-1", "attributes": {}}}
     assert DOCUMENT.extract(raw)["file_url"] is None
+
+
+def test_document_extract_missing_withdrawal_fields_are_none() -> None:
+    # withdrawn/reason_withdrawn come from the source attributes but are absent
+    # on most documents; they should surface as None, not KeyError.
+    raw = {"data": {"id": "X-1", "attributes": {}}}
+    out = DOCUMENT.extract(raw)
+    assert out["withdrawn"] is None
+    assert out["reason_withdrawn"] is None
 
 
 def test_comment_extract_packs_attachments_json() -> None:

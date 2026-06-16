@@ -160,6 +160,8 @@ DATA_TYPES: dict[str, _DataTypeConfig] = {
             "comment_start_date": pl.Utf8,
             "comment_end_date": pl.Utf8,
             "file_url": pl.Utf8,
+            "withdrawn": pl.Utf8,
+            "reason_withdrawn": pl.Utf8,
         },
         "extract": lambda d: {
             "document_id": d.get("data", {}).get("id"),
@@ -172,6 +174,8 @@ DATA_TYPES: dict[str, _DataTypeConfig] = {
             "comment_start_date": d.get("data", {}).get("attributes", {}).get("commentStartDate"),
             "comment_end_date": d.get("data", {}).get("attributes", {}).get("commentEndDate"),
             "file_url": (d.get("data", {}).get("attributes", {}).get("fileFormats") or [{}])[0].get("fileUrl"),
+            "withdrawn": d.get("data", {}).get("attributes", {}).get("withdrawn"),
+            "reason_withdrawn": d.get("data", {}).get("attributes", {}).get("reasonWithdrawn"),
         },
     },
     "comments": {
