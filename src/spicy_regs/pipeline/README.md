@@ -100,6 +100,8 @@ All columns are stored as strings (`large_string` in PyArrow).
 | `comment_start_date` | Comment period start |
 | `comment_end_date` | Comment period end |
 | `file_url` | URL to the original document file |
+| `withdrawn` | Whether the document was withdrawn (`"true"`/`"false"`, often null) |
+| `reason_withdrawn` | Stated reason for withdrawal (often null) |
 
 ### Comments (~31.6M rows)
 

@@ -42,6 +42,8 @@ These fields are stable enough to start with, but use `--describe` for the actua
 - `comment_start_date`
 - `comment_end_date`
 - `file_url`
+- `withdrawn` (`"true"`/`"false"`, often null)
+- `reason_withdrawn` (often null)
 
 ### comments
 
