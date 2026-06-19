@@ -49,6 +49,15 @@ spicy-regs-mcp = "spicy_regs.mcp_server:main"
 requires = ["uv_build"]
 build-backend = "uv_build"
 
+[tool.pytest.ini_options]
+# Integration tests hit external services (the public Mirrulations S3 mirror)
+# and are excluded from the default run so the unit suite stays hermetic. The
+# dedicated "Integration (live data)" workflow runs them via `-m integration`.
+addopts = "-m 'not integration'"
+markers = [
+    "integration: live test against external data (anonymous Mirrulations S3); run in the Integration CI workflow, not the default suite",
+]
+
 [tool.ruff]
 line-length = 120
 target-version = "py312"
