@@ -21,6 +21,7 @@ def test_extract_records_flattens_raw_payloads() -> None:
                 "docketType": "Rulemaking",
                 "modifyDate": "2024-06-15",
                 "dkAbstract": "Proposed rule",
+                "rin": "2060-AG12",
             },
         }
     }
@@ -33,6 +34,7 @@ def test_extract_records_flattens_raw_payloads() -> None:
             "docket_type": "Rulemaking",
             "modify_date": "2024-06-15",
             "abstract": "Proposed rule",
+            "rin": "2060-AG12",
         }
     ]
 
