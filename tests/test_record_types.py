@@ -1,8 +1,11 @@
 """Tests for the RecordType registry in spicy_regs.schemas.regulations."""
 
 from json import loads
+from pathlib import Path
 
 from spicy_regs.schemas import COMMENT, DOCKET, DOCUMENT, RECORD_TYPES, RecordType
+
+SAMPLE_DATA = Path(__file__).resolve().parents[1] / "sample-data" / "mirrulations"
 
 
 def test_registry_keys_and_names_match() -> None:
@@ -119,6 +122,24 @@ def test_document_extract_handles_missing_file_formats() -> None:
     assert out["file_url"] is None
     assert out["attachments_json"] is None
     assert out["fr_doc_num"] is None
+
+
+def test_document_extract_matches_real_sample_payload() -> None:
+    # Guard against drift from the real regulations.gov shape: run the extract
+    # against the committed sample payload, not a hand-built dict.
+    raw = loads((SAMPLE_DATA / "document-ACF-2025-0038-0001.json").read_text())
+    out = DOCUMENT.extract(raw)
+    assert out["document_id"] == "ACF-2025-0038-0001"
+    assert out["docket_id"] == "ACF-2025-0038"
+    assert out["fr_doc_num"] == "2025-13790"
+    assert out["file_url"] == "https://downloads.regulations.gov/ACF-2025-0038-0001/content.pdf"
+    assert loads(out["attachments_json"]) == [
+        {
+            "url": "https://downloads.regulations.gov/ACF-2025-0038-0001/content.pdf",
+            "format": "pdf",
+            "size": 239826,
+        }
+    ]
 
 
 def test_document_extract_missing_withdrawal_fields_are_none() -> None:
