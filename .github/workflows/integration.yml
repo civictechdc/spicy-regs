@@ -33,4 +33,7 @@ jobs:
         run: uv sync
 
       - name: Run integration tests (live Mirrulations S3)
-        run: uv run pytest -m integration -v
+        # -s disables pytest output capture so loguru's step-by-step logs
+        # (which write to stderr) stream live into the Actions log, not just
+        # on failure. -v prints each test id.
+        run: uv run pytest -m integration -v -s

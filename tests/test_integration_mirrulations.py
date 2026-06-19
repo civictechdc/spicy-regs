@@ -18,6 +18,7 @@ import polars as pl
 import pytest
 from botocore import UNSIGNED
 from botocore.config import Config as BotoConfig
+from loguru import logger
 
 from spicy_regs.pipeline.extract import download_and_parse
 from spicy_regs.pipeline.transform import merge_staging_files, write_staging
@@ -44,15 +45,22 @@ def test_real_document_attachment_metadata_through_transform(tmp_path):
         "s3", region_name="us-east-1", config=BotoConfig(signature_version=UNSIGNED)
     )
 
+    logger.info("Fetching live document s3://{}/{}", BUCKET, DOC_KEY)
     # download_and_parse is the exact function the pipeline uses per file.
     record = download_and_parse(s3, BUCKET, DOC_KEY, DOCUMENT.extract)
     assert record is not None, f"could not fetch {DOC_KEY} from s3://{BUCKET}"
+    logger.success(
+        "Fetched + extracted {} (docket {}, fr_doc_num {})",
+        record["document_id"], record["docket_id"], record["fr_doc_num"],
+    )
 
     staging = tmp_path / "staging"
     output = tmp_path / "output"
     output.mkdir()
 
+    logger.info("Writing staging Parquet under {}", staging)
     write_staging("EPA", "documents", [record], staging, DOCUMENT_SCHEMA)
+    logger.info("Merging staging -> {}/documents.parquet", output)
     merge_staging_files(
         staging, output, ["documents"],
         {"documents": DOCUMENT_SCHEMA},
@@ -60,6 +68,7 @@ def test_real_document_attachment_metadata_through_transform(tmp_path):
     )
 
     merged = pl.read_parquet(output / "documents.parquet")
+    logger.info("Merged output: {} row(s), columns={}", merged.height, merged.columns)
     assert merged.height == 1
     row = merged.row(0, named=True)
 
@@ -68,6 +77,11 @@ def test_real_document_attachment_metadata_through_transform(tmp_path):
     assert row["fr_doc_num"] == EXPECTED_FR_DOC_NUM
 
     attachments = json.loads(row["attachments_json"])
+    logger.info(
+        "Recovered {} attachment(s): {}",
+        len(attachments),
+        ", ".join(f"{a['format']}={a['size']}B" for a in attachments),
+    )
     assert len(attachments) >= 2
     assert {a["format"] for a in attachments} >= {"pdf", "html"}
     for a in attachments:
@@ -76,3 +90,7 @@ def test_real_document_attachment_metadata_through_transform(tmp_path):
 
     # file_url stays the first usable rendition for backward compatibility.
     assert row["file_url"] == attachments[0]["url"]
+    logger.success(
+        "Document attachment metadata survived extract -> staging -> merge "
+        "for {}", row["document_id"],
+    )
