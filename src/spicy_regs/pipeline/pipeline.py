@@ -114,6 +114,37 @@ def _extract_comment(d: dict) -> dict:
     }
 
 
+def _extract_document(d: dict) -> dict:
+    attrs = d.get("data", {}).get("attributes", {})
+
+    # Each fileFormats entry is one downloadable rendition of the document
+    # (e.g. content.pdf), carrying its own URL, format, and byte size. Keep the
+    # full list — the single file_url below is retained for backward compat.
+    attachments = [
+        {"url": f["fileUrl"], "format": f.get("format"), "size": f.get("size")}
+        for f in attrs.get("fileFormats") or []
+        if f.get("fileUrl")
+    ]
+
+    return {
+        "document_id": d.get("data", {}).get("id"),
+        "docket_id": (v.strip('"') if (v := attrs.get("docketId")) else v),
+        "agency_code": attrs.get("agencyId"),
+        "title": attrs.get("title"),
+        "document_type": attrs.get("documentType"),
+        "posted_date": attrs.get("postedDate"),
+        "modify_date": attrs.get("modifyDate"),
+        "comment_start_date": attrs.get("commentStartDate"),
+        "comment_end_date": attrs.get("commentEndDate"),
+        "file_url": attachments[0]["url"] if attachments else None,
+        "attachments_json": json_dumps(attachments) if attachments else None,
+        "fr_doc_num": attrs.get("frDocNum"),
+        "withdrawn": attrs.get("withdrawn"),
+        "reason_withdrawn": attrs.get("reasonWithdrawn"),
+        "additional_rins": (json_dumps(rins) if (rins := attrs.get("additionalRins")) else None),
+    }
+
+
 DEDUP_KEYS: dict[str, str] = {
     "dockets": "docket_id",
     "documents": "document_id",
@@ -162,25 +193,13 @@ DATA_TYPES: dict[str, _DataTypeConfig] = {
             "comment_start_date": pl.Utf8,
             "comment_end_date": pl.Utf8,
             "file_url": pl.Utf8,
+            "attachments_json": pl.Utf8,
+            "fr_doc_num": pl.Utf8,
             "withdrawn": pl.Utf8,
             "reason_withdrawn": pl.Utf8,
             "additional_rins": pl.Utf8,
         },
-        "extract": lambda d: {
-            "document_id": d.get("data", {}).get("id"),
-            "docket_id": (v.strip('"') if (v := d.get("data", {}).get("attributes", {}).get("docketId")) else v),
-            "agency_code": d.get("data", {}).get("attributes", {}).get("agencyId"),
-            "title": d.get("data", {}).get("attributes", {}).get("title"),
-            "document_type": d.get("data", {}).get("attributes", {}).get("documentType"),
-            "posted_date": d.get("data", {}).get("attributes", {}).get("postedDate"),
-            "modify_date": d.get("data", {}).get("attributes", {}).get("modifyDate"),
-            "comment_start_date": d.get("data", {}).get("attributes", {}).get("commentStartDate"),
-            "comment_end_date": d.get("data", {}).get("attributes", {}).get("commentEndDate"),
-            "file_url": (d.get("data", {}).get("attributes", {}).get("fileFormats") or [{}])[0].get("fileUrl"),
-            "withdrawn": d.get("data", {}).get("attributes", {}).get("withdrawn"),
-            "reason_withdrawn": d.get("data", {}).get("attributes", {}).get("reasonWithdrawn"),
-            "additional_rins": (json_dumps(rins) if (rins := d.get("data", {}).get("attributes", {}).get("additionalRins")) else None),
-        },
+        "extract": _extract_document,
     },
     "comments": {
         "path_pattern": "/comments/",

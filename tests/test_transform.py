@@ -1,5 +1,7 @@
 """Tests for transform module: staging, merging, partitioning, feed summary."""
 
+import json
+from pathlib import Path
 from unittest.mock import patch
 
 import polars as pl
@@ -14,12 +16,15 @@ from spicy_regs.pipeline.transform import (
     update_comments_index,
     write_staging,
 )
+from spicy_regs.schemas import DOCUMENT
 from tests.conftest import (
     COMMENT_SCHEMA,
     DOCKET_SCHEMA,
     DOCUMENT_SCHEMA,
     write_parquet_from_dicts,
 )
+
+SAMPLE_DATA = Path(__file__).resolve().parents[1] / "sample-data" / "mirrulations"
 
 
 class TestWriteStaging:
@@ -665,3 +670,75 @@ class TestUpdateCommentsIndex:
         assert len(idx) == 2  # old entry preserved + new entry
         assert idx.filter(pl.col("docket_id") == "OLD-001")["row_count"][0] == 100
         assert idx.filter(pl.col("docket_id") == "NEW-001")["row_count"][0] == 1
+
+
+class TestDocumentAttachmentColumns:
+    """End-to-end coverage that the document attachment columns survive the
+    transform layer: extract -> staging Parquet -> DuckDB merge -> read back."""
+
+    def test_attachment_columns_survive_staging_and_merge(self, tmp_path):
+        staging = tmp_path / "staging"
+        output = tmp_path / "output"
+        output.mkdir()
+
+        # Start from the real regulations.gov sample so the staging schema cast
+        # and merge are exercised against an actual payload.
+        raw = json.loads((SAMPLE_DATA / "document-ACF-2025-0038-0001.json").read_text())
+        record = DOCUMENT.extract(raw)
+        write_staging("ACF", "documents", [record], staging, DOCUMENT_SCHEMA)
+
+        merge_staging_files(
+            staging, output, ["documents"],
+            {"documents": DOCUMENT_SCHEMA},
+            {"documents": "document_id"},
+        )
+
+        merged = pl.read_parquet(output / "documents.parquet")
+        assert merged.height == 1
+        row = merged.row(0, named=True)
+        assert row["document_id"] == "ACF-2025-0038-0001"
+        assert row["fr_doc_num"] == "2025-13790"
+        assert json.loads(row["attachments_json"]) == [
+            {
+                "url": "https://downloads.regulations.gov/ACF-2025-0038-0001/content.pdf",
+                "format": "pdf",
+                "size": 239826,
+            }
+        ]
+
+    def test_merge_unions_new_attachment_columns_into_existing_output(self, tmp_path):
+        # Schema evolution: an existing documents.parquet written before these
+        # columns existed should merge cleanly, with the new columns NULL on the
+        # old row and populated on the freshly-extracted one.
+        staging = tmp_path / "staging"
+        output = tmp_path / "output"
+        output.mkdir()
+
+        legacy_schema = {k: v for k, v in DOCUMENT_SCHEMA.items() if k not in ("attachments_json", "fr_doc_num")}
+        existing = [{
+            "document_id": "OLD-001", "docket_id": "ACF-2025-0038", "agency_code": "ACF",
+            "title": "old", "document_type": "Notice",
+            "posted_date": "2024-01-01", "modify_date": "2024-01-01",
+            "comment_start_date": None, "comment_end_date": None, "file_url": None,
+            "withdrawn": "false", "reason_withdrawn": None, "additional_rins": None,
+        }]
+        write_parquet_from_dicts(output / "documents.parquet", existing, legacy_schema)
+
+        raw = json.loads((SAMPLE_DATA / "document-ACF-2025-0038-0001.json").read_text())
+        write_staging("ACF", "documents", [DOCUMENT.extract(raw)], staging, DOCUMENT_SCHEMA)
+
+        merge_staging_files(
+            staging, output, ["documents"],
+            {"documents": DOCUMENT_SCHEMA},
+            {"documents": "document_id"},
+        )
+
+        merged = pl.read_parquet(output / "documents.parquet").sort("document_id")
+        assert merged.height == 2
+        assert "attachments_json" in merged.columns
+        assert "fr_doc_num" in merged.columns
+        old_row = merged.filter(pl.col("document_id") == "OLD-001").row(0, named=True)
+        assert old_row["attachments_json"] is None
+        assert old_row["fr_doc_num"] is None
+        new_row = merged.filter(pl.col("document_id") == "ACF-2025-0038-0001").row(0, named=True)
+        assert new_row["fr_doc_num"] == "2025-13790"

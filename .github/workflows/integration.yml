@@ -1,0 +1,39 @@
+name: Integration (live data)
+
+# Exercises the ETL extract -> staging -> merge path against a REAL document
+# fetched live from the public Mirrulations S3 mirror (the pipeline's upstream
+# source). Kept separate from ci.yml because it needs outbound network access
+# and can be affected by upstream availability — the hermetic unit suite in
+# ci.yml stays fast and deterministic. The weekly run catches source-shape drift.
+
+on:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 12 * * 1'  # Mondays 12:00 UTC
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run integration tests (live Mirrulations S3)
+        # -s disables pytest output capture so loguru's step-by-step logs
+        # (which write to stderr) stream live into the Actions log, not just
+        # on failure. -v prints each test id.
+        run: uv run pytest -m integration -v -s
