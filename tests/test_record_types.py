@@ -84,9 +84,41 @@ def test_document_extract_takes_first_file_url() -> None:
     assert loads(out["additional_rins"]) == ["2060-AG12", "2060-AG13"]
 
 
+def test_document_extract_packs_attachment_list_and_fr_doc_num() -> None:
+    # The document's fileFormats are its downloadable renditions; the full list
+    # (url + format + size) is packed into attachments_json, and the Federal
+    # Register document number is surfaced as fr_doc_num.
+    raw = {
+        "data": {
+            "id": "ACF-2025-0038-0001",
+            "attributes": {
+                "docketId": "ACF-2025-0038",
+                "agencyId": "ACF",
+                "frDocNum": "2025-13790",
+                "fileFormats": [
+                    {"fileUrl": "https://downloads.gov/content.pdf", "format": "pdf", "size": 239826},
+                    {"fileUrl": "https://downloads.gov/content.htm", "format": "htm", "size": 5120},
+                    {"format": "pdf"},  # no fileUrl -> skipped
+                ],
+            },
+        }
+    }
+    out = DOCUMENT.extract(raw)
+    assert out["fr_doc_num"] == "2025-13790"
+    # file_url stays the first usable rendition for backward compatibility.
+    assert out["file_url"] == "https://downloads.gov/content.pdf"
+    assert loads(out["attachments_json"]) == [
+        {"url": "https://downloads.gov/content.pdf", "format": "pdf", "size": 239826},
+        {"url": "https://downloads.gov/content.htm", "format": "htm", "size": 5120},
+    ]
+
+
 def test_document_extract_handles_missing_file_formats() -> None:
     raw = {"data": {"id": "X-1", "attributes": {}}}
-    assert DOCUMENT.extract(raw)["file_url"] is None
+    out = DOCUMENT.extract(raw)
+    assert out["file_url"] is None
+    assert out["attachments_json"] is None
+    assert out["fr_doc_num"] is None
 
 
 def test_document_extract_missing_withdrawal_fields_are_none() -> None:
