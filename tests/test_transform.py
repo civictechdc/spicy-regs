@@ -9,6 +9,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from spicy_regs.pipeline.transform import (
+    build_agency_rollups,
     build_feed_summary,
     merge_comments_partitioned,
     merge_staging_files,
@@ -463,6 +464,116 @@ class TestBuildFeedSummary:
         assert epa_0001["comment_count"][0] == 2
         fda = summary.filter(pl.col("docket_id") == "FDA-2024-0010")
         assert fda["comment_count"][0] == 1
+
+
+COMMENTS_INDEX_SCHEMA = {
+    "agency_code": pl.Utf8,
+    "docket_id": pl.Utf8,
+    "year": pl.Int64,
+    "month": pl.Int64,
+    "row_count": pl.Int64,
+}
+
+
+class TestBuildAgencyRollups:
+    def _write_index(self, output_dir, rows):
+        pl.DataFrame(rows, schema=COMMENTS_INDEX_SCHEMA).write_parquet(output_dir / "comments_index.parquet")
+
+    def test_writes_both_artifacts(self, tmp_output, sample_dockets, sample_documents):
+        write_parquet_from_dicts(tmp_output / "dockets.parquet", sample_dockets, DOCKET_SCHEMA)
+        write_parquet_from_dicts(tmp_output / "documents.parquet", sample_documents, DOCUMENT_SCHEMA)
+
+        stats_file, volume_file = build_agency_rollups(tmp_output)
+        assert stats_file.exists()
+        assert volume_file.exists()
+
+    def test_agency_stats_counts(self, tmp_output, sample_dockets, sample_documents):
+        write_parquet_from_dicts(tmp_output / "dockets.parquet", sample_dockets, DOCKET_SCHEMA)
+        write_parquet_from_dicts(tmp_output / "documents.parquet", sample_documents, DOCUMENT_SCHEMA)
+        self._write_index(
+            tmp_output,
+            [
+                {"agency_code": "EPA", "docket_id": "EPA-2024-0001", "year": 2024, "month": 6, "row_count": 2},
+                {"agency_code": "EPA", "docket_id": "EPA-2024-0002", "year": 2024, "month": 7, "row_count": 1},
+                {"agency_code": "FDA", "docket_id": "FDA-2024-0010", "year": 2024, "month": 5, "row_count": 1},
+            ],
+        )
+
+        stats_file, _ = build_agency_rollups(tmp_output)
+        stats = pl.read_parquet(stats_file)
+
+        epa = stats.filter(pl.col("agency_code") == "EPA")
+        assert epa["docket_count"][0] == 2  # EPA-2024-0001, EPA-2024-0002
+        assert epa["document_count"][0] == 1  # D-001
+        assert epa["comment_count"][0] == 3  # 2 + 1
+
+        fda = stats.filter(pl.col("agency_code") == "FDA")
+        assert fda["docket_count"][0] == 1
+        assert fda["document_count"][0] == 1
+        assert fda["comment_count"][0] == 1
+
+    def test_agency_stats_one_row_per_agency(self, tmp_output, sample_dockets, sample_documents):
+        write_parquet_from_dicts(tmp_output / "dockets.parquet", sample_dockets, DOCKET_SCHEMA)
+        write_parquet_from_dicts(tmp_output / "documents.parquet", sample_documents, DOCUMENT_SCHEMA)
+
+        stats = pl.read_parquet(build_agency_rollups(tmp_output)[0])
+        assert sorted(stats["agency_code"].to_list()) == ["EPA", "FDA"]
+
+    def test_agency_stats_falls_back_to_monolithic_comments(self, tmp_output, sample_dockets, sample_comments):
+        """Without a comments index, counts come from comments.parquet."""
+        write_parquet_from_dicts(tmp_output / "dockets.parquet", sample_dockets, DOCKET_SCHEMA)
+        write_parquet_from_dicts(tmp_output / "comments.parquet", sample_comments, COMMENT_SCHEMA)
+
+        stats = pl.read_parquet(build_agency_rollups(tmp_output)[0])
+        epa = stats.filter(pl.col("agency_code") == "EPA")
+        assert epa["comment_count"][0] == 3  # C-001, C-002, C-004
+        fda = stats.filter(pl.col("agency_code") == "FDA")
+        assert fda["comment_count"][0] == 1  # C-003
+
+    def test_agency_monthly_volume_by_type(self, tmp_output, sample_dockets, sample_documents):
+        write_parquet_from_dicts(tmp_output / "dockets.parquet", sample_dockets, DOCKET_SCHEMA)
+        write_parquet_from_dicts(tmp_output / "documents.parquet", sample_documents, DOCUMENT_SCHEMA)
+
+        volume = pl.read_parquet(build_agency_rollups(tmp_output)[1])
+
+        # D-001: EPA / Proposed Rule / 2024-06
+        epa = volume.filter(pl.col("agency_code") == "EPA")
+        assert epa["year"][0] == 2024
+        assert epa["month"][0] == 6
+        assert epa["document_type"][0] == "Proposed Rule"
+        assert epa["document_count"][0] == 1
+
+        # D-002: FDA / Notice / 2024-04
+        fda = volume.filter(pl.col("agency_code") == "FDA")
+        assert fda["document_type"][0] == "Notice"
+        assert fda["month"][0] == 4
+
+    def test_monthly_volume_aggregates_same_bucket(self, tmp_output, sample_dockets):
+        write_parquet_from_dicts(tmp_output / "dockets.parquet", sample_dockets, DOCKET_SCHEMA)
+        docs = [
+            {"document_id": f"D-{i}", "docket_id": "EPA-2024-0001", "agency_code": "EPA", "title": "t", "document_type": "Notice", "posted_date": "2024-06-15", "modify_date": "2024-06-15", "comment_start_date": None, "comment_end_date": None, "file_url": None, "attachments_json": None, "fr_doc_num": None, "withdrawn": None, "reason_withdrawn": None, "additional_rins": None}
+            for i in range(3)
+        ]
+        write_parquet_from_dicts(tmp_output / "documents.parquet", docs, DOCUMENT_SCHEMA)
+
+        volume = pl.read_parquet(build_agency_rollups(tmp_output)[1])
+        assert len(volume) == 1
+        assert volume["document_count"][0] == 3
+
+    def test_without_documents_emits_empty_volume(self, tmp_output, sample_dockets):
+        write_parquet_from_dicts(tmp_output / "dockets.parquet", sample_dockets, DOCKET_SCHEMA)
+
+        stats_file, volume_file = build_agency_rollups(tmp_output)
+        stats = pl.read_parquet(stats_file)
+        assert all(c == 0 for c in stats["document_count"].to_list())
+
+        volume = pl.read_parquet(volume_file)
+        assert len(volume) == 0
+        assert volume.columns == ["agency_code", "year", "month", "document_type", "document_count"]
+
+    def test_raises_on_missing_dockets(self, tmp_output):
+        with pytest.raises(FileNotFoundError):
+            build_agency_rollups(tmp_output)
 
 
 class TestMergeCommentsPartitioned:

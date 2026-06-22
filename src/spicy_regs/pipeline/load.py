@@ -56,10 +56,13 @@ def upload_to_r2(output_dir: Path, data_type_names: list[str]) -> None:
         if pf.exists():
             files_to_upload.append(pf)
 
-    # Always include feed summary if it exists
-    feed_summary = output_dir / "feed_summary.parquet"
-    if feed_summary.exists():
-        files_to_upload.append(feed_summary)
+    # Always include the materialized rollups if they exist (feed summary +
+    # the per-agency directory/profile rollups). These are tiny, denormalized,
+    # and identical across all viewers.
+    for rollup_name in ("feed_summary", "agency_stats", "agency_monthly_volume"):
+        rollup = output_dir / f"{rollup_name}.parquet"
+        if rollup.exists():
+            files_to_upload.append(rollup)
 
     manifest_file = output_dir / "manifest.parquet"
     if manifest_file.exists():
