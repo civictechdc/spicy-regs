@@ -15,6 +15,7 @@ re-exported here so every "transform" concept is discoverable from one package:
 """
 
 from spicy_regs.pipeline.transform import (
+    build_agency_rollups,
     build_feed_summary,
     merge_comments_partitioned,
     merge_staging_files,
@@ -26,4 +27,5 @@ __all__ = [
     "merge_comments_partitioned",
     "update_comments_index",
     "build_feed_summary",
+    "build_agency_rollups",
 ]

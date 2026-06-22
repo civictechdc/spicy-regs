@@ -38,6 +38,7 @@ from spicy_regs.schemas import RECORD_TYPES, RecordType
 from spicy_regs.sources import mirrulations, r2
 from spicy_regs.transforms import ExtractRecords
 from spicy_regs.transforms.merge import (
+    build_agency_rollups,
     build_feed_summary,
     merge_comments_partitioned,
     merge_staging_files,
@@ -122,6 +123,8 @@ class RegulationsPipeline(Pipeline):
             if not self.skip_post_process:
                 logger.info("Building feed summary...")
                 build_feed_summary(output_dir)
+                logger.info("Building agency rollups...")
+                build_agency_rollups(output_dir)
         else:
             logger.info("No new records staged; skipping merge.")
 
