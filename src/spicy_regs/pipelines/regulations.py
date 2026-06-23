@@ -36,8 +36,8 @@ from spicy_regs.pipelines.base import Pipeline
 from spicy_regs.pipelines.staging import stage_agencies
 from spicy_regs.schemas import RECORD_TYPES, RecordType
 from spicy_regs.sources import mirrulations, r2
-from spicy_regs.transforms import ExtractRecords
-from spicy_regs.transforms.merge import (
+from spicy_regs.transforms import (
+    ExtractRecords,
     build_agency_rollups,
     build_feed_summary,
     merge_comments_partitioned,

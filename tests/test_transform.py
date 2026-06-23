@@ -8,7 +8,7 @@ import polars as pl
 import pyarrow.parquet as pq
 import pytest
 
-from spicy_regs.transforms.merge import (
+from spicy_regs.transforms import (
     build_agency_rollups,
     build_feed_summary,
     merge_comments_partitioned,

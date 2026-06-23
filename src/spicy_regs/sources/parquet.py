@@ -10,7 +10,7 @@ stage only — merging staged files is a transform, and publishing to R2 is the
 from collections.abc import Iterable
 from pathlib import Path
 
-from spicy_regs.transforms.merge import write_staging
+from spicy_regs.transforms.write_staging import write_staging
 from spicy_regs.schemas import RecordType
 from spicy_regs.sources.base import Writer
 
