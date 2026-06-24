@@ -20,7 +20,7 @@ import duckdb
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
-DEFAULT_R2_BASE_URL = "https://pub-5fc11ad134984edf8d9af452dd1849d6.r2.dev"
+DEFAULT_R2_BASE_URL = "https://r2.spicy-regs.dev"
 TABLES = ("dockets", "documents", "comments", "comments_index", "feed_summary")
 STATEMENT_TIMEOUT = os.environ.get("SPICY_REGS_STATEMENT_TIMEOUT", "30s")
 

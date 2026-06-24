@@ -164,12 +164,12 @@ s3://spicy-regs/
 
 ```sql
 -- Dockets: statistics skipping on sorted agency_code
-SELECT * FROM read_parquet('https://pub-5fc11ad134984edf8d9af452dd1849d6.r2.dev/dockets.parquet')
+SELECT * FROM read_parquet('https://r2.spicy-regs.dev/dockets.parquet')
 WHERE agency_code = 'EPA';
 
 -- Comments: agency-partitioned query (reads only EPA partition)
 SELECT * FROM read_parquet(
-  'https://pub-5fc11ad134984edf8d9af452dd1849d6.r2.dev/comments/agency/agency_code=EPA/part-0.parquet'
+  'https://r2.spicy-regs.dev/comments/agency/agency_code=EPA/part-0.parquet'
 ) WHERE docket_id = 'EPA-HQ-OAR-2021-0317';
 ```
 

@@ -46,7 +46,7 @@ jupyter notebook
 ```python
 import duckdb
 
-R2_URL = "https://pub-5fc11ad134984edf8d9af452dd1849d6.r2.dev"
+R2_URL = "https://r2.spicy-regs.dev"
 
 conn = duckdb.connect()
 conn.execute("INSTALL httpfs; LOAD httpfs;")
