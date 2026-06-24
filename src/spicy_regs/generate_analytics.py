@@ -9,7 +9,7 @@ from pathlib import Path
 import duckdb
 
 # Default R2 URL (can be overridden for local testing)
-R2_BASE_URL = "https://pub-5fc11ad134984edf8d9af452dd1849d6.r2.dev"
+R2_BASE_URL = "https://r2.spicy-regs.dev"
 
 
 def generate_analytics(parquet_dir: Path | None = None, output_dir: Path | None = None) -> dict[str, Path]:
