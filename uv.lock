@@ -4457,7 +4457,7 @@ dev = [
 requires-dist = [
     { name = "boto3" },
     { name = "cyclopts" },
-    { name = "duckdb" },
+    { name = "duckdb", specifier = ">=1.4" },
     { name = "httpx" },
     { name = "loguru" },
     { name = "mcp", specifier = ">=1.10.0" },

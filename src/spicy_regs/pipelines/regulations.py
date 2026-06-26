@@ -35,7 +35,7 @@ from spicy_regs.manifest import Manifest
 from spicy_regs.pipelines.base import Pipeline
 from spicy_regs.pipelines.staging import stage_agencies
 from spicy_regs.schemas import RECORD_TYPES, RecordType
-from spicy_regs.sources import mirrulations, r2
+from spicy_regs.sources import iceberg, mirrulations, r2
 from spicy_regs.transforms import (
     ExtractRecords,
     build_agency_rollups,
@@ -67,6 +67,7 @@ class RegulationsPipeline(Pipeline):
         skip_post_process: bool = False,
         full_refresh: bool = False,
         max_workers: int = 4,
+        use_iceberg: bool = False,
         verbose: bool = False,
     ) -> None:
         self.agency = agency
@@ -80,6 +81,7 @@ class RegulationsPipeline(Pipeline):
         self.skip_post_process = skip_post_process
         self.full_refresh = full_refresh
         self.max_workers = max_workers
+        self.use_iceberg = use_iceberg
         self.verbose = verbose
 
     def run(self) -> None:
@@ -179,14 +181,32 @@ class RegulationsPipeline(Pipeline):
         record_types: list[RecordType],
         staged: dict[str, int],
     ) -> None:
-        """Merge staging files: dockets/documents monolithically, comments partitioned."""
+        """Merge staging files: dockets/documents monolithically, comments partitioned.
+
+        When ``use_iceberg`` is set, the ``dockets`` table is routed through the
+        R2 Data Catalog (Iceberg ``MERGE INTO`` + public Parquet export) instead
+        of the whole-file ``merge_staging_files`` rewrite. This is the
+        proof-of-concept scope — documents and comments stay on the existing
+        path until the Iceberg flow is vetted.
+        """
         names = [rt.name for rt in record_types]
 
         non_comment = [n for n in names if n != "comments"]
+
+        iceberg_names = []
+        if self.use_iceberg and "dockets" in non_comment:
+            iceberg_names = ["dockets"]
+            non_comment = [n for n in non_comment if n != "dockets"]
+
         if non_comment:
             schemas = {n: RECORD_TYPES[n].schema for n in non_comment}
             dedup_keys = {n: RECORD_TYPES[n].dedup_key for n in non_comment}
             merge_staging_files(staging_dir, output_dir, non_comment, schemas, dedup_keys)
+
+        # Iceberg path: MERGE into the catalog, then export the public Parquet
+        # snapshot that the existing R2 upload (dual model) will publish.
+        for name in iceberg_names:
+            iceberg.merge_and_export(staging_dir, output_dir, RECORD_TYPES[name])
 
         if "comments" in names and staged.get("comments", 0) > 0:
             changed = merge_comments_partitioned(
@@ -218,6 +238,9 @@ def main(
     skip_post_process: Annotated[bool, Parameter(help="Skip feed summary build")] = False,
     full_refresh: Annotated[bool, Parameter(help="Ignore manifest + existing output")] = False,
     max_workers: Annotated[int, Parameter(help="Agencies processed in parallel")] = 4,
+    use_iceberg: Annotated[
+        bool, Parameter(help="Route the dockets table through R2 Data Catalog (Iceberg)")
+    ] = False,
     verbose: Annotated[bool, Parameter(name=["--verbose", "-v"], help="Verbose logging")] = False,
 ) -> None:
     """Run the regulations.gov ETL pipeline."""
@@ -233,6 +256,7 @@ def main(
         skip_post_process=skip_post_process,
         full_refresh=full_refresh,
         max_workers=max_workers,
+        use_iceberg=use_iceberg,
         verbose=verbose,
     ).run()
 

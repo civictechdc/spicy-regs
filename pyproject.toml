@@ -10,7 +10,7 @@ dependencies = [
     "pyarrow",
     "tqdm",
     "httpx",
-    "duckdb",
+    "duckdb>=1.4",  # >=1.4 required to ATTACH an Iceberg REST catalog and MERGE INTO it
     "pandas",
     "prefect",
     "cyclopts",

@@ -26,6 +26,42 @@ uv sync
 cp .env.example .env  # Then fill in your credentials
 ```
 
+## Apache Iceberg (R2 Data Catalog) — experimental
+
+The new `run-pipeline` ETL can route the **dockets** table through
+[R2 Data Catalog](https://developers.cloudflare.com/r2/data-catalog/), the
+managed Apache Iceberg REST catalog built into R2, instead of the whole-file
+read-dedup-rewrite merge. This is a **proof-of-concept** scope: only `dockets`
+goes through Iceberg, and only when you opt in with `--use-iceberg`. Documents
+and comments are untouched, and the production `etl.yml` cron never uses this
+path.
+
+How it works (see `src/spicy_regs/sources/iceberg.py`):
+
+1. The staged per-agency Parquet is upserted into the catalog table via DuckDB
+   `MERGE INTO` (dedup by `docket_id`, keep the latest `modify_date`) — a
+   row-level commit that produces a new Iceberg snapshot, not a full rewrite.
+2. The full table is exported back to `output/dockets.parquet` so the
+   no-credentials CLI `download` and the public MCP server keep working
+   unchanged (the "dual model" — Iceberg is the system of record, public
+   Parquet is the read mirror).
+
+Requires DuckDB ≥ 1.4 and these env vars (URI + warehouse are under
+*R2 → your bucket → Settings → Data Catalog*; the token needs **R2 + data
+catalog** permissions):
+
+```bash
+R2_CATALOG_URI=...        # the Iceberg REST catalog endpoint
+R2_CATALOG_WAREHOUSE=...  # the warehouse name
+R2_CATALOG_TOKEN=...      # R2 API token (R2 + data-catalog scopes)
+R2_CATALOG_NAMESPACE=default  # optional, defaults to "default"
+```
+
+```bash
+# Smallest useful Iceberg run: one agency, recent dockets only, no upload.
+uv run run-pipeline --agency EPA --skip-comments --since-year 2025 --use-iceberg --skip-upload
+```
+
 ## Usage
 
 ### Full ETL (all agencies)
