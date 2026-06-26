@@ -21,7 +21,7 @@ from botocore.config import Config as BotoConfig
 from loguru import logger
 
 from spicy_regs.pipeline.extract import download_and_parse
-from spicy_regs.pipeline.transform import merge_staging_files, write_staging
+from spicy_regs.transforms import merge_staging_files, write_staging
 from spicy_regs.schemas import DOCUMENT
 from tests.conftest import DOCUMENT_SCHEMA
 

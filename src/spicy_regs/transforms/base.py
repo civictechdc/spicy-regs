@@ -11,7 +11,8 @@ record stream (lazily, one at a time), so they compose and stay memory-light.
 
 Bulk, whole-dataset operations — deduplicating by key, partitioning, building
 summaries — are *not* Transforms: they need every row at once and are done
-columnar/out-of-core (see ``spicy_regs.pipeline.transform``). Keeping that line
+columnar/out-of-core (the bulk modules in :mod:`spicy_regs.transforms`).
+Keeping that line
 sharp is deliberate: a Transform never has to buffer the whole dataset.
 """
 

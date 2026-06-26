@@ -43,6 +43,7 @@ from spicy_regs.pipeline.load import (
     upload_to_r2,
 )
 from spicy_regs.pipeline.transform import (
+    build_agency_rollups,
     build_feed_summary,
     merge_comments_partitioned,
     merge_staging_files,
@@ -345,6 +346,12 @@ def build_feed_summary_task(output_dir: Path) -> Path:
     return build_feed_summary(output_dir)
 
 
+@task(name="build-agency-rollups", cache_policy=NO_CACHE)
+def build_agency_rollups_task(output_dir: Path) -> tuple[Path, Path]:
+    """Build agency_stats + agency_monthly_volume materialized rollups."""
+    return build_agency_rollups(output_dir)
+
+
 @task(name="build-search-index", cache_policy=NO_CACHE)
 def build_search_index_task(output_dir: Path) -> Path:
     """Build docket_search.json.gz for the in-browser search."""
@@ -424,6 +431,7 @@ def pipeline(
         logger.info("Merge-only mode - merging existing staging files...")
         merge_staging_task(staging_dir, output_dir, data_type_names)
         build_feed_summary_task(output_dir)
+        build_agency_rollups_task(output_dir)
         logger.info("Merge complete!")
         return
 
@@ -518,6 +526,8 @@ def pipeline(
     else:
         logger.info("Building feed summary...")
         build_feed_summary_task(output_dir)
+        logger.info("Building agency rollups...")
+        build_agency_rollups_task(output_dir)
         # Only rebuild the search index when dockets changed — it's a
         # small computation but the resulting file is uploaded and served
         # from CDN, so avoid churning it needlessly.
