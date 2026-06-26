@@ -33,6 +33,11 @@ on:
         required: false
         default: true
         type: boolean
+      use_iceberg:
+        description: 'Route the dockets table through R2 Data Catalog (Iceberg)'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   etl-new:
@@ -62,6 +67,11 @@ jobs:
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          # Only used when use_iceberg is on; harmless otherwise.
+          R2_CATALOG_URI: ${{ secrets.R2_CATALOG_URI }}
+          R2_CATALOG_WAREHOUSE: ${{ secrets.R2_CATALOG_WAREHOUSE }}
+          R2_CATALOG_TOKEN: ${{ secrets.R2_CATALOG_TOKEN }}
+          R2_CATALOG_NAMESPACE: ${{ secrets.R2_CATALOG_NAMESPACE }}
         run: |
           ARGS=""
           if [ -n "${{ inputs.agency }}" ]; then
@@ -80,6 +90,9 @@ jobs:
             ARGS="$ARGS --skip-upload"
           else
             ARGS="$ARGS --no-skip-upload"
+          fi
+          if [ "${{ inputs.use_iceberg }}" = "true" ]; then
+            ARGS="$ARGS --use-iceberg"
           fi
           echo "Running: uv run run-pipeline $ARGS"
           uv run run-pipeline $ARGS
