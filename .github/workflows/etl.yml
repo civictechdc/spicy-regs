@@ -1,24 +1,9 @@
 name: Daily ETL Refresh
 
+# The daily schedule has moved to the new Pipeline path ("ETL (new pipeline)").
+# This legacy workflow is kept as a manual fallback only — it is no longer
+# scheduled so it can never collide with the new pipeline's R2 writes.
 on:
-  schedule:
-    # Run 15 batches spread across the day (21 agencies each = 315 total)
-    # Batch 0: 6 AM UTC, Batch 1: 7 AM UTC, ..., Batch 14: 8 PM UTC
-    - cron: '0 6 * * *'   # Batch 0
-    - cron: '0 7 * * *'   # Batch 1
-    - cron: '0 8 * * *'   # Batch 2
-    - cron: '0 9 * * *'   # Batch 3
-    - cron: '0 10 * * *'  # Batch 4
-    - cron: '0 11 * * *'  # Batch 5
-    - cron: '0 12 * * *'  # Batch 6
-    - cron: '0 13 * * *'  # Batch 7
-    - cron: '0 14 * * *'  # Batch 8
-    - cron: '0 15 * * *'  # Batch 9
-    - cron: '0 16 * * *'  # Batch 10
-    - cron: '0 17 * * *'  # Batch 11
-    - cron: '0 18 * * *'  # Batch 12
-    - cron: '0 19 * * *'  # Batch 13
-    - cron: '0 20 * * *'  # Batch 14
   workflow_dispatch:
     inputs:
       full_refresh:
