@@ -47,6 +47,7 @@ docs = [
 etl = "spicy_regs.pipeline.pipeline:app"
 run-pipeline = "spicy_regs.pipelines.regulations:app"
 enrich-pdf-text = "spicy_regs.pipeline.enrich_pdf:main"
+backfill-comment-text = "spicy_regs.pipeline.backfill_derived_text:main"
 embed = "spicy_regs.vectordb.embed:main"
 spicy-regs = "spicy_regs.cli:main"
 spicy-regs-mcp = "spicy_regs.mcp_server:main"

@@ -72,6 +72,26 @@ Other useful flags (see `uv run run-pipeline --help` for the full list):
 | `--no-skip-upload`      | Also publish to R2 (needs credentials in `.env`)          |
 | `--no-enrich-text`      | Skip filling comment `text_content` from Mirrulations' pre-extracted attachment text |
 
+### Backfill comment text for already-published data
+
+The ETL fills `text_content` inline only for comments it processes fresh — the
+incremental manifest skips comments ingested before that, so they stay `NULL`.
+To backfill the existing dataset from Mirrulations' pre-extracted text (reading
+straight from the bucket's `derived-data` prefix — no PDF download, no JSON
+re-ingest), download the comments and run:
+
+```bash
+uv run spicy-regs download --types comments     # grab the published parquet
+uv run backfill-comment-text                     # fill text_content in place
+uv run backfill-comment-text --limit 5000        # cap work for a trial run
+uv run backfill-comment-text --upload            # also republish to R2 (needs credentials)
+```
+
+It is incremental and re-runnable (rows that already have a
+`text_extraction_status` are skipped unless you pass `--overwrite`). Document
+text isn't published to `derived-data`; backfill those via
+`uv run enrich-pdf-text --target documents`.
+
 Next steps:
 - Open the runnable example pipeline at `tests/test_example_pipeline.py`.
 - Read [CONTRIBUTING.md](CONTRIBUTING.md) for architecture and how to add your
