@@ -1,9 +1,9 @@
 name: ETL (new pipeline)
 
 # Production daily ETL, running the new Pipeline/Reader/Writer path via the
-# `run-pipeline` CLI (which drives RegulationsPipeline.run()). This replaced the
-# legacy "Daily ETL Refresh" cron, which is now manual-only — only one of them
-# may write to R2 on a schedule.
+# `run-pipeline` CLI (which drives RegulationsPipeline.run()). This is the sole
+# scheduled ETL: the legacy Prefect "Daily ETL Refresh" workflow has been
+# removed.
 #
 # On `schedule`: 15 batches (21 agencies each = 315) spread across the day; the
 # batch number is derived from the UTC hour, upload to R2 is ON, and the feed

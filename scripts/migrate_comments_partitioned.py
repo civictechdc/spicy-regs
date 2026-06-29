@@ -102,14 +102,14 @@ def migrate(output_dir: Path) -> None:
 
     # Build the index
     logger.info("Building comments index...")
-    from spicy_regs.pipeline.transform import update_comments_index
+    from spicy_regs.transforms import update_comments_index
 
     index_path = update_comments_index(output_dir, written_files)
     logger.info("Index written to {}", index_path)
 
     logger.info("Migration complete!")
     logger.info("You can now upload with:")
-    logger.info("  uv run python -m spicy_regs.pipeline.upload_r2 {}", output_dir / "comments_index.parquet")
+    logger.info("  uv run python -m spicy_regs.sources.r2 {}", output_dir / "comments_index.parquet")
     logger.info("  And upload the comments/ directory to R2")
 
 

@@ -19,7 +19,7 @@ on:
       - '.github/workflows/deploy-docs.yml'
   # Refresh after the ETL publishes new data.
   workflow_run:
-    workflows: ["Daily ETL Refresh", "ETL (new pipeline – vetting)"]
+    workflows: ["ETL (new pipeline)"]
     types: [completed]
   workflow_dispatch:
 

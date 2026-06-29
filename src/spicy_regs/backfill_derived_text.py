@@ -7,7 +7,7 @@ is the one-time / re-runnable backfill: it reads the already-published comment
 Parquet, fills ``text_content`` from the bucket's ``derived-data`` prefix (no PDF
 download, no JSON re-ingest), and writes it back.
 
-It is the derived-data sibling of :mod:`spicy_regs.pipeline.enrich_pdf`: same
+It is the derived-data sibling of :mod:`spicy_regs.enrich_pdf`: same
 in-place, incremental, partition-aware shape, but the text source is
 Mirrulations' pre-extracted ``.txt`` rather than a downloaded PDF. Rows are
 skipped unless they have an attachment and no ``text_extraction_status`` yet, so
@@ -257,7 +257,7 @@ def main() -> None:
             overwrite=args.overwrite,
         )
         if args.upload and changed:
-            from spicy_regs.pipeline.load import upload_comment_partitions
+            from spicy_regs.sources.r2 import upload_comment_partitions
 
             upload_comment_partitions(args.output_dir, changed)
     else:
@@ -268,9 +268,9 @@ def main() -> None:
             overwrite=args.overwrite,
         )
         if args.upload:
-            from spicy_regs.pipeline.upload_r2 import upload_to_r2 as _upload_r2
+            from spicy_regs.sources.r2 import upload_file
 
-            _upload_r2(args.output_dir / "comments.parquet")
+            upload_file(args.output_dir / "comments.parquet")
 
 
 if __name__ == "__main__":

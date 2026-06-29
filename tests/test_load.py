@@ -1,11 +1,11 @@
-"""Tests for the upload-side guardrails in load.py / upload_r2.py."""
+"""Tests for the upload-side guardrails in the R2 connector (sources/r2.py)."""
 
 from unittest.mock import MagicMock
 
 import pytest
 
-from spicy_regs.pipeline import upload_r2
-from spicy_regs.pipeline.upload_r2 import upload_to_r2
+from spicy_regs.sources import r2 as upload_r2
+from spicy_regs.sources.r2 import upload_file as upload_to_r2
 
 
 class TestUploadShrinkGuard:

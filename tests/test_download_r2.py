@@ -11,8 +11,8 @@ from unittest.mock import MagicMock
 import httpx
 import pytest
 
-from spicy_regs.pipeline import download_r2
-from spicy_regs.pipeline.download_r2 import download_from_r2
+from spicy_regs.sources import r2 as download_r2
+from spicy_regs.sources.r2 import download_from_r2
 
 
 def _fake_stream(*, status_code: int = 200, body: bytes = b"", raise_exc: Exception | None = None):

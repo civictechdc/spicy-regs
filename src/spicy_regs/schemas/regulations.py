@@ -46,7 +46,7 @@ def _extract_comment(d: dict) -> dict:
         "attachments_json": json_dumps(attachments) if attachments else None,
         # Left None here; filled downstream. The run-pipeline ETL fills it inline
         # from Mirrulations' pre-extracted text (transforms.EnrichCommentText),
-        # with the PDF text-extraction step (spicy_regs.pipeline.enrich_pdf) as
+        # with the PDF text-extraction step (spicy_regs.enrich_pdf) as
         # the backfill for attachments not yet extracted upstream.
         "text_content": None,
         "text_extraction_status": None,
@@ -82,7 +82,7 @@ def _extract_document(d: dict) -> dict:
         "reason_withdrawn": attrs.get("reasonWithdrawn"),
         "additional_rins": (json_dumps(rins) if (rins := attrs.get("additionalRins")) else None),
         # Populated out-of-band by the PDF text-extraction step
-        # (spicy_regs.pipeline.enrich_pdf); the raw JSON has no text layer.
+        # (spicy_regs.enrich_pdf); the raw JSON has no text layer.
         "text_content": None,
         "text_extraction_status": None,
     }

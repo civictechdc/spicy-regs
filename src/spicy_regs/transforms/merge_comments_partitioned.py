@@ -27,7 +27,7 @@ def merge_comments_partitioned(
     """
     import duckdb
 
-    from spicy_regs.pipeline.download_r2 import download_from_r2
+    from spicy_regs.sources.r2 import download_from_r2
 
     staging_type_dir = staging_dir / "comments"
     if not staging_type_dir.exists():

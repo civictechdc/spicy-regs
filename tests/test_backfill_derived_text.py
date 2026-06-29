@@ -11,7 +11,7 @@ import json
 
 import polars as pl
 
-from spicy_regs.pipeline.backfill_derived_text import (
+from spicy_regs.backfill_derived_text import (
     backfill_comment_partitions,
     enrich_comments_with_derived_text,
 )
