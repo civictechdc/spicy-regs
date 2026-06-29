@@ -143,8 +143,8 @@ def cmd_search(args):
 
     search_configs = {
         "dockets": ["title", "abstract"],
-        "documents": ["title"],
-        "comments": ["title", "comment"],
+        "documents": ["title", "text_content"],
+        "comments": ["title", "comment", "text_content"],
     }
 
     for data_type, columns in search_configs.items():

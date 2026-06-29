@@ -112,6 +112,10 @@ def _extract_comment(d: dict) -> dict:
         "modify_date": attrs.get("modifyDate"),
         "receive_date": attrs.get("receiveDate"),
         "attachments_json": json_dumps(attachments) if attachments else None,
+        # Populated out-of-band by the PDF text-extraction step
+        # (spicy_regs.pipeline.enrich_pdf) from any PDF attachments.
+        "text_content": None,
+        "text_extraction_status": None,
     }
 
 
@@ -143,6 +147,10 @@ def _extract_document(d: dict) -> dict:
         "withdrawn": attrs.get("withdrawn"),
         "reason_withdrawn": attrs.get("reasonWithdrawn"),
         "additional_rins": (json_dumps(rins) if (rins := attrs.get("additionalRins")) else None),
+        # Populated out-of-band by the PDF text-extraction step
+        # (spicy_regs.pipeline.enrich_pdf); the raw JSON has no text layer.
+        "text_content": None,
+        "text_extraction_status": None,
     }
 
 
@@ -199,6 +207,10 @@ DATA_TYPES: dict[str, _DataTypeConfig] = {
             "withdrawn": pl.Utf8,
             "reason_withdrawn": pl.Utf8,
             "additional_rins": pl.Utf8,
+            # Text extracted from the document's PDF rendition, plus the outcome
+            # of that extraction ("ok"/"empty"/"encrypted"/"error"/None if not yet run).
+            "text_content": pl.Utf8,
+            "text_extraction_status": pl.Utf8,
         },
         "extract": _extract_document,
     },
@@ -219,6 +231,10 @@ DATA_TYPES: dict[str, _DataTypeConfig] = {
             "modify_date": pl.Utf8,
             "receive_date": pl.Utf8,
             "attachments_json": pl.Utf8,
+            # Text extracted from the comment's PDF attachment(s), plus the outcome
+            # ("ok"/"empty"/"encrypted"/"error"/None if not yet run).
+            "text_content": pl.Utf8,
+            "text_extraction_status": pl.Utf8,
         },
         "extract": _extract_comment,
     },
