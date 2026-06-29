@@ -1,0 +1,124 @@
+# Spicy Regs data dictionary — curated descriptions.
+#
+# This file is the human layer of the data dictionary. Column *names and types*
+# are the source of truth in code (RECORD_TYPES in
+# src/spicy_regs/schemas/regulations.py for the core tables, and DERIVED_SCHEMAS
+# in src/spicy_regs/data_dictionary.py for the rollups). This file supplies the
+# prose. The two are reconciled by `spicy-regs-dict check`, which fails if a
+# column has no description here or a description references a column that no
+# longer exists — so a schema change forces a docs update in the same PR.
+#
+# To regenerate the browsable site after editing:  uv run spicy-regs-dict generate
+
+tables:
+  dockets:
+    summary: >-
+      One row per regulations.gov docket. A docket is the top-level folder a
+      federal agency opens for a rulemaking or other action; it groups the
+      documents the agency posts and the public comments it receives.
+    columns:
+      docket_id: "Unique docket identifier (e.g. `EPA-HQ-OAR-2021-0317`). Primary key / dedup key."
+      agency_code: "Posting agency's short code (e.g. `EPA`, `FDA`, `ACF`)."
+      title: "Human-readable docket title."
+      docket_type: "Docket category, typically `Rulemaking` or `Nonrulemaking`."
+      modify_date: "Timestamp the docket was last modified on regulations.gov (ISO 8601 string)."
+      abstract: "Agency-written summary of the docket (regulations.gov `dkAbstract`). Often null."
+      rin: "Regulation Identifier Number tying the docket to the Unified Agenda. Often null."
+
+  documents:
+    summary: >-
+      One row per document posted to a docket — proposed rules, final rules,
+      notices, supporting analyses, and public-submission stubs. Joins to
+      `dockets` on `docket_id`.
+    columns:
+      document_id: "Unique document identifier. Primary key / dedup key."
+      docket_id: "Parent docket this document belongs to. Foreign key to `dockets.docket_id`."
+      agency_code: "Posting agency's short code."
+      title: "Document title."
+      document_type: "Document category (e.g. `Rule`, `Proposed Rule`, `Notice`, `Supporting & Related Material`)."
+      posted_date: "Date the document was posted publicly (ISO 8601 string)."
+      modify_date: "Timestamp the document was last modified (ISO 8601 string)."
+      comment_start_date: "Start of the public comment period this document opens, if any. Often null."
+      comment_end_date: "End (deadline) of the public comment period, if any. Often null."
+      file_url: "URL of the document's primary downloadable rendition. Retained for backward compatibility; see `attachments_json` for the full list. Often null."
+      attachments_json: "JSON array of every downloadable rendition: `[{url, format, size}]`. Null when the document has no files."
+      fr_doc_num: "Federal Register document number, when the document was published in the FR. Often null."
+      withdrawn: 'Whether the document was withdrawn, as the string `"true"`/`"false"`. Often null.'
+      reason_withdrawn: "Agency-supplied reason for withdrawal, when withdrawn. Often null."
+      additional_rins: "JSON array of additional Regulation Identifier Numbers beyond the docket's primary RIN. Often null."
+
+  comments:
+    summary: >-
+      One row per public comment submitted to a docket — the largest table
+      (tens of millions of rows). On R2 it is also published as Hive-partitioned
+      files under `comments/agency_code=.../docket_id=.../year=.../month=...`.
+      Joins to `dockets` on `docket_id`.
+    columns:
+      comment_id: "Unique comment identifier. Primary key / dedup key."
+      docket_id: "Docket the comment was submitted to. Foreign key to `dockets.docket_id`."
+      agency_code: "Receiving agency's short code."
+      first_name: "Commenter's first name, when provided. Often null."
+      last_name: "Commenter's last name, when provided. Often null."
+      organization: "Organization the commenter represents, when provided. Often null."
+      category: "Submitter category as classified on regulations.gov. Often null."
+      title: "Comment title / subject line."
+      comment: "Full free-text body of the comment. The largest field in the dataset."
+      document_type: "Document category for the comment record, typically `Public Submission`."
+      posted_date: "Date the comment was posted publicly (ISO 8601 string)."
+      modify_date: "Timestamp the comment was last modified (ISO 8601 string)."
+      receive_date: "Date the agency received the comment (ISO 8601 string)."
+      attachments_json: "JSON array of any files attached to the comment: `[{title, formats:[{url, format, size}]}]`. Null when there are no attachments."
+
+  comments_index:
+    summary: >-
+      A tiny per-partition row-count index for the partitioned comments. It maps
+      each `comments/` partition to its row count so consumers can compute
+      comment totals and discover partitions without scanning the full comments
+      dataset. Maintained by `update_comments_index`.
+    columns:
+      agency_code: "Agency code of the partition (the `agency_code=` path segment)."
+      docket_id: "Docket id of the partition (the `docket_id=` path segment)."
+      year: "Year of the partition, from `posted_date` (the `year=` path segment)."
+      month: "Month (1–12) of the partition (the `month=` path segment)."
+      row_count: "Number of comment rows in that partition file."
+
+  feed_summary:
+    summary: >-
+      A pre-computed rollup with one row per docket, joining docket metadata to
+      comment counts and comment-period dates. Powers feed/timeline views
+      without scanning the full comments dataset. Built by `build_feed_summary`,
+      sorted by `modify_date` descending.
+    columns:
+      docket_id: "Docket identifier. One row per docket."
+      agency_code: "Posting agency's short code."
+      title: "Docket title (from `dockets`)."
+      docket_type: "Docket category (from `dockets`)."
+      modify_date: "Docket last-modified timestamp; the table is sorted by this descending."
+      abstract: "Docket abstract (from `dockets`). Often null."
+      comment_count: "Total comments on the docket, summed from `comments_index`. 0 when none."
+      comment_end_date: "Latest comment-period end date across the docket's documents. Null when unknown."
+      date_created: "Earliest document `posted_date` on the docket, used as a creation date. Null when unknown."
+
+  agency_stats:
+    summary: >-
+      A per-agency dimension table — one row per agency with docket, document,
+      and comment counts. Powers agency directory and profile pages. Built by
+      `build_agency_rollups`, sorted by comment then document count descending.
+    columns:
+      agency_code: "Agency short code. One row per agency."
+      docket_count: "Number of dockets posted by the agency."
+      document_count: "Number of documents posted by the agency."
+      comment_count: "Total comments received by the agency, summed from `comments_index`."
+
+  agency_monthly_volume:
+    summary: >-
+      Per-agency monthly document volume, broken out by document type — one row
+      per (agency, year, month, document_type). Feeds activity sparklines and
+      profile activity panels. Built by `build_agency_rollups` from document
+      `posted_date`.
+    columns:
+      agency_code: "Agency short code."
+      year: "Year of the documents, extracted from `posted_date`."
+      month: "Month (1–12) of the documents, extracted from `posted_date`."
+      document_type: "Document category counted in this bucket (e.g. `Rule`, `Notice`)."
+      document_count: "Number of documents the agency posted of that type in that month."

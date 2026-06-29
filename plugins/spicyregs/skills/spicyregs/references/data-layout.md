@@ -2,6 +2,10 @@
 
 Use this reference when you need a quick map of the remote or local data files before issuing SQL.
 
+> Looking for full, column-by-column descriptions of every table? See the
+> [Spicy Regs Data Dictionary](https://civictechdc.github.io/spicy-regs/). This
+> page is the terse SQL cheat sheet; the dictionary is the complete reference.
+
 ## Common locations
 
 - Default public R2 bucket: `https://r2.spicy-regs.dev`

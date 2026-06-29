@@ -16,6 +16,7 @@ dependencies = [
     "cyclopts",
     "loguru",
     "mcp>=1.10.0",
+    "pyyaml",  # data dictionary descriptions (src/spicy_regs/data_dictionary.py)
 ]
 
 [project.optional-dependencies]
@@ -37,6 +38,9 @@ dev = [
     "textblob",
     "ty",
 ]
+docs = [
+    "mkdocs-material",
+]
 
 [project.scripts]
 etl = "spicy_regs.pipeline.pipeline:app"
@@ -44,6 +48,7 @@ run-pipeline = "spicy_regs.pipelines.regulations:app"
 embed = "spicy_regs.vectordb.embed:main"
 spicy-regs = "spicy_regs.cli:main"
 spicy-regs-mcp = "spicy_regs.mcp_server:main"
+spicy-regs-dict = "spicy_regs.data_dictionary:main"
 
 [build-system]
 requires = ["uv_build"]
