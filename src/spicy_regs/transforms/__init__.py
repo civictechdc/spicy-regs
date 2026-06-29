@@ -5,6 +5,12 @@ from spicy_regs.transforms.extract import ExtractRecords
 from spicy_regs.transforms.merge_comments_partitioned import merge_comments_partitioned
 from spicy_regs.transforms.merge_staging_files import merge_staging_files
 from spicy_regs.transforms.partition_comments import partition_comments
+from spicy_regs.transforms.pdf_text import (
+    PAGE_SEPARATOR,
+    PdfTextResult,
+    PdfTextStatus,
+    extract_pdf_text,
+)
 from spicy_regs.transforms.update_comments_index import update_comments_index
 from spicy_regs.transforms.write_staging import write_staging
 
@@ -18,4 +24,8 @@ __all__ = [
     "partition_comments",
     "build_feed_summary",
     "build_agency_rollups",
+    "extract_pdf_text",
+    "PdfTextResult",
+    "PdfTextStatus",
+    "PAGE_SEPARATOR",
 ]
