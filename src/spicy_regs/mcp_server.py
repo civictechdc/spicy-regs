@@ -17,6 +17,9 @@ from __future__ import annotations
 
 import os
 import tempfile
+import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
@@ -44,6 +47,39 @@ TABLES = (
     "agency_monthly_volume",
 )
 STATEMENT_TIMEOUT = os.environ.get("SPICY_REGS_STATEMENT_TIMEOUT", "30s")
+
+
+def _parse_timeout_seconds(raw: str) -> float | None:
+    """Parse ``SPICY_REGS_STATEMENT_TIMEOUT`` into seconds (``None`` disables it).
+
+    DuckDB has no ``statement_timeout`` configuration parameter — ``SET
+    statement_timeout=...`` raises ``Catalog Error: unrecognized configuration
+    parameter``. The cap is instead enforced with a watchdog that interrupts the
+    connection (see :func:`_statement_timeout`). Accepts a bare number of
+    seconds or a value suffixed with ``ms``/``s``/``m``; non-positive values
+    disable the timeout.
+    """
+    text = raw.strip().lower()
+    if not text:
+        return None
+    multiplier = 1.0
+    for suffix, factor in (("ms", 0.001), ("s", 1.0), ("m", 60.0)):
+        if text.endswith(suffix):
+            multiplier = factor
+            text = text[: -len(suffix)].strip()
+            break
+    try:
+        value = float(text)
+    except ValueError as exc:
+        raise RuntimeError(
+            f"SPICY_REGS_STATEMENT_TIMEOUT is not a valid duration: {raw!r}"
+        ) from exc
+    if value <= 0:
+        return None
+    return value * multiplier
+
+
+STATEMENT_TIMEOUT_SECONDS = _parse_timeout_seconds(STATEMENT_TIMEOUT)
 
 INSTRUCTIONS = (
     "Query the Spicy Regs regulatory dataset (regulations.gov mirror) over "
@@ -129,12 +165,45 @@ def _connect() -> duckdb.DuckDBPyConnection:
     con.execute("SET autoload_known_extensions=false")
     con.execute("SET allow_unsigned_extensions=false")
     con.execute("SET disabled_filesystems='LocalFileSystem'")
-    con.execute(f"SET statement_timeout='{STATEMENT_TIMEOUT}'")
+    # DuckDB has no statement_timeout parameter; the per-query cap is enforced
+    # by the _statement_timeout watchdog wrapping each tool's execution.
     con.execute("SET lock_configuration=true")
     for name in TABLES:
         url = f"{R2_BASE_URL}/{name}.parquet"
         con.execute(f"CREATE VIEW {name} AS SELECT * FROM read_parquet('{url}')")
     return con
+
+
+@contextmanager
+def _statement_timeout(con: duckdb.DuckDBPyConnection) -> Iterator[None]:
+    """Cap the wrapped query's runtime, replacing the missing DuckDB setting.
+
+    Starts a watchdog timer that calls ``con.interrupt()`` once the configured
+    budget elapses; a tripped timer turns DuckDB's ``InterruptException`` into a
+    ``TimeoutError`` so the cause is unambiguous. A no-op when the timeout is
+    disabled.
+    """
+    if STATEMENT_TIMEOUT_SECONDS is None:
+        yield
+        return
+    tripped = threading.Event()
+
+    def _interrupt() -> None:
+        tripped.set()
+        con.interrupt()
+
+    timer = threading.Timer(STATEMENT_TIMEOUT_SECONDS, _interrupt)
+    timer.start()
+    try:
+        yield
+    except duckdb.InterruptException as exc:
+        if tripped.is_set():
+            raise TimeoutError(
+                f"Query exceeded the {STATEMENT_TIMEOUT} statement timeout"
+            ) from exc
+        raise
+    finally:
+        timer.cancel()
 
 
 def _register_tools(mcp: FastMCP) -> None:
@@ -160,7 +229,8 @@ def _register_tools(mcp: FastMCP) -> None:
                 "available_tables": list(TABLES),
             }
         con = _connect()
-        rows = con.execute(f"DESCRIBE {table}").fetchall()
+        with _statement_timeout(con):
+            rows = con.execute(f"DESCRIBE {table}").fetchall()
         return {
             "table": table,
             "columns": [
@@ -188,9 +258,12 @@ def _register_tools(mcp: FastMCP) -> None:
             return {"error": "max_rows must be between 1 and 500"}
 
         con = _connect()
-        cursor = con.execute(sql)
-        columns = [desc[0] for desc in cursor.description] if cursor.description else []
-        rows = cursor.fetchmany(max_rows)
+        with _statement_timeout(con):
+            cursor = con.execute(sql)
+            columns = (
+                [desc[0] for desc in cursor.description] if cursor.description else []
+            )
+            rows = cursor.fetchmany(max_rows)
         result_rows = [
             {col: _jsonify(val) for col, val in zip(columns, row)} for row in rows
         ]
