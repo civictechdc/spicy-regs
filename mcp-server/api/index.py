@@ -9,9 +9,11 @@ the same tool surface (names, parameters, behavior); the test at
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 from uuid import UUID
@@ -19,6 +21,14 @@ from uuid import UUID
 import duckdb
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
+from mcp.types import Icon
+
+# This file is loaded as a standalone module — both as the Vercel function
+# entrypoint and, in tests, via importlib.spec_from_file_location — so its own
+# directory isn't on sys.path. Add it so the sibling generated _icon module
+# (produced by scripts/gen_icon.py) resolves in every context.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _icon import ICON_DATA_URI  # noqa: E402
 
 DEFAULT_R2_BASE_URL = "https://r2.spicy-regs.dev"
 TABLES = ("dockets", "documents", "comments", "comments_index", "feed_summary")
@@ -31,6 +41,11 @@ INSTRUCTIONS = (
     "Always LIMIT result sets while exploring. Cite docket IDs, document "
     "IDs, comment IDs, agency codes, and dates from the rows you return."
 )
+
+# Server icon, advertised on the Implementation metadata sent during
+# ``initialize``. A base64 data: URI (not an https:// URL) so it works for both
+# the stdio and HTTP transports — see scripts/gen_icon.py.
+ICONS = [Icon(src=ICON_DATA_URI, mimeType="image/png", sizes=["512x512"])]
 
 
 def _resolve_r2_base_url() -> str:
@@ -114,6 +129,7 @@ def _connect() -> duckdb.DuckDBPyConnection:
 mcp = FastMCP(
     "spicy-regs",
     instructions=INSTRUCTIONS,
+    icons=ICONS,
     stateless_http=True,
     streamable_http_path="/mcp",
     # The hosted deployment is reached via mcp.spicy-regs.dev and per-deploy
