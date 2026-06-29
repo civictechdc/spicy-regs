@@ -24,5 +24,5 @@ One row per public comment submitted to a docket — the largest table (tens of 
 | `modify_date` | `VARCHAR` | Timestamp the comment was last modified (ISO 8601 string). |
 | `receive_date` | `VARCHAR` | Date the agency received the comment (ISO 8601 string). |
 | `attachments_json` | `VARCHAR` | JSON array of any files attached to the comment: `[{title, formats:[{url, format, size}]}]`. Null when there are no attachments. |
-| `text_content` | `VARCHAR` | Plain text extracted from the comment's PDF attachment(s) by the PDF text-extraction step. Null until that step has run; see `text_extraction_status`. |
-| `text_extraction_status` | `VARCHAR` | Outcome of PDF text extraction: `ok`, `empty` (no extractable text, e.g. scanned/image-only PDFs — OCR is out of scope), `encrypted` (password-protected), or `error`. Null before extraction has been attempted. |
+| `text_content` | `VARCHAR` | Plain text of the comment's attachment(s). Filled inline during the ETL from Mirrulations' pre-extracted text (the bucket's `derived-data` prefix); attachments not yet extracted upstream are backfilled by the on-demand PDF text-extraction step. Null when neither has produced text; see `text_extraction_status`. |
+| `text_extraction_status` | `VARCHAR` | Outcome of attachment text extraction: `ok` (text was filled, from derived-data or PDF extraction), `empty` (no extractable text, e.g. scanned/image-only PDFs — OCR is out of scope), `encrypted` (password-protected), or `error`. Null when no text has been filled yet. |

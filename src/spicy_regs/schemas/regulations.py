@@ -44,8 +44,10 @@ def _extract_comment(d: dict) -> dict:
         "modify_date": attrs.get("modifyDate"),
         "receive_date": attrs.get("receiveDate"),
         "attachments_json": json_dumps(attachments) if attachments else None,
-        # Populated out-of-band by the PDF text-extraction step
-        # (spicy_regs.pipeline.enrich_pdf) from any PDF attachments.
+        # Left None here; filled downstream. The run-pipeline ETL fills it inline
+        # from Mirrulations' pre-extracted text (transforms.EnrichCommentText),
+        # with the PDF text-extraction step (spicy_regs.pipeline.enrich_pdf) as
+        # the backfill for attachments not yet extracted upstream.
         "text_content": None,
         "text_extraction_status": None,
     }
