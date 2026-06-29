@@ -31,7 +31,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _icon import ICON_DATA_URI  # noqa: E402
 
 DEFAULT_R2_BASE_URL = "https://r2.spicy-regs.dev"
-TABLES = ("dockets", "documents", "comments", "comments_index", "feed_summary")
+# The full published R2 surface. Must match the data dictionary's table list
+# (src/spicy_regs/data_dictionary.py::TABLES) — a test enforces it so the two
+# can't drift. Keep in sync with the canonical copy in src/spicy_regs/mcp_server.py.
+TABLES = (
+    "dockets",
+    "documents",
+    "comments",
+    "comments_index",
+    "feed_summary",
+    "agency_stats",
+    "agency_monthly_volume",
+)
 STATEMENT_TIMEOUT = os.environ.get("SPICY_REGS_STATEMENT_TIMEOUT", "30s")
 
 INSTRUCTIONS = (
@@ -156,7 +167,8 @@ def list_sources() -> dict[str, Any]:
 def describe_table(table: str) -> dict[str, Any]:
     """Return the column schema for one Spicy Regs table.
 
-    Valid tables: dockets, documents, comments, comments_index, feed_summary.
+    Valid tables: dockets, documents, comments, comments_index, feed_summary,
+    agency_stats, agency_monthly_volume.
     """
     if table not in TABLES:
         return {
@@ -185,8 +197,9 @@ def query_sql(sql: str, max_rows: int = 25) -> dict[str, Any]:
     """Run a SQL query against the Spicy Regs R2 tables and return up to max_rows rows.
 
     The connection is in-memory and read-only against R2. Available views:
-    dockets, documents, comments, comments_index, feed_summary. Always include
-    a LIMIT in exploratory queries; results past max_rows are dropped.
+    dockets, documents, comments, comments_index, feed_summary, agency_stats,
+    agency_monthly_volume. Always include a LIMIT in exploratory queries;
+    results past max_rows are dropped.
     """
     if max_rows <= 0 or max_rows > 500:
         return {"error": "max_rows must be between 1 and 500"}

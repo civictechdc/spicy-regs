@@ -1,0 +1,46 @@
+site_name: Spicy Regs Data Dictionary
+site_description: Schema reference for the Spicy Regs regulations.gov dataset.
+site_url: https://docs.spicy-regs.dev/
+repo_url: https://github.com/civictechdc/spicy-regs
+repo_name: civictechdc/spicy-regs
+edit_uri: edit/main/data_dictionary/descriptions.yaml
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      accent: red
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      accent: red
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+
+markdown_extensions:
+  - admonition
+  - tables
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+nav:
+  - Overview: index.md
+  - Tables:
+      - dockets: tables/dockets.md
+      - documents: tables/documents.md
+      - comments: tables/comments.md
+      - comments_index: tables/comments_index.md
+      - feed_summary: tables/feed_summary.md
+      - agency_stats: tables/agency_stats.md
+      - agency_monthly_volume: tables/agency_monthly_volume.md

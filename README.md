@@ -76,6 +76,21 @@ Next steps:
 - Read [CONTRIBUTING.md](CONTRIBUTING.md) for architecture and how to add your
   own reader / transform / writer / pipeline.
 
+## Data dictionary
+
+A full, column-by-column reference for every published table lives at the
+[**Spicy Regs Data Dictionary**](https://civictechdc.github.io/spicy-regs/). It
+is generated from the schema in this repo and kept in sync by CI, so it always
+matches what's published to R2. To work on it locally:
+
+```bash
+uv run spicy-regs-dict check        # verify descriptions match the schema
+uv run spicy-regs-dict generate     # regenerate docs/tables/*.md
+uv run --group docs mkdocs serve    # preview the site at 127.0.0.1:8000
+```
+
+Edit descriptions in `data_dictionary/descriptions.yaml`.
+
 ## Open Example Notebooks under /notebooks
 
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/civictechdc/spicy-regs/HEAD)

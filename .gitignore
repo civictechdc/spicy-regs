@@ -18,7 +18,8 @@ lance-data
 .DS_Store
 .claude
 ./scripts
-docs
+# MkDocs build output. The data dictionary *source* lives in docs/ and is tracked.
+site
 recovery
 .env.local
 .env*.local

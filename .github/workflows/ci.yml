@@ -52,3 +52,36 @@ jobs:
 
       - name: Run tests
         run: uv run pytest
+
+  data-dictionary:
+    # Guards that the data dictionary stays in sync with the schema: the
+    # descriptions cover every column, and the committed table pages match what
+    # the generator would produce. A schema change without a docs update fails
+    # here. Offline (no network) — the live-data reconciliation runs in the
+    # docs deploy workflow.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Check descriptions vs schema
+        run: uv run spicy-regs-dict check
+
+      - name: Verify generated table pages are up to date
+        run: |
+          uv run spicy-regs-dict generate
+          git diff --exit-code docs/tables \
+            || { echo "::error::docs/tables is stale. Run 'uv run spicy-regs-dict generate' and commit."; exit 1; }
