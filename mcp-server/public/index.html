@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Spicy Regs MCP Server</title>
+  <meta name="description" content="Connect the Spicy Regs regulatory dataset (regulations.gov mirror) to Claude, Cursor, VS Code, and any MCP client." />
+  <link rel="icon" type="image/png" href="/icon.png" />
+  <style>
+    :root {
+      --blue: #1f5ba6;
+      --blue-dark: #17457d;
+      --blue-light: #4a7fc0;
+      --ink: #16202c;
+      --muted: #5b6b7b;
+      --line: #e3e8ee;
+      --bg: #f6f8fb;
+      --card: #ffffff;
+      --code-bg: #0f1b2a;
+      --code-ink: #e6edf6;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.55;
+    }
+    a { color: var(--blue); }
+    .wrap { max-width: 860px; margin: 0 auto; padding: 0 20px; }
+
+    header {
+      background: linear-gradient(160deg, var(--blue) 0%, var(--blue-dark) 100%);
+      color: #fff;
+      padding: 56px 0 48px;
+    }
+    .brand { display: flex; align-items: center; gap: 18px; }
+    .brand img {
+      width: 72px; height: 72px; border-radius: 18px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      flex: 0 0 auto;
+    }
+    .brand h1 { margin: 0; font-size: 2rem; letter-spacing: -0.02em; }
+    .brand p { margin: 4px 0 0; color: #cfe0f4; font-size: 1.02rem; }
+    header .lead {
+      margin: 26px 0 0; max-width: 620px; color: #e7effa; font-size: 1.06rem;
+    }
+    .endpoint {
+      margin-top: 26px; display: inline-flex; align-items: center; gap: 10px;
+      background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25);
+      padding: 10px 14px; border-radius: 10px; font-size: 0.95rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .endpoint .label { color: #bcd2ee; font-family: inherit; }
+
+    main { padding: 40px 0 64px; }
+    section { margin-top: 14px; }
+    h2 {
+      font-size: 1.35rem; letter-spacing: -0.01em; margin: 40px 0 6px;
+      padding-top: 8px;
+    }
+    .section-sub { color: var(--muted); margin: 0 0 18px; }
+
+    .card {
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: var(--radius); padding: 22px 22px 8px; margin-bottom: 18px;
+      box-shadow: 0 1px 2px rgba(16,32,48,0.04);
+    }
+    .card h3 {
+      margin: 0 0 4px; font-size: 1.12rem; display: flex; align-items: center; gap: 9px;
+    }
+    .card .req { font-size: 0.85rem; color: var(--muted); margin: 0 0 14px; }
+    .badge {
+      font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.04em; color: var(--blue-dark); background: #e8f0fa;
+      border-radius: 999px; padding: 3px 9px; vertical-align: middle;
+    }
+
+    ol { margin: 0 0 16px; padding-left: 22px; }
+    ol li { margin: 6px 0; }
+
+    .codeblock {
+      position: relative; background: var(--code-bg); color: var(--code-ink);
+      border-radius: 10px; margin: 12px 0 18px; overflow: hidden;
+    }
+    .codeblock pre {
+      margin: 0; padding: 16px 64px 16px 16px; overflow-x: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.86rem; line-height: 1.5;
+    }
+    .codeblock .copy {
+      position: absolute; top: 8px; right: 8px;
+      background: #24364a; color: #cfe0f4;
+      border: 1px solid rgba(255,255,255,0.18); border-radius: 7px;
+      font-size: 0.74rem; padding: 5px 10px; cursor: pointer;
+      font-family: inherit; box-shadow: -8px 0 10px 4px var(--code-bg);
+    }
+    .codeblock .copy:hover { background: #324863; color: #fff; }
+    .codeblock .copy.copied { color: #aef0c4; border-color: rgba(174,240,196,0.5); }
+
+    .pathline { color: #8aa4c2; font-size: 0.8rem; margin: -6px 0 0; font-family: ui-monospace, monospace; }
+
+    .tools-table { width: 100%; border-collapse: collapse; margin: 4px 0 18px; font-size: 0.95rem; }
+    .tools-table th, .tools-table td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+    .tools-table th { color: var(--muted); font-weight: 600; }
+    .tools-table code { background: #eef2f7; padding: 1px 6px; border-radius: 5px; font-size: 0.86em; }
+
+    footer { border-top: 1px solid var(--line); padding: 26px 0 50px; color: var(--muted); font-size: 0.9rem; }
+    footer a { text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    @media (max-width: 560px) {
+      header { padding: 40px 0 36px; }
+      .brand { flex-direction: column; align-items: flex-start; gap: 14px; }
+      .brand h1 { font-size: 1.6rem; }
+      .endpoint { font-size: 0.82rem; flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="brand">
+        <img src="/icon.png" alt="Spicy Regs logo" />
+        <div>
+          <h1>Spicy Regs MCP Server</h1>
+          <p>A regulations.gov mirror, queryable from your AI tools.</p>
+        </div>
+      </div>
+      <p class="lead">
+        A remote <a href="https://modelcontextprotocol.io" style="color:#fff;text-decoration:underline">Model Context Protocol</a>
+        server that exposes the Spicy Regs regulatory dataset — dockets, documents,
+        and public comments — to any MCP-compatible client. It runs DuckDB queries
+        against a public Cloudflare R2 parquet bucket; no API key, no local install required.
+      </p>
+      <div class="endpoint">
+        <span class="label">Endpoint</span>
+        <strong>https://mcp.spicy-regs.dev/mcp</strong>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap">
+
+      <h2>Set up in your AI tool</h2>
+      <p class="section-sub">Pick your client below. Most accept the remote HTTP endpoint directly; for local-process clients there's a <code>uvx</code> stdio option too.</p>
+
+      <!-- Claude.ai -->
+      <div class="card">
+        <h3>Claude.ai <span class="badge">web &amp; desktop</span></h3>
+        <p class="req">Requires a Pro, Max, Team, or Enterprise plan.</p>
+        <ol>
+          <li>Open <strong>Settings → Connectors → Add custom connector</strong>.</li>
+          <li>Name it <strong>Spicy Regs</strong>.</li>
+          <li>Set the URL to <strong>https://mcp.spicy-regs.dev/mcp</strong>.</li>
+          <li>Leave authentication as <strong>None</strong> (the dataset is public).</li>
+          <li>Save, then toggle the connector on in any conversation.</li>
+        </ol>
+      </div>
+
+      <!-- Claude Code -->
+      <div class="card">
+        <h3>Claude Code</h3>
+        <p class="req">Two transports work — pick one.</p>
+        <p style="margin:0 0 2px;font-size:0.9rem;color:var(--muted)">Remote HTTP:</p>
+        <div class="codeblock">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>claude mcp add --transport http spicy-regs https://mcp.spicy-regs.dev/mcp</code></pre>
+        </div>
+        <p style="margin:0 0 2px;font-size:0.9rem;color:var(--muted)">Local stdio via <code>uvx</code> (no remote dependency):</p>
+        <div class="codeblock">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>claude mcp add spicy-regs -- uvx --from "spicy-regs @ git+https://github.com/civictechdc/spicy-regs" spicy-regs-mcp</code></pre>
+        </div>
+      </div>
+
+      <!-- Cursor -->
+      <div class="card">
+        <h3>Cursor</h3>
+        <p class="req">Add to your MCP config, then enable it under Settings → MCP.</p>
+        <p class="pathline">~/.cursor/mcp.json &nbsp;(global) &nbsp;·&nbsp; .cursor/mcp.json &nbsp;(per-project)</p>
+        <div class="codeblock">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>{
+  "mcpServers": {
+    "spicy-regs": {
+      "url": "https://mcp.spicy-regs.dev/mcp"
+    }
+  }
+}</code></pre>
+        </div>
+      </div>
+
+      <!-- VS Code -->
+      <div class="card">
+        <h3>VS Code <span class="badge">Copilot</span></h3>
+        <p class="req">Add a workspace MCP config (Agent mode required).</p>
+        <p class="pathline">.vscode/mcp.json</p>
+        <div class="codeblock">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>{
+  "servers": {
+    "spicy-regs": {
+      "type": "http",
+      "url": "https://mcp.spicy-regs.dev/mcp"
+    }
+  }
+}</code></pre>
+        </div>
+      </div>
+
+      <!-- Windsurf -->
+      <div class="card">
+        <h3>Windsurf</h3>
+        <p class="req">Add to the Cascade MCP config, then refresh the server list.</p>
+        <p class="pathline">~/.codeium/windsurf/mcp_config.json</p>
+        <div class="codeblock">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>{
+  "mcpServers": {
+    "spicy-regs": {
+      "serverUrl": "https://mcp.spicy-regs.dev/mcp"
+    }
+  }
+}</code></pre>
+        </div>
+      </div>
+
+      <!-- Generic -->
+      <div class="card">
+        <h3>Any other MCP client</h3>
+        <p class="req">Most clients accept either a remote streamable-HTTP URL or a local stdio command.</p>
+        <p style="margin:0 0 2px;font-size:0.9rem;color:var(--muted)">Remote (streamable HTTP):</p>
+        <div class="codeblock">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>https://mcp.spicy-regs.dev/mcp</code></pre>
+        </div>
+        <p style="margin:0 0 2px;font-size:0.9rem;color:var(--muted)">Local (stdio) — runs the published console script with <code>uvx</code>:</p>
+        <div class="codeblock">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>uvx --from "spicy-regs @ git+https://github.com/civictechdc/spicy-regs" spicy-regs-mcp</code></pre>
+        </div>
+      </div>
+
+      <h2>Tools exposed</h2>
+      <p class="section-sub">Three read-only tools over the R2 dataset.</p>
+      <table class="tools-table">
+        <thead>
+          <tr><th>Tool</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>list_sources</code></td><td>List the logical tables in the R2 dataset.</td></tr>
+          <tr><td><code>describe_table(table)</code></td><td>Get the column schema for one table.</td></tr>
+          <tr><td><code>query_sql(sql, max_rows=25)</code></td><td>Run a read-only SQL query against the R2 views.</td></tr>
+        </tbody>
+      </table>
+      <p class="section-sub" style="margin-top:2px">
+        Available views: <code>dockets</code>, <code>documents</code>, <code>comments</code>,
+        <code>comments_index</code>, <code>feed_summary</code>, <code>agency_stats</code>,
+        <code>agency_monthly_volume</code>. Full schemas live in the
+        <a href="https://docs.spicy-regs.dev/">data dictionary</a>.
+      </p>
+
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a href="https://github.com/civictechdc/spicy-regs">GitHub</a>
+      &nbsp;·&nbsp;
+      <a href="https://docs.spicy-regs.dev/">Data dictionary</a>
+      &nbsp;·&nbsp;
+      <a href="https://modelcontextprotocol.io">About MCP</a>
+      <p style="margin:14px 0 0">A <a href="https://www.civictechdc.org/">Civic Tech DC</a> project. Data sourced from regulations.gov.</p>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelectorAll(".codeblock .copy").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var code = btn.parentElement.querySelector("code");
+        var text = code ? code.innerText : "";
+        navigator.clipboard.writeText(text).then(function () {
+          var prev = btn.textContent;
+          btn.textContent = "Copied";
+          btn.classList.add("copied");
+          setTimeout(function () {
+            btn.textContent = prev;
+            btn.classList.remove("copied");
+          }, 1600);
+        });
+      });
+    });
+  </script>
+</body>
+</html>

@@ -29,12 +29,23 @@ ETL dependencies (boto3, polars, prefect, ...) — keep the two in sync.
 | `query_sql(sql, max_rows=25)` | Run a SQL query against the R2 views |
 
 Available views: `dockets`, `documents`, `comments`, `comments_index`,
-`feed_summary`.
+`feed_summary`, `agency_stats`, `agency_monthly_volume`.
+
+## Landing page
+
+The base route (**`https://mcp.spicy-regs.dev/`**) serves a static landing
+page with copy-paste setup instructions for Claude.ai, Claude Code, Cursor,
+VS Code, Windsurf, and generic MCP clients. It's a plain static file
+(`public/index.html`, with `public/icon.png`) — Vercel serves the `public/`
+directory at the site root, and the `/mcp` rewrite still routes the protocol
+endpoint to the function untouched (the filesystem is matched before
+rewrites). Edit the HTML directly to change the instructions.
 
 ## Deploy to Vercel
 
 The production deployment lives at **`https://mcp.spicy-regs.dev/mcp`** —
-that's the MCP endpoint you give to clients.
+that's the MCP endpoint you give to clients. The base route
+(`https://mcp.spicy-regs.dev/`) serves the setup landing page described above.
 
 Deploys run through GitHub Actions
 ([`.github/workflows/deploy-mcp.yml`](../.github/workflows/deploy-mcp.yml))
