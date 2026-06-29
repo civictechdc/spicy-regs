@@ -163,15 +163,18 @@ def _apply_security_settings(con: duckdb.DuckDBPyConnection) -> None:
     con.execute("SET autoinstall_known_extensions=false")
     con.execute("SET autoload_known_extensions=false")
     con.execute("SET allow_unsigned_extensions=false")
-    # Disabling LocalFileSystem stops user SQL from reading local files, but it
-    # also blocks DuckDB's on-disk spill target: temp_directory defaults to a
-    # local ".tmp", so any query that exceeds memory_limit (e.g. a GROUP BY or
-    # ORDER BY over the larger tables) would otherwise fail with the confusing
-    # "File system LocalFileSystem has been disabled by configuration". An empty
-    # temp_directory disables spilling — queries run in memory or fail with a
-    # clear out-of-memory error instead. Must precede disabling the filesystem.
+    # NB: do NOT disable LocalFileSystem here. It is tempting as a guard against
+    # user SQL reading local files, but httpfs reads the system CA bundle off
+    # the local filesystem for every TLS handshake, so disabling it breaks the
+    # only thing this server does — reading the R2 parquet over HTTPS fails with
+    # "File system LocalFileSystem has been disabled by configuration" the
+    # moment a view binds. See the query_sql docstring for the access model.
+    #
+    # Disable on-disk spilling instead: temp_directory defaults to a local
+    # ".tmp" that is read-only on serverless hosts, so a spilling query (a big
+    # GROUP BY/ORDER BY) would fail there anyway. Empty disables spilling —
+    # queries run in memory or fail with a clear out-of-memory error.
     con.execute("SET temp_directory=''")
-    con.execute("SET disabled_filesystems='LocalFileSystem'")
     # DuckDB has no statement_timeout parameter; the per-query cap is enforced
     # by the _statement_timeout watchdog wrapping each tool's execution.
     con.execute("SET lock_configuration=true")
