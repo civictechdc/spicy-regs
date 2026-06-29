@@ -75,6 +75,10 @@ def _extract_document(d: dict) -> dict:
         "withdrawn": attrs.get("withdrawn"),
         "reason_withdrawn": attrs.get("reasonWithdrawn"),
         "additional_rins": (json_dumps(rins) if (rins := attrs.get("additionalRins")) else None),
+        # Populated out-of-band by the PDF text-extraction step
+        # (spicy_regs.pipeline.enrich_pdf); the raw JSON has no text layer.
+        "text_content": None,
+        "text_extraction_status": None,
     }
 
 
@@ -122,6 +126,10 @@ DOCUMENT = RecordType(
         "withdrawn": pl.Utf8,
         "reason_withdrawn": pl.Utf8,
         "additional_rins": pl.Utf8,
+        # Text extracted from the document's PDF rendition, plus the outcome
+        # of that extraction ("ok"/"empty"/"encrypted"/"error"/None if not yet run).
+        "text_content": pl.Utf8,
+        "text_extraction_status": pl.Utf8,
     },
     dedup_key="document_id",
     extract=_extract_document,

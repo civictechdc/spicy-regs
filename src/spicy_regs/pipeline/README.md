@@ -107,6 +107,28 @@ uv run etl --merge-only --output-dir ./output
 | `--upload-only` | Only upload to R2 |
 | `--partition-only` | Partition comments by agency and upload |
 
+## PDF text extraction
+
+The metadata ETL above only moves JSON, so `documents.text_content` is left
+`NULL`. A separate, opt-in step backfills it by downloading each document's PDF
+rendition and extracting its embedded text:
+
+```bash
+# Enrich ./output/documents.parquet in place. Incremental by default:
+# documents that already have a text_extraction_status are skipped.
+uv run enrich-pdf-text --output-dir ./output
+
+uv run enrich-pdf-text --output-dir ./output --limit 500    # cap a run
+uv run enrich-pdf-text --output-dir ./output --overwrite    # re-extract everything
+```
+
+It is kept out of the hot metadata path on purpose — it makes one HTTP request
+per PDF, which is far slower than the JSON ingest. The pieces are split along
+the usual lines: `sources/pdf.py` fetches the bytes (I/O), `transforms/pdf_text.py`
+turns bytes into text (pure, no network), and `pipeline/enrich_pdf.py` joins them
+over the Parquet. Scanned / image-only PDFs have no text layer and come back
+`empty` — OCR is out of scope.
+
 ## Data Schema
 
 All columns are stored as strings (`large_string` in PyArrow).
@@ -140,6 +162,8 @@ All columns are stored as strings (`large_string` in PyArrow).
 | `withdrawn` | Whether the document was withdrawn (`"true"`/`"false"`, often null) |
 | `reason_withdrawn` | Stated reason for withdrawal (often null) |
 | `additional_rins` | JSON array of additional RINs linked to the document (often null) |
+| `text_content` | Text extracted from the document's PDF rendition (null until the PDF text step runs) |
+| `text_extraction_status` | Outcome of PDF text extraction: `ok` / `empty` (scanned, no text layer) / `encrypted` / `error`, or null if not yet attempted |
 
 ### Comments (~31.6M rows)
 

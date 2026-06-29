@@ -60,8 +60,8 @@ def sample_comments() -> list[dict]:
 @pytest.fixture
 def sample_documents() -> list[dict]:
     return [
-        {"document_id": "D-001", "docket_id": "EPA-2024-0001", "agency_code": "EPA", "title": "Proposed Rule", "document_type": "Proposed Rule", "posted_date": "2024-06-01", "modify_date": "2024-06-01", "comment_start_date": "2024-06-01", "comment_end_date": "2024-07-01", "file_url": None, "attachments_json": None, "fr_doc_num": None, "withdrawn": "false", "reason_withdrawn": None, "additional_rins": None},
-        {"document_id": "D-002", "docket_id": "FDA-2024-0010", "agency_code": "FDA", "title": "Notice", "document_type": "Notice", "posted_date": "2024-04-15", "modify_date": "2024-04-15", "comment_start_date": "2024-04-15", "comment_end_date": "2024-05-15", "file_url": None, "attachments_json": None, "fr_doc_num": "2025-13790", "withdrawn": "true", "reason_withdrawn": "Superseded by revised proposal", "additional_rins": "[\"0910-AH35\"]"},
+        {"document_id": "D-001", "docket_id": "EPA-2024-0001", "agency_code": "EPA", "title": "Proposed Rule", "document_type": "Proposed Rule", "posted_date": "2024-06-01", "modify_date": "2024-06-01", "comment_start_date": "2024-06-01", "comment_end_date": "2024-07-01", "file_url": None, "attachments_json": None, "fr_doc_num": None, "withdrawn": "false", "reason_withdrawn": None, "additional_rins": None, "text_content": None, "text_extraction_status": None},
+        {"document_id": "D-002", "docket_id": "FDA-2024-0010", "agency_code": "FDA", "title": "Notice", "document_type": "Notice", "posted_date": "2024-04-15", "modify_date": "2024-04-15", "comment_start_date": "2024-04-15", "comment_end_date": "2024-05-15", "file_url": None, "attachments_json": None, "fr_doc_num": "2025-13790", "withdrawn": "true", "reason_withdrawn": "Superseded by revised proposal", "additional_rins": "[\"0910-AH35\"]", "text_content": None, "text_extraction_status": None},
     ]
 
 
@@ -108,6 +108,8 @@ DOCUMENT_SCHEMA = {
     "withdrawn": pl.Utf8,
     "reason_withdrawn": pl.Utf8,
     "additional_rins": pl.Utf8,
+    "text_content": pl.Utf8,
+    "text_extraction_status": pl.Utf8,
 }
 
 

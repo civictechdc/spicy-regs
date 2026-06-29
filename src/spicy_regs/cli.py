@@ -143,7 +143,7 @@ def cmd_search(args):
 
     search_configs = {
         "dockets": ["title", "abstract"],
-        "documents": ["title"],
+        "documents": ["title", "text_content"],
         "comments": ["title", "comment"],
     }
 
