@@ -70,6 +70,7 @@ Other useful flags (see `uv run run-pipeline --help` for the full list):
 | `--max-workers 8`       | Agencies processed in parallel (default 4)                |
 | `--full-refresh`        | Ignore the existing manifest and rebuild from scratch     |
 | `--no-skip-upload`      | Also publish to R2 (needs credentials in `.env`)          |
+| `--no-enrich-text`      | Skip filling comment `text_content` from Mirrulations' pre-extracted attachment text |
 
 Next steps:
 - Open the runnable example pipeline at `tests/test_example_pipeline.py`.

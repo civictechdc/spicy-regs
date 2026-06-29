@@ -36,8 +36,12 @@ from spicy_regs.pipelines.base import Pipeline
 from spicy_regs.pipelines.staging import stage_agencies
 from spicy_regs.schemas import RECORD_TYPES, RecordType
 from spicy_regs.sources import iceberg, mirrulations, r2
+from spicy_regs.sources.derived_text import DerivedCommentText
 from spicy_regs.transforms import (
+    Chain,
+    EnrichCommentText,
     ExtractRecords,
+    Transform,
     build_agency_rollups,
     build_feed_summary,
     merge_comments_partitioned,
@@ -68,6 +72,7 @@ class RegulationsPipeline(Pipeline):
         full_refresh: bool = False,
         max_workers: int = 4,
         use_iceberg: bool = False,
+        enrich_text: bool = True,
         verbose: bool = False,
     ) -> None:
         self.agency = agency
@@ -82,6 +87,7 @@ class RegulationsPipeline(Pipeline):
         self.full_refresh = full_refresh
         self.max_workers = max_workers
         self.use_iceberg = use_iceberg
+        self.enrich_text = enrich_text
         self.verbose = verbose
 
     def run(self) -> None:
@@ -112,7 +118,7 @@ class RegulationsPipeline(Pipeline):
             mirrulations.reader_factory(
                 processed_keys=manifest, since_year=self.since_year, verbose=self.verbose
             ),
-            transform_for=ExtractRecords,
+            transform_for=self._transform_for,
             max_workers=self.max_workers,
         )
         manifest.record(result.consumed_keys)
@@ -141,6 +147,21 @@ class RegulationsPipeline(Pipeline):
         logger.info("Done!")
 
     # -- regulations-specific wiring ---------------------------------------
+
+    def _transform_for(self, record_type: RecordType) -> Transform:
+        """Build the staging transform for one record type.
+
+        Every type is flattened by :class:`ExtractRecords`. Comments are
+        additionally enriched inline with Mirrulations' pre-extracted attachment
+        text (the primary source for ``text_content``); a fresh
+        :class:`DerivedCommentText` — and thus a fresh S3 resource — is built per
+        call so the chain is safe to run from staging's worker threads.
+        """
+        extract = ExtractRecords(record_type)
+        if record_type.name == "comments" and self.enrich_text:
+            fetcher = DerivedCommentText(mirrulations.s3_resource())
+            return Chain(extract, EnrichCommentText(fetcher))
+        return extract
 
     def _record_types(self) -> list[RecordType]:
         """The record types to process, honoring skip/only-comments."""
@@ -241,6 +262,12 @@ def main(
     use_iceberg: Annotated[
         bool, Parameter(help="Route the dockets table through R2 Data Catalog (Iceberg)")
     ] = False,
+    enrich_text: Annotated[
+        bool,
+        Parameter(
+            help="Fill comment text_content inline from Mirrulations derived-data extracted text"
+        ),
+    ] = True,
     verbose: Annotated[bool, Parameter(name=["--verbose", "-v"], help="Verbose logging")] = False,
 ) -> None:
     """Run the regulations.gov ETL pipeline."""
@@ -257,6 +284,7 @@ def main(
         full_refresh=full_refresh,
         max_workers=max_workers,
         use_iceberg=use_iceberg,
+        enrich_text=enrich_text,
         verbose=verbose,
     ).run()
 
