@@ -90,6 +90,8 @@ COMMENT_SCHEMA = {
     "modify_date": pl.Utf8,
     "receive_date": pl.Utf8,
     "attachments_json": pl.Utf8,
+    "text_content": pl.Utf8,
+    "text_extraction_status": pl.Utf8,
 }
 
 DOCUMENT_SCHEMA = {

@@ -109,14 +109,19 @@ uv run etl --merge-only --output-dir ./output
 
 ## PDF text extraction
 
-The metadata ETL above only moves JSON, so `documents.text_content` is left
-`NULL`. A separate, opt-in step backfills it by downloading each document's PDF
-rendition and extracting its embedded text:
+The metadata ETL above only moves JSON, so `text_content` is left `NULL` on
+both documents and comments. A separate, opt-in step backfills it by
+downloading PDF attachments and extracting their embedded text:
 
 ```bash
-# Enrich ./output/documents.parquet in place. Incremental by default:
-# documents that already have a text_extraction_status are skipped.
+# Documents (default). Enriches ./output/documents.parquet in place.
+# Incremental: rows that already have a text_extraction_status are skipped.
 uv run enrich-pdf-text --output-dir ./output
+
+# Comment attachments. Uses the Hive-partitioned comments/agency/ layout when
+# present, else the monolithic comments.parquet. --limit is a total budget
+# across partitions.
+uv run enrich-pdf-text --output-dir ./output --target comments
 
 uv run enrich-pdf-text --output-dir ./output --limit 500    # cap a run
 uv run enrich-pdf-text --output-dir ./output --overwrite    # re-extract everything
@@ -126,8 +131,10 @@ It is kept out of the hot metadata path on purpose — it makes one HTTP request
 per PDF, which is far slower than the JSON ingest. The pieces are split along
 the usual lines: `sources/pdf.py` fetches the bytes (I/O), `transforms/pdf_text.py`
 turns bytes into text (pure, no network), and `pipeline/enrich_pdf.py` joins them
-over the Parquet. Scanned / image-only PDFs have no text layer and come back
-`empty` — OCR is out of scope.
+over the Parquet. Documents and comments pack their attachment renditions
+differently (documents flat, comments nested under each attachment's `formats`),
+so each has its own URL extractor feeding one shared core. Scanned / image-only
+PDFs have no text layer and come back `empty` — OCR is out of scope.
 
 ## Data Schema
 
@@ -183,6 +190,8 @@ All columns are stored as strings (`large_string` in PyArrow).
 | `modify_date` | Last modification date |
 | `receive_date` | Date received |
 | `attachments_json` | Compact JSON array of comment attachments |
+| `text_content` | Text extracted from the comment's PDF attachment(s) (null until the PDF text step runs) |
+| `text_extraction_status` | Outcome of PDF text extraction: `ok` / `empty` / `encrypted` / `error`, or null if not yet attempted |
 
 ## Output Structure on R2
 

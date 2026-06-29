@@ -7,7 +7,9 @@ import polars as pl
 from tests.pdf_fixtures import make_pdf, make_textless_pdf
 
 from spicy_regs.pipeline.enrich_pdf import (
+    enrich_comments_with_pdf_text,
     enrich_documents_with_pdf_text,
+    pdf_urls_for_comment,
     pdf_urls_for_document,
 )
 
@@ -127,3 +129,62 @@ def test_enrich_respects_limit() -> None:
         limit=1,
     )
     assert stats["selected"] == 1
+
+
+# --- Comment attachments (nested formats shape) ---------------------------
+
+
+def test_comment_pdf_urls_reads_nested_formats() -> None:
+    # Comment attachments nest renditions under each attachment's "formats".
+    attachments = json.dumps(
+        [
+            {
+                "title": "Exhibit A",
+                "formats": [
+                    {"url": "https://x/a.htm", "format": "htm"},
+                    {"url": "https://x/a.pdf", "format": "pdf"},
+                ],
+            },
+            {"title": "Exhibit B", "formats": [{"url": "https://x/b.pdf", "format": "pdf"}]},
+        ]
+    )
+    assert pdf_urls_for_comment(attachments) == ["https://x/a.pdf", "https://x/b.pdf"]
+
+
+def test_comment_pdf_urls_none_and_bad_json() -> None:
+    assert pdf_urls_for_comment(None) == []
+    assert pdf_urls_for_comment("not json") == []
+    assert pdf_urls_for_comment(json.dumps([{"title": "no formats"}])) == []
+
+
+def _comments_frame() -> pl.DataFrame:
+    return pl.DataFrame(
+        {
+            "comment_id": ["C-pdf", "C-plain"],
+            "attachments_json": [
+                json.dumps([{"title": "Letter", "formats": [{"url": "https://x/c.pdf", "format": "pdf"}]}]),
+                None,
+            ],
+            "text_content": [None, None],
+            "text_extraction_status": [None, None],
+        },
+        schema={
+            "comment_id": pl.Utf8,
+            "attachments_json": pl.Utf8,
+            "text_content": pl.Utf8,
+            "text_extraction_status": pl.Utf8,
+        },
+    )
+
+
+def test_enrich_comments_fills_attachment_text() -> None:
+    enriched, stats = enrich_comments_with_pdf_text(
+        _comments_frame(),
+        fetch=lambda url: make_pdf(["Comment attachment body"]),
+    )
+    by_id = {r["comment_id"]: r for r in enriched.iter_rows(named=True)}
+    assert by_id["C-pdf"]["text_extraction_status"] == "ok"
+    assert "Comment attachment body" in by_id["C-pdf"]["text_content"]
+    # Comment with no attachment is never selected.
+    assert by_id["C-plain"]["text_extraction_status"] is None
+    assert stats == {"selected": 1, "ok": 1, "empty": 0, "encrypted": 0, "error": 0}
