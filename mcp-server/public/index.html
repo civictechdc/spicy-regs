@@ -14,54 +14,46 @@
       --muted: #5b6b7b;
       --line: #e3e8ee;
       --bg: #f6f8fb;
-      --card: #ffffff;
       --code-bg: #0f1b2a;
       --code-ink: #e6edf6;
     }
     * { box-sizing: border-box; }
-    html, body { height: 100%; }
     body {
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       color: var(--ink);
       background: var(--bg);
       line-height: 1.5;
-      display: flex;
-      flex-direction: column;
       min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px 20px;
     }
     a { color: var(--blue); }
-    .wrap { width: 100%; max-width: 780px; margin: 0 auto; padding: 0 20px; }
 
-    /* ---- header ---- */
-    header {
-      background: linear-gradient(160deg, var(--blue) 0%, var(--blue-dark) 100%);
-      color: #fff;
-      padding: 20px 0 18px;
-    }
-    .topbar { display: flex; align-items: center; gap: 14px; }
-    .topbar img { width: 46px; height: 46px; border-radius: 12px; flex: 0 0 auto; box-shadow: 0 4px 14px rgba(0,0,0,0.25); }
-    .topbar h1 { margin: 0; font-size: 1.3rem; letter-spacing: -0.02em; }
-    .topbar p { margin: 1px 0 0; color: #cfe0f4; font-size: 0.88rem; }
-    .topbar .links { margin-left: auto; display: flex; gap: 14px; font-size: 0.86rem; }
-    .topbar .links a { color: #d6e4f6; text-decoration: none; white-space: nowrap; }
-    .topbar .links a:hover { color: #fff; text-decoration: underline; }
+    .card { width: 100%; max-width: 660px; text-align: center; }
+
+    /* ---- brand ---- */
+    .brand img { width: 56px; height: 56px; border-radius: 14px; box-shadow: 0 6px 18px rgba(31,91,166,0.28); }
+    .brand h1 { margin: 8px 0 2px; font-size: 1.5rem; letter-spacing: -0.02em; }
+    .brand p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+
+    /* ---- endpoint ---- */
     .endpoint {
-      margin-top: 14px; display: flex; align-items: center; gap: 10px;
-      background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.22);
-      padding: 8px 8px 8px 12px; border-radius: 10px; font-size: 0.9rem;
+      margin: 18px auto 0; display: inline-flex; align-items: center; gap: 10px;
+      background: #fff; border: 1px solid var(--line); border-radius: 11px;
+      padding: 7px 7px 7px 14px; box-shadow: 0 1px 2px rgba(16,32,48,0.05);
+      max-width: 100%;
     }
-    .endpoint .label { color: #bcd2ee; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; }
-    .endpoint code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: #fff; flex: 1; overflow-x: auto; }
-    .endpoint .copy { flex: 0 0 auto; }
+    .endpoint .label { color: var(--muted); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; }
+    .endpoint code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--blue-dark); font-size: 0.92rem; overflow-x: auto; }
 
-    /* ---- main / tabs ---- */
-    main { flex: 1 0 auto; padding: 20px 0 14px; }
+    /* ---- tabs ---- */
     .tabs {
-      display: flex; gap: 4px; border-bottom: 2px solid var(--line);
-      overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+      display: flex; justify-content: center; flex-wrap: wrap; gap: 2px;
+      margin: 18px 0 0; border-bottom: 2px solid var(--line);
     }
-    .tabs::-webkit-scrollbar { display: none; }
     .tab {
       appearance: none; background: none; border: none; cursor: pointer;
       font: inherit; font-size: 0.92rem; font-weight: 600; color: var(--muted);
@@ -71,7 +63,8 @@
     .tab:hover { color: var(--ink); background: #eef2f7; }
     .tab[aria-selected="true"] { color: var(--blue-dark); border-bottom-color: var(--blue); }
 
-    .panel { display: none; padding: 18px 2px 0; }
+    /* ---- panels (left-aligned content inside the centered card) ---- */
+    .panel { display: none; text-align: left; padding: 18px 0 0; }
     .panel[data-active] { display: block; }
     .panel .req { font-size: 0.85rem; color: var(--muted); margin: 0 0 12px; }
     .panel .req .badge {
@@ -82,6 +75,7 @@
     .steps li { margin: 5px 0; font-size: 0.95rem; }
     .panel .hint { font-size: 0.85rem; color: var(--muted); margin: 0 0 3px; }
     .pathline { color: var(--muted); font-size: 0.8rem; margin: 0 0 4px; font-family: ui-monospace, monospace; }
+    code.inline { background: #eef2f7; padding: 1px 5px; border-radius: 5px; font-size: 0.92em; }
 
     .codeblock { position: relative; background: var(--code-bg); color: var(--code-ink); border-radius: 9px; margin: 6px 0 14px; overflow: hidden; }
     .codeblock pre {
@@ -97,143 +91,164 @@
     .copy.copied { color: #aef0c4; border-color: rgba(174,240,196,0.5); }
     .codeblock .copy { position: absolute; top: 7px; right: 7px; box-shadow: -8px 0 10px 4px var(--code-bg); }
 
-    /* ---- footer ---- */
-    footer { flex: 0 0 auto; border-top: 1px solid var(--line); padding: 12px 0; font-size: 0.83rem; color: var(--muted); }
-    footer .wrap { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
-    footer code { background: #eef2f7; padding: 1px 5px; border-radius: 5px; font-size: 0.92em; }
-    footer .tools strong { color: var(--ink); font-weight: 600; }
+    /* ---- tools section ---- */
+    .tools { text-align: left; margin: 16px 0 0; padding: 14px 0 0; border-top: 1px solid var(--line); }
+    .tools h2 { margin: 0 0 2px; font-size: 1.02rem; letter-spacing: -0.01em; }
+    .tools .sub { margin: 0 0 12px; font-size: 0.85rem; color: var(--muted); }
+    .tools dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 7px 14px; align-items: baseline; }
+    .tools dt { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.84rem; color: var(--blue-dark); white-space: nowrap; }
+    .tools dd { margin: 0; font-size: 0.9rem; color: var(--ink); }
+    .tools .views { margin: 13px 0 0; font-size: 0.85rem; color: var(--muted); }
+    .tools .views code { font-size: 0.92em; }
 
-    @media (max-width: 560px) {
-      .topbar .links { display: none; }
-      .topbar h1 { font-size: 1.15rem; }
+    .meta { margin: 14px 0 0; font-size: 0.84rem; color: var(--muted); }
+    .meta a { text-decoration: none; }
+    .meta a:hover { text-decoration: underline; }
+    .meta .dot { margin: 0 8px; opacity: 0.5; }
+
+    @media (max-width: 540px) {
+      .tools dl { grid-template-columns: 1fr; gap: 2px; }
+      .tools dt { margin-top: 8px; }
     }
   </style>
 </head>
 <body>
-  <header>
-    <div class="wrap">
-      <div class="topbar">
-        <img src="/icon.png" alt="Spicy Regs logo" />
-        <div>
-          <h1>Spicy Regs MCP Server</h1>
-          <p>A regulations.gov mirror, queryable from your AI tools.</p>
-        </div>
-        <nav class="links">
-          <a href="https://docs.spicy-regs.dev/">Data dictionary</a>
-          <a href="https://github.com/civictechdc/spicy-regs">GitHub</a>
-          <a href="https://modelcontextprotocol.io">About MCP</a>
-        </nav>
-      </div>
-      <div class="endpoint">
-        <span class="label">Endpoint</span>
-        <code id="endpoint">https://mcp.spicy-regs.dev/mcp</code>
-        <button class="copy" type="button" data-copy="https://mcp.spicy-regs.dev/mcp">Copy</button>
-      </div>
+  <div class="card">
+    <div class="brand">
+      <img src="/icon.png" alt="Spicy Regs logo" />
+      <h1>Spicy Regs MCP Server</h1>
+      <p>A regulations.gov mirror, queryable from your AI tools.</p>
     </div>
-  </header>
 
-  <main>
-    <div class="wrap">
-      <div class="tabs" role="tablist" aria-label="Setup instructions by tool">
-        <button class="tab" role="tab" aria-selected="true" data-tab="claude-ai">Claude.ai</button>
-        <button class="tab" role="tab" aria-selected="false" data-tab="claude-code">Claude Code</button>
-        <button class="tab" role="tab" aria-selected="false" data-tab="cursor">Cursor</button>
-        <button class="tab" role="tab" aria-selected="false" data-tab="vscode">VS Code</button>
-        <button class="tab" role="tab" aria-selected="false" data-tab="windsurf">Windsurf</button>
-        <button class="tab" role="tab" aria-selected="false" data-tab="other">Other clients</button>
+    <div class="endpoint">
+      <span class="label">Endpoint</span>
+      <code>https://mcp.spicy-regs.dev/mcp</code>
+      <button class="copy" type="button" data-copy="https://mcp.spicy-regs.dev/mcp">Copy</button>
+    </div>
+
+    <div class="tabs" role="tablist" aria-label="Setup instructions by tool">
+      <button class="tab" role="tab" aria-selected="true" data-tab="claude-ai">Claude.ai</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="claude-code">Claude Code</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="cursor">Cursor</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="vscode">VS Code</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="windsurf">Windsurf</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="other">Other clients</button>
+    </div>
+
+    <!-- Claude.ai -->
+    <section class="panel" id="panel-claude-ai" role="tabpanel" data-active>
+      <p class="req"><span class="badge">Pro · Max · Team · Enterprise</span>web &amp; desktop</p>
+      <ol class="steps">
+        <li>Open <strong>Settings → Connectors → Add custom connector</strong>.</li>
+        <li>Name it <strong>Spicy Regs</strong>.</li>
+        <li>Set the URL to the endpoint above.</li>
+        <li>Leave authentication as <strong>None</strong> — the dataset is public.</li>
+        <li>Save, then toggle the connector on in any conversation.</li>
+      </ol>
+    </section>
+
+    <!-- Claude Code -->
+    <section class="panel" id="panel-claude-code" role="tabpanel">
+      <p class="hint">Remote HTTP:</p>
+      <div class="codeblock">
+        <button class="copy" type="button">Copy</button>
+        <pre><code>claude mcp add --transport http spicy-regs https://mcp.spicy-regs.dev/mcp</code></pre>
       </div>
+      <p class="hint">Local stdio via <code class="inline">uvx</code> (no remote dependency):</p>
+      <div class="codeblock">
+        <button class="copy" type="button">Copy</button>
+        <pre><code>claude mcp add spicy-regs -- uvx --from "spicy-regs @ git+https://github.com/civictechdc/spicy-regs" spicy-regs-mcp</code></pre>
+      </div>
+    </section>
 
-      <!-- Claude.ai -->
-      <section class="panel" id="panel-claude-ai" role="tabpanel" data-active>
-        <p class="req"><span class="badge">Pro · Max · Team · Enterprise</span>web &amp; desktop</p>
-        <ol class="steps">
-          <li>Open <strong>Settings → Connectors → Add custom connector</strong>.</li>
-          <li>Name it <strong>Spicy Regs</strong>.</li>
-          <li>Set the URL to the endpoint above.</li>
-          <li>Leave authentication as <strong>None</strong> — the dataset is public.</li>
-          <li>Save, then toggle the connector on in any conversation.</li>
-        </ol>
-      </section>
-
-      <!-- Claude Code -->
-      <section class="panel" id="panel-claude-code" role="tabpanel">
-        <p class="hint">Remote HTTP:</p>
-        <div class="codeblock">
-          <button class="copy" type="button">Copy</button>
-          <pre><code>claude mcp add --transport http spicy-regs https://mcp.spicy-regs.dev/mcp</code></pre>
-        </div>
-        <p class="hint">Local stdio via <code style="background:#eef2f7;padding:1px 5px;border-radius:5px">uvx</code> (no remote dependency):</p>
-        <div class="codeblock">
-          <button class="copy" type="button">Copy</button>
-          <pre><code>claude mcp add spicy-regs -- uvx --from "spicy-regs @ git+https://github.com/civictechdc/spicy-regs" spicy-regs-mcp</code></pre>
-        </div>
-      </section>
-
-      <!-- Cursor -->
-      <section class="panel" id="panel-cursor" role="tabpanel">
-        <p class="hint">Add to your MCP config, then enable it under <strong>Settings → MCP</strong>.</p>
-        <p class="pathline">~/.cursor/mcp.json (global) · .cursor/mcp.json (per-project)</p>
-        <div class="codeblock">
-          <button class="copy" type="button">Copy</button>
-          <pre><code>{
+    <!-- Cursor -->
+    <section class="panel" id="panel-cursor" role="tabpanel">
+      <p class="hint">Add to your MCP config, then enable it under <strong>Settings → MCP</strong>.</p>
+      <p class="pathline">~/.cursor/mcp.json (global) · .cursor/mcp.json (per-project)</p>
+      <div class="codeblock">
+        <button class="copy" type="button">Copy</button>
+        <pre><code>{
   "mcpServers": {
     "spicy-regs": { "url": "https://mcp.spicy-regs.dev/mcp" }
   }
 }</code></pre>
-        </div>
-      </section>
+      </div>
+    </section>
 
-      <!-- VS Code -->
-      <section class="panel" id="panel-vscode" role="tabpanel">
-        <p class="hint">Add a workspace MCP config (Copilot Agent mode required).</p>
-        <p class="pathline">.vscode/mcp.json</p>
-        <div class="codeblock">
-          <button class="copy" type="button">Copy</button>
-          <pre><code>{
+    <!-- VS Code -->
+    <section class="panel" id="panel-vscode" role="tabpanel">
+      <p class="hint">Add a workspace MCP config (Copilot Agent mode required).</p>
+      <p class="pathline">.vscode/mcp.json</p>
+      <div class="codeblock">
+        <button class="copy" type="button">Copy</button>
+        <pre><code>{
   "servers": {
     "spicy-regs": { "type": "http", "url": "https://mcp.spicy-regs.dev/mcp" }
   }
 }</code></pre>
-        </div>
-      </section>
+      </div>
+    </section>
 
-      <!-- Windsurf -->
-      <section class="panel" id="panel-windsurf" role="tabpanel">
-        <p class="hint">Add to the Cascade MCP config, then refresh the server list.</p>
-        <p class="pathline">~/.codeium/windsurf/mcp_config.json</p>
-        <div class="codeblock">
-          <button class="copy" type="button">Copy</button>
-          <pre><code>{
+    <!-- Windsurf -->
+    <section class="panel" id="panel-windsurf" role="tabpanel">
+      <p class="hint">Add to the Cascade MCP config, then refresh the server list.</p>
+      <p class="pathline">~/.codeium/windsurf/mcp_config.json</p>
+      <div class="codeblock">
+        <button class="copy" type="button">Copy</button>
+        <pre><code>{
   "mcpServers": {
     "spicy-regs": { "serverUrl": "https://mcp.spicy-regs.dev/mcp" }
   }
 }</code></pre>
-        </div>
-      </section>
+      </div>
+    </section>
 
-      <!-- Other -->
-      <section class="panel" id="panel-other" role="tabpanel">
-        <p class="hint">Most clients accept a remote streamable-HTTP URL:</p>
-        <div class="codeblock">
-          <button class="copy" type="button">Copy</button>
-          <pre><code>https://mcp.spicy-regs.dev/mcp</code></pre>
-        </div>
-        <p class="hint">Or run it locally over stdio with <code style="background:#eef2f7;padding:1px 5px;border-radius:5px">uvx</code>:</p>
-        <div class="codeblock">
-          <button class="copy" type="button">Copy</button>
-          <pre><code>uvx --from "spicy-regs @ git+https://github.com/civictechdc/spicy-regs" spicy-regs-mcp</code></pre>
-        </div>
-      </section>
-    </div>
-  </main>
+    <!-- Other -->
+    <section class="panel" id="panel-other" role="tabpanel">
+      <p class="hint">Most clients accept a remote streamable-HTTP URL:</p>
+      <div class="codeblock">
+        <button class="copy" type="button">Copy</button>
+        <pre><code>https://mcp.spicy-regs.dev/mcp</code></pre>
+      </div>
+      <p class="hint">Or run it locally over stdio with <code class="inline">uvx</code>:</p>
+      <div class="codeblock">
+        <button class="copy" type="button">Copy</button>
+        <pre><code>uvx --from "spicy-regs @ git+https://github.com/civictechdc/spicy-regs" spicy-regs-mcp</code></pre>
+      </div>
+    </section>
 
-  <footer>
-    <div class="wrap">
-      <span class="tools"><strong>Tools:</strong> <code>list_sources</code> · <code>describe_table</code> · <code>query_sql</code></span>
-      <span>·</span>
-      <span><strong>Views:</strong> dockets, documents, comments, comments_index, feed_summary, agency_stats, agency_monthly_volume</span>
+    <!-- Tools -->
+    <div class="tools">
+      <h2>Tools exposed</h2>
+      <p class="sub">Three read-only tools, querying parquet on Cloudflare R2 via DuckDB.</p>
+      <dl>
+        <dt>list_sources</dt>
+        <dd>List the logical tables available in the dataset.</dd>
+        <dt>describe_table(table)</dt>
+        <dd>Return the column schema for one table.</dd>
+        <dt>query_sql(sql, max_rows=25)</dt>
+        <dd>Run a read-only SQL query against the views below (always <code class="inline">LIMIT</code> while exploring).</dd>
+      </dl>
+      <p class="views">
+        <strong>Views:</strong>
+        <code class="inline">dockets</code> ·
+        <code class="inline">documents</code> ·
+        <code class="inline">comments</code> ·
+        <code class="inline">comments_index</code> ·
+        <code class="inline">feed_summary</code> ·
+        <code class="inline">agency_stats</code> ·
+        <code class="inline">agency_monthly_volume</code>
+      </p>
     </div>
-  </footer>
+
+    <p class="meta">
+      <a href="https://docs.spicy-regs.dev/">Data dictionary</a>
+      <span class="dot">·</span>
+      <a href="https://github.com/civictechdc/spicy-regs">GitHub</a>
+      <span class="dot">·</span>
+      <a href="https://modelcontextprotocol.io">About MCP</a>
+    </p>
+  </div>
 
   <script>
     var tabs = Array.prototype.slice.call(document.querySelectorAll(".tab"));
@@ -244,8 +259,7 @@
     };
     function select(name) {
       tabs.forEach(function (t) {
-        var on = t.dataset.tab === name;
-        t.setAttribute("aria-selected", on ? "true" : "false");
+        t.setAttribute("aria-selected", t.dataset.tab === name ? "true" : "false");
       });
       Object.keys(panels).forEach(function (k) {
         var el = document.getElementById(panels[k]);
