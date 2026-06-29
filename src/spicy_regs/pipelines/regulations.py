@@ -38,12 +38,14 @@ from spicy_regs.schemas import RECORD_TYPES, RecordType
 from spicy_regs.sources import iceberg, mirrulations, r2
 from spicy_regs.sources.derived_text import DerivedCommentText
 from spicy_regs.transforms import (
+    INDEX_FILENAME,
     Chain,
     EnrichCommentText,
     ExtractRecords,
     Transform,
     build_agency_rollups,
     build_feed_summary,
+    build_search_index,
     merge_comments_partitioned,
     merge_staging_files,
     update_comments_index,
@@ -133,6 +135,11 @@ class RegulationsPipeline(Pipeline):
                 build_feed_summary(output_dir)
                 logger.info("Building agency rollups...")
                 build_agency_rollups(output_dir)
+                # Only rebuild the docket search index when dockets changed — the
+                # gzipped blob is served from CDN, so avoid churning it needlessly.
+                if staged.get("dockets", 0) > 0:
+                    logger.info("Building docket search index...")
+                    build_search_index(output_dir)
         else:
             logger.info("No new records staged; skipping merge.")
 
@@ -143,6 +150,11 @@ class RegulationsPipeline(Pipeline):
         elif any(staged.values()):
             logger.info("Uploading to R2...")
             r2.upload_dataset(output_dir, [rt.name for rt in record_types if rt.name != "comments"])
+            # Publish the search index when this run rebuilt it (dockets changed).
+            search_index = output_dir / INDEX_FILENAME
+            if not self.skip_post_process and staged.get("dockets", 0) > 0 and search_index.exists():
+                logger.info("Uploading search index...")
+                r2.upload_file(search_index)
 
         logger.info("Done!")
 

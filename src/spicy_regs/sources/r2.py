@@ -17,6 +17,7 @@ from pathlib import Path
 from spicy_regs.pipeline.download_r2 import download_from_r2
 from spicy_regs.pipeline.load import upload_comment_partitions as _upload_comment_partitions
 from spicy_regs.pipeline.load import upload_to_r2 as _upload_to_r2
+from spicy_regs.pipeline.upload_r2 import upload_to_r2 as _upload_file
 
 
 def download(remote_key: str, local_path: Path) -> bool:
@@ -36,3 +37,8 @@ def upload_dataset(output_dir: Path, data_types: list[str]) -> None:
 def upload_comment_partitions(output_dir: Path, changed_files: list[Path]) -> None:
     """Publish changed comment partition files and the comments index."""
     _upload_comment_partitions(output_dir, changed_files)
+
+
+def upload_file(local_path: Path, remote_key: str | None = None) -> None:
+    """Publish a single file to R2 (remote key defaults to the filename)."""
+    _upload_file(local_path, remote_key=remote_key)
