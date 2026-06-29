@@ -26,6 +26,9 @@ from uuid import UUID
 import duckdb
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
+from mcp.types import Icon
+
+from spicy_regs._icon import ICON_DATA_URI
 
 DEFAULT_R2_BASE_URL = "https://r2.spicy-regs.dev"
 TABLES = ("dockets", "documents", "comments", "comments_index", "feed_summary")
@@ -38,6 +41,11 @@ INSTRUCTIONS = (
     "Always LIMIT result sets while exploring. Cite docket IDs, document "
     "IDs, comment IDs, agency codes, and dates from the rows you return."
 )
+
+# Server icon, advertised on the Implementation metadata sent during
+# ``initialize``. A base64 data: URI (not an https:// URL) so it works for both
+# the stdio and HTTP transports — see scripts/gen_icon.py.
+ICONS = [Icon(src=ICON_DATA_URI, mimeType="image/png", sizes=["512x512"])]
 
 
 def _resolve_r2_base_url() -> str:
@@ -185,7 +193,7 @@ def _register_tools(mcp: FastMCP) -> None:
 
 def build_server() -> FastMCP:
     """Construct a FastMCP server with the Spicy Regs tools registered."""
-    mcp = FastMCP("spicy-regs", instructions=INSTRUCTIONS)
+    mcp = FastMCP("spicy-regs", instructions=INSTRUCTIONS, icons=ICONS)
     _register_tools(mcp)
     return mcp
 
@@ -195,6 +203,7 @@ def build_app():
     mcp = FastMCP(
         "spicy-regs",
         instructions=INSTRUCTIONS,
+        icons=ICONS,
         stateless_http=True,
         streamable_http_path="/mcp",
         # The hosted deployment is reached via mcp.spicy-regs.dev and
