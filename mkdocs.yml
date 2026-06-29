@@ -1,6 +1,6 @@
 site_name: Spicy Regs Data Dictionary
 site_description: Schema reference for the Spicy Regs regulations.gov dataset.
-site_url: https://civictechdc.github.io/spicy-regs/
+site_url: https://docs.spicy-regs.dev/
 repo_url: https://github.com/civictechdc/spicy-regs
 repo_name: civictechdc/spicy-regs
 edit_uri: edit/main/data_dictionary/descriptions.yaml
