@@ -8,13 +8,14 @@
   <link rel="icon" type="image/png" href="/icon.png" />
   <style>
     :root {
-      --blue: #1f5ba6;
-      --blue-dark: #17457d;
-      --ink: #16202c;
-      --muted: #5b6b7b;
-      --line: #e3e8ee;
-      --bg: #f6f8fb;
-      --code-bg: #0f1b2a;
+      --blue: #5b9bdd;       /* accent: active-tab underline, links */
+      --blue-dark: #8fc0f5;  /* brighter accent: emphasis text on dark */
+      --ink: #e7eef7;
+      --muted: #94a8bd;
+      --line: #2a3543;
+      --bg: #0e1620;
+      --surface: #18222f;    /* raised surfaces: endpoint pill, inline code, badge */
+      --code-bg: #0a111c;
       --code-ink: #e6edf6;
     }
     * { box-sizing: border-box; }
@@ -42,8 +43,8 @@
     /* ---- endpoint ---- */
     .endpoint {
       margin: 18px auto 0; display: inline-flex; align-items: center; gap: 10px;
-      background: #fff; border: 1px solid var(--line); border-radius: 11px;
-      padding: 7px 7px 7px 14px; box-shadow: 0 1px 2px rgba(16,32,48,0.05);
+      background: var(--surface); border: 1px solid var(--line); border-radius: 11px;
+      padding: 7px 7px 7px 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.3);
       max-width: 100%;
     }
     .endpoint .label { color: var(--muted); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; }
@@ -60,7 +61,7 @@
       padding: 9px 14px; white-space: nowrap; border-bottom: 2px solid transparent;
       margin-bottom: -2px; border-radius: 8px 8px 0 0;
     }
-    .tab:hover { color: var(--ink); background: #eef2f7; }
+    .tab:hover { color: var(--ink); background: var(--surface); }
     .tab[aria-selected="true"] { color: var(--blue-dark); border-bottom-color: var(--blue); }
 
     /* ---- panels (left-aligned content inside the centered card) ---- */
@@ -69,13 +70,13 @@
     .panel .req { font-size: 0.85rem; color: var(--muted); margin: 0 0 12px; }
     .panel .req .badge {
       font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
-      color: var(--blue-dark); background: #e8f0fa; border-radius: 999px; padding: 2px 8px; margin-right: 6px;
+      color: #a9cdf5; background: #1c2c40; border-radius: 999px; padding: 2px 8px; margin-right: 6px;
     }
     .steps { margin: 0; padding-left: 20px; }
     .steps li { margin: 5px 0; font-size: 0.95rem; }
     .panel .hint { font-size: 0.85rem; color: var(--muted); margin: 0 0 3px; }
     .pathline { color: var(--muted); font-size: 0.8rem; margin: 0 0 4px; font-family: ui-monospace, monospace; }
-    code.inline { background: #eef2f7; padding: 1px 5px; border-radius: 5px; font-size: 0.92em; }
+    code.inline { background: var(--surface); color: #cdd9e6; padding: 1px 5px; border-radius: 5px; font-size: 0.92em; }
 
     .codeblock { position: relative; background: var(--code-bg); color: var(--code-ink); border-radius: 9px; margin: 6px 0 14px; overflow: hidden; }
     .codeblock pre {
