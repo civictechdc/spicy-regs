@@ -154,20 +154,25 @@ def test_sandbox_survives_temp_spill():
         pytest.fail(f"sandbox crashed a spilling query on local temp: {exc}")
 
 
-def test_sandbox_blocks_local_file_reads(tmp_path):
-    """The local-file sandbox must stay intact (security regression guard)."""
+def test_sandbox_does_not_disable_local_filesystem():
+    """LocalFileSystem must stay enabled, or httpfs HTTPS reads break.
+
+    Regression for ``Permission Error: File system LocalFileSystem has been
+    disabled by configuration`` raised when a view binds: httpfs reads the
+    system CA bundle off the local filesystem for the TLS handshake, so
+    ``disabled_filesystems='LocalFileSystem'`` makes every R2 read fail. Guard
+    against re-adding it.
+    """
     con = _sandboxed_connection()
-    secret = tmp_path / "secret.csv"
-    secret.write_text("a,b\n1,2\n")
-    with pytest.raises(duckdb.PermissionException):
-        con.execute(f"SELECT * FROM read_csv_auto('{secret}')").fetchall()
+    disabled = con.execute("SELECT current_setting('disabled_filesystems')").fetchone()
+    assert disabled[0] == ""
 
 
 def test_sandbox_locks_configuration():
-    """User SQL must not be able to re-enable a disabled filesystem."""
+    """User SQL must not be able to relax the sandbox once it is applied."""
     con = _sandboxed_connection()
     with pytest.raises(duckdb.Error):
-        con.execute("SET disabled_filesystems=''")
+        con.execute("SET allow_unsigned_extensions=true")
 
 
 @pytest.mark.integration
