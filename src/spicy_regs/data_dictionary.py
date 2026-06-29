@@ -51,10 +51,19 @@ TABLES: tuple[str, ...] = (
     "agency_monthly_volume",
 )
 
-# Tables that the MCP server (list_sources / describe_table) exposes today.
-# The other two are published to R2 but not yet queryable over MCP.
+# Tables the MCP server (list_sources / describe_table / query_sql) exposes.
+# This must equal spicy_regs.mcp_server.TABLES; a test enforces it so the docs'
+# "queryable via MCP" flag can't drift from what the server actually serves.
 MCP_QUERYABLE: frozenset[str] = frozenset(
-    {"dockets", "documents", "comments", "comments_index", "feed_summary"}
+    {
+        "dockets",
+        "documents",
+        "comments",
+        "comments_index",
+        "feed_summary",
+        "agency_stats",
+        "agency_monthly_volume",
+    }
 )
 
 # Schemas for the derived rollups. These mirror the SQL/Polars schemas in

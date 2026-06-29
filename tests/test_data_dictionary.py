@@ -8,8 +8,6 @@ Hermetic (no network): everything here runs against the in-code schema
 
 from __future__ import annotations
 
-import pytest
-
 from spicy_regs import data_dictionary as dd
 from spicy_regs.schemas.regulations import RECORD_TYPES
 
@@ -85,7 +83,19 @@ def test_committed_pages_are_up_to_date(tmp_path):
         )
 
 
-@pytest.mark.parametrize("table", dd.TABLES)
-def test_mcp_queryable_flag_is_known(table):
-    # Sanity: the MCP-queryable set is a subset of all tables.
+def test_mcp_queryable_subset_of_tables():
     assert dd.MCP_QUERYABLE <= set(dd.TABLES)
+
+
+def test_mcp_server_tables_match_dictionary():
+    """The MCP server must expose exactly the dictionary's published tables."""
+    from spicy_regs import mcp_server
+
+    assert set(mcp_server.TABLES) == set(dd.TABLES)
+
+
+def test_mcp_queryable_matches_mcp_server():
+    """The docs' 'queryable via MCP' flag must track what the server serves."""
+    from spicy_regs import mcp_server
+
+    assert dd.MCP_QUERYABLE == set(mcp_server.TABLES)

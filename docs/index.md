@@ -29,8 +29,8 @@ publishes them, plus a few small pre-computed rollups, to
 | [`comments`](tables/comments.md) | one row per public comment | Yes |
 | [`comments_index`](tables/comments_index.md) | one row per comment partition | Yes |
 | [`feed_summary`](tables/feed_summary.md) | one row per docket (rollup) | Yes |
-| [`agency_stats`](tables/agency_stats.md) | one row per agency (rollup) | No (R2 only) |
-| [`agency_monthly_volume`](tables/agency_monthly_volume.md) | one row per agency/month/type (rollup) | No (R2 only) |
+| [`agency_stats`](tables/agency_stats.md) | one row per agency (rollup) | Yes |
+| [`agency_monthly_volume`](tables/agency_monthly_volume.md) | one row per agency/month/type (rollup) | Yes |
 
 ## How the tables relate
 
@@ -54,7 +54,7 @@ dockets (docket_id)
 === "AI assistant (MCP)"
 
     The hosted MCP server exposes `list_sources`, `describe_table`, and
-    `query_sql` over the five core tables. Add
+    `query_sql` over all of the tables above. Add
     `https://mcp.spicy-regs.dev/mcp` as a connector, or run it locally:
 
     ```bash
