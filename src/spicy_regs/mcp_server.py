@@ -152,6 +152,31 @@ def _jsonify(value: Any) -> Any:
     return str(value)
 
 
+def _apply_security_settings(con: duckdb.DuckDBPyConnection) -> None:
+    """Lock a fresh connection down to read-only remote access.
+
+    Separated from :func:`_connect` (which also installs httpfs and creates the
+    R2 views) so the sandbox can be exercised in tests without network access.
+    Run after httpfs is loaded and before any user SQL.
+    """
+    con.execute("SET preserve_insertion_order=false")
+    con.execute("SET autoinstall_known_extensions=false")
+    con.execute("SET autoload_known_extensions=false")
+    con.execute("SET allow_unsigned_extensions=false")
+    # Disabling LocalFileSystem stops user SQL from reading local files, but it
+    # also blocks DuckDB's on-disk spill target: temp_directory defaults to a
+    # local ".tmp", so any query that exceeds memory_limit (e.g. a GROUP BY or
+    # ORDER BY over the larger tables) would otherwise fail with the confusing
+    # "File system LocalFileSystem has been disabled by configuration". An empty
+    # temp_directory disables spilling — queries run in memory or fail with a
+    # clear out-of-memory error instead. Must precede disabling the filesystem.
+    con.execute("SET temp_directory=''")
+    con.execute("SET disabled_filesystems='LocalFileSystem'")
+    # DuckDB has no statement_timeout parameter; the per-query cap is enforced
+    # by the _statement_timeout watchdog wrapping each tool's execution.
+    con.execute("SET lock_configuration=true")
+
+
 def _connect() -> duckdb.DuckDBPyConnection:
     con = duckdb.connect()
     # Must precede INSTALL/LOAD: that step writes the extension under
@@ -160,14 +185,7 @@ def _connect() -> duckdb.DuckDBPyConnection:
     con.execute(f"SET home_directory='{HOME_DIRECTORY.replace(chr(39), chr(39) * 2)}'")
     con.execute("INSTALL httpfs")
     con.execute("LOAD httpfs")
-    con.execute("SET preserve_insertion_order=false")
-    con.execute("SET autoinstall_known_extensions=false")
-    con.execute("SET autoload_known_extensions=false")
-    con.execute("SET allow_unsigned_extensions=false")
-    con.execute("SET disabled_filesystems='LocalFileSystem'")
-    # DuckDB has no statement_timeout parameter; the per-query cap is enforced
-    # by the _statement_timeout watchdog wrapping each tool's execution.
-    con.execute("SET lock_configuration=true")
+    _apply_security_settings(con)
     for name in TABLES:
         url = f"{R2_BASE_URL}/{name}.parquet"
         con.execute(f"CREATE VIEW {name} AS SELECT * FROM read_parquet('{url}')")
