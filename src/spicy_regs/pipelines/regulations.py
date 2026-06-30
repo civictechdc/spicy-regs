@@ -218,9 +218,24 @@ class RegulationsPipeline(Pipeline):
         return agencies
 
     def _download_existing(self, output_dir: Path, record_types: list[RecordType]) -> None:
-        """Fetch existing monolithic output from R2 so the merge appends to it."""
+        """Fetch existing output from R2 so an incremental run appends to it.
+
+        Monolithic ``{type}.parquet`` files are pulled whole. Comment
+        *partitions* are large and fetched on demand during the merge, but the
+        global comment index must be primed here: ``update_comments_index``
+        rebuilds the index by keeping the existing rows for partitions this run
+        didn't touch, reading them from the local ``comments_index.parquet``.
+        Without the remote index on disk, a batch that stages new comments
+        rewrites the index down to only its own ~21 agencies' partitions — and
+        the upload shrink-guard then (correctly) aborts the run.
+        """
         for rt in record_types:
-            if rt.name == "comments":  # comments are partitioned, fetched on demand at merge
+            if rt.name == "comments":
+                # Partitions are fetched on demand at merge, but the index is
+                # global — prime it so the rebuild keeps untouched partitions.
+                index_file = output_dir / "comments_index.parquet"
+                if not index_file.exists():
+                    r2.download("comments_index.parquet", index_file)
                 continue
             local = output_dir / f"{rt.name}.parquet"
             if not local.exists():

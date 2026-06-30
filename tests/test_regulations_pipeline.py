@@ -311,6 +311,68 @@ def test_run_skips_partition_upload_when_no_comments(
     assert "partitions" not in calls
 
 
+def test_run_primes_comments_index_from_r2_before_merge(
+    tmp_output: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An incremental comments run must download the existing global index.
+
+    ``update_comments_index`` keeps the rows for partitions this batch didn't
+    touch by reading the local ``comments_index.parquet``. If that file is
+    never fetched from R2, the rebuilt index collapses to only this batch's
+    partitions and the upload shrink-guard aborts the run. Guard against the
+    regression by asserting the index is requested during the prime step and
+    that pre-existing rows survive the rebuild.
+    """
+    monkeypatch.delenv("R2_PUBLIC_URL", raising=False)  # keep merge's partition fetch offline
+    store = {
+        _comment_key("c1", "EPA-2024-0001"): dumps(
+            _comment_payload("c1", "EPA-2024-0001", "2024-01-01T00:00:00Z")
+        ).encode(),
+    }
+    monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
+    monkeypatch.setattr(regulations.r2, "upload_dataset", lambda out, types: None)
+    monkeypatch.setattr(regulations.r2, "upload_comment_partitions", lambda out, changed: None)
+
+    # A pre-existing remote index covering a partition this batch won't touch.
+    prior = pl.DataFrame(
+        {
+            "agency_code": ["NOAA"],
+            "docket_id": ["NOAA-2020-0009"],
+            "year": [2020],
+            "month": [5],
+            "row_count": [42],
+        },
+        schema={
+            "agency_code": pl.Utf8, "docket_id": pl.Utf8,
+            "year": pl.Int64, "month": pl.Int64, "row_count": pl.Int64,
+        },
+    )
+
+    requested: list[str] = []
+
+    def fake_download(remote_key: str, local_path: Path) -> bool:
+        requested.append(remote_key)
+        if remote_key == "comments_index.parquet":
+            prior.write_parquet(local_path)
+            return True
+        return False  # partitions are absent on R2 in this test
+
+    monkeypatch.setattr(regulations.r2, "download", fake_download)
+
+    RegulationsPipeline(
+        agency=AGENCY, output_dir=tmp_output, only_comments=True,
+        enrich_text=False, skip_post_process=True, skip_upload=False,
+    ).run()
+
+    assert "comments_index.parquet" in requested, "existing comment index was never fetched from R2"
+
+    index = pl.read_parquet(tmp_output / "comments_index.parquet")
+    keys = set(zip(index["agency_code"].to_list(), index["docket_id"].to_list()))
+    # The untouched NOAA partition survives the rebuild alongside the new EPA one.
+    assert ("NOAA", "NOAA-2020-0009") in keys
+    assert ("EPA", "EPA-2024-0001") in keys
+
+
 # --- CLI -------------------------------------------------------------------
 
 
