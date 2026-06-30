@@ -38,12 +38,14 @@ from spicy_regs.schemas import RECORD_TYPES, RecordType
 from spicy_regs.sources import iceberg, mirrulations, r2
 from spicy_regs.sources.derived_text import DerivedCommentText
 from spicy_regs.transforms import (
+    INDEX_FILENAME,
     Chain,
     EnrichCommentText,
     ExtractRecords,
     Transform,
     build_agency_rollups,
     build_feed_summary,
+    build_search_index,
     merge_comments_partitioned,
     merge_staging_files,
     update_comments_index,
@@ -125,14 +127,20 @@ class RegulationsPipeline(Pipeline):
 
         # 3. Transform: merge per-agency staging into the deduplicated dataset.
         staged = result.rows_by_type
+        changed_comments: list[Path] = []
         if any(staged.values()):
-            self._merge(staging_dir, output_dir, record_types, staged)
+            changed_comments = self._merge(staging_dir, output_dir, record_types, staged)
             rmtree(staging_dir, ignore_errors=True)
             if not self.skip_post_process:
                 logger.info("Building feed summary...")
                 build_feed_summary(output_dir)
                 logger.info("Building agency rollups...")
                 build_agency_rollups(output_dir)
+                # Only rebuild the docket search index when dockets changed — the
+                # gzipped blob is served from CDN, so avoid churning it needlessly.
+                if staged.get("dockets", 0) > 0:
+                    logger.info("Building docket search index...")
+                    build_search_index(output_dir)
         else:
             logger.info("No new records staged; skipping merge.")
 
@@ -143,6 +151,16 @@ class RegulationsPipeline(Pipeline):
         elif any(staged.values()):
             logger.info("Uploading to R2...")
             r2.upload_dataset(output_dir, [rt.name for rt in record_types if rt.name != "comments"])
+            # Comments are partitioned, not monolithic: publish the partitions
+            # changed this run plus the refreshed index.
+            if changed_comments:
+                logger.info("Uploading {} changed comment partitions...", len(changed_comments))
+                r2.upload_comment_partitions(output_dir, changed_comments)
+            # Publish the search index when this run rebuilt it (dockets changed).
+            search_index = output_dir / INDEX_FILENAME
+            if not self.skip_post_process and staged.get("dockets", 0) > 0 and search_index.exists():
+                logger.info("Uploading search index...")
+                r2.upload_file(search_index)
 
         logger.info("Done!")
 
@@ -201,7 +219,7 @@ class RegulationsPipeline(Pipeline):
         output_dir: Path,
         record_types: list[RecordType],
         staged: dict[str, int],
-    ) -> None:
+    ) -> list[Path]:
         """Merge staging files: dockets/documents monolithically, comments partitioned.
 
         When ``use_iceberg`` is set, the ``dockets`` table is routed through the
@@ -209,6 +227,9 @@ class RegulationsPipeline(Pipeline):
         of the whole-file ``merge_staging_files`` rewrite. This is the
         proof-of-concept scope — documents and comments stay on the existing
         path until the Iceberg flow is vetted.
+
+        Returns the comment partition files changed this run (empty when no
+        comments were staged), so the caller can publish exactly those to R2.
         """
         names = [rt.name for rt in record_types]
 
@@ -229,15 +250,17 @@ class RegulationsPipeline(Pipeline):
         for name in iceberg_names:
             iceberg.merge_and_export(staging_dir, output_dir, RECORD_TYPES[name])
 
+        changed_comments: list[Path] = []
         if "comments" in names and staged.get("comments", 0) > 0:
-            changed = merge_comments_partitioned(
+            changed_comments = merge_comments_partitioned(
                 staging_dir,
                 output_dir,
                 schema=RECORD_TYPES["comments"].schema,
                 dedup_key=RECORD_TYPES["comments"].dedup_key,
             )
-            if changed:
-                update_comments_index(output_dir, changed)
+            if changed_comments:
+                update_comments_index(output_dir, changed_comments)
+        return changed_comments
 
 
 # --- CLI / run file --------------------------------------------------------

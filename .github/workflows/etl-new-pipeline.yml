@@ -1,11 +1,35 @@
-name: ETL (new pipeline – vetting)
+name: ETL (new pipeline)
 
-# Manual-only workflow that exercises the new Pipeline/Reader/Writer path via
-# the `run-pipeline` CLI (which addresses a pipeline by name and calls run()).
-# It is intentionally NOT scheduled so it can never collide with the production
-# "Daily ETL Refresh" cron. `skip_upload` defaults to true so a vetting run
-# cannot write to production R2 — flip it off deliberately once trusted.
+# Production daily ETL, running the new Pipeline/Reader/Writer path via the
+# `run-pipeline` CLI (which drives RegulationsPipeline.run()). This is the sole
+# scheduled ETL: the legacy Prefect "Daily ETL Refresh" workflow has been
+# removed.
+#
+# On `schedule`: 15 batches (21 agencies each = 315) spread across the day; the
+# batch number is derived from the UTC hour, upload to R2 is ON, and the feed
+# summary / agency rollups are built only on the final batch.
+#
+# On `workflow_dispatch`: inputs drive a one-off run. `skip_upload` still
+# defaults to true so a manual vetting run cannot write to production R2 — flip
+# it off deliberately.
 on:
+  schedule:
+    # Batch 0: 6 AM UTC, Batch 1: 7 AM UTC, ..., Batch 14: 8 PM UTC
+    - cron: '0 6 * * *'   # Batch 0
+    - cron: '0 7 * * *'   # Batch 1
+    - cron: '0 8 * * *'   # Batch 2
+    - cron: '0 9 * * *'   # Batch 3
+    - cron: '0 10 * * *'  # Batch 4
+    - cron: '0 11 * * *'  # Batch 5
+    - cron: '0 12 * * *'  # Batch 6
+    - cron: '0 13 * * *'  # Batch 7
+    - cron: '0 14 * * *'  # Batch 8
+    - cron: '0 15 * * *'  # Batch 9
+    - cron: '0 16 * * *'  # Batch 10
+    - cron: '0 17 * * *'  # Batch 11
+    - cron: '0 18 * * *'  # Batch 12
+    - cron: '0 19 * * *'  # Batch 13
+    - cron: '0 20 * * *'  # Batch 14
   workflow_dispatch:
     inputs:
       agency:
@@ -45,6 +69,30 @@ jobs:
     timeout-minutes: 60
 
     steps:
+      - name: Determine run parameters
+        id: params
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            # Map the UTC hour to a batch number (6 AM = batch 0 ... 8 PM = 14).
+            HOUR=$(date -u +%H)
+            BATCH=$((10#$HOUR - 6))
+            echo "batch_number=$BATCH" >> $GITHUB_OUTPUT
+            # Scheduled runs publish to R2.
+            echo "skip_upload=false" >> $GITHUB_OUTPUT
+            # Build feed summary + agency rollups only on the final batch.
+            if [ "$BATCH" != "14" ]; then
+              echo "skip_post_process=true" >> $GITHUB_OUTPUT
+            else
+              echo "skip_post_process=false" >> $GITHUB_OUTPUT
+            fi
+            echo "Running scheduled batch $BATCH (hour $HOUR UTC)"
+          else
+            echo "batch_number=${{ inputs.batch_number }}" >> $GITHUB_OUTPUT
+            echo "skip_upload=${{ inputs.skip_upload }}" >> $GITHUB_OUTPUT
+            echo "skip_post_process=false" >> $GITHUB_OUTPUT
+            echo "Running manual dispatch (skip_upload=${{ inputs.skip_upload }})"
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -80,13 +128,16 @@ jobs:
           if [ -n "${{ inputs.since_year }}" ]; then
             ARGS="$ARGS --since-year ${{ inputs.since_year }}"
           fi
-          if [ -n "${{ inputs.batch_number }}" ]; then
-            ARGS="$ARGS --batch-number ${{ inputs.batch_number }} --batch-size 21"
+          if [ -n "${{ steps.params.outputs.batch_number }}" ]; then
+            ARGS="$ARGS --batch-number ${{ steps.params.outputs.batch_number }} --batch-size 21"
+          fi
+          if [ "${{ steps.params.outputs.skip_post_process }}" = "true" ]; then
+            ARGS="$ARGS --skip-post-process"
           fi
           if [ "${{ inputs.full_refresh }}" = "true" ]; then
             ARGS="$ARGS --full-refresh"
           fi
-          if [ "${{ inputs.skip_upload }}" = "true" ]; then
+          if [ "${{ steps.params.outputs.skip_upload }}" = "true" ]; then
             ARGS="$ARGS --skip-upload"
           else
             ARGS="$ARGS --no-skip-upload"

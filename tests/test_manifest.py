@@ -1,4 +1,4 @@
-"""Tests for manifest save/load cycle (load.save_manifest + extract.load_manifest)."""
+"""Tests for the manifest save/load cycle (manifest.save_manifest + Manifest.load)."""
 
 from pathlib import Path
 
@@ -6,8 +6,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import polars as pl
 
-from spicy_regs.pipeline.extract import BloomFilter
-from spicy_regs.pipeline.load import save_manifest
+from spicy_regs.manifest import BloomFilter, Manifest, save_manifest
 
 
 def _write_manifest(path: Path, keys: list[str]) -> None:
@@ -59,66 +58,44 @@ class TestSaveManifest:
         assert not (tmp_output / "manifest_new.parquet").exists()
 
 
-class TestLoadManifest:
+class TestManifestLoad:
     def test_load_into_bloom_filter(self, tmp_output):
-        """load_manifest should populate PROCESSED_KEYS with a BloomFilter."""
-        import spicy_regs.pipeline.pipeline as pipeline_mod
-        from spicy_regs.pipeline.extract import load_manifest
-
+        """Manifest.load should back membership with a BloomFilter of the keys."""
         keys = [f"raw-data/EPA/text-{i:04d}.json" for i in range(100)]
         _write_manifest(tmp_output / "manifest.parquet", keys)
 
-        # Call the Prefect task function directly
-        load_manifest.fn(tmp_output)
+        manifest = Manifest.load(tmp_output)
 
-        assert isinstance(pipeline_mod.PROCESSED_KEYS, BloomFilter)
+        assert isinstance(manifest._processed, BloomFilter)
         for k in keys:
-            assert k in pipeline_mod.PROCESSED_KEYS
-        assert "nonexistent-key" not in pipeline_mod.PROCESSED_KEYS
+            assert k in manifest
+        assert "nonexistent-key" not in manifest
 
-    # def test_load_no_manifest(self, tmp_output):
-    #     """load_manifest with no file should leave PROCESSED_KEYS as empty set."""
-    #     import spicy_regs.pipeline.pipeline as pipeline_mod
-    #     from spicy_regs.pipeline.extract import load_manifest
-
-    #     original = pipeline_mod.PROCESSED_KEYS
-    #     pipeline_mod.PROCESSED_KEYS = set()
-
-    #     # No manifest file, no R2 (no env vars set)
-    #     load_manifest.fn(tmp_output)
-
-    #     # Should still be the empty set (not a BloomFilter)
-    #     assert pipeline_mod.PROCESSED_KEYS == set()
-    #     pipeline_mod.PROCESSED_KEYS = original
+    def test_load_no_manifest_is_empty(self, tmp_output, monkeypatch):
+        """With no local manifest and R2 not configured, load yields an empty manifest."""
+        monkeypatch.delenv("R2_PUBLIC_URL", raising=False)
+        manifest = Manifest.load(tmp_output)
+        assert "anything" not in manifest
 
 
 class TestManifestRoundTrip:
     def test_save_then_load(self, tmp_output):
-        """Keys saved via save_manifest should be found via load_manifest."""
-        import spicy_regs.pipeline.pipeline as pipeline_mod
-        from spicy_regs.pipeline.extract import load_manifest
-
+        """Keys saved via save_manifest should be found via Manifest.load."""
         keys = {f"raw-data/AGENCY-{i}/text-{j:04d}.json" for i in range(5) for j in range(50)}
         save_manifest(tmp_output, keys)
 
-        load_manifest.fn(tmp_output)
-        assert isinstance(pipeline_mod.PROCESSED_KEYS, BloomFilter)
-
+        manifest = Manifest.load(tmp_output)
         for k in keys:
-            assert k in pipeline_mod.PROCESSED_KEYS
+            assert k in manifest
 
     def test_incremental_save_then_load(self, tmp_output):
         """Multiple save_manifest calls should accumulate keys."""
-        import spicy_regs.pipeline.pipeline as pipeline_mod
-        from spicy_regs.pipeline.extract import load_manifest
-
         batch1 = {f"batch1-{i}" for i in range(50)}
         batch2 = {f"batch2-{i}" for i in range(50)}
 
         save_manifest(tmp_output, batch1)
         save_manifest(tmp_output, batch2)
 
-        load_manifest.fn(tmp_output)
-
+        manifest = Manifest.load(tmp_output)
         for k in batch1 | batch2:
-            assert k in pipeline_mod.PROCESSED_KEYS
+            assert k in manifest

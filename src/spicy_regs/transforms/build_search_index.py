@@ -1,4 +1,4 @@
-"""Build docket_search.json: the data blob powering client-side search.
+"""Transform: build docket_search.json, the data blob powering client-side search.
 
 Produces a single gzipped JSON file the frontend loads into MiniSearch at
 runtime. We emit raw docket records (not a pre-serialized MiniSearch index)
@@ -122,12 +122,3 @@ def build_search_index(output_dir: Path) -> Path:
         gz_mb / raw_mb,
     )
     return out_path
-
-
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output-dir", type=Path, default=Path("output"))
-    args = parser.parse_args()
-    build_search_index(args.output_dir)

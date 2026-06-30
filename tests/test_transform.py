@@ -577,7 +577,7 @@ class TestBuildAgencyRollups:
 
 
 class TestMergeCommentsPartitioned:
-    @patch("spicy_regs.pipeline.download_r2.download_from_r2", return_value=False)
+    @patch("spicy_regs.sources.r2.download_from_r2", return_value=False)
     def test_partitions_by_agency_docket_year_month(self, mock_dl, tmp_path, sample_comments):
         staging = tmp_path / "staging"
         output = tmp_path / "output"
@@ -597,7 +597,7 @@ class TestMergeCommentsPartitioned:
             assert any("year=" in part for part in parts)
             assert any("month=" in part for part in parts)
 
-    @patch("spicy_regs.pipeline.download_r2.download_from_r2", return_value=False)
+    @patch("spicy_regs.sources.r2.download_from_r2", return_value=False)
     def test_preserves_all_rows(self, mock_dl, tmp_path, sample_comments):
         staging = tmp_path / "staging"
         output = tmp_path / "output"
@@ -609,7 +609,7 @@ class TestMergeCommentsPartitioned:
         total = sum(pq.ParquetFile(f).metadata.num_rows for f in changed)
         assert total == len(sample_comments)
 
-    @patch("spicy_regs.pipeline.download_r2.download_from_r2", return_value=False)
+    @patch("spicy_regs.sources.r2.download_from_r2", return_value=False)
     def test_deduplicates_comments(self, mock_dl, tmp_path):
         staging = tmp_path / "staging"
         output = tmp_path / "output"
@@ -634,7 +634,7 @@ class TestMergeCommentsPartitioned:
         assert df["modify_date"][0] == "2024-08-01"
         assert df["comment"][0] == "new body"
 
-    @patch("spicy_regs.pipeline.download_r2.download_from_r2", return_value=False)
+    @patch("spicy_regs.sources.r2.download_from_r2", return_value=False)
     def test_merges_with_existing_partition(self, mock_dl, tmp_path):
         """When an existing partition file is present, new data should merge with it."""
         staging = tmp_path / "staging"
@@ -668,7 +668,7 @@ class TestMergeCommentsPartitioned:
         assert len(df) == 2  # existing + new
         assert set(df["comment_id"].to_list()) == {"C-EXIST", "C-NEW"}
 
-    @patch("spicy_regs.pipeline.download_r2.download_from_r2", return_value=False)
+    @patch("spicy_regs.sources.r2.download_from_r2", return_value=False)
     def test_merges_existing_partition_missing_new_columns(self, mock_dl, tmp_path):
         """An existing partition written before submitter columns were added
         must still merge: its missing columns surface as NULL rather than
@@ -716,7 +716,7 @@ class TestMergeCommentsPartitioned:
         assert new_row["first_name"][0] == "Ada"
         assert new_row["category"][0] == "Individual"
 
-    @patch("spicy_regs.pipeline.download_r2.download_from_r2", return_value=False)
+    @patch("spicy_regs.sources.r2.download_from_r2", return_value=False)
     def test_returns_empty_for_no_staging(self, mock_dl, tmp_path):
         staging = tmp_path / "staging"
         output = tmp_path / "output"

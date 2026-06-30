@@ -11,14 +11,16 @@ into schema-shaped records is the job of the
 :class:`~spicy_regs.transforms.extract.ExtractRecords` transform.
 """
 
+import re
 from collections.abc import Callable, Iterator
+from json import loads
 from typing import Any
 
 import boto3
 from botocore import UNSIGNED
 from botocore.config import Config as BotoConfig
+from tqdm import tqdm
 
-from spicy_regs.pipeline.extract import download_and_parse, get_agencies, list_json_files
 from spicy_regs.schemas import RecordType
 from spicy_regs.sources.base import Reader
 
@@ -36,6 +38,83 @@ def s3_resource() -> Any:
 def s3_client() -> Any:
     """Anonymous S3 client (used only for agency discovery)."""
     return boto3.client("s3", region_name="us-east-1", config=BotoConfig(signature_version=UNSIGNED))
+
+
+def get_agencies(s3_client: Any, bucket_name: str, prefix: str) -> list[str]:
+    """Get the list of all agencies from the S3 bucket.
+
+    Uses the S3 client directly with ``Delimiter='/'`` to efficiently list
+    only top-level folder names without iterating all objects.
+    """
+    response = s3_client.list_objects_v2(
+        Bucket=bucket_name,
+        Prefix=f"{prefix}/",
+        Delimiter="/",
+    )
+    agencies = []
+    for p in response.get("CommonPrefixes", []):
+        agency = p["Prefix"].split("/")[1]
+        if agency:
+            agencies.append(agency)
+    return sorted(agencies)
+
+
+def list_json_files(
+    s3_resource: Any,
+    bucket_name: str,
+    prefix: str,
+    agency: str,
+    data_type: str,
+    path_pattern: str,
+    processed_keys: Any = None,
+    verbose: bool = False,
+    since_year: int | None = None,
+) -> list[str]:
+    """List all JSON files for an agency and data type, excluding already processed."""
+    # Match year from docket ID in path: raw-data/{agency}/{agency}-{YYYY}-...
+    year_pattern = re.compile(rf"{re.escape(prefix)}/{re.escape(agency)}/{re.escape(agency)}-(\d{{4}})-")
+
+    files = []
+    skipped = 0
+    filtered_by_year = 0
+    total_scanned = 0
+    bucket = s3_resource.Bucket(bucket_name)
+
+    for obj in bucket.objects.filter(Prefix=f"{prefix}/{agency}/"):
+        key = obj.key
+        if "/text-" in key and path_pattern in key and key.endswith(".json"):
+            total_scanned += 1
+            if since_year:
+                m = year_pattern.search(key)
+                if m and int(m.group(1)) < since_year:
+                    filtered_by_year += 1
+                    continue
+            if processed_keys and key in processed_keys:
+                skipped += 1
+                continue
+            files.append(key)
+
+    if verbose:
+        year_msg = f", filtered_by_year {filtered_by_year}" if since_year else ""
+        tqdm.write(f"    [{agency}] {data_type}: scanned {total_scanned}, skipped {skipped}{year_msg}, new {len(files)}")
+
+    return files
+
+
+def download_and_parse(
+    s3_resource: Any,
+    bucket_name: str,
+    key: str,
+    extract_fn: Callable[[dict], dict],
+) -> dict | None:
+    """Download a single JSON file from S3 and parse it with the given extractor."""
+    try:
+        obj = s3_resource.Object(bucket_name, key)
+        content = obj.get()["Body"].read()
+        data = loads(content)
+        return extract_fn(data)
+    except Exception:
+        return None
 
 
 def discover_agencies() -> list[str]:

@@ -6,7 +6,7 @@ import polars as pl
 
 from tests.pdf_fixtures import make_pdf, make_textless_pdf
 
-from spicy_regs.pipeline.enrich_pdf import (
+from spicy_regs.enrich_pdf import (
     enrich_comments_with_pdf_text,
     enrich_documents_with_pdf_text,
     pdf_urls_for_comment,

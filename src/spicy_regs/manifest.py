@@ -15,16 +15,91 @@ from R2 when not present locally). A false positive only means a genuinely new
 file is skipped this run and picked up on the next one — never data loss.
 """
 
+from array import array
 from collections.abc import Container, Iterable
+from hashlib import md5, sha1
+from math import log
 from pathlib import Path
 from threading import Lock
 
+import pyarrow as pa
 import pyarrow.parquet as pq
 from loguru import logger
 
-from spicy_regs.pipeline.download_r2 import download_from_r2
-from spicy_regs.pipeline.extract import BloomFilter
-from spicy_regs.pipeline.load import save_manifest
+from spicy_regs.sources.r2 import download_from_r2
+
+
+# ---------------------------------------------------------------------------
+# Bloom filter — stdlib-only, ~34 MB for 30M keys at 1e-7 FP rate.
+#
+# A false positive only means we skip a file that was actually new; the
+# next run will pick it up. This replaces a Python set that consumed
+# ~5 GB for 27M strings.
+# ---------------------------------------------------------------------------
+
+class BloomFilter:
+    """Memory-efficient probabilistic set membership using a bit array."""
+
+    __slots__ = ("_bits", "_nbits", "_k")
+
+    def __init__(self, capacity: int, fp_rate: float = 1e-7) -> None:
+        self._nbits = max(1, int(-capacity * log(fp_rate) / (log(2) ** 2)))
+        self._k = max(1, int((self._nbits / capacity) * log(2)))
+        # 'L' = unsigned long (4 bytes each)
+        self._bits = array("L", [0]) * (self._nbits // 32 + 1)
+
+    def _hashes(self, key: str) -> list[int]:
+        kb = key.encode()
+        h1 = int.from_bytes(md5(kb).digest()[:8], "little")
+        h2 = int.from_bytes(sha1(kb).digest()[:8], "little")
+        return [(h1 + i * h2) % self._nbits for i in range(self._k)]
+
+    def add(self, key: str) -> None:
+        for pos in self._hashes(key):
+            self._bits[pos >> 5] |= 1 << (pos & 31)
+
+    def __contains__(self, key: str) -> bool:
+        for pos in self._hashes(key):
+            if not (self._bits[pos >> 5] & (1 << (pos & 31))):
+                return False
+        return True
+
+    @property
+    def size_bytes(self) -> int:
+        return len(self._bits) * 4
+
+
+def save_manifest(output_dir: Path, new_keys: set[str]) -> None:
+    """Append new keys to the existing manifest Parquet file.
+
+    Reads the old manifest (if any) in streaming batches, writes those
+    plus the new keys to a temp file, then replaces the original.
+    This avoids loading the full 27M-key manifest into memory.
+    """
+    manifest_file = output_dir / "manifest.parquet"
+    temp_file = output_dir / "manifest_new.parquet"
+    schema = pa.schema([("key", pa.large_string())])
+
+    existing_rows = 0
+    with pq.ParquetWriter(temp_file, schema, compression="zstd") as writer:
+        # Stream existing manifest rows
+        if manifest_file.exists():
+            pf = pq.ParquetFile(manifest_file)
+            for batch in pf.iter_batches(batch_size=500_000, columns=["key"]):
+                table = pa.Table.from_batches([batch]).cast(schema)
+                writer.write_table(table)
+                existing_rows += batch.num_rows
+
+        # Append new keys
+        new_table = pa.table({"key": list(new_keys)}).cast(schema)
+        writer.write_table(new_table)
+
+    if manifest_file.exists():
+        manifest_file.unlink()
+    temp_file.rename(manifest_file)
+
+    total = existing_rows + len(new_keys)
+    logger.info("Saved manifest: {:,} keys ({:,} existing + {:,} new)", total, existing_rows, len(new_keys))
 
 
 class Manifest:

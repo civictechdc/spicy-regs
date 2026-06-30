@@ -1,6 +1,7 @@
 from spicy_regs.transforms.base import Transform
 from spicy_regs.transforms.build_agency_rollups import build_agency_rollups
 from spicy_regs.transforms.build_feed_summary import build_feed_summary
+from spicy_regs.transforms.build_search_index import INDEX_FILENAME, build_search_index
 from spicy_regs.transforms.chain import Chain
 from spicy_regs.transforms.enrich_derived_text import EnrichCommentText
 from spicy_regs.transforms.extract import ExtractRecords
@@ -28,6 +29,8 @@ __all__ = [
     "partition_comments",
     "build_feed_summary",
     "build_agency_rollups",
+    "build_search_index",
+    "INDEX_FILENAME",
     "extract_pdf_text",
     "PdfTextResult",
     "PdfTextStatus",

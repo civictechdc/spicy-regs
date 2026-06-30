@@ -21,7 +21,7 @@ from botocore import UNSIGNED
 from botocore.config import Config as BotoConfig
 from loguru import logger
 
-from spicy_regs.pipeline.extract import download_and_parse
+from spicy_regs.sources.mirrulations import download_and_parse
 from spicy_regs.schemas import COMMENT
 from spicy_regs.sources.derived_text import DerivedCommentText
 from spicy_regs.transforms import Chain, EnrichCommentText, ExtractRecords
