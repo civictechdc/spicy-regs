@@ -89,6 +89,59 @@ def test_vercel_copy_in_sync():
     assert vercel.TABLES == mcp_server.TABLES
     assert vercel.INSTRUCTIONS == mcp_server.INSTRUCTIONS
     assert vercel.DEFAULT_R2_BASE_URL == mcp_server.DEFAULT_R2_BASE_URL
+    # The catalog-backed comments path must stay identical across the two copies.
+    assert vercel.CATALOG_ALIAS == mcp_server.CATALOG_ALIAS
+    assert vercel.DEFAULT_CATALOG_NAMESPACE == mcp_server.DEFAULT_CATALOG_NAMESPACE
+
+
+# --- catalog config resolution ----------------------------------------------
+
+_CATALOG_ENV = ("R2_CATALOG_URI", "R2_CATALOG_WAREHOUSE", "R2_CATALOG_TOKEN")
+
+
+@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
+def test_resolve_catalog_config_none_when_unset(module_name, monkeypatch):
+    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+    for var in (*_CATALOG_ENV, "R2_CATALOG_NAMESPACE"):
+        monkeypatch.delenv(var, raising=False)
+    assert module._resolve_catalog_config() is None
+
+
+@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
+def test_resolve_catalog_config_partial_is_none(module_name, monkeypatch):
+    """Missing any one of the three required vars => disabled (fall back)."""
+    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+    monkeypatch.setenv("R2_CATALOG_URI", "https://catalog.example/x")
+    monkeypatch.setenv("R2_CATALOG_WAREHOUSE", "wh")
+    monkeypatch.delenv("R2_CATALOG_TOKEN", raising=False)
+    assert module._resolve_catalog_config() is None
+
+
+@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
+def test_resolve_catalog_config_full(module_name, monkeypatch):
+    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+    monkeypatch.setenv("R2_CATALOG_URI", "https://catalog.example/x")
+    monkeypatch.setenv("R2_CATALOG_WAREHOUSE", "wh")
+    monkeypatch.setenv("R2_CATALOG_TOKEN", "secret-token")
+    monkeypatch.delenv("R2_CATALOG_NAMESPACE", raising=False)
+    config = module._resolve_catalog_config()
+    assert config == {
+        "uri": "https://catalog.example/x",
+        "warehouse": "wh",
+        "token": "secret-token",
+        "namespace": module.DEFAULT_CATALOG_NAMESPACE,
+    }
+
+
+@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
+def test_resolve_catalog_config_rejects_injection(module_name, monkeypatch):
+    """Values are inlined into CREATE SECRET / ATTACH, so quotes are rejected."""
+    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+    monkeypatch.setenv("R2_CATALOG_URI", "https://catalog.example/x")
+    monkeypatch.setenv("R2_CATALOG_WAREHOUSE", "wh'); DROP")
+    monkeypatch.setenv("R2_CATALOG_TOKEN", "t")
+    with pytest.raises(RuntimeError, match="illegal characters"):
+        module._resolve_catalog_config()
 
 
 # --- Connection sandbox -----------------------------------------------------
