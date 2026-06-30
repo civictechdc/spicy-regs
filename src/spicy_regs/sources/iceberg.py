@@ -228,7 +228,9 @@ def _build_comments_index(con, record_type: RecordType, output_dir: Path) -> Pat
     return index_file
 
 
-def seed_comments_from_parquet(con, source_glob: str, record_type: RecordType) -> int:
+def seed_comments_from_parquet(
+    con, source_glob: str, record_type: RecordType, replace_agency: str | None = None
+) -> int:
     """Bulk-load published comment Parquet into the catalog table; return its count.
 
     One-time cutover helper: the partitioned ``comments/`` tree on R2 is already
@@ -238,6 +240,12 @@ def seed_comments_from_parquet(con, source_glob: str, record_type: RecordType) -
     ``agency_code`` / ``docket_id`` as columns (year/month live only in the path
     and are not table columns).
 
+    When ``replace_agency`` is given, all existing rows for that ``agency_code``
+    are deleted before the insert. The loader runs one agency at a time, so this
+    makes each agency load idempotent — re-running (after a timeout, or over an
+    already-seeded table) replaces that agency's rows instead of duplicating
+    them, since the plain ``INSERT`` does no dedup.
+
     Columns absent from every file in the glob (an older partition written before
     a column was added) are inserted as ``NULL`` — mirroring the schema-evolution
     handling in ``transforms.merge_comments_partitioned`` — so a mixed-vintage
@@ -246,6 +254,11 @@ def seed_comments_from_parquet(con, source_glob: str, record_type: RecordType) -
     """
     columns = list(record_type.schema)
     esc = _sql_str(source_glob)
+    if replace_agency is not None:
+        con.execute(
+            f"DELETE FROM {_qualified(record_type)} "
+            f"WHERE agency_code = '{_sql_str(replace_agency)}';"
+        )
     present = {
         row[0]
         for row in con.execute(

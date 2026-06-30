@@ -41,7 +41,10 @@ on:
 jobs:
   seed:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    # The full (all-agency) load copies ~37M rows from R2 into the catalog, so
+    # give it ample headroom. The load is idempotent per agency, so even if it
+    # is interrupted a re-run safely resumes.
+    timeout-minutes: 360
 
     steps:
       - name: Checkout
