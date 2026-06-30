@@ -63,7 +63,7 @@ on:
         default: true
         type: boolean
       use_iceberg:
-        description: 'Route the dockets table through R2 Data Catalog (Iceberg)'
+        description: 'Route dockets + comments through R2 Data Catalog (Iceberg)'
         required: false
         default: false
         type: boolean

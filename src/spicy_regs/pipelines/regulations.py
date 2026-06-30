@@ -156,6 +156,14 @@ class RegulationsPipeline(Pipeline):
             if changed_comments:
                 logger.info("Uploading {} changed comment partitions...", len(changed_comments))
                 r2.upload_comment_partitions(output_dir, changed_comments)
+            # Iceberg comments path: the MERGE wrote the rows through the catalog
+            # (not under the public comments/ prefix), so there are no partition
+            # files to push — only the refreshed index needs publishing.
+            elif self.use_iceberg and staged.get("comments", 0) > 0:
+                index_file = output_dir / "comments_index.parquet"
+                if index_file.exists():
+                    logger.info("Uploading refreshed comments index (Iceberg path)...")
+                    r2.upload_file(index_file, remote_key="comments_index.parquet")
             # Publish the search index when this run rebuilt it (dockets changed).
             search_index = output_dir / INDEX_FILENAME
             if not self.skip_post_process and staged.get("dockets", 0) > 0 and search_index.exists():
@@ -224,12 +232,15 @@ class RegulationsPipeline(Pipeline):
 
         When ``use_iceberg`` is set, the ``dockets`` table is routed through the
         R2 Data Catalog (Iceberg ``MERGE INTO`` + public Parquet export) instead
-        of the whole-file ``merge_staging_files`` rewrite. This is the
-        proof-of-concept scope — documents and comments stay on the existing
-        path until the Iceberg flow is vetted.
+        of the whole-file ``merge_staging_files`` rewrite, and ``comments`` are
+        routed through :func:`iceberg.merge_comments` (row-level upsert into the
+        catalog + index rebuild, no monolithic export) instead of the
+        partitioned ``merge_comments_partitioned`` path. ``documents`` stay on
+        the existing whole-file path until the Iceberg flow is vetted for them.
 
         Returns the comment partition files changed this run (empty when no
-        comments were staged), so the caller can publish exactly those to R2.
+        comments were staged or when comments went through Iceberg), so the
+        caller can publish exactly those to R2.
         """
         names = [rt.name for rt in record_types]
 
@@ -252,14 +263,21 @@ class RegulationsPipeline(Pipeline):
 
         changed_comments: list[Path] = []
         if "comments" in names and staged.get("comments", 0) > 0:
-            changed_comments = merge_comments_partitioned(
-                staging_dir,
-                output_dir,
-                schema=RECORD_TYPES["comments"].schema,
-                dedup_key=RECORD_TYPES["comments"].dedup_key,
-            )
-            if changed_comments:
-                update_comments_index(output_dir, changed_comments)
+            if self.use_iceberg:
+                # Row-level upsert into the catalog table (the read surface) and
+                # rebuild the index. No partition files are produced, so
+                # changed_comments stays empty and the caller publishes only the
+                # refreshed index.
+                iceberg.merge_comments(staging_dir, output_dir, RECORD_TYPES["comments"])
+            else:
+                changed_comments = merge_comments_partitioned(
+                    staging_dir,
+                    output_dir,
+                    schema=RECORD_TYPES["comments"].schema,
+                    dedup_key=RECORD_TYPES["comments"].dedup_key,
+                )
+                if changed_comments:
+                    update_comments_index(output_dir, changed_comments)
         return changed_comments
 
 

@@ -8,6 +8,7 @@ the same tool surface (names, parameters, behavior); the test at
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import tempfile
@@ -47,6 +48,17 @@ TABLES = (
     "agency_monthly_volume",
 )
 STATEMENT_TIMEOUT = os.environ.get("SPICY_REGS_STATEMENT_TIMEOUT", "30s")
+
+logger = logging.getLogger(__name__)
+
+# DuckDB alias the R2 Data Catalog is attached under (mirrors
+# ``spicy_regs.sources.iceberg._CATALOG_ALIAS``). When the catalog is
+# configured, the ``comments`` view is served from it instead of the monolithic
+# ``comments.parquet`` — the comments table is too large to keep republishing as
+# a single file, so the catalog is its read surface. All other tables stay on
+# the public Parquet snapshots.
+CATALOG_ALIAS = "reg_catalog"
+DEFAULT_CATALOG_NAMESPACE = "default"
 
 
 def _parse_timeout_seconds(raw: str) -> float | None:
@@ -131,6 +143,36 @@ def _resolve_home_directory() -> str:
 HOME_DIRECTORY = _resolve_home_directory()
 
 
+def _resolve_catalog_config() -> dict[str, str] | None:
+    """Return R2 Data Catalog connection settings, or ``None`` when unconfigured.
+
+    The catalog is optional: when ``R2_CATALOG_URI`` / ``R2_CATALOG_WAREHOUSE`` /
+    ``R2_CATALOG_TOKEN`` are all present the ``comments`` view is served from the
+    Iceberg catalog; otherwise the server falls back to the monolithic
+    ``comments.parquet`` (the dual model). The token used here should be a
+    read-scoped R2 API token — this is a public, read-only server.
+
+    Values are inlined into ``CREATE SECRET`` / ``ATTACH`` (which take no bind
+    parameters), so any value containing a quote, backslash, or control
+    character is rejected outright rather than escaped.
+    """
+    uri = os.environ.get("R2_CATALOG_URI")
+    warehouse = os.environ.get("R2_CATALOG_WAREHOUSE")
+    token = os.environ.get("R2_CATALOG_TOKEN")
+    if not (uri and warehouse and token):
+        return None
+    config = {
+        "uri": uri,
+        "warehouse": warehouse,
+        "token": token,
+        "namespace": os.environ.get("R2_CATALOG_NAMESPACE", DEFAULT_CATALOG_NAMESPACE),
+    }
+    for key, value in config.items():
+        if any(c in value for c in ("'", "\\", "\x00", "\n", "\r")):
+            raise RuntimeError(f"R2 catalog {key} contains illegal characters")
+    return config
+
+
 def _jsonify(value: Any) -> Any:
     """Coerce DuckDB row values into JSON-serializable forms."""
     if value is None or isinstance(value, (str, int, float, bool)):
@@ -180,6 +222,31 @@ def _apply_security_settings(con: duckdb.DuckDBPyConnection) -> None:
     con.execute("SET lock_configuration=true")
 
 
+def _attach_catalog(con: duckdb.DuckDBPyConnection, config: dict[str, str]) -> bool:
+    """Attach the R2 Data Catalog so the ``comments`` view can read from it.
+
+    Best-effort: if the iceberg extension or the attach fails (bad token,
+    network, catalog down) the server stays up by falling back to the monolithic
+    ``comments.parquet``. Must run before :func:`_apply_security_settings` locks
+    the configuration. Returns ``True`` only when the catalog is attached.
+    """
+    try:
+        con.execute("INSTALL iceberg")
+        con.execute("LOAD iceberg")
+        con.execute(
+            "CREATE OR REPLACE SECRET r2_catalog_secret "
+            f"(TYPE ICEBERG, TOKEN '{config['token']}');"
+        )
+        con.execute(
+            f"ATTACH '{config['warehouse']}' AS {CATALOG_ALIAS} "
+            f"(TYPE ICEBERG, ENDPOINT '{config['uri']}');"
+        )
+        return True
+    except duckdb.Error as exc:
+        logger.warning("R2 catalog attach failed; comments fall back to monolith: %s", exc)
+        return False
+
+
 def _connect() -> duckdb.DuckDBPyConnection:
     con = duckdb.connect()
     # Must precede INSTALL/LOAD: that step writes the extension under
@@ -188,8 +255,28 @@ def _connect() -> duckdb.DuckDBPyConnection:
     con.execute(f"SET home_directory='{HOME_DIRECTORY.replace(chr(39), chr(39) * 2)}'")
     con.execute("INSTALL httpfs")
     con.execute("LOAD httpfs")
+
+    # Optionally attach the Iceberg catalog (before the config lock) so the
+    # comments view can be served from it.
+    catalog = _resolve_catalog_config()
+    catalog_attached = catalog is not None and _attach_catalog(con, catalog)
+
     _apply_security_settings(con)
     for name in TABLES:
+        if name == "comments" and catalog_attached:
+            namespace = catalog["namespace"]  # type: ignore[index]
+            try:
+                con.execute(
+                    f'CREATE VIEW comments AS SELECT * FROM '
+                    f'{CATALOG_ALIAS}."{namespace}"."comments"'
+                )
+                continue
+            except duckdb.Error as exc:
+                # Catalog reachable but the table isn't there yet — fall back to
+                # the monolith rather than breaking every query on the server.
+                logger.warning(
+                    "comments not available in catalog; falling back to monolith: %s", exc
+                )
         url = f"{R2_BASE_URL}/{name}.parquet"
         con.execute(f"CREATE VIEW {name} AS SELECT * FROM read_parquet('{url}')")
     return con

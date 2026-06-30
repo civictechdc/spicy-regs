@@ -18,6 +18,13 @@ of :mod:`spicy_regs.sources.r2`:
 * :func:`merge_and_export` — ensure the table exists, MERGE the per-agency
   staging Parquet in, then export a public ``{name}.parquet`` snapshot so the
   no-credentials CLI / MCP read path keeps working (the "dual model").
+* :func:`merge_comments` — the comments variant. Comments are tens of millions
+  of rows, so there is no monolithic ``comments.parquet`` snapshot to keep
+  fresh; the catalog table *is* the read surface (the MCP server queries it
+  directly when the catalog is configured). Instead of exporting the whole
+  table, this MERGEs the staged rows and rebuilds the tiny
+  ``comments_index.parquet`` (per-partition row counts) that the feed summary
+  and agency rollups read for comment counts.
 
 Credentials are read from the environment, alongside the existing ``R2_*`` vars:
 
@@ -177,6 +184,76 @@ def _export_parquet(con, record_type: RecordType, output_dir: Path) -> Path:
         """
     )
     return out_file
+
+
+def _build_comments_index(con, record_type: RecordType, output_dir: Path) -> Path:
+    """Rebuild ``comments_index.parquet`` from the catalog comments table.
+
+    The index is the small per-``(agency_code, docket_id, year, month)`` row-count
+    artifact that ``build_feed_summary`` / ``build_agency_rollups`` read instead
+    of scanning the full comments table. With comments living in the catalog
+    there is no partitioned ``comments/`` tree to count, so the index is derived
+    straight from the table — keeping the same schema (agency_code, docket_id,
+    year, month, row_count) ``transforms.update_comments_index`` produces.
+
+    ``year`` / ``month`` come from ``posted_date`` to match the partitioning the
+    legacy path used; ``docket_id`` is trimmed of stray quotes for the same
+    reason. Written atomically via a temp file so a crashed rebuild can't leave a
+    half-written index in place.
+    """
+    index_file = output_dir / "comments_index.parquet"
+    tmp_file = index_file.with_suffix(".tmp.parquet")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    con.execute(
+        f"""
+        COPY (
+            SELECT
+                agency_code,
+                TRIM(docket_id, '"') AS docket_id,
+                EXTRACT(YEAR FROM CAST(posted_date AS TIMESTAMP))::BIGINT AS year,
+                EXTRACT(MONTH FROM CAST(posted_date AS TIMESTAMP))::BIGINT AS month,
+                CAST(COUNT(*) AS BIGINT) AS row_count
+            FROM {_qualified(record_type)}
+            WHERE posted_date IS NOT NULL
+              AND agency_code IS NOT NULL
+              AND docket_id IS NOT NULL
+            GROUP BY 1, 2, 3, 4
+        ) TO '{_sql_str(str(tmp_file))}' (FORMAT PARQUET, COMPRESSION ZSTD);
+        """
+    )
+    tmp_file.replace(index_file)
+    return index_file
+
+
+def merge_comments(staging_dir: Path, output_dir: Path, record_type: RecordType) -> Path | None:
+    """Upsert staged comments into the catalog, then rebuild the comments index.
+
+    Unlike :func:`merge_and_export`, this does **not** write a monolithic
+    ``comments.parquet`` — the comments table is too large to re-export on every
+    run, and the catalog is the read surface. Returns the path to the refreshed
+    ``comments_index.parquet`` (which the pipeline publishes to R2), or ``None``
+    when there was nothing staged.
+    """
+    staging_files = _staging_files(staging_dir, record_type)
+    if not staging_files:
+        logger.info("iceberg: no staging files for {}; skipping merge", record_type.name)
+        return None
+
+    con = _connect()
+    try:
+        _ensure_table(con, record_type)
+        logger.info(
+            "iceberg: MERGE {} staging file(s) into {}",
+            len(staging_files), _qualified(record_type),
+        )
+        _merge(con, staging_files, record_type)
+        total = con.execute(f"SELECT count(*) FROM {_qualified(record_type)}").fetchone()[0]
+        logger.info("iceberg: {} now holds {:,} rows", record_type.name, total)
+        index_file = _build_comments_index(con, record_type, output_dir)
+        logger.info("iceberg: rebuilt comments index at {}", index_file)
+        return index_file
+    finally:
+        con.close()
 
 
 def merge_and_export(staging_dir: Path, output_dir: Path, record_type: RecordType) -> Path | None:

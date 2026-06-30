@@ -21,6 +21,14 @@ Use this reference when you need a quick map of the remote or local data files b
 - `feed_summary.parquet`
 - Local-only: `comments/` partitioned comment parquet files may exist instead of a monolithic `comments.parquet`
 
+> **Comments read surface.** `comments_index.parquet` (per-partition counts) is
+> always the source for comment *counts*. The row-level `comments` table is
+> served either from the monolithic `comments.parquet` snapshot or, when the
+> deployment has the R2 Data Catalog configured (`R2_CATALOG_*`), directly from
+> the Iceberg `comments` table in the catalog — which is kept current by the
+> ETL's row-level `MERGE`. Either way you query the `comments` table by name;
+> the MCP server picks the surface.
+
 ## Practical schema hints
 
 These fields are stable enough to start with, but use `--describe` for the actual schema.

@@ -16,7 +16,7 @@ import duckdb
 import polars as pl
 import pytest
 
-from spicy_regs.schemas import DOCKET
+from spicy_regs.schemas import COMMENT, DOCKET
 from spicy_regs.sources import iceberg
 
 
@@ -25,6 +25,25 @@ def _write_staging(staging_dir: Path, agency: str, rows: list[dict]) -> None:
     type_dir = staging_dir / DOCKET.name
     type_dir.mkdir(parents=True, exist_ok=True)
     pl.DataFrame(rows, schema=DOCKET.schema).write_parquet(type_dir / f"{agency}.parquet")
+
+
+def _write_comment_staging(staging_dir: Path, agency: str, rows: list[dict]) -> None:
+    """Mimic transforms.write_staging: staging_dir/comments/{agency}.parquet."""
+    type_dir = staging_dir / COMMENT.name
+    type_dir.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame(rows, schema=COMMENT.schema).write_parquet(type_dir / f"{agency}.parquet")
+
+
+def _comment(comment_id: str, docket_id: str, agency: str, posted_date: str, modify_date: str | None = None) -> dict:
+    row = {col: None for col in COMMENT.schema}
+    row.update(
+        comment_id=comment_id,
+        docket_id=docket_id,
+        agency_code=agency,
+        posted_date=posted_date,
+        modify_date=modify_date or posted_date,
+    )
+    return row
 
 
 @pytest.fixture
@@ -146,3 +165,82 @@ def test_export_parquet_matches_published_shape(tmp_path, local_catalog) -> None
 def test_merge_and_export_noop_without_staging(tmp_path) -> None:
     # No staging files for dockets -> returns None and never touches the catalog.
     assert iceberg.merge_and_export(tmp_path / "empty", tmp_path / "out", DOCKET) is None
+
+
+# --- comments path (catalog table + derived index) -------------------------
+
+
+def test_build_comments_index_counts_per_partition(tmp_path, local_catalog) -> None:
+    """The index derived from the catalog must hold one row per
+    (agency, docket, year, month) with the right counts and schema."""
+    con = local_catalog
+    iceberg._ensure_table(con, COMMENT)
+
+    staging = tmp_path / "staging"
+    _write_comment_staging(
+        staging,
+        "EPA",
+        [
+            # Two comments in the same partition (EPA, EPA-1, 2025-01).
+            _comment("c1", "EPA-1", "EPA", "2025-01-15T00:00:00Z"),
+            _comment("c2", "EPA-1", "EPA", "2025-01-20T00:00:00Z"),
+            # A different month -> its own partition.
+            _comment("c3", "EPA-1", "EPA", "2025-02-03T00:00:00Z"),
+            # A different docket.
+            _comment("c4", "EPA-2", "EPA", "2025-01-09T00:00:00Z"),
+        ],
+    )
+    iceberg._merge(con, iceberg._staging_files(staging, COMMENT), COMMENT)
+
+    out = tmp_path / "output"
+    index_file = iceberg._build_comments_index(con, COMMENT, out)
+    assert index_file == out / "comments_index.parquet"
+
+    df = pl.read_parquet(index_file)
+    assert set(df.columns) == {"agency_code", "docket_id", "year", "month", "row_count"}
+    got = {
+        (r["agency_code"], r["docket_id"], r["year"], r["month"]): r["row_count"]
+        for r in df.iter_rows(named=True)
+    }
+    assert got == {
+        ("EPA", "EPA-1", 2025, 1): 2,
+        ("EPA", "EPA-1", 2025, 2): 1,
+        ("EPA", "EPA-2", 2025, 1): 1,
+    }
+
+
+def test_build_comments_index_rebuilds_after_merge(tmp_path, local_catalog) -> None:
+    """A second merge (new rows + a dedup'd update) must be reflected in a
+    full index rebuild — the index always mirrors the current table."""
+    con = local_catalog
+    iceberg._ensure_table(con, COMMENT)
+    out = tmp_path / "output"
+
+    s1 = tmp_path / "s1"
+    _write_comment_staging(s1, "EPA", [_comment("c1", "EPA-1", "EPA", "2025-01-15T00:00:00Z")])
+    iceberg._merge(con, iceberg._staging_files(s1, COMMENT), COMMENT)
+    iceberg._build_comments_index(con, COMMENT, out)
+
+    s2 = tmp_path / "s2"
+    _write_comment_staging(
+        s2,
+        "EPA",
+        [
+            # Re-posted c1 (same id) must not inflate the count.
+            _comment("c1", "EPA-1", "EPA", "2025-01-15T00:00:00Z", modify_date="2025-03-01T00:00:00Z"),
+            _comment("c5", "EPA-1", "EPA", "2025-01-25T00:00:00Z"),
+        ],
+    )
+    iceberg._merge(con, iceberg._staging_files(s2, COMMENT), COMMENT)
+    index_file = iceberg._build_comments_index(con, COMMENT, out)
+
+    df = pl.read_parquet(index_file)
+    assert df.height == 1
+    row = next(df.iter_rows(named=True))
+    assert (row["agency_code"], row["docket_id"], row["year"], row["month"]) == ("EPA", "EPA-1", 2025, 1)
+    assert row["row_count"] == 2  # c1 (deduped) + c5
+
+
+def test_merge_comments_noop_without_staging(tmp_path) -> None:
+    # No staged comments -> returns None and never touches the catalog.
+    assert iceberg.merge_comments(tmp_path / "empty", tmp_path / "out", COMMENT) is None
