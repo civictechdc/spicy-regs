@@ -244,3 +244,77 @@ def test_build_comments_index_rebuilds_after_merge(tmp_path, local_catalog) -> N
 def test_merge_comments_noop_without_staging(tmp_path) -> None:
     # No staged comments -> returns None and never touches the catalog.
     assert iceberg.merge_comments(tmp_path / "empty", tmp_path / "out", COMMENT) is None
+
+
+# --- catalog seed loader ---------------------------------------------------
+
+
+def _write_partition(comments_dir: Path, agency: str, docket: str, year: int, month: int, rows: list[dict]) -> None:
+    """Write a published-layout partition file: agency_code=/docket_id=/year=/month=/part-0.parquet."""
+    part = (
+        comments_dir
+        / f"agency_code={agency}"
+        / f"docket_id={docket}"
+        / f"year={year}"
+        / f"month={month}"
+    )
+    part.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame(rows, schema=COMMENT.schema).write_parquet(part / "part-0.parquet")
+
+
+def test_seed_comments_from_parquet_loads_partition_tree(tmp_path, local_catalog) -> None:
+    """The seed loader copies the published partition tree into the catalog table."""
+    con = local_catalog
+    iceberg._ensure_table(con, COMMENT)
+
+    comments_dir = tmp_path / "comments"
+    _write_partition(
+        comments_dir, "EPA", "EPA-1", 2025, 1,
+        [
+            _comment("c1", "EPA-1", "EPA", "2025-01-15T00:00:00Z"),
+            _comment("c2", "EPA-1", "EPA", "2025-01-20T00:00:00Z"),
+        ],
+    )
+    _write_partition(
+        comments_dir, "EPA", "EPA-1", 2025, 2,
+        [_comment("c3", "EPA-1", "EPA", "2025-02-03T00:00:00Z")],
+    )
+
+    glob = str(comments_dir / "agency_code=EPA/docket_id=*/year=*/month=*/part-0.parquet")
+    total = iceberg.seed_comments_from_parquet(con, glob, COMMENT)
+    assert total == 3
+
+    # agency_code / docket_id survive as real columns (read with hive off).
+    rows = con.execute(
+        f'SELECT comment_id, agency_code, docket_id FROM {iceberg._qualified(COMMENT)} '
+        "ORDER BY comment_id"
+    ).fetchall()
+    assert rows == [
+        ("c1", "EPA", "EPA-1"),
+        ("c2", "EPA", "EPA-1"),
+        ("c3", "EPA", "EPA-1"),
+    ]
+
+
+def test_seed_comments_tolerates_missing_columns(tmp_path, local_catalog) -> None:
+    """An older partition missing a later-added column loads with NULLs, not an error."""
+    con = local_catalog
+    iceberg._ensure_table(con, COMMENT)
+
+    # A partition file written with a reduced (older) schema — no text_content etc.
+    reduced = {"comment_id": pl.Utf8, "docket_id": pl.Utf8, "agency_code": pl.Utf8, "posted_date": pl.Utf8}
+    part = tmp_path / "comments" / "agency_code=EPA" / "docket_id=EPA-9" / "year=2024" / "month=5"
+    part.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame(
+        [{"comment_id": "old1", "docket_id": "EPA-9", "agency_code": "EPA", "posted_date": "2024-05-01T00:00:00Z"}],
+        schema=reduced,
+    ).write_parquet(part / "part-0.parquet")
+
+    glob = str(tmp_path / "comments" / "agency_code=*/docket_id=*/year=*/month=*/part-0.parquet")
+    total = iceberg.seed_comments_from_parquet(con, glob, COMMENT)
+    assert total == 1
+
+    text_content = con.execute(
+        f"SELECT text_content FROM {iceberg._qualified(COMMENT)} WHERE comment_id = 'old1'"
+    ).fetchone()[0]
+    assert text_content is None
