@@ -13,7 +13,9 @@ into schema-shaped records is the job of the
 
 import re
 from collections.abc import Callable, Iterator
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from json import loads
+from threading import Lock
 from typing import Any
 
 import boto3
@@ -28,6 +30,12 @@ from spicy_regs.sources.base import Reader
 # that uses them, not in the pipeline.
 BUCKET = "mirrulations"
 PREFIX = "raw-data"
+
+# Downloads are tiny JSON GETs against S3 — I/O-bound, so a pool of threads per
+# agency turns thousands of serial round-trips into concurrent ones. The single
+# anonymous resource is shared across the pool: unsigned read-only GetObject has
+# no credential-refresh race, and botocore's connection pool is thread-safe.
+DEFAULT_DOWNLOAD_WORKERS = 16
 
 
 def s3_resource() -> Any:
@@ -96,9 +104,57 @@ def list_json_files(
 
     if verbose:
         year_msg = f", filtered_by_year {filtered_by_year}" if since_year else ""
-        tqdm.write(f"    [{agency}] {data_type}: scanned {total_scanned}, skipped {skipped}{year_msg}, new {len(files)}")
+        tqdm.write(
+            f"    [{agency}] {data_type}: scanned {total_scanned}, skipped {skipped}{year_msg}, new {len(files)}"
+        )
 
     return files
+
+
+def list_agency_files_by_type(
+    s3_resource: Any,
+    bucket_name: str,
+    prefix: str,
+    agency: str,
+    record_types: list[RecordType],
+    processed_keys: Any = None,
+    verbose: bool = False,
+    since_year: int | None = None,
+) -> dict[str, list[str]]:
+    """List one agency's JSON files in a single pass, bucketed by record type.
+
+    The Mirrulations layout nests every record type under the same agency
+    prefix, so calling :func:`list_json_files` once per type re-scans the whole
+    (potentially millions of objects) prefix N times. This scans it once and
+    classifies each key by which record type's ``path_pattern`` it contains —
+    the patterns (``/docket/``, ``/documents/``, ``/comments/``) are mutually
+    exclusive, so each key maps to at most one type.
+    """
+    year_pattern = re.compile(rf"{re.escape(prefix)}/{re.escape(agency)}/{re.escape(agency)}-(\d{{4}})-")
+    patterns = [(rt.name, rt.path_pattern) for rt in record_types if rt.path_pattern]
+    result: dict[str, list[str]] = {rt.name: [] for rt in record_types}
+
+    bucket = s3_resource.Bucket(bucket_name)
+    for obj in bucket.objects.filter(Prefix=f"{prefix}/{agency}/"):
+        key = obj.key
+        if "/text-" not in key or not key.endswith(".json"):
+            continue
+        matched = next((name for name, pattern in patterns if pattern in key), None)
+        if matched is None:
+            continue
+        if since_year:
+            m = year_pattern.search(key)
+            if m and int(m.group(1)) < since_year:
+                continue
+        if processed_keys and key in processed_keys:
+            continue
+        result[matched].append(key)
+
+    if verbose:
+        summary = ", ".join(f"{name} {len(keys)}" for name, keys in result.items())
+        tqdm.write(f"    [{agency}] single-scan listing: {summary}")
+
+    return result
 
 
 def download_and_parse(
@@ -127,7 +183,6 @@ def _identity(payload: dict) -> dict:
     return payload
 
 
-
 class MirrulationsReader(Reader):
     """Reads one agency's records of a single record type from Mirrulations S3.
 
@@ -146,6 +201,8 @@ class MirrulationsReader(Reader):
         processed_keys: Any = None,
         since_year: int | None = None,
         verbose: bool = False,
+        download_workers: int = DEFAULT_DOWNLOAD_WORKERS,
+        key_lister: Callable[[], list[str]] | None = None,
     ) -> None:
         self.s3_resource = s3_resource
         self.bucket = bucket
@@ -155,6 +212,10 @@ class MirrulationsReader(Reader):
         self.processed_keys = processed_keys
         self.since_year = since_year
         self.verbose = verbose
+        self.download_workers = download_workers
+        # When set, supplies this record type's keys (e.g. from a shared
+        # single-scan listing); otherwise the reader lists them itself.
+        self.key_lister = key_lister
         self.last_keys: list[str] = []
 
     def iter_records(self) -> Iterator[dict]:
@@ -163,41 +224,121 @@ class MirrulationsReader(Reader):
                 f"MirrulationsReader requires a path-addressable record type, "
                 f"but {self.record_type.name!r} has no path_pattern."
             )
-        self.last_keys = list_json_files(
-            self.s3_resource,
-            self.bucket,
-            self.prefix,
-            self.agency,
-            self.record_type.name,
-            self.record_type.path_pattern,
-            self.processed_keys,
-            self.verbose,
-            self.since_year,
-        )
-        for key in self.last_keys:
-            payload = download_and_parse(self.s3_resource, self.bucket, key, _identity)
-            if payload is not None:
-                yield payload
+        if self.key_lister is not None:
+            self.last_keys = self.key_lister()
+        else:
+            self.last_keys = list_json_files(
+                self.s3_resource,
+                self.bucket,
+                self.prefix,
+                self.agency,
+                self.record_type.name,
+                self.record_type.path_pattern,
+                self.processed_keys,
+                self.verbose,
+                self.since_year,
+            )
+        # Fan the per-file GETs out across a thread pool — they are independent,
+        # I/O-bound round trips. Order is irrelevant (dedup happens later by key).
+        workers = max(1, min(self.download_workers, len(self.last_keys)))
+        if workers <= 1:
+            for key in self.last_keys:
+                payload = download_and_parse(self.s3_resource, self.bucket, key, _identity)
+                if payload is not None:
+                    yield payload
+            return
+
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = [
+                executor.submit(download_and_parse, self.s3_resource, self.bucket, key, _identity)
+                for key in self.last_keys
+            ]
+            for future in as_completed(futures):
+                payload = future.result()
+                if payload is not None:
+                    yield payload
+
+
+class _AgencyListingCache:
+    """Memoizes one single-scan listing per agency, shared across its readers.
+
+    ``stage_agencies`` builds a reader per (agency, record type) and runs an
+    agency's record types sequentially within one worker thread, so the first
+    reader for an agency triggers the scan and the rest read from the cache.
+    Different agencies populate different keys concurrently, guarded by a lock.
+    """
+
+    def __init__(
+        self,
+        record_types: list[RecordType],
+        *,
+        processed_keys: Any,
+        since_year: int | None,
+        verbose: bool,
+    ) -> None:
+        self._record_types = record_types
+        self._processed_keys = processed_keys
+        self._since_year = since_year
+        self._verbose = verbose
+        self._by_agency: dict[str, dict[str, list[str]]] = {}
+        self._lock = Lock()
+
+    def keys_for(self, s3_resource: Any, agency: str, record_type: RecordType) -> list[str]:
+        with self._lock:
+            listed = self._by_agency.get(agency)
+        if listed is None:
+            scanned = list_agency_files_by_type(
+                s3_resource,
+                BUCKET,
+                PREFIX,
+                agency,
+                self._record_types,
+                processed_keys=self._processed_keys,
+                verbose=self._verbose,
+                since_year=self._since_year,
+            )
+            with self._lock:
+                listed = self._by_agency.setdefault(agency, scanned)
+        return listed.get(record_type.name, [])
 
 
 def reader_factory(
+    record_types: list[RecordType],
     *,
     processed_keys: Any = None,
     since_year: int | None = None,
     verbose: bool = False,
+    download_workers: int = DEFAULT_DOWNLOAD_WORKERS,
+    resource_factory: Callable[[], Any] | None = None,
 ) -> Callable[[str, RecordType], MirrulationsReader]:
     """Build a ``read(agency, record_type) -> MirrulationsReader`` factory.
 
     The shared options (manifest membership test, year filter, verbosity) are
     bound once; the orchestrator just supplies the agency and record type. Each
     reader gets its own S3 resource so the factory is safe to call from worker
-    threads.
+    threads. The full set of ``record_types`` is bound so each agency's prefix
+    is scanned once and the keys bucketed by type, rather than re-scanned per
+    record type.
     """
+    cache = _AgencyListingCache(record_types, processed_keys=processed_keys, since_year=since_year, verbose=verbose)
+    # Resolve at call time (not as a default arg) so a monkeypatched
+    # ``mirrulations.s3_resource`` is honored, and each reader still gets its
+    # own resource — safe to call from the staging worker threads.
+    make_resource = resource_factory or s3_resource
 
     def read(agency: str, record_type: RecordType) -> MirrulationsReader:
+        resource = make_resource()
         return MirrulationsReader(
-            s3_resource(), BUCKET, PREFIX, agency, record_type,
-            processed_keys=processed_keys, since_year=since_year, verbose=verbose,
+            resource,
+            BUCKET,
+            PREFIX,
+            agency,
+            record_type,
+            processed_keys=processed_keys,
+            since_year=since_year,
+            verbose=verbose,
+            download_workers=download_workers,
+            key_lister=lambda: cache.keys_for(resource, agency, record_type),
         )
 
     return read

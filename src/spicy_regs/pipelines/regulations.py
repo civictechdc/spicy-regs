@@ -111,14 +111,19 @@ class RegulationsPipeline(Pipeline):
         # 2. Extract → stage: fan agencies out, pumping each source into staging.
         logger.info(
             "Processing {} agencies × {} record types ({} workers)",
-            len(agencies), len(record_types), self.max_workers,
+            len(agencies),
+            len(record_types),
+            self.max_workers,
         )
         result = stage_agencies(
             agencies,
             record_types,
             staging_dir,
             mirrulations.reader_factory(
-                processed_keys=manifest, since_year=self.since_year, verbose=self.verbose
+                record_types,
+                processed_keys=manifest,
+                since_year=self.since_year,
+                verbose=self.verbose,
             ),
             transform_for=self._transform_for,
             max_workers=self.max_workers,
@@ -282,14 +287,10 @@ def main(
     skip_post_process: Annotated[bool, Parameter(help="Skip feed summary build")] = False,
     full_refresh: Annotated[bool, Parameter(help="Ignore manifest + existing output")] = False,
     max_workers: Annotated[int, Parameter(help="Agencies processed in parallel")] = 4,
-    use_iceberg: Annotated[
-        bool, Parameter(help="Route the dockets table through R2 Data Catalog (Iceberg)")
-    ] = False,
+    use_iceberg: Annotated[bool, Parameter(help="Route the dockets table through R2 Data Catalog (Iceberg)")] = False,
     enrich_text: Annotated[
         bool,
-        Parameter(
-            help="Fill comment text_content inline from Mirrulations derived-data extracted text"
-        ),
+        Parameter(help="Fill comment text_content inline from Mirrulations derived-data extracted text"),
     ] = True,
     verbose: Annotated[bool, Parameter(name=["--verbose", "-v"], help="Verbose logging")] = False,
 ) -> None:

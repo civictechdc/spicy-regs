@@ -2,7 +2,7 @@
 
 from json import dumps
 
-from spicy_regs.schemas import DOCKET
+from spicy_regs.schemas import COMMENT, DOCKET, DOCUMENT
 from spicy_regs.sources import MirrulationsReader
 
 BUCKET = "mirrulations"
@@ -109,3 +109,110 @@ def test_since_year_filters_older_dockets() -> None:
     reader = MirrulationsReader(_FakeS3Resource(_make_store()), BUCKET, PREFIX, AGENCY, DOCKET, since_year=2025)
     records = list(reader.iter_records())
     assert [_raw_id(r) for r in records] == ["EPA-2025-0002"]
+
+
+def test_iter_records_downloads_concurrently() -> None:
+    """Downloads for one agency run in parallel, not one-at-a-time.
+
+    A Barrier that only releases once all N downloads are simultaneously in
+    flight is a deterministic proof of concurrency: a serial implementation
+    can never gather N parties, so the barrier times out, those downloads
+    raise, and nothing is yielded. Concurrent downloads all rendezvous and
+    every payload comes back.
+    """
+    import threading
+
+    n = 4
+    store = {_docket_key(f"EPA-2024-{i:04d}"): dumps(_docket_payload(f"EPA-2024-{i:04d}")).encode() for i in range(n)}
+    barrier = threading.Barrier(n, timeout=5)
+
+    class _BarrierObj(_FakeObj):
+        def get(self) -> dict:
+            barrier.wait()  # blocks until all N downloads are concurrently in flight
+            return super().get()
+
+    class _BarrierResource(_FakeS3Resource):
+        def Object(self, name: str, key: str) -> _BarrierObj:  # noqa: N802
+            return _BarrierObj(key, self._store[key])
+
+    reader = MirrulationsReader(_BarrierResource(store), BUCKET, PREFIX, AGENCY, DOCKET, download_workers=n)
+    records = list(reader.iter_records())
+
+    assert len(records) == n
+
+
+class _CountingObjects(_FakeObjects):
+    """Counts how many times the agency prefix is scanned."""
+
+    def __init__(self, store: dict[str, bytes], scans: list[int]) -> None:
+        super().__init__(store)
+        self._scans = scans
+
+    def filter(self, Prefix: str):  # noqa: N803 — mirrors boto3 kwarg
+        self._scans[0] += 1
+        return super().filter(Prefix=Prefix)
+
+
+class _CountingResource(_FakeS3Resource):
+    def __init__(self, store: dict[str, bytes], scans: list[int]) -> None:
+        super().__init__(store)
+        self._scans = scans
+
+    def Bucket(self, name: str):  # noqa: N802
+        bucket = super().Bucket(name)
+        bucket.objects = _CountingObjects(self._store, self._scans)
+        return bucket
+
+
+def _typed_store() -> dict[str, bytes]:
+    base = f"{PREFIX}/{AGENCY}/EPA-2024-0001/text-EPA-2024-0001"
+    return {
+        f"{base}/docket/EPA-2024-0001.json": dumps(_docket_payload("EPA-2024-0001")).encode(),
+        f"{base}/documents/EPA-2024-0001-0001.json": b'{"data": {}}',
+        f"{base}/comments/EPA-2024-0001-0002.json": b'{"data": {}}',
+        # Non-JSON / binary — must be ignored.
+        f"{base}/binary-EPA-2024-0001/docket/x.pdf": b"x",
+    }
+
+
+def test_single_scan_buckets_keys_by_record_type() -> None:
+    """One prefix scan classifies an agency's keys for all record types.
+
+    Replaces the prior behavior of scanning the whole agency prefix once per
+    record type (3x). A counting fake proves exactly one scan happens.
+    """
+    from spicy_regs.sources.mirrulations import list_agency_files_by_type
+
+    scans = [0]
+    resource = _CountingResource(_typed_store(), scans)
+
+    result = list_agency_files_by_type(resource, BUCKET, PREFIX, AGENCY, [DOCKET, DOCUMENT, COMMENT])
+
+    assert scans[0] == 1
+    assert result["dockets"] == [f"{PREFIX}/{AGENCY}/EPA-2024-0001/text-EPA-2024-0001/docket/EPA-2024-0001.json"]
+    assert result["documents"] == [
+        f"{PREFIX}/{AGENCY}/EPA-2024-0001/text-EPA-2024-0001/documents/EPA-2024-0001-0001.json"
+    ]
+    assert result["comments"] == [
+        f"{PREFIX}/{AGENCY}/EPA-2024-0001/text-EPA-2024-0001/comments/EPA-2024-0001-0002.json"
+    ]
+
+
+def test_reader_factory_scans_each_agency_once() -> None:
+    """The readers a factory builds for one agency share a single prefix scan."""
+    from spicy_regs.sources.mirrulations import reader_factory
+
+    scans = [0]
+    resource = _CountingResource(_typed_store(), scans)
+    read = reader_factory([DOCKET, DOCUMENT, COMMENT], resource_factory=lambda: resource)
+
+    keys_by_type = {}
+    for record_type in (DOCKET, DOCUMENT, COMMENT):
+        reader = read(AGENCY, record_type)
+        list(reader.iter_records())
+        keys_by_type[record_type.name] = reader.last_keys
+
+    assert scans[0] == 1  # one scan for the agency, not one per record type
+    assert len(keys_by_type["dockets"]) == 1
+    assert len(keys_by_type["documents"]) == 1
+    assert len(keys_by_type["comments"]) == 1
