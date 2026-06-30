@@ -1,0 +1,95 @@
+name: Seed comments catalog (manual)
+
+# On-demand loader for the R2 Data Catalog cutover. Copies the already-current
+# published comments/ partition tree on R2 into the Iceberg `comments` table so
+# the MCP servers can serve row-level reads from the catalog instead of the
+# frozen monolithic comments.parquet (see PRs #89/#90).
+#
+# Manual dispatch only — it WRITES to the production catalog, so it never runs on
+# a schedule. It defaults to a single-agency smoke test (OMB, the docket from the
+# original bug); flip `full_load` on for the complete load once the smoke test
+# looks right. The underlying script refuses a non-empty table unless `append`
+# is set, so a re-run can't silently double-load.
+#
+# Requires the catalog to be provisioned and these repo secrets to be set:
+#   R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT, R2_BUCKET_NAME  (read source partitions)
+#   R2_CATALOG_URI, R2_CATALOG_WAREHOUSE, R2_CATALOG_TOKEN               (write the catalog table)
+on:
+  workflow_dispatch:
+    inputs:
+      agency:
+        description: 'Seed only this agency_code (smoke test). Ignored when full_load is true.'
+        required: false
+        default: 'OMB'
+        type: string
+      full_load:
+        description: 'Load ALL agencies (overrides agency)'
+        required: false
+        default: false
+        type: boolean
+      append:
+        description: 'Allow loading into a non-empty catalog table'
+        required: false
+        default: false
+        type: boolean
+      upload_index:
+        description: 'Publish the rebuilt comments_index.parquet to R2 after loading'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Seed catalog from R2 partitions
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          R2_CATALOG_URI: ${{ secrets.R2_CATALOG_URI }}
+          R2_CATALOG_WAREHOUSE: ${{ secrets.R2_CATALOG_WAREHOUSE }}
+          R2_CATALOG_TOKEN: ${{ secrets.R2_CATALOG_TOKEN }}
+          R2_CATALOG_NAMESPACE: ${{ secrets.R2_CATALOG_NAMESPACE }}
+        run: |
+          ARGS=""
+          if [ "${{ inputs.full_load }}" = "true" ]; then
+            echo "Full load: every agency"
+          elif [ -n "${{ inputs.agency }}" ]; then
+            ARGS="$ARGS --agency ${{ inputs.agency }}"
+          fi
+          if [ "${{ inputs.append }}" = "true" ]; then
+            ARGS="$ARGS --append"
+          fi
+          if [ "${{ inputs.upload_index }}" = "true" ]; then
+            ARGS="$ARGS --upload-index"
+          fi
+          echo "Running: uv run python scripts/seed_comments_catalog.py $ARGS"
+          uv run python scripts/seed_comments_catalog.py $ARGS
+
+      - name: Verify freshness (index vs rows)
+        if: ${{ inputs.full_load == true }}
+        env:
+          R2_CATALOG_URI: ${{ secrets.R2_CATALOG_URI }}
+          R2_CATALOG_WAREHOUSE: ${{ secrets.R2_CATALOG_WAREHOUSE }}
+          R2_CATALOG_TOKEN: ${{ secrets.R2_CATALOG_TOKEN }}
+          R2_CATALOG_NAMESPACE: ${{ secrets.R2_CATALOG_NAMESPACE }}
+        run: uv run python scripts/check_comments_freshness.py
