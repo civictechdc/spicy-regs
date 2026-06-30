@@ -24,6 +24,15 @@ embed = [
     "sentence-transformers",
     "torch",
 ]
+# Experimental: an Apache Beam proof-of-concept for defining pipelines, kept out
+# of the core/dev deps on purpose. apache-beam pins heavy transitive deps
+# (pyarrow, numpy, protobuf, dill) that can clash with the polars/duckdb/pyarrow
+# stack, so install it only when exploring the Beam path. See
+# src/spicy_regs/beam/README.md. DirectRunner ships with base apache-beam;
+# apache-beam[gcp] is only needed to target Dataflow.
+beam = [
+    "apache-beam",
+]
 
 [dependency-groups]
 dev = [
@@ -44,6 +53,7 @@ docs = [
 
 [project.scripts]
 run-pipeline = "spicy_regs.pipelines.regulations:app"
+run-beam-example = "spicy_regs.beam.example_pipeline:app"
 enrich-pdf-text = "spicy_regs.enrich_pdf:main"
 backfill-comment-text = "spicy_regs.backfill_derived_text:main"
 embed = "spicy_regs.vectordb.embed:main"
@@ -83,4 +93,9 @@ python-version = "3.12"
 exclude = [
     "notebooks",
     ".venv",
+    # Experimental Beam spike: apache-beam ships without complete type stubs and
+    # is an optional extra (not installed in the default env), so exclude it
+    # rather than loosen global type-checking. See src/spicy_regs/beam/README.md.
+    "src/spicy_regs/beam",
+    "tests/test_beam_pipeline.py",
 ]

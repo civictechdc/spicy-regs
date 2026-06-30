@@ -173,6 +173,12 @@ in `transforms/merge.py`; they are functions, not `Transform` subclasses.
 Plain helper modules (e.g. `sources/r2.py`) are storage/connection utilities,
 not connectors — don't subclass them.
 
+**Experimental: Apache Beam.** A proof-of-concept exploring whether these same
+building blocks could be expressed with Apache Beam lives in
+`src/spicy_regs/beam/` (behind the optional `beam` extra). See its
+[evaluation README](src/spicy_regs/beam/README.md) for how the model maps onto
+Beam and why it's not adopted in production today.
+
 ### Recipes
 
 - **Add a record shape:** construct a new `RecordType` in `schemas/` (set
