@@ -225,6 +225,46 @@ def _build_comments_index(con, record_type: RecordType, output_dir: Path) -> Pat
     return index_file
 
 
+def seed_comments_from_parquet(con, source_glob: str, record_type: RecordType) -> int:
+    """Bulk-load published comment Parquet into the catalog table; return its count.
+
+    One-time cutover helper: the partitioned ``comments/`` tree on R2 is already
+    current, so this copies it straight into the catalog ``comments`` table
+    instead of re-ingesting from Mirrulations. ``source_glob`` is read with
+    ``hive_partitioning=false`` because the partition files already carry
+    ``agency_code`` / ``docket_id`` as columns (year/month live only in the path
+    and are not table columns).
+
+    Columns absent from every file in the glob (an older partition written before
+    a column was added) are inserted as ``NULL`` — mirroring the schema-evolution
+    handling in ``transforms.merge_comments_partitioned`` — so a mixed-vintage
+    tree loads cleanly. The connection + any S3 secret are set up by the caller
+    so this stays testable against a local catalog and local files.
+    """
+    columns = list(record_type.schema)
+    esc = _sql_str(source_glob)
+    present = {
+        row[0]
+        for row in con.execute(
+            f"DESCRIBE SELECT * FROM read_parquet('{esc}', "
+            "union_by_name=true, hive_partitioning=false)"
+        ).fetchall()
+    }
+    projection = ", ".join(
+        f'CAST("{c}" AS VARCHAR) AS "{c}"' if c in present else f'CAST(NULL AS VARCHAR) AS "{c}"'
+        for c in columns
+    )
+    col_list = ", ".join(f'"{c}"' for c in columns)
+    con.execute(
+        f"""
+        INSERT INTO {_qualified(record_type)} ({col_list})
+        SELECT {projection}
+        FROM read_parquet('{esc}', union_by_name=true, hive_partitioning=false);
+        """
+    )
+    return con.execute(f"SELECT count(*) FROM {_qualified(record_type)}").fetchone()[0]
+
+
 def merge_comments(staging_dir: Path, output_dir: Path, record_type: RecordType) -> Path | None:
     """Upsert staged comments into the catalog, then rebuild the comments index.
 
