@@ -306,6 +306,43 @@ def test_seed_comments_from_parquet_loads_partition_tree(tmp_path, local_catalog
     ]
 
 
+def test_seed_comments_replace_agency_is_idempotent(tmp_path, local_catalog) -> None:
+    """Loading the same agency twice with replace_agency must not duplicate rows."""
+    con = local_catalog
+    iceberg._ensure_table(con, COMMENT)
+
+    comments_dir = tmp_path / "comments"
+    _write_partition(
+        comments_dir, "EPA", "EPA-1", 2025, 1,
+        [
+            _comment("c1", "EPA-1", "EPA", "2025-01-15T00:00:00Z"),
+            _comment("c2", "EPA-1", "EPA", "2025-01-20T00:00:00Z"),
+        ],
+    )
+    glob = str(comments_dir / "agency_code=EPA/docket_id=*/year=*/month=*/part-0.parquet")
+
+    first = iceberg.seed_comments_from_parquet(con, glob, COMMENT, replace_agency="EPA")
+    assert first == 2
+    # Re-running the same agency replaces, not appends.
+    second = iceberg.seed_comments_from_parquet(con, glob, COMMENT, replace_agency="EPA")
+    assert second == 2
+
+    # A different agency present in the table is untouched by replacing EPA.
+    _write_partition(
+        comments_dir, "DOL", "DOL-1", 2025, 3,
+        [_comment("d1", "DOL-1", "DOL", "2025-03-01T00:00:00Z")],
+    )
+    dol_glob = str(comments_dir / "agency_code=DOL/docket_id=*/year=*/month=*/part-0.parquet")
+    iceberg.seed_comments_from_parquet(con, dol_glob, COMMENT, replace_agency="DOL")
+    iceberg.seed_comments_from_parquet(con, glob, COMMENT, replace_agency="EPA")  # again
+    counts = dict(
+        con.execute(
+            f'SELECT agency_code, count(*) FROM {iceberg._qualified(COMMENT)} GROUP BY agency_code'
+        ).fetchall()
+    )
+    assert counts == {"EPA": 2, "DOL": 1}
+
+
 def test_seed_comments_tolerates_missing_columns(tmp_path, local_catalog) -> None:
     """An older partition missing a later-added column loads with NULLs, not an error."""
     con = local_catalog

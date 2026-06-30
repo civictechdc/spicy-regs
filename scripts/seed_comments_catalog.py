@@ -90,7 +90,9 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, default=Path("output"))
     parser.add_argument(
         "--append", action="store_true",
-        help="Allow loading into a non-empty catalog table (default: refuse)",
+        help="Allow loading into a non-empty catalog table (default: refuse). "
+             "The load is idempotent per agency (each agency's rows are replaced), "
+             "so this is safe for resuming an interrupted run.",
     )
     parser.add_argument(
         "--upload-index", action="store_true",
@@ -111,7 +113,8 @@ def main() -> int:
         if existing and not args.append:
             logger.error(
                 "Catalog comments table already has {:,} rows. Re-run with --append "
-                "to add to it, or empty the table first.", existing,
+                "to load anyway — the load is idempotent per agency (each agency's "
+                "rows are replaced), so this is safe.", existing,
             )
             return 1
 
@@ -126,7 +129,12 @@ def main() -> int:
                 "docket_id=*/year=*/month=*/part-0.parquet"
             )
             try:
-                total = iceberg.seed_comments_from_parquet(con, glob, COMMENT)
+                # replace_agency makes each agency load idempotent: a re-run
+                # (resume after a timeout, or over an already-seeded table)
+                # replaces that agency's rows rather than duplicating them.
+                total = iceberg.seed_comments_from_parquet(
+                    con, glob, COMMENT, replace_agency=agency
+                )
             except Exception as exc:  # noqa: BLE001 — keep going, report at the end
                 logger.warning("  [{}/{}] {}: skipped ({})", i, len(agencies), agency, exc)
                 continue
