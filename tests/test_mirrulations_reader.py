@@ -216,3 +216,16 @@ def test_reader_factory_scans_each_agency_once() -> None:
     assert len(keys_by_type["dockets"]) == 1
     assert len(keys_by_type["documents"]) == 1
     assert len(keys_by_type["comments"]) == 1
+
+
+def test_s3_resource_connection_pool_fits_download_workers() -> None:
+    """The S3 resource's HTTP connection pool must be at least as large as the
+    download thread pool. Otherwise concurrent GETs oversubscribe a too-small
+    pool: connections churn into CLOSE_WAIT and the run stalls (botocore's
+    default max_pool_connections is 10, below DEFAULT_DOWNLOAD_WORKERS)."""
+    from spicy_regs.sources.mirrulations import DEFAULT_DOWNLOAD_WORKERS, s3_resource
+
+    resource = s3_resource()
+    pool_size = resource.meta.client.meta.config.max_pool_connections
+
+    assert pool_size >= DEFAULT_DOWNLOAD_WORKERS
