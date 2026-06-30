@@ -38,9 +38,19 @@ PREFIX = "raw-data"
 DEFAULT_DOWNLOAD_WORKERS = 16
 
 
-def s3_resource() -> Any:
-    """A fresh anonymous S3 resource (one per worker keeps threads independent)."""
-    return boto3.resource("s3", region_name="us-east-1", config=BotoConfig(signature_version=UNSIGNED))
+def s3_resource(max_pool_connections: int = DEFAULT_DOWNLOAD_WORKERS) -> Any:
+    """A fresh anonymous S3 resource (one per worker keeps threads independent).
+
+    The connection pool is sized to the download concurrency: botocore defaults
+    to 10, but the reader fans GETs across ``DEFAULT_DOWNLOAD_WORKERS`` threads.
+    A pool smaller than the thread count oversubscribes — connections churn into
+    CLOSE_WAIT and the run stalls — so the pool must be at least the worker count.
+    """
+    return boto3.resource(
+        "s3",
+        region_name="us-east-1",
+        config=BotoConfig(signature_version=UNSIGNED, max_pool_connections=max_pool_connections),
+    )
 
 
 def s3_client() -> Any:
@@ -323,7 +333,9 @@ def reader_factory(
     cache = _AgencyListingCache(record_types, processed_keys=processed_keys, since_year=since_year, verbose=verbose)
     # Resolve at call time (not as a default arg) so a monkeypatched
     # ``mirrulations.s3_resource`` is honored, and each reader still gets its
-    # own resource — safe to call from the staging worker threads.
+    # own resource — safe to call from the staging worker threads. ``s3_resource``
+    # sizes its connection pool to ``DEFAULT_DOWNLOAD_WORKERS``, which matches the
+    # reader's default ``download_workers`` so the pool is never oversubscribed.
     make_resource = resource_factory or s3_resource
 
     def read(agency: str, record_type: RecordType) -> MirrulationsReader:
