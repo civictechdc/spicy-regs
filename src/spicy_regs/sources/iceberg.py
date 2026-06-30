@@ -54,7 +54,10 @@ def is_configured() -> bool:
 
 
 def _namespace() -> str:
-    return getenv("R2_CATALOG_NAMESPACE", "default")
+    # `or "default"` (not getenv's default arg) so an env var set to an empty
+    # string — e.g. a GitHub Actions `${{ secrets.R2_CATALOG_NAMESPACE }}` that
+    # resolves to "" when the secret is unset — still falls back to "default".
+    return getenv("R2_CATALOG_NAMESPACE") or "default"
 
 
 def _schema_ref() -> str:

@@ -73,6 +73,16 @@ def test_is_configured(monkeypatch) -> None:
     assert iceberg.is_configured() is True
 
 
+def test_namespace_empty_defaults(monkeypatch) -> None:
+    # Unset -> default; explicitly empty (e.g. an unset GH secret) -> default too.
+    monkeypatch.delenv("R2_CATALOG_NAMESPACE", raising=False)
+    assert iceberg._namespace() == "default"
+    monkeypatch.setenv("R2_CATALOG_NAMESPACE", "")
+    assert iceberg._namespace() == "default"
+    monkeypatch.setenv("R2_CATALOG_NAMESPACE", "custom")
+    assert iceberg._namespace() == "custom"
+
+
 def test_connect_raises_when_unconfigured(monkeypatch) -> None:
     for var in iceberg._REQUIRED_ENV:
         monkeypatch.delenv(var, raising=False)
