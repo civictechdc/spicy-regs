@@ -14,22 +14,27 @@ name: ETL (new pipeline)
 # it off deliberately.
 on:
   schedule:
-    # Batch 0: 6 AM UTC, Batch 1: 7 AM UTC, ..., Batch 14: 8 PM UTC
-    - cron: '0 6 * * *'   # Batch 0
-    - cron: '0 7 * * *'   # Batch 1
-    - cron: '0 8 * * *'   # Batch 2
-    - cron: '0 9 * * *'   # Batch 3
-    - cron: '0 10 * * *'  # Batch 4
-    - cron: '0 11 * * *'  # Batch 5
-    - cron: '0 12 * * *'  # Batch 6
-    - cron: '0 13 * * *'  # Batch 7
-    - cron: '0 14 * * *'  # Batch 8
-    - cron: '0 15 * * *'  # Batch 9
-    - cron: '0 16 * * *'  # Batch 10
-    - cron: '0 17 * * *'  # Batch 11
-    - cron: '0 18 * * *'  # Batch 12
-    - cron: '0 19 * * *'  # Batch 13
-    - cron: '0 20 * * *'  # Batch 14
+    # Batch 0: ~6 AM UTC, Batch 1: ~7 AM UTC, ..., Batch 14: ~8 PM UTC.
+    # The minute is offset off the top of the hour (:25) on purpose: GitHub
+    # delays or drops `schedule` events during the high-load window at the
+    # start of every hour, so `:00` crons fire late or not at all. The batch
+    # number is still derived from the UTC hour at runtime, so any minute
+    # within the hour maps to the same batch.
+    - cron: '25 6 * * *'   # Batch 0
+    - cron: '25 7 * * *'   # Batch 1
+    - cron: '25 8 * * *'   # Batch 2
+    - cron: '25 9 * * *'   # Batch 3
+    - cron: '25 10 * * *'  # Batch 4
+    - cron: '25 11 * * *'  # Batch 5
+    - cron: '25 12 * * *'  # Batch 6
+    - cron: '25 13 * * *'  # Batch 7
+    - cron: '25 14 * * *'  # Batch 8
+    - cron: '25 15 * * *'  # Batch 9
+    - cron: '25 16 * * *'  # Batch 10
+    - cron: '25 17 * * *'  # Batch 11
+    - cron: '25 18 * * *'  # Batch 12
+    - cron: '25 19 * * *'  # Batch 13
+    - cron: '25 20 * * *'  # Batch 14
   workflow_dispatch:
     inputs:
       agency:
