@@ -165,7 +165,9 @@ def _resolve_catalog_config() -> dict[str, str] | None:
         "uri": uri,
         "warehouse": warehouse,
         "token": token,
-        "namespace": os.environ.get("R2_CATALOG_NAMESPACE", DEFAULT_CATALOG_NAMESPACE),
+        # `or DEFAULT` (not get's default arg) so an env var set to an empty
+        # string falls back to the default namespace rather than "".
+        "namespace": os.environ.get("R2_CATALOG_NAMESPACE") or DEFAULT_CATALOG_NAMESPACE,
     }
     for key, value in config.items():
         if any(c in value for c in ("'", "\\", "\x00", "\n", "\r")):

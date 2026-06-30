@@ -134,6 +134,19 @@ def test_resolve_catalog_config_full(module_name, monkeypatch):
 
 
 @pytest.mark.parametrize("module_name", ["canonical", "vercel"])
+def test_resolve_catalog_config_empty_namespace_defaults(module_name, monkeypatch):
+    """An empty R2_CATALOG_NAMESPACE (e.g. an unset GH secret -> "") -> default."""
+    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+    monkeypatch.setenv("R2_CATALOG_URI", "https://catalog.example/x")
+    monkeypatch.setenv("R2_CATALOG_WAREHOUSE", "wh")
+    monkeypatch.setenv("R2_CATALOG_TOKEN", "t")
+    monkeypatch.setenv("R2_CATALOG_NAMESPACE", "")
+    config = module._resolve_catalog_config()
+    assert config is not None
+    assert config["namespace"] == module.DEFAULT_CATALOG_NAMESPACE
+
+
+@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
 def test_resolve_catalog_config_rejects_injection(module_name, monkeypatch):
     """Values are inlined into CREATE SECRET / ATTACH, so quotes are rejected."""
     module = mcp_server if module_name == "canonical" else _load_vercel_copy()
