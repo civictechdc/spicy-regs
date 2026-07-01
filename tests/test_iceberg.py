@@ -121,11 +121,7 @@ def test_merge_inserts_then_dedups(tmp_path, local_catalog) -> None:
     )
     iceberg._merge(con, iceberg._staging_files(staging2, DOCKET), DOCKET)
 
-    rows = dict(
-        con.execute(
-            f'SELECT docket_id, title FROM {iceberg._qualified(DOCKET)} ORDER BY docket_id'
-        ).fetchall()
-    )
+    rows = dict(con.execute(f"SELECT docket_id, title FROM {iceberg._qualified(DOCKET)} ORDER BY docket_id").fetchall())
     assert rows == {"EPA-1": "First UPDATED", "EPA-2": "Second", "EPA-3": "Third"}
 
 
@@ -142,10 +138,42 @@ def test_merge_keeps_existing_when_incoming_is_older(tmp_path, local_catalog) ->
     _write_staging(staging2, "EPA", [_docket("EPA-1", "EPA", "Older", "2025-01-01")])
     iceberg._merge(con, iceberg._staging_files(staging2, DOCKET), DOCKET)
 
-    title = con.execute(
-        f'SELECT title FROM {iceberg._qualified(DOCKET)} WHERE docket_id = \'EPA-1\''
-    ).fetchone()[0]
+    title = con.execute(f"SELECT title FROM {iceberg._qualified(DOCKET)} WHERE docket_id = 'EPA-1'").fetchone()[0]
     assert title == "Newer"
+
+
+def test_merge_upserts_without_merge_into(tmp_path) -> None:
+    """The R2 Data Catalog (Iceberg) rejects ``MERGE INTO`` — DuckDB raises
+    ``NotImplementedException`` against an iceberg table — so ``_merge`` must
+    express the upsert as ``DELETE`` + ``INSERT`` (the DML the seed loader uses).
+
+    The in-memory test catalog is a native DuckDB table that *does* accept
+    ``MERGE INTO`` (which is exactly why the original bug escaped the suite), so
+    this asserts on the emitted SQL rather than the row result. The
+    ``local_catalog`` behavior tests above cover the upsert semantics.
+    """
+    _write_staging(tmp_path / "s", "EPA", [_docket("EPA-1", "EPA", "T", "2025-01-01")])
+    files = iceberg._staging_files(tmp_path / "s", DOCKET)
+
+    executed: list[str] = []
+
+    class _RecordingCon:
+        def execute(self, sql, *args, **kwargs):
+            executed.append(sql)
+            return self
+
+        def fetchall(self):
+            return []
+
+        def fetchone(self):
+            return [0]
+
+    iceberg._merge(_RecordingCon(), files, DOCKET)
+
+    sql = " ".join(executed).upper()
+    assert "MERGE INTO" not in sql, "Iceberg catalog does not support MERGE INTO"
+    assert "DELETE FROM" in sql
+    assert "INSERT INTO" in sql
 
 
 def test_export_parquet_matches_published_shape(tmp_path, local_catalog) -> None:
@@ -208,10 +236,7 @@ def test_build_comments_index_counts_per_partition(tmp_path, local_catalog) -> N
 
     df = pl.read_parquet(index_file)
     assert set(df.columns) == {"agency_code", "docket_id", "year", "month", "row_count"}
-    got = {
-        (r["agency_code"], r["docket_id"], r["year"], r["month"]): r["row_count"]
-        for r in df.iter_rows(named=True)
-    }
+    got = {(r["agency_code"], r["docket_id"], r["year"], r["month"]): r["row_count"] for r in df.iter_rows(named=True)}
     assert got == {
         ("EPA", "EPA-1", 2025, 1): 2,
         ("EPA", "EPA-1", 2025, 2): 1,
@@ -261,13 +286,7 @@ def test_merge_comments_noop_without_staging(tmp_path) -> None:
 
 def _write_partition(comments_dir: Path, agency: str, docket: str, year: int, month: int, rows: list[dict]) -> None:
     """Write a published-layout partition file: agency_code=/docket_id=/year=/month=/part-0.parquet."""
-    part = (
-        comments_dir
-        / f"agency_code={agency}"
-        / f"docket_id={docket}"
-        / f"year={year}"
-        / f"month={month}"
-    )
+    part = comments_dir / f"agency_code={agency}" / f"docket_id={docket}" / f"year={year}" / f"month={month}"
     part.mkdir(parents=True, exist_ok=True)
     pl.DataFrame(rows, schema=COMMENT.schema).write_parquet(part / "part-0.parquet")
 
@@ -279,14 +298,22 @@ def test_seed_comments_from_parquet_loads_partition_tree(tmp_path, local_catalog
 
     comments_dir = tmp_path / "comments"
     _write_partition(
-        comments_dir, "EPA", "EPA-1", 2025, 1,
+        comments_dir,
+        "EPA",
+        "EPA-1",
+        2025,
+        1,
         [
             _comment("c1", "EPA-1", "EPA", "2025-01-15T00:00:00Z"),
             _comment("c2", "EPA-1", "EPA", "2025-01-20T00:00:00Z"),
         ],
     )
     _write_partition(
-        comments_dir, "EPA", "EPA-1", 2025, 2,
+        comments_dir,
+        "EPA",
+        "EPA-1",
+        2025,
+        2,
         [_comment("c3", "EPA-1", "EPA", "2025-02-03T00:00:00Z")],
     )
 
@@ -296,8 +323,7 @@ def test_seed_comments_from_parquet_loads_partition_tree(tmp_path, local_catalog
 
     # agency_code / docket_id survive as real columns (read with hive off).
     rows = con.execute(
-        f'SELECT comment_id, agency_code, docket_id FROM {iceberg._qualified(COMMENT)} '
-        "ORDER BY comment_id"
+        f"SELECT comment_id, agency_code, docket_id FROM {iceberg._qualified(COMMENT)} ORDER BY comment_id"
     ).fetchall()
     assert rows == [
         ("c1", "EPA", "EPA-1"),
@@ -313,7 +339,11 @@ def test_seed_comments_replace_agency_is_idempotent(tmp_path, local_catalog) -> 
 
     comments_dir = tmp_path / "comments"
     _write_partition(
-        comments_dir, "EPA", "EPA-1", 2025, 1,
+        comments_dir,
+        "EPA",
+        "EPA-1",
+        2025,
+        1,
         [
             _comment("c1", "EPA-1", "EPA", "2025-01-15T00:00:00Z"),
             _comment("c2", "EPA-1", "EPA", "2025-01-20T00:00:00Z"),
@@ -329,16 +359,18 @@ def test_seed_comments_replace_agency_is_idempotent(tmp_path, local_catalog) -> 
 
     # A different agency present in the table is untouched by replacing EPA.
     _write_partition(
-        comments_dir, "DOL", "DOL-1", 2025, 3,
+        comments_dir,
+        "DOL",
+        "DOL-1",
+        2025,
+        3,
         [_comment("d1", "DOL-1", "DOL", "2025-03-01T00:00:00Z")],
     )
     dol_glob = str(comments_dir / "agency_code=DOL/docket_id=*/year=*/month=*/part-0.parquet")
     iceberg.seed_comments_from_parquet(con, dol_glob, COMMENT, replace_agency="DOL")
     iceberg.seed_comments_from_parquet(con, glob, COMMENT, replace_agency="EPA")  # again
     counts = dict(
-        con.execute(
-            f'SELECT agency_code, count(*) FROM {iceberg._qualified(COMMENT)} GROUP BY agency_code'
-        ).fetchall()
+        con.execute(f"SELECT agency_code, count(*) FROM {iceberg._qualified(COMMENT)} GROUP BY agency_code").fetchall()
     )
     assert counts == {"EPA": 2, "DOL": 1}
 

@@ -82,9 +82,7 @@ def _connect():
 
     if not is_configured():
         missing = [var for var in _REQUIRED_ENV if not getenv(var)]
-        raise RuntimeError(
-            "R2 Data Catalog is not configured; missing env var(s): " + ", ".join(missing)
-        )
+        raise RuntimeError("R2 Data Catalog is not configured; missing env var(s): " + ", ".join(missing))
 
     uri = getenv("R2_CATALOG_URI", "")
     warehouse = getenv("R2_CATALOG_WAREHOUSE", "")
@@ -94,10 +92,7 @@ def _connect():
     con.execute("INSTALL iceberg; LOAD iceberg;")
     con.execute("INSTALL httpfs; LOAD httpfs;")
     con.execute(f"CREATE OR REPLACE SECRET r2_catalog_secret (TYPE ICEBERG, TOKEN '{_sql_str(token)}');")
-    con.execute(
-        f"ATTACH '{_sql_str(warehouse)}' AS {_CATALOG_ALIAS} "
-        f"(TYPE ICEBERG, ENDPOINT '{_sql_str(uri)}');"
-    )
+    con.execute(f"ATTACH '{_sql_str(warehouse)}' AS {_CATALOG_ALIAS} (TYPE ICEBERG, ENDPOINT '{_sql_str(uri)}');")
     return con
 
 
@@ -127,41 +122,65 @@ def _staging_files(staging_dir: Path, record_type: RecordType) -> list[Path]:
 
 
 def _merge(con, staging_files: list[Path], record_type: RecordType) -> None:
-    """Row-level upsert of the staged rows into the Iceberg table via ``MERGE INTO``.
+    """Row-level upsert of the staged rows into the Iceberg table.
+
+    Expressed as ``DELETE`` + ``INSERT`` rather than ``MERGE INTO``: the R2 Data
+    Catalog is an Iceberg table, and DuckDB's iceberg engine raises
+    ``NotImplementedException`` for ``MERGE INTO``/``ON CONFLICT`` — only plain
+    ``DELETE``/``INSERT`` are supported (the same DML :func:`seed_comments_from_parquet`
+    uses).
 
     Mirrors the dedup semantics of ``transforms.merge_staging_files``: collapse
-    the staging rows to one per key (latest ``modify_date`` wins), then merge
-    that against the table — updating only when the incoming row is newer and
-    inserting brand-new keys. ``modify_date`` is an ISO-8601 string, so the
-    lexical ``>`` comparison orders chronologically.
+    the staging rows to one per key (latest ``modify_date`` wins), keep only the
+    keys whose incoming row is brand-new or strictly newer than the table's, then
+    replace exactly those keys. Deleting by key (not by agency) is essential — a
+    since-year-filtered run stages only a slice, so an agency-wide delete would
+    drop the rows it isn't re-inserting. ``modify_date`` is an ISO-8601 string,
+    so the lexical ``>`` comparison orders chronologically.
     """
     cols = list(record_type.schema)
     key = record_type.dedup_key
+    tbl = _qualified(record_type)
+    # Temp names are per-record-type so a dockets + comments run on one
+    # connection can't collide.
+    staged = f"_staged_{record_type.name}"
+    winners = f"_winners_{record_type.name}"
 
     files_sql = ", ".join(f"'{_sql_str(str(p))}'" for p in staging_files)
     col_select = ", ".join(f'CAST("{c}" AS VARCHAR) AS "{c}"' for c in cols)
-    set_clause = ", ".join(f'"{c}" = s."{c}"' for c in cols if c != key)
-    insert_cols = ", ".join(f'"{c}"' for c in cols)
-    insert_vals = ", ".join(f's."{c}"' for c in cols)
+    col_list = ", ".join(f'"{c}"' for c in cols)
 
+    # 1. Collapse staging to one row per key (latest modify_date wins).
     con.execute(
         f"""
-        MERGE INTO {_qualified(record_type)} AS t
-        USING (
-            SELECT {col_select}
-            FROM read_parquet([{files_sql}], union_by_name=true)
-            QUALIFY ROW_NUMBER() OVER (
-                PARTITION BY "{key}"
-                ORDER BY modify_date DESC NULLS LAST
-            ) = 1
-        ) AS s
-        ON t."{key}" = s."{key}"
-        WHEN MATCHED AND (t.modify_date IS NULL OR s.modify_date > t.modify_date)
-            THEN UPDATE SET {set_clause}
-        WHEN NOT MATCHED
-            THEN INSERT ({insert_cols}) VALUES ({insert_vals});
+        CREATE OR REPLACE TEMP TABLE {staged} AS
+        SELECT {col_select}
+        FROM read_parquet([{files_sql}], union_by_name=true)
+        QUALIFY ROW_NUMBER() OVER (
+            PARTITION BY "{key}"
+            ORDER BY modify_date DESC NULLS LAST
+        ) = 1;
         """
     )
+    # 2. Keep only rows that should win over the table: a new key, or one whose
+    #    incoming modify_date is strictly newer (matching the old MERGE guard).
+    con.execute(
+        f"""
+        CREATE OR REPLACE TEMP TABLE {winners} AS
+        SELECT s.*
+        FROM {staged} s
+        LEFT JOIN {tbl} t ON t."{key}" = s."{key}"
+        WHERE t."{key}" IS NULL
+           OR t.modify_date IS NULL
+           OR s.modify_date > t.modify_date;
+        """
+    )
+    # 3. Upsert = delete exactly the winning keys, then insert their rows.
+    con.execute(f'DELETE FROM {tbl} WHERE "{key}" IN (SELECT "{key}" FROM {winners});')
+    con.execute(f"INSERT INTO {tbl} ({col_list}) SELECT {col_list} FROM {winners};")
+
+    con.execute(f"DROP TABLE IF EXISTS {staged};")
+    con.execute(f"DROP TABLE IF EXISTS {winners};")
 
 
 def _export_parquet(con, record_type: RecordType, output_dir: Path) -> Path:
@@ -255,20 +274,15 @@ def seed_comments_from_parquet(
     columns = list(record_type.schema)
     esc = _sql_str(source_glob)
     if replace_agency is not None:
-        con.execute(
-            f"DELETE FROM {_qualified(record_type)} "
-            f"WHERE agency_code = '{_sql_str(replace_agency)}';"
-        )
+        con.execute(f"DELETE FROM {_qualified(record_type)} WHERE agency_code = '{_sql_str(replace_agency)}';")
     present = {
         row[0]
         for row in con.execute(
-            f"DESCRIBE SELECT * FROM read_parquet('{esc}', "
-            "union_by_name=true, hive_partitioning=false)"
+            f"DESCRIBE SELECT * FROM read_parquet('{esc}', union_by_name=true, hive_partitioning=false)"
         ).fetchall()
     }
     projection = ", ".join(
-        f'CAST("{c}" AS VARCHAR) AS "{c}"' if c in present else f'CAST(NULL AS VARCHAR) AS "{c}"'
-        for c in columns
+        f'CAST("{c}" AS VARCHAR) AS "{c}"' if c in present else f'CAST(NULL AS VARCHAR) AS "{c}"' for c in columns
     )
     col_list = ", ".join(f'"{c}"' for c in columns)
     con.execute(
@@ -300,7 +314,8 @@ def merge_comments(staging_dir: Path, output_dir: Path, record_type: RecordType)
         _ensure_table(con, record_type)
         logger.info(
             "iceberg: MERGE {} staging file(s) into {}",
-            len(staging_files), _qualified(record_type),
+            len(staging_files),
+            _qualified(record_type),
         )
         _merge(con, staging_files, record_type)
         total = con.execute(f"SELECT count(*) FROM {_qualified(record_type)}").fetchone()[0]
@@ -329,7 +344,8 @@ def merge_and_export(staging_dir: Path, output_dir: Path, record_type: RecordTyp
         _ensure_table(con, record_type)
         logger.info(
             "iceberg: MERGE {} staging file(s) into {}",
-            len(staging_files), _qualified(record_type),
+            len(staging_files),
+            _qualified(record_type),
         )
         _merge(con, staging_files, record_type)
         total = con.execute(f"SELECT count(*) FROM {_qualified(record_type)}").fetchone()[0]
