@@ -84,6 +84,22 @@ def _agencies(con, bucket: str, only: str | None) -> list[str]:
     return [r[0] for r in rows]
 
 
+def _expected_counts(con, bucket: str) -> dict[str, int]:
+    """Per-agency expected row count, from the published index (sum of row_count).
+
+    Drives the resume skip: an agency whose catalog count already equals its
+    expected count is fully loaded, so a re-run leaves it untouched instead of
+    re-inserting its (potentially thousands of) partition files.
+    """
+    index_uri = f"s3://{bucket}/comments_index.parquet"
+    rows = con.execute(
+        f"SELECT agency_code, CAST(SUM(row_count) AS BIGINT) "
+        f"FROM read_parquet('{iceberg._sql_str(index_uri)}') "
+        "WHERE agency_code IS NOT NULL GROUP BY agency_code"
+    ).fetchall()
+    return {r[0]: r[1] for r in rows}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--agency", help="Load only this agency_code (default: all)")
@@ -119,28 +135,49 @@ def main() -> int:
             return 1
 
         agencies = _agencies(con, bucket, args.agency)
+        expected = _expected_counts(con, bucket)
         logger.info("Seeding {} agency partition set(s) into the catalog", len(agencies))
 
-        total = existing
+        qualified = iceberg._qualified(COMMENT)
+        loaded = skipped = 0
         for i, agency in enumerate(agencies, 1):
             safe = iceberg._sql_str(agency)
+            # Resume skip: if this agency's rows are already fully present
+            # (catalog count matches the index), leave it untouched. Each
+            # agency loads via a single atomic INSERT, so a nonzero count that
+            # matches means it completed — no partial-agency state to worry about.
+            want = expected.get(agency)
+            have = con.execute(
+                f"SELECT count(*) FROM {qualified} WHERE agency_code = '{safe}'"
+            ).fetchone()[0]
+            if want is not None and have == want and have > 0:
+                logger.info(
+                    "  [{}/{}] {}: already loaded ({:,} rows) — skipping", i, len(agencies), agency, have
+                )
+                skipped += 1
+                continue
             glob = (
                 f"s3://{bucket}/comments/agency_code={safe}/"
                 "docket_id=*/year=*/month=*/part-0.parquet"
             )
             try:
                 # replace_agency makes each agency load idempotent: a re-run
-                # (resume after a timeout, or over an already-seeded table)
                 # replaces that agency's rows rather than duplicating them.
                 total = iceberg.seed_comments_from_parquet(
                     con, glob, COMMENT, replace_agency=agency
                 )
+                loaded += 1
             except Exception as exc:  # noqa: BLE001 — keep going, report at the end
                 logger.warning("  [{}/{}] {}: skipped ({})", i, len(agencies), agency, exc)
                 continue
             logger.info("  [{}/{}] {}: catalog now holds {:,} rows", i, len(agencies), agency, total)
 
-        logger.info("Load complete: {:,} rows in the catalog comments table", total)
+        total = con.execute(f"SELECT count(*) FROM {qualified}").fetchone()[0]
+        logger.info(
+            "Load complete: {:,} rows in the catalog comments table "
+            "({} agencies loaded, {} already-current skipped)",
+            total, loaded, skipped,
+        )
 
         index_file = iceberg._build_comments_index(con, COMMENT, args.output_dir)
         logger.info("Rebuilt comments index at {}", index_file)
