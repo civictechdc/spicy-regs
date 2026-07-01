@@ -214,20 +214,16 @@ def upload_directory_to_r2(local_dir: Path, remote_prefix: str | None = None) ->
 
 
 def upload_dataset(output_dir: Path, data_types: list[str]) -> None:
-    """Publish the merged ``{data_type}.parquet`` files (+ rollups + manifest) in parallel."""
+    """Publish the merged ``{data_type}.parquet`` base tables (+ manifest) in parallel.
+
+    Rollups (feed_summary, agency_stats, ...) are no longer published here — each
+    is built and uploaded by its own decoupled ``run-rollup-*`` pipeline.
+    """
     files_to_upload = []
     for data_type in data_types:
         pf = output_dir / f"{data_type}.parquet"
         if pf.exists():
             files_to_upload.append(pf)
-
-    # Always include the materialized rollups if they exist (feed summary +
-    # the per-agency directory/profile rollups). These are tiny, denormalized,
-    # and identical across all viewers.
-    for rollup_name in ("feed_summary", "agency_stats", "agency_monthly_volume"):
-        rollup = output_dir / f"{rollup_name}.parquet"
-        if rollup.exists():
-            files_to_upload.append(rollup)
 
     manifest_file = output_dir / "manifest.parquet"
     if manifest_file.exists():

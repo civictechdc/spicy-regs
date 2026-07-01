@@ -1,6 +1,11 @@
 from spicy_regs.transforms.base import Transform
+from spicy_regs.transforms.build_agency_monthly_volume import build_agency_monthly_volume
 from spicy_regs.transforms.build_agency_rollups import build_agency_rollups
+from spicy_regs.transforms.build_agency_stats import build_agency_stats
+from spicy_regs.transforms.build_discovery_signals import build_discovery_signals
 from spicy_regs.transforms.build_feed_summary import build_feed_summary
+from spicy_regs.transforms.build_fr_docket_links import build_fr_docket_links
+from spicy_regs.transforms.build_rulemaking_lifecycles import build_rulemaking_lifecycles
 from spicy_regs.transforms.build_search_index import INDEX_FILENAME, build_search_index
 from spicy_regs.transforms.chain import Chain
 from spicy_regs.transforms.enrich_derived_text import EnrichCommentText
@@ -29,6 +34,11 @@ __all__ = [
     "partition_comments",
     "build_feed_summary",
     "build_agency_rollups",
+    "build_agency_stats",
+    "build_agency_monthly_volume",
+    "build_discovery_signals",
+    "build_rulemaking_lifecycles",
+    "build_fr_docket_links",
     "build_search_index",
     "INDEX_FILENAME",
     "extract_pdf_text",

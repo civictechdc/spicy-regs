@@ -1,0 +1,22 @@
+name: Rollup — docket_search
+
+# Decoupled rollup: rebuilds docket_search.json.gz (browser MiniSearch index)
+# from dockets.parquet. Runs after the ETL's final batch (20:25 UTC) closes.
+on:
+  schedule:
+    - cron: '0 23 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-docket-search
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}

@@ -6,8 +6,9 @@ name: ETL (new pipeline)
 # removed.
 #
 # On `schedule`: 15 batches (21 agencies each = 315) spread across the day; the
-# batch number is derived from the UTC hour, upload to R2 is ON, and the feed
-# summary / agency rollups are built only on the final batch.
+# batch number is derived from the UTC hour and upload to R2 is ON. Rollups
+# (feed_summary, agency_stats, ...) are built by separate `rollup-*.yml`
+# workflows, each on its own cron reading the base tables this ETL publishes.
 #
 # On `workflow_dispatch`: inputs drive a one-off run. `skip_upload` still
 # defaults to true so a manual vetting run cannot write to production R2 — flip
@@ -84,17 +85,10 @@ jobs:
             echo "batch_number=$BATCH" >> $GITHUB_OUTPUT
             # Scheduled runs publish to R2.
             echo "skip_upload=false" >> $GITHUB_OUTPUT
-            # Build feed summary + agency rollups only on the final batch.
-            if [ "$BATCH" != "14" ]; then
-              echo "skip_post_process=true" >> $GITHUB_OUTPUT
-            else
-              echo "skip_post_process=false" >> $GITHUB_OUTPUT
-            fi
             echo "Running scheduled batch $BATCH (hour $HOUR UTC)"
           else
             echo "batch_number=${{ inputs.batch_number }}" >> $GITHUB_OUTPUT
             echo "skip_upload=${{ inputs.skip_upload }}" >> $GITHUB_OUTPUT
-            echo "skip_post_process=false" >> $GITHUB_OUTPUT
             echo "Running manual dispatch (skip_upload=${{ inputs.skip_upload }})"
           fi
 
@@ -135,9 +129,6 @@ jobs:
           fi
           if [ -n "${{ steps.params.outputs.batch_number }}" ]; then
             ARGS="$ARGS --batch-number ${{ steps.params.outputs.batch_number }} --batch-size 21"
-          fi
-          if [ "${{ steps.params.outputs.skip_post_process }}" = "true" ]; then
-            ARGS="$ARGS --skip-post-process"
           fi
           if [ "${{ inputs.full_refresh }}" = "true" ]; then
             ARGS="$ARGS --full-refresh"
