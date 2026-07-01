@@ -1,0 +1,23 @@
+name: Rollup — fr_docket_links
+
+# Decoupled rollup: rebuilds fr_docket_links.parquet by exploding
+# federal_register.parquet's docket_ids_json. federal_register.parquet is
+# produced by a separate ingestion path; this reads it from R2 as a base input.
+on:
+  schedule:
+    - cron: '30 23 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-fr-docket-links
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}

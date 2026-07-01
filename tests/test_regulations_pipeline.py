@@ -127,7 +127,6 @@ def test_run_extracts_stages_and_merges(tmp_output: Path, monkeypatch: pytest.Mo
         agency=AGENCY,
         output_dir=tmp_output,
         skip_comments=True,
-        skip_post_process=True,
         skip_upload=True,
     ).run()
 
@@ -146,7 +145,7 @@ def test_run_dedups_on_merge_keeping_latest_modify_date(
     monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
 
     RegulationsPipeline(
-        agency=AGENCY, output_dir=tmp_output, skip_comments=True, skip_post_process=True, skip_upload=True
+        agency=AGENCY, output_dir=tmp_output, skip_comments=True, skip_upload=True
     ).run()
 
     df = pl.read_parquet(tmp_output / "dockets.parquet")
@@ -158,7 +157,7 @@ def test_run_with_no_records_is_noop(tmp_output: Path, monkeypatch: pytest.Monke
     monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource({}))
 
     RegulationsPipeline(
-        agency=AGENCY, output_dir=tmp_output, skip_comments=True, skip_post_process=True, skip_upload=True
+        agency=AGENCY, output_dir=tmp_output, skip_comments=True, skip_upload=True
     ).run()
 
     assert not (tmp_output / "dockets.parquet").exists()
@@ -170,7 +169,7 @@ def test_run_with_no_records_is_noop(tmp_output: Path, monkeypatch: pytest.Monke
 def _run(tmp_output: Path, **overrides: Any) -> None:
     kwargs: dict[str, Any] = dict(
         agency=AGENCY, output_dir=tmp_output, skip_comments=True,
-        skip_post_process=True, skip_upload=True,
+        skip_upload=True,
     )
     kwargs.update(overrides)
     RegulationsPipeline(**kwargs).run()
@@ -238,7 +237,7 @@ def test_processes_multiple_agencies_in_parallel(
     monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
 
     RegulationsPipeline(
-        output_dir=tmp_output, skip_comments=True, skip_post_process=True,
+        output_dir=tmp_output, skip_comments=True,
         skip_upload=True, max_workers=2,
     ).run()
 
@@ -274,7 +273,7 @@ def test_run_uploads_changed_comment_partitions(
 
     RegulationsPipeline(
         agency=AGENCY, output_dir=tmp_output, only_comments=True,
-        enrich_text=False, skip_post_process=True, skip_upload=False,
+        enrich_text=False, skip_upload=False,
     ).run()
 
     assert "partitions" in calls, "changed comment partitions were never uploaded"
@@ -304,7 +303,7 @@ def test_run_skips_partition_upload_when_no_comments(
 
     RegulationsPipeline(
         agency=AGENCY, output_dir=tmp_output, skip_comments=True,
-        skip_post_process=True, skip_upload=False,
+        skip_upload=False,
     ).run()
 
     assert "dataset" in calls
@@ -361,7 +360,7 @@ def test_run_primes_comments_index_from_r2_before_merge(
 
     RegulationsPipeline(
         agency=AGENCY, output_dir=tmp_output, only_comments=True,
-        enrich_text=False, skip_post_process=True, skip_upload=False,
+        enrich_text=False, skip_upload=False,
     ).run()
 
     assert "comments_index.parquet" in requested, "existing comment index was never fetched from R2"

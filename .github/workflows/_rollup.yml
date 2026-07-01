@@ -1,0 +1,68 @@
+name: Rollup (reusable)
+
+# Reusable workflow that runs one decoupled rollup pipeline (`run-rollup-*`).
+# Each rollup has its own thin caller workflow (rollup-*.yml) with its own cron;
+# they all delegate here so the build/publish steps live in one place.
+#
+# The `run-rollup-*` console scripts default to --skip-upload (vetting), so this
+# passes --no-skip-upload for real runs; callers can flip it back for dry runs.
+on:
+  workflow_call:
+    inputs:
+      command:
+        description: 'The run-rollup-* console script to run (e.g. run-rollup-feed-summary)'
+        required: true
+        type: string
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  rollup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run rollup
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          # Passed via env (not interpolated into the command) to keep the run
+          # step free of any templated string in an executable position.
+          COMMAND: ${{ inputs.command }}
+          SKIP_UPLOAD: ${{ inputs.skip_upload }}
+        run: |
+          if [ "$SKIP_UPLOAD" = "true" ]; then
+            UPLOAD_ARG="--skip-upload"
+          else
+            UPLOAD_ARG="--no-skip-upload"
+          fi
+          echo "Running: uv run $COMMAND $UPLOAD_ARG"
+          uv run "$COMMAND" "$UPLOAD_ARG"
+
+      - name: Upload artifacts (for debugging)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollup-output
+          path: output/
+          retention-days: 7
