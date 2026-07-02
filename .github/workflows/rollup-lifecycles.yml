@@ -1,0 +1,22 @@
+name: Rollup — rulemaking_lifecycles
+
+# Decoupled rollup: rebuilds rulemaking_lifecycles.parquet (Proposed→Rule pairs
+# + stuck proposals) from documents.parquet. Runs after the ETL's final batch.
+on:
+  schedule:
+    - cron: '10 23 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-lifecycles
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}

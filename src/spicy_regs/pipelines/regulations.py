@@ -38,14 +38,10 @@ from spicy_regs.schemas import RECORD_TYPES, RecordType
 from spicy_regs.sources import iceberg, mirrulations, r2
 from spicy_regs.sources.derived_text import DerivedCommentText
 from spicy_regs.transforms import (
-    INDEX_FILENAME,
     Chain,
     EnrichCommentText,
     ExtractRecords,
     Transform,
-    build_agency_rollups,
-    build_feed_summary,
-    build_search_index,
     merge_comments_partitioned,
     merge_staging_files,
     update_comments_index,
@@ -70,7 +66,6 @@ class RegulationsPipeline(Pipeline):
         only_comments: bool = False,
         batch_number: int | None = None,
         batch_size: int = 45,
-        skip_post_process: bool = False,
         full_refresh: bool = False,
         max_workers: int = 4,
         use_iceberg: bool = False,
@@ -85,7 +80,6 @@ class RegulationsPipeline(Pipeline):
         self.only_comments = only_comments
         self.batch_number = batch_number
         self.batch_size = batch_size
-        self.skip_post_process = skip_post_process
         self.full_refresh = full_refresh
         self.max_workers = max_workers
         self.use_iceberg = use_iceberg
@@ -136,16 +130,11 @@ class RegulationsPipeline(Pipeline):
         if any(staged.values()):
             changed_comments = self._merge(staging_dir, output_dir, record_types, staged)
             rmtree(staging_dir, ignore_errors=True)
-            if not self.skip_post_process:
-                logger.info("Building feed summary...")
-                build_feed_summary(output_dir)
-                logger.info("Building agency rollups...")
-                build_agency_rollups(output_dir)
-                # Only rebuild the docket search index when dockets changed — the
-                # gzipped blob is served from CDN, so avoid churning it needlessly.
-                if staged.get("dockets", 0) > 0:
-                    logger.info("Building docket search index...")
-                    build_search_index(output_dir)
+            # Rollups (feed_summary, agency_stats, agency_monthly_volume,
+            # docket_search, rulemaking_lifecycles, discovery_signals,
+            # fr_docket_links) are no longer built here. Each is materialized by
+            # its own decoupled pipeline (`run-rollup-*`) on an independent cron,
+            # reading the base tables this ETL publishes below.
         else:
             logger.info("No new records staged; skipping merge.")
 
@@ -169,11 +158,6 @@ class RegulationsPipeline(Pipeline):
                 if index_file.exists():
                     logger.info("Uploading refreshed comments index (Iceberg path)...")
                     r2.upload_file(index_file, remote_key="comments_index.parquet")
-            # Publish the search index when this run rebuilt it (dockets changed).
-            search_index = output_dir / INDEX_FILENAME
-            if not self.skip_post_process and staged.get("dockets", 0) > 0 and search_index.exists():
-                logger.info("Uploading search index...")
-                r2.upload_file(search_index)
 
         logger.info("Done!")
 
@@ -317,7 +301,6 @@ def main(
     only_comments: Annotated[bool, Parameter(help="Only process comments")] = False,
     batch_number: Annotated[int | None, Parameter(help="Batch number (0-indexed)")] = None,
     batch_size: Annotated[int, Parameter(help="Agencies per batch")] = 45,
-    skip_post_process: Annotated[bool, Parameter(help="Skip feed summary build")] = False,
     full_refresh: Annotated[bool, Parameter(help="Ignore manifest + existing output")] = False,
     max_workers: Annotated[int, Parameter(help="Agencies processed in parallel")] = 4,
     use_iceberg: Annotated[bool, Parameter(help="Route the dockets table through R2 Data Catalog (Iceberg)")] = False,
@@ -337,7 +320,6 @@ def main(
         only_comments=only_comments,
         batch_number=batch_number,
         batch_size=batch_size,
-        skip_post_process=skip_post_process,
         full_refresh=full_refresh,
         max_workers=max_workers,
         use_iceberg=use_iceberg,

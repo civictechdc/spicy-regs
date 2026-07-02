@@ -1,0 +1,22 @@
+name: Rollup — discovery_signals
+
+# Decoupled rollup: rebuilds discovery_signals.parquet (per-agency document-output
+# spike signal) from documents.parquet. Runs after the ETL's final batch.
+on:
+  schedule:
+    - cron: '20 23 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-discovery-signals
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}

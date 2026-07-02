@@ -44,6 +44,13 @@ docs = [
 
 [project.scripts]
 run-pipeline = "spicy_regs.pipelines.regulations:app"
+run-rollup-feed-summary = "spicy_regs.pipelines.rollups.feed_summary:app"
+run-rollup-agency-stats = "spicy_regs.pipelines.rollups.agency_stats:app"
+run-rollup-agency-monthly-volume = "spicy_regs.pipelines.rollups.agency_monthly_volume:app"
+run-rollup-docket-search = "spicy_regs.pipelines.rollups.docket_search:app"
+run-rollup-lifecycles = "spicy_regs.pipelines.rollups.rulemaking_lifecycles:app"
+run-rollup-discovery-signals = "spicy_regs.pipelines.rollups.discovery_signals:app"
+run-rollup-fr-docket-links = "spicy_regs.pipelines.rollups.fr_docket_links:app"
 enrich-pdf-text = "spicy_regs.enrich_pdf:main"
 backfill-comment-text = "spicy_regs.backfill_derived_text:main"
 embed = "spicy_regs.vectordb.embed:main"

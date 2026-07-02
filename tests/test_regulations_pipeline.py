@@ -130,7 +130,6 @@ def test_run_extracts_stages_and_merges(tmp_output: Path, monkeypatch: pytest.Mo
         agency=AGENCY,
         output_dir=tmp_output,
         skip_comments=True,
-        skip_post_process=True,
         skip_upload=True,
     ).run()
 
@@ -147,7 +146,7 @@ def test_run_dedups_on_merge_keeping_latest_modify_date(tmp_output: Path, monkey
     monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
 
     RegulationsPipeline(
-        agency=AGENCY, output_dir=tmp_output, skip_comments=True, skip_post_process=True, skip_upload=True
+        agency=AGENCY, output_dir=tmp_output, skip_comments=True, skip_upload=True
     ).run()
 
     df = pl.read_parquet(tmp_output / "dockets.parquet")
@@ -159,7 +158,7 @@ def test_run_with_no_records_is_noop(tmp_output: Path, monkeypatch: pytest.Monke
     monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource({}))
 
     RegulationsPipeline(
-        agency=AGENCY, output_dir=tmp_output, skip_comments=True, skip_post_process=True, skip_upload=True
+        agency=AGENCY, output_dir=tmp_output, skip_comments=True, skip_upload=True
     ).run()
 
     assert not (tmp_output / "dockets.parquet").exists()
@@ -173,7 +172,6 @@ def _run(tmp_output: Path, **overrides: Any) -> None:
         agency=AGENCY,
         output_dir=tmp_output,
         skip_comments=True,
-        skip_post_process=True,
         skip_upload=True,
     )
     kwargs.update(overrides)
@@ -239,7 +237,6 @@ def test_processes_multiple_agencies_in_parallel(tmp_output: Path, monkeypatch: 
     RegulationsPipeline(
         output_dir=tmp_output,
         skip_comments=True,
-        skip_post_process=True,
         skip_upload=True,
         max_workers=2,
     ).run()
@@ -279,7 +276,6 @@ def test_run_uploads_changed_comment_partitions(tmp_output: Path, monkeypatch: p
         output_dir=tmp_output,
         only_comments=True,
         enrich_text=False,
-        skip_post_process=True,
         skip_upload=False,
     ).run()
 
@@ -311,7 +307,6 @@ def test_run_skips_partition_upload_when_no_comments(tmp_output: Path, monkeypat
         agency=AGENCY,
         output_dir=tmp_output,
         skip_comments=True,
-        skip_post_process=True,
         skip_upload=False,
     ).run()
 
@@ -373,7 +368,6 @@ def test_run_primes_comments_index_from_r2_before_merge(tmp_output: Path, monkey
         output_dir=tmp_output,
         only_comments=True,
         enrich_text=False,
-        skip_post_process=True,
         skip_upload=False,
     ).run()
 
