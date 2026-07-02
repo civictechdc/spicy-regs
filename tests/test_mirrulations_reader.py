@@ -32,6 +32,9 @@ class _FakeBody:
     def read(self) -> bytes:
         return self._data
 
+    def close(self) -> None:
+        pass
+
 
 class _FakeObj:
     def __init__(self, key: str, content: bytes) -> None:
@@ -216,6 +219,53 @@ def test_reader_factory_scans_each_agency_once() -> None:
     assert len(keys_by_type["dockets"]) == 1
     assert len(keys_by_type["documents"]) == 1
     assert len(keys_by_type["comments"]) == 1
+
+
+def test_download_and_parse_closes_body_on_read_error() -> None:
+    """A failed download must still close the response body.
+
+    If ``read()`` raises (timeout, connection reset) and the body is left open,
+    the underlying S3 connection leaks into CLOSE_WAIT instead of returning to
+    the pool. Enough leaks exhaust the pool and later downloads block forever
+    acquiring a connection — the low-CPU / CLOSE_WAIT-pileup hang seen on large
+    agencies. Closing the body on every path keeps the pool healthy.
+    """
+    from spicy_regs.sources.mirrulations import download_and_parse
+
+    closed = {"value": False}
+
+    class _Body:
+        def read(self) -> bytes:
+            raise OSError("connection reset by peer")
+
+        def close(self) -> None:
+            closed["value"] = True
+
+    class _Obj:
+        def get(self) -> dict:
+            return {"Body": _Body()}
+
+    class _Res:
+        def Object(self, bucket: str, key: str) -> _Obj:  # noqa: N802
+            return _Obj()
+
+    result = download_and_parse(_Res(), BUCKET, "some/key.json", lambda d: d)
+
+    assert result is None  # the error is swallowed (record skipped this run)
+    assert closed["value"] is True  # ...but the body was closed, so no leak
+
+
+def test_s3_resource_configures_retries() -> None:
+    """The resource must set an explicit retry policy so a transient S3 error
+    is retried rather than silently dropping the record (botocore's default
+    leaves ``retries`` unset)."""
+    from spicy_regs.sources.mirrulations import s3_resource
+
+    cfg = s3_resource().meta.client.meta.config
+    assert cfg.retries is not None
+    # botocore normalizes max_attempts -> total_max_attempts under standard mode.
+    attempts = cfg.retries.get("total_max_attempts") or cfg.retries.get("max_attempts", 0)
+    assert attempts >= 2
 
 
 def test_s3_resource_connection_pool_fits_download_workers() -> None:
