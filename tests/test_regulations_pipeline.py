@@ -39,6 +39,9 @@ class _FakeBody:
     def read(self) -> bytes:
         return self._data
 
+    def close(self) -> None:
+        pass
+
 
 class _FakeObj:
     def __init__(self, key: str, content: bytes) -> None:
@@ -135,9 +138,7 @@ def test_run_extracts_stages_and_merges(tmp_output: Path, monkeypatch: pytest.Mo
     assert sorted(df["docket_id"].to_list()) == ["EPA-2024-0001", "EPA-2025-0002"]
 
 
-def test_run_dedups_on_merge_keeping_latest_modify_date(
-    tmp_output: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_run_dedups_on_merge_keeping_latest_modify_date(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # Same docket id seen twice with different modify dates -> one row, latest wins.
     store = {
         _docket_key("EPA-2024-0001", "old"): dumps(_docket_payload("EPA-2024-0001", "2024-01-01")).encode(),
@@ -169,16 +170,17 @@ def test_run_with_no_records_is_noop(tmp_output: Path, monkeypatch: pytest.Monke
 
 def _run(tmp_output: Path, **overrides: Any) -> None:
     kwargs: dict[str, Any] = dict(
-        agency=AGENCY, output_dir=tmp_output, skip_comments=True,
-        skip_post_process=True, skip_upload=True,
+        agency=AGENCY,
+        output_dir=tmp_output,
+        skip_comments=True,
+        skip_post_process=True,
+        skip_upload=True,
     )
     kwargs.update(overrides)
     RegulationsPipeline(**kwargs).run()
 
 
-def test_second_run_skips_keys_already_in_manifest(
-    tmp_output: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_second_run_skips_keys_already_in_manifest(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("R2_PUBLIC_URL", raising=False)
     store = {
         _docket_key("EPA-2024-0001"): dumps(_docket_payload("EPA-2024-0001", "2024-01-01")).encode(),
@@ -200,9 +202,7 @@ def test_second_run_skips_keys_already_in_manifest(
     assert merge_calls == []
 
 
-def test_full_refresh_reprocesses_despite_manifest(
-    tmp_output: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_full_refresh_reprocesses_despite_manifest(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("R2_PUBLIC_URL", raising=False)
     store = {_docket_key("EPA-2024-0001"): dumps(_docket_payload("EPA-2024-0001", "2024-01-01")).encode()}
     monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
@@ -212,7 +212,8 @@ def test_full_refresh_reprocesses_despite_manifest(
     merge_calls: list = []
     real_merge = regulations.merge_staging_files
     monkeypatch.setattr(
-        regulations, "merge_staging_files",
+        regulations,
+        "merge_staging_files",
         lambda *a, **k: (merge_calls.append(1), real_merge(*a, **k))[1],
     )
     _run(tmp_output, full_refresh=True)
@@ -222,9 +223,7 @@ def test_full_refresh_reprocesses_despite_manifest(
 # --- parallelism -----------------------------------------------------------
 
 
-def test_processes_multiple_agencies_in_parallel(
-    tmp_output: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_processes_multiple_agencies_in_parallel(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("R2_PUBLIC_URL", raising=False)
     monkeypatch.setenv("AGENCIES", "EPA,FDA")
     store = {
@@ -238,8 +237,11 @@ def test_processes_multiple_agencies_in_parallel(
     monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
 
     RegulationsPipeline(
-        output_dir=tmp_output, skip_comments=True, skip_post_process=True,
-        skip_upload=True, max_workers=2,
+        output_dir=tmp_output,
+        skip_comments=True,
+        skip_post_process=True,
+        skip_upload=True,
+        max_workers=2,
     ).run()
 
     df = pl.read_parquet(tmp_output / "dockets.parquet")
@@ -249,9 +251,7 @@ def test_processes_multiple_agencies_in_parallel(
 # --- upload ----------------------------------------------------------------
 
 
-def test_run_uploads_changed_comment_partitions(
-    tmp_output: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_run_uploads_changed_comment_partitions(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A run that stages comments must publish the changed partitions + index,
     not just the monolithic dataset."""
     monkeypatch.delenv("R2_PUBLIC_URL", raising=False)  # keep merge's R2 fetch offline
@@ -264,17 +264,23 @@ def test_run_uploads_changed_comment_partitions(
 
     calls: dict[str, list] = {}
     monkeypatch.setattr(
-        regulations.r2, "upload_dataset",
+        regulations.r2,
+        "upload_dataset",
         lambda out, types: calls.setdefault("dataset", []).append((out, types)),
     )
     monkeypatch.setattr(
-        regulations.r2, "upload_comment_partitions",
+        regulations.r2,
+        "upload_comment_partitions",
         lambda out, changed: calls.setdefault("partitions", []).append((out, list(changed))),
     )
 
     RegulationsPipeline(
-        agency=AGENCY, output_dir=tmp_output, only_comments=True,
-        enrich_text=False, skip_post_process=True, skip_upload=False,
+        agency=AGENCY,
+        output_dir=tmp_output,
+        only_comments=True,
+        enrich_text=False,
+        skip_post_process=True,
+        skip_upload=False,
     ).run()
 
     assert "partitions" in calls, "changed comment partitions were never uploaded"
@@ -285,9 +291,7 @@ def test_run_uploads_changed_comment_partitions(
     assert "dataset" in calls
 
 
-def test_run_skips_partition_upload_when_no_comments(
-    tmp_output: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_run_skips_partition_upload_when_no_comments(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A dockets-only run must not call the comment-partition upload."""
     monkeypatch.delenv("R2_PUBLIC_URL", raising=False)
     store = {
@@ -298,22 +302,24 @@ def test_run_skips_partition_upload_when_no_comments(
     calls: dict[str, list] = {}
     monkeypatch.setattr(regulations.r2, "upload_dataset", lambda out, types: calls.setdefault("dataset", []).append(1))
     monkeypatch.setattr(
-        regulations.r2, "upload_comment_partitions",
+        regulations.r2,
+        "upload_comment_partitions",
         lambda out, changed: calls.setdefault("partitions", []).append(1),
     )
 
     RegulationsPipeline(
-        agency=AGENCY, output_dir=tmp_output, skip_comments=True,
-        skip_post_process=True, skip_upload=False,
+        agency=AGENCY,
+        output_dir=tmp_output,
+        skip_comments=True,
+        skip_post_process=True,
+        skip_upload=False,
     ).run()
 
     assert "dataset" in calls
     assert "partitions" not in calls
 
 
-def test_run_primes_comments_index_from_r2_before_merge(
-    tmp_output: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_run_primes_comments_index_from_r2_before_merge(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """An incremental comments run must download the existing global index.
 
     ``update_comments_index`` keeps the rows for partitions this batch didn't
@@ -343,8 +349,11 @@ def test_run_primes_comments_index_from_r2_before_merge(
             "row_count": [42],
         },
         schema={
-            "agency_code": pl.Utf8, "docket_id": pl.Utf8,
-            "year": pl.Int64, "month": pl.Int64, "row_count": pl.Int64,
+            "agency_code": pl.Utf8,
+            "docket_id": pl.Utf8,
+            "year": pl.Int64,
+            "month": pl.Int64,
+            "row_count": pl.Int64,
         },
     )
 
@@ -360,8 +369,12 @@ def test_run_primes_comments_index_from_r2_before_merge(
     monkeypatch.setattr(regulations.r2, "download", fake_download)
 
     RegulationsPipeline(
-        agency=AGENCY, output_dir=tmp_output, only_comments=True,
-        enrich_text=False, skip_post_process=True, skip_upload=False,
+        agency=AGENCY,
+        output_dir=tmp_output,
+        only_comments=True,
+        enrich_text=False,
+        skip_post_process=True,
+        skip_upload=False,
     ).run()
 
     assert "comments_index.parquet" in requested, "existing comment index was never fetched from R2"

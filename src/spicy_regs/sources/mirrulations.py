@@ -49,7 +49,16 @@ def s3_resource(max_pool_connections: int = DEFAULT_DOWNLOAD_WORKERS) -> Any:
     return boto3.resource(
         "s3",
         region_name="us-east-1",
-        config=BotoConfig(signature_version=UNSIGNED, max_pool_connections=max_pool_connections),
+        config=BotoConfig(
+            signature_version=UNSIGNED,
+            max_pool_connections=max_pool_connections,
+            # Bound every S3 op so a stalled connection fails fast and retries
+            # instead of wedging a worker indefinitely; standard mode retries
+            # transient errors (throttling, resets) rather than dropping records.
+            connect_timeout=30,
+            read_timeout=30,
+            retries={"max_attempts": 5, "mode": "standard"},
+        ),
     )
 
 
@@ -173,12 +182,22 @@ def download_and_parse(
     key: str,
     extract_fn: Callable[[dict], dict],
 ) -> dict | None:
-    """Download a single JSON file from S3 and parse it with the given extractor."""
+    """Download a single JSON file from S3 and parse it with the given extractor.
+
+    The response body is closed on every path — including a failed read — so a
+    transient error can't leak the connection into CLOSE_WAIT and starve the
+    pool. Leaked connections were the cause of the low-CPU/CLOSE_WAIT hang seen
+    on large agencies: once the pool drained, later downloads blocked forever
+    waiting for a free connection.
+    """
     try:
         obj = s3_resource.Object(bucket_name, key)
-        content = obj.get()["Body"].read()
-        data = loads(content)
-        return extract_fn(data)
+        body = obj.get()["Body"]
+        try:
+            content = body.read()
+        finally:
+            body.close()
+        return extract_fn(loads(content))
     except Exception:
         return None
 
