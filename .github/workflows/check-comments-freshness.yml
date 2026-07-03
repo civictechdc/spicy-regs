@@ -1,0 +1,64 @@
+name: Check comments freshness
+
+# Guards against the comments read surface drifting behind the comments_index.
+# The counts (comments_index / feed_summary / agency_stats) and the row-level
+# `comments` table are produced by different steps, so they can diverge — the
+# index advertising comments for a month the row data doesn't actually contain.
+# That exact gap (OMB-2026-0034: ~39k June-2026 comments in the index, zero rows
+# in `comments`) is what drove the Iceberg cutover; this check makes a recurrence
+# visible instead of silent.
+#
+# scripts/check_comments_freshness.py exits 1 when any agency's rows lag the
+# index, so a drift turns this job red (and notifies watchers). It reads whatever
+# the MCP server is configured to read: the R2 Data Catalog (Iceberg) when the
+# R2_CATALOG_* secrets are set, otherwise the public monolithic comments.parquet
+# — i.e. it validates the actual surface users query.
+#
+# Read-only: it never writes to R2 or the catalog. Runs after the day's ETL and
+# rollups have settled (last ETL batch ~20:25 UTC, feed_summary rollup 22:30).
+on:
+  schedule:
+    - cron: '30 23 * * *'
+  workflow_dispatch:
+    inputs:
+      agency:
+        description: 'Restrict the check to a single agency_code'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Check comments freshness
+        env:
+          # When present, the check validates the Iceberg catalog surface;
+          # otherwise it falls back to the public monolithic comments.parquet.
+          R2_CATALOG_URI: ${{ secrets.R2_CATALOG_URI }}
+          R2_CATALOG_WAREHOUSE: ${{ secrets.R2_CATALOG_WAREHOUSE }}
+          R2_CATALOG_TOKEN: ${{ secrets.R2_CATALOG_TOKEN }}
+          R2_CATALOG_NAMESPACE: ${{ secrets.R2_CATALOG_NAMESPACE }}
+        run: |
+          ARGS=""
+          if [ -n "${{ inputs.agency }}" ]; then
+            ARGS="$ARGS --agency ${{ inputs.agency }}"
+          fi
+          echo "Running: uv run python scripts/check_comments_freshness.py $ARGS"
+          uv run python scripts/check_comments_freshness.py $ARGS
