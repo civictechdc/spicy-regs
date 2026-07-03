@@ -43,10 +43,7 @@ _EXTRACTED_RE = re.compile(r"(?P<comment_id>.+)_attachment_\d+_extracted\.txt$")
 
 def comments_extracted_prefix(agency: str, docket_id: str) -> str:
     """S3 prefix holding one docket's comment-attachment extractions (all tools)."""
-    return (
-        f"{DERIVED_PREFIX}/{agency}/{docket_id}/mirrulations/"
-        f"extracted_txt/comments_extracted_text/"
-    )
+    return f"{DERIVED_PREFIX}/{agency}/{docket_id}/mirrulations/extracted_txt/comments_extracted_text/"
 
 
 class DerivedCommentText:
@@ -86,9 +83,7 @@ class DerivedCommentText:
         self._docket_index[docket_id] = index
         return index
 
-    def text_for(
-        self, agency: str | None, docket_id: str | None, comment_id: str | None
-    ) -> str | None:
+    def text_for(self, agency: str | None, docket_id: str | None, comment_id: str | None) -> str | None:
         """Concatenated extracted text for one comment, or ``None`` if none exists."""
         if not (agency and docket_id and comment_id):
             return None
@@ -100,7 +95,13 @@ class DerivedCommentText:
         parts: list[str] = []
         for key in keys:
             try:
-                body = self._resource.Object(self._bucket_name, key).get()["Body"].read()
+                stream = self._resource.Object(self._bucket_name, key).get()["Body"]
+                # Close the body on every path — a failed read must not leak the
+                # connection into CLOSE_WAIT and eventually starve the pool.
+                try:
+                    body = stream.read()
+                finally:
+                    stream.close()
             except Exception as exc:  # noqa: BLE001 — one bad object shouldn't sink the rest
                 logger.warning("derived-data read failed for {}: {}", key, exc)
                 continue
