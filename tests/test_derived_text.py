@@ -26,6 +26,9 @@ class _FakeBody:
     def read(self) -> bytes:
         return self._data
 
+    def close(self) -> None:
+        pass
+
 
 class _FakeObj:
     def __init__(self, key: str, content: bytes) -> None:
@@ -70,12 +73,20 @@ def _store() -> dict[str, bytes]:
     # ACF docket: comment 0004 has one attachment; comment 0015 has two
     # (pypdf tool). EPA docket: comment 0009 uses a different tool (pdfminer).
     return {
-        _extracted_key("ACF", "ACF-2025-0038", "pypdf", "ACF-2025-0038-0004_attachment_1_extracted.txt"): b"Wisconsin DCF comment body",
-        _extracted_key("ACF", "ACF-2025-0038", "pypdf", "ACF-2025-0038-0015_attachment_1_extracted.txt"): b"first attachment",
-        _extracted_key("ACF", "ACF-2025-0038", "pypdf", "ACF-2025-0038-0015_attachment_2_extracted.txt"): b"second attachment",
+        _extracted_key(
+            "ACF", "ACF-2025-0038", "pypdf", "ACF-2025-0038-0004_attachment_1_extracted.txt"
+        ): b"Wisconsin DCF comment body",
+        _extracted_key(
+            "ACF", "ACF-2025-0038", "pypdf", "ACF-2025-0038-0015_attachment_1_extracted.txt"
+        ): b"first attachment",
+        _extracted_key(
+            "ACF", "ACF-2025-0038", "pypdf", "ACF-2025-0038-0015_attachment_2_extracted.txt"
+        ): b"second attachment",
         # An empty extraction (e.g. a scanned/image PDF) — should not count as text.
         _extracted_key("ACF", "ACF-2025-0038", "pypdf", "ACF-2025-0038-0020_attachment_1_extracted.txt"): b"   \n  ",
-        _extracted_key("EPA", "EPA-HQ-OA-2024-0001", "pdfminer", "EPA-HQ-OA-2024-0001-0009_attachment_1_extracted.txt"): b"EPA comment text",
+        _extracted_key(
+            "EPA", "EPA-HQ-OA-2024-0001", "pdfminer", "EPA-HQ-OA-2024-0001-0009_attachment_1_extracted.txt"
+        ): b"EPA comment text",
     }
 
 
@@ -85,6 +96,41 @@ def _store() -> dict[str, bytes]:
 def test_text_for_single_attachment() -> None:
     fetcher = DerivedCommentText(_FakeS3Resource(_store()), BUCKET)
     assert fetcher.text_for("ACF", "ACF-2025-0038", "ACF-2025-0038-0004") == "Wisconsin DCF comment body"
+
+
+def test_text_for_closes_body_on_read_error() -> None:
+    """A failed derived-data read must still close the response body.
+
+    With enrichment on, text_for runs per comment; a leaked body (open on the
+    error path) leaves its S3 connection in CLOSE_WAIT until the pool starves
+    and downloads block forever — the hang seen on comment-heavy agencies.
+    """
+    closed = {"value": False}
+
+    class _RaisingBody:
+        def read(self) -> bytes:
+            raise OSError("connection reset by peer")
+
+        def close(self) -> None:
+            closed["value"] = True
+
+    class _RaisingObj(_FakeObj):
+        def __init__(self) -> None:
+            super().__init__("key", b"")
+
+        def get(self) -> dict:
+            return {"Body": _RaisingBody()}
+
+    class _RaisingResource(_FakeS3Resource):
+        def Object(self, name: str, key: str) -> _FakeObj:  # noqa: N802
+            return _RaisingObj()
+
+    fetcher = DerivedCommentText(_RaisingResource(_store()), BUCKET)
+    # This comment has one attachment in the index, so text_for reaches the read.
+    result = fetcher.text_for("ACF", "ACF-2025-0038", "ACF-2025-0038-0004")
+
+    assert result is None  # the bad read is handled gracefully
+    assert closed["value"] is True  # ...and the body was closed, so no leak
 
 
 def test_text_for_concatenates_multiple_attachments_in_order() -> None:
