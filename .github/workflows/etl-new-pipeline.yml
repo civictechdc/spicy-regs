@@ -6,8 +6,10 @@ name: ETL (new pipeline)
 # removed.
 #
 # On `schedule`: 15 batches (21 agencies each = 315) spread across the day; the
-# batch number is derived from the UTC hour and upload to R2 is ON. Rollups
-# (feed_summary, agency_stats, ...) are built by separate `rollup-*.yml`
+# batch number is derived from the UTC hour, upload to R2 is ON, and the run is
+# routed through the R2 Data Catalog (Iceberg) — the comments read surface the
+# MCP servers query — so the catalog stays current instead of drifting stale.
+# Rollups (feed_summary, agency_stats, ...) are built by separate `rollup-*.yml`
 # workflows, each on its own cron reading the base tables this ETL publishes.
 #
 # On `workflow_dispatch`: inputs drive a one-off run. `skip_upload` still
@@ -64,7 +66,7 @@ on:
         default: true
         type: boolean
       use_iceberg:
-        description: 'Route dockets + comments through R2 Data Catalog (Iceberg)'
+        description: 'Route dockets + comments through R2 Data Catalog (Iceberg). Dispatch runs only; scheduled runs always use Iceberg.'
         required: false
         default: false
         type: boolean
@@ -85,10 +87,16 @@ jobs:
             echo "batch_number=$BATCH" >> $GITHUB_OUTPUT
             # Scheduled runs publish to R2.
             echo "skip_upload=false" >> $GITHUB_OUTPUT
+            # The comments read surface is the Iceberg catalog now, so scheduled
+            # runs MUST route through it — otherwise comments land only in the
+            # partitioned tree and the catalog (what the MCP servers read) drifts
+            # stale again. Dispatch runs still honor their own use_iceberg input.
+            echo "use_iceberg=true" >> $GITHUB_OUTPUT
             echo "Running scheduled batch $BATCH (hour $HOUR UTC)"
           else
             echo "batch_number=${{ inputs.batch_number }}" >> $GITHUB_OUTPUT
             echo "skip_upload=${{ inputs.skip_upload }}" >> $GITHUB_OUTPUT
+            echo "use_iceberg=${{ inputs.use_iceberg }}" >> $GITHUB_OUTPUT
             echo "Running manual dispatch (skip_upload=${{ inputs.skip_upload }})"
           fi
 
@@ -138,7 +146,7 @@ jobs:
           else
             ARGS="$ARGS --no-skip-upload"
           fi
-          if [ "${{ inputs.use_iceberg }}" = "true" ]; then
+          if [ "${{ steps.params.outputs.use_iceberg }}" = "true" ]; then
             ARGS="$ARGS --use-iceberg"
           fi
           echo "Running: uv run run-pipeline $ARGS"
