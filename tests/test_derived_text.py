@@ -114,12 +114,15 @@ def test_text_for_closes_body_on_read_error() -> None:
         def close(self) -> None:
             closed["value"] = True
 
-    class _RaisingObj:
+    class _RaisingObj(_FakeObj):
+        def __init__(self) -> None:
+            super().__init__("key", b"")
+
         def get(self) -> dict:
             return {"Body": _RaisingBody()}
 
     class _RaisingResource(_FakeS3Resource):
-        def Object(self, name: str, key: str) -> _RaisingObj:  # noqa: N802
+        def Object(self, name: str, key: str) -> _FakeObj:  # noqa: N802
             return _RaisingObj()
 
     fetcher = DerivedCommentText(_RaisingResource(_store()), BUCKET)
