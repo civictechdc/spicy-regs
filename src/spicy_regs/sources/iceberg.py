@@ -89,6 +89,16 @@ def _connect():
     token = getenv("R2_CATALOG_TOKEN", "")
 
     con = duckdb.connect()
+    # avro is installed explicitly before iceberg: DuckDB 1.5's iceberg extension
+    # pulls in `avro` to read Iceberg manifests and otherwise auto-installs it
+    # lazily during LOAD, a nested install that fails in sandboxes without a
+    # writable home directory. Provisioning it on the top-level path avoids that.
+    # Best-effort: older DuckDB (<1.5) has no separate avro extension, so ignore
+    # the error there and let iceberg use its bundled Avro path.
+    try:
+        con.execute("INSTALL avro; LOAD avro;")
+    except duckdb.Error as avro_exc:
+        logger.info("avro not separately provisioned ({}); using iceberg's bundled path", avro_exc)
     con.execute("INSTALL iceberg; LOAD iceberg;")
     con.execute("INSTALL httpfs; LOAD httpfs;")
     con.execute(f"CREATE OR REPLACE SECRET r2_catalog_secret (TYPE ICEBERG, TOKEN '{_sql_str(token)}');")
