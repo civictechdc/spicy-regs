@@ -233,6 +233,23 @@ def _attach_catalog(con: duckdb.DuckDBPyConnection, config: dict[str, str]) -> b
     the configuration. Returns ``True`` only when the catalog is attached.
     """
     try:
+        # DuckDB 1.5's iceberg extension reads Avro manifests via a separate
+        # `avro` extension. iceberg tries to auto-install it lazily during LOAD,
+        # but that nested install doesn't inherit the session's home_directory in
+        # serverless sandboxes (Vercel) and dies with "Can't find the home
+        # directory at ''" — so the whole attach fails and comments silently fall
+        # back to the frozen monolith. Installing avro explicitly first runs on
+        # the same top-level path that already installs httpfs/iceberg fine, so it
+        # sees the configured home_directory and the nested auto-install is skipped.
+        #
+        # Best-effort: on older DuckDB (<1.5) avro isn't a separate extension and
+        # `INSTALL avro` errors — swallow it and let iceberg use its bundled Avro
+        # path, so this never regresses environments where the attach already works.
+        try:
+            con.execute("INSTALL avro")
+            con.execute("LOAD avro")
+        except duckdb.Error as avro_exc:
+            logger.info("avro not separately provisioned (%s); using iceberg's bundled path", avro_exc)
         con.execute("INSTALL iceberg")
         con.execute("LOAD iceberg")
         con.execute(
