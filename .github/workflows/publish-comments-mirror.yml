@@ -62,6 +62,12 @@ jobs:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          # Bypass r2's byte-size shrink guard: re-exporting from the catalog
+          # re-sorts + re-compresses the data, so a partition can be several times
+          # smaller on disk while holding *more* rows (verified: ACF 19.7 MB -> 6.0 MB
+          # with more rows + fresher dates). The script enforces a row-count floor
+          # instead, which is the right check for a full export.
+          R2_ALLOW_SHRINK: '1'
           R2_CATALOG_URI: ${{ secrets.R2_CATALOG_URI }}
           R2_CATALOG_WAREHOUSE: ${{ secrets.R2_CATALOG_WAREHOUSE }}
           R2_CATALOG_TOKEN: ${{ secrets.R2_CATALOG_TOKEN }}

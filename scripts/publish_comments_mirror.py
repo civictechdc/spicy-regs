@@ -31,11 +31,22 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import pyarrow.parquet as pq
 from loguru import logger
 
 from spicy_regs.schemas.regulations import RECORD_TYPES
 from spicy_regs.sources import iceberg, r2
 from spicy_regs.transforms import partition_comments
+
+# The mirror runs with R2_ALLOW_SHRINK=1 (see the workflow): re-exporting from the
+# catalog legitimately changes on-disk size — the sorted, freshly-compressed
+# partitions can be several times *smaller* than the old published files while
+# holding *more* rows — so r2's byte-size shrink guard produces false positives.
+# This row-count floor replaces that protection with one appropriate for a full
+# export: a catastrophically empty/broken catalog read (which would otherwise wipe
+# the public files) is caught here before anything is uploaded. The live table is
+# tens of millions of rows; a floor well below that only trips on real breakage.
+MIN_EXPECTED_ROWS = 1_000_000
 
 
 def main() -> int:
@@ -55,6 +66,19 @@ def main() -> int:
 
     # 1. Monolith + index straight from the catalog.
     result = iceberg.export_public_comments(output_dir, comments_rt)
+
+    # Floor check (replaces the bypassed byte-size shrink guard): refuse to publish
+    # a catastrophically small export that would wipe the live public files.
+    n_rows = pq.ParquetFile(result["comments"]).metadata.num_rows
+    if n_rows < MIN_EXPECTED_ROWS:
+        logger.error(
+            "Exported monolith has only {:,} rows (< {:,} floor); the catalog read looks "
+            "broken — refusing to publish and overwrite the live files",
+            n_rows,
+            MIN_EXPECTED_ROWS,
+        )
+        return 1
+    logger.info("Exported monolith has {:,} rows", n_rows)
 
     # 2. Derive the per-agency tree the UI reads for scoped queries from that monolith.
     partition_dir = partition_comments(output_dir)
