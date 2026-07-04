@@ -7,8 +7,9 @@ name: Dedupe comments catalog (manual)
 #
 # Manual dispatch only — the apply path WRITES to the production catalog, so it
 # never runs on a schedule. It defaults to a read-only audit; flip `apply` on to
-# rebuild the table deduplicated. The rebuild uses CREATE OR REPLACE (atomic swap,
-# never DELETE), so a failed run can't corrupt or double the data.
+# rebuild the table deduplicated. The rebuild writes a fresh table per-agency and
+# swaps it in by RENAME (never DELETE, never a whole-table single write), ordered
+# so an unsupported RENAME fails with the live table still in place.
 #
 # Recommended sequence: run once with apply=false (audit), review the report in
 # the logs, run again with apply=true, then run apply=false once more to confirm

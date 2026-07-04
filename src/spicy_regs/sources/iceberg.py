@@ -400,44 +400,48 @@ def audit_duplicates(con, record_type: RecordType) -> list[tuple[str, int, int]]
 def dedupe_table(con, record_type: RecordType) -> tuple[int, int]:
     """Collapse the catalog table to one row per ``dedup_key`` (latest modify_date).
 
-    Rebuilds the table with ``CREATE OR REPLACE TABLE`` from a materialized temp
-    rather than ``DELETE`` + reinsert. This is deliberate: the historical
-    duplication came from loads whose ``DELETE`` did not remove prior rows on the
-    R2 Data Catalog, so a DELETE-based cleanup could double the problem instead of
-    fixing it. ``CREATE OR REPLACE`` is atomic — it either swaps in the clean
-    snapshot or fails without destroying the existing data — and never depends on
-    delete semantics.
+    Builds a fresh sibling table by writing the deduped rows **one agency at a
+    time**, then swaps it in by ``RENAME``. Two constraints drive this shape:
 
-    The dedup temp is filled **one agency at a time** rather than with a single
-    global window: a ``ROW_NUMBER() OVER (PARTITION BY key)`` over tens of millions
-    of rows with large text is a blocking sort that OOMs the runner, whereas the
-    same window scoped to one agency stays small (this mirrors how
-    ``transforms.partition_comments`` keeps peak memory bounded). Duplicates only
-    ever occur within a single agency (a ``comment_id`` belongs to one agency), so
-    per-agency dedup is equivalent to a global one here. The final swap reads the
-    materialized temp, so it never reads the table it is rewriting.
+    * Never ``DELETE``. The historical duplication came from loads whose ``DELETE``
+      didn't remove prior rows on the R2 Data Catalog, so a delete-based cleanup
+      could double the problem.
+    * Never touch tens of millions of rows in one statement. A global
+      ``ROW_NUMBER() OVER (PARTITION BY key)`` OOMs the runner on the read side,
+      and a single ``CREATE OR REPLACE ... AS SELECT`` of the whole table OOMs it
+      on the Iceberg *write* side. Both the daily merge and the original seed only
+      ever write per-agency slices, which fit — so this does the same. Duplicates
+      only ever occur within one agency (a ``comment_id`` belongs to one agency),
+      so per-agency dedup equals a global one here.
+
+    The swap is ordered so that if the catalog doesn't support ``ALTER TABLE
+    RENAME`` the very first rename fails with the live table still in place (the
+    fresh table is only a harmless sibling at that point).
 
     Returns ``(rows_before, rows_after)``; ``rows_after`` equals the number of
     distinct keys when the rebuild succeeds.
     """
     key = record_type.dedup_key
+    name = record_type.name
     tbl = _qualified(record_type)
+    dedup_tbl = f'{_schema_ref()}."{name}_dedup"'
+    stale_tbl = f'{_schema_ref()}."{name}_stale"'
+    col_defs = ", ".join(f'"{c}" VARCHAR' for c in record_type.schema)
     col_list = ", ".join(f'"{c}"' for c in record_type.schema)
-    tmp = f"_dedup_{record_type.name}"
 
     before = con.execute(f"SELECT count(*) FROM {tbl}").fetchone()[0]
 
-    # Empty temp with the table's shape; fill it per agency to bound peak memory.
-    con.execute(f"DROP TABLE IF EXISTS {tmp};")
-    con.execute(f"CREATE TEMP TABLE {tmp} AS SELECT {col_list} FROM {tbl} WHERE false;")
+    # Fresh sibling table (clear any stray from a prior aborted run).
+    con.execute(f"DROP TABLE IF EXISTS {dedup_tbl};")
+    con.execute(f"CREATE TABLE {dedup_tbl} ({col_defs});")
 
     agencies = [r[0] for r in con.execute(f"SELECT DISTINCT agency_code FROM {tbl}").fetchall()]
-    logger.info("iceberg: deduping {} agency bucket(s) of {}", len(agencies), record_type.name)
+    logger.info("iceberg: rebuilding {} deduplicated across {} agency bucket(s)", name, len(agencies))
     for agency in agencies:
         where = "agency_code IS NULL" if agency is None else f"agency_code = '{_sql_str(agency)}'"
         con.execute(
             f"""
-            INSERT INTO {tmp} ({col_list})
+            INSERT INTO {dedup_tbl} ({col_list})
             SELECT {col_list}
             FROM {tbl}
             WHERE {where}
@@ -448,10 +452,14 @@ def dedupe_table(con, record_type: RecordType) -> tuple[int, int]:
             """
         )
 
-    # Atomic swap from the materialized temp (streaming scan, no window/sort).
-    con.execute(f"CREATE OR REPLACE TABLE {tbl} AS SELECT {col_list} FROM {tmp};")
-    con.execute(f"DROP TABLE IF EXISTS {tmp};")
-    after = con.execute(f"SELECT count(*) FROM {tbl}").fetchone()[0]
+    after = con.execute(f"SELECT count(*) FROM {dedup_tbl}").fetchone()[0]
+
+    # Swap by rename (metadata only — no bulk rewrite). Renaming the live table
+    # first means an unsupported RENAME fails here, before anything destructive.
+    con.execute(f"DROP TABLE IF EXISTS {stale_tbl};")
+    con.execute(f'ALTER TABLE {tbl} RENAME TO "{name}_stale";')
+    con.execute(f'ALTER TABLE {dedup_tbl} RENAME TO "{name}";')
+    con.execute(f"DROP TABLE IF EXISTS {stale_tbl};")
     return before, after
 
 

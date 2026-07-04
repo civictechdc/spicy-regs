@@ -11,10 +11,11 @@ Default mode is a **read-only audit**: it reports every agency whose row count
 exceeds its distinct ``comment_id`` count, plus totals. Nothing is written.
 
 ``--apply`` rebuilds the table deduplicated (one row per ``comment_id``, latest
-``modify_date``) via ``CREATE OR REPLACE TABLE`` — an atomic swap that never
-relies on ``DELETE`` (the very operation that left the duplicates), so it can't
-double the problem: it either swaps in the clean snapshot or fails without
-touching the existing data. After a successful apply, re-run the mirror
+``modify_date``): it writes a fresh sibling table **one agency at a time** and
+swaps it in by ``RENAME``. It never uses ``DELETE`` (the operation that left the
+duplicates) and never rewrites the whole table in one statement (which OOMs the
+runner on both the read and Iceberg-write sides) — only bounded per-agency
+writes, then a metadata-only rename. After a successful apply, re-run the mirror
 (``publish_comments_mirror.py``) so the public files the UI reads are refreshed.
 
 Safe rollout: run with no flags first (audit), eyeball the report, then ``--apply``,
