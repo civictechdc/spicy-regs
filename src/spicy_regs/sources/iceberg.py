@@ -406,8 +406,16 @@ def dedupe_table(con, record_type: RecordType) -> tuple[int, int]:
     R2 Data Catalog, so a DELETE-based cleanup could double the problem instead of
     fixing it. ``CREATE OR REPLACE`` is atomic — it either swaps in the clean
     snapshot or fails without destroying the existing data — and never depends on
-    delete semantics. The temp is materialized first so the replace doesn't read
-    the table it is rewriting.
+    delete semantics.
+
+    The dedup temp is filled **one agency at a time** rather than with a single
+    global window: a ``ROW_NUMBER() OVER (PARTITION BY key)`` over tens of millions
+    of rows with large text is a blocking sort that OOMs the runner, whereas the
+    same window scoped to one agency stays small (this mirrors how
+    ``transforms.partition_comments`` keeps peak memory bounded). Duplicates only
+    ever occur within a single agency (a ``comment_id`` belongs to one agency), so
+    per-agency dedup is equivalent to a global one here. The final swap reads the
+    materialized temp, so it never reads the table it is rewriting.
 
     Returns ``(rows_before, rows_after)``; ``rows_after`` equals the number of
     distinct keys when the rebuild succeeds.
@@ -418,17 +426,29 @@ def dedupe_table(con, record_type: RecordType) -> tuple[int, int]:
     tmp = f"_dedup_{record_type.name}"
 
     before = con.execute(f"SELECT count(*) FROM {tbl}").fetchone()[0]
-    con.execute(
-        f"""
-        CREATE OR REPLACE TEMP TABLE {tmp} AS
-        SELECT {col_list}
-        FROM {tbl}
-        QUALIFY ROW_NUMBER() OVER (
-            PARTITION BY "{key}"
-            ORDER BY modify_date DESC NULLS LAST
-        ) = 1;
-        """
-    )
+
+    # Empty temp with the table's shape; fill it per agency to bound peak memory.
+    con.execute(f"DROP TABLE IF EXISTS {tmp};")
+    con.execute(f"CREATE TEMP TABLE {tmp} AS SELECT {col_list} FROM {tbl} WHERE false;")
+
+    agencies = [r[0] for r in con.execute(f"SELECT DISTINCT agency_code FROM {tbl}").fetchall()]
+    logger.info("iceberg: deduping {} agency bucket(s) of {}", len(agencies), record_type.name)
+    for agency in agencies:
+        where = "agency_code IS NULL" if agency is None else f"agency_code = '{_sql_str(agency)}'"
+        con.execute(
+            f"""
+            INSERT INTO {tmp} ({col_list})
+            SELECT {col_list}
+            FROM {tbl}
+            WHERE {where}
+            QUALIFY ROW_NUMBER() OVER (
+                PARTITION BY "{key}"
+                ORDER BY modify_date DESC NULLS LAST
+            ) = 1;
+            """
+        )
+
+    # Atomic swap from the materialized temp (streaming scan, no window/sort).
     con.execute(f"CREATE OR REPLACE TABLE {tbl} AS SELECT {col_list} FROM {tmp};")
     con.execute(f"DROP TABLE IF EXISTS {tmp};")
     after = con.execute(f"SELECT count(*) FROM {tbl}").fetchone()[0]

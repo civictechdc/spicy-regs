@@ -31,6 +31,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import tempfile
 
 from loguru import logger
 
@@ -54,8 +55,12 @@ def main() -> int:
     comments_rt = RECORD_TYPES["comments"]
     con = iceberg._connect()
     try:
+        # Keep peak memory bounded on the CI runner: fewer threads, a firm memory
+        # cap, and on-disk spill for the per-agency dedup windows.
         con.execute("SET preserve_insertion_order=false")
-        con.execute("SET memory_limit='6GB'")
+        con.execute("SET memory_limit='5GB'")
+        con.execute("SET threads=2")
+        con.execute(f"SET temp_directory='{tempfile.gettempdir()}/duckdb_dedup_spill'")
 
         dupes = iceberg.audit_duplicates(con, comments_rt)
         if not dupes:
