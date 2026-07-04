@@ -397,3 +397,42 @@ def test_seed_comments_tolerates_missing_columns(tmp_path, local_catalog) -> Non
         f"SELECT text_content FROM {iceberg._qualified(COMMENT)} WHERE comment_id = 'old1'"
     ).fetchone()[0]
     assert text_content is None
+
+
+def test_export_public_comments_rebuilds_mirror(tmp_path, local_catalog, monkeypatch) -> None:
+    """export_public_comments writes the public monolith + index straight from the
+    catalog, and that monolith feeds partition_comments to produce the per-agency
+    tree the UI reads."""
+    from spicy_regs.transforms import partition_comments
+
+    con = local_catalog
+    iceberg._ensure_table(con, COMMENT)
+
+    staging = tmp_path / "staging"
+    _write_comment_staging(staging, "EPA", [
+        _comment("c1", "EPA-1", "EPA", "2025-01-15T00:00:00Z"),
+        _comment("c2", "EPA-2", "EPA", "2025-02-03T00:00:00Z"),
+    ])
+    _write_comment_staging(staging, "OMB", [
+        _comment("c3", "OMB-1", "OMB", "2026-06-29T00:00:00Z"),
+    ])
+    iceberg._merge(con, iceberg._staging_files(staging, COMMENT), COMMENT)
+
+    # export_public_comments opens its own catalog connection; point it at the
+    # local in-memory one (it closes the connection when done — safe to double-close).
+    monkeypatch.setattr(iceberg, "_connect", lambda: con)
+
+    out = tmp_path / "output"
+    result = iceberg.export_public_comments(out, COMMENT)
+
+    assert result["comments"] == out / "comments.parquet"
+    assert result["index"] == out / "comments_index.parquet"
+    monolith = pl.read_parquet(result["comments"])
+    assert monolith.height == 3
+    assert set(monolith["agency_code"].to_list()) == {"EPA", "OMB"}
+
+    # The monolith drives the coarse per-agency tree the UI reads for scoped queries.
+    partition_dir = partition_comments(out)
+    omb_part = partition_dir / "agency_code=OMB" / "part-0.parquet"
+    assert omb_part.exists()
+    assert pl.read_parquet(omb_part).height == 1

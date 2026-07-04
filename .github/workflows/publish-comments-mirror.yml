@@ -1,0 +1,75 @@
+name: Publish comments mirror
+
+# Regenerates the PUBLIC comments Parquet surface from the Iceberg catalog so the
+# browser UI (which can't read the credentialed catalog) serves current comments.
+#
+# Once the ETL routes comments through Iceberg, rows land in the catalog and only
+# comments_index.parquet is republished — the flat comments.parquet monolith and
+# the per-agency comments/agency/agency_code=*/part-0.parquet tree the UI reads
+# stop being refreshed. This job rebuilds all of them from the catalog and uploads
+# them, restoring the dual model (catalog = system of record, public Parquet = the
+# anonymous read mirror).
+#
+# Runs daily after the ETL batches finish (last batch ~20:25 UTC), plus manual
+# dispatch. Read-only against the catalog; the only writes are the public mirror
+# files, and upload_file refuses to overwrite a much smaller remote object, so a
+# truncated export can't wipe the live data.
+#
+# Requires:
+#   R2_CATALOG_URI, R2_CATALOG_WAREHOUSE, R2_CATALOG_TOKEN   (read the catalog)
+#   R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT, R2_BUCKET_NAME  (write public Parquet)
+on:
+  schedule:
+    - cron: '30 21 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Build the mirror but do not publish to R2 (dry run)'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: publish-comments-mirror
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # Full-table export of tens of millions of rows from the catalog, plus the
+    # streaming per-agency partition pass. Give it ample headroom.
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Publish comments mirror from the catalog
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          R2_CATALOG_URI: ${{ secrets.R2_CATALOG_URI }}
+          R2_CATALOG_WAREHOUSE: ${{ secrets.R2_CATALOG_WAREHOUSE }}
+          R2_CATALOG_TOKEN: ${{ secrets.R2_CATALOG_TOKEN }}
+          R2_CATALOG_NAMESPACE: ${{ secrets.R2_CATALOG_NAMESPACE }}
+        run: |
+          ARGS=""
+          if [ "${{ inputs.skip_upload }}" = "true" ]; then
+            ARGS="$ARGS --skip-upload"
+          fi
+          echo "Running: uv run python scripts/publish_comments_mirror.py $ARGS"
+          uv run python scripts/publish_comments_mirror.py $ARGS
