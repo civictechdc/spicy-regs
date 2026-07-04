@@ -1,0 +1,66 @@
+name: Dedupe comments catalog (manual)
+
+# Audits and (optionally) removes duplicate rows from the Iceberg `comments`
+# catalog table. The one-time seed duplicated rows for agencies loaded more than
+# once (its per-agency DELETE didn't remove prior rows on the R2 Data Catalog);
+# the daily merge is unaffected. See scripts/dedupe_comments_catalog.py.
+#
+# Manual dispatch only — the apply path WRITES to the production catalog, so it
+# never runs on a schedule. It defaults to a read-only audit; flip `apply` on to
+# rebuild the table deduplicated. The rebuild uses CREATE OR REPLACE (atomic swap,
+# never DELETE), so a failed run can't corrupt or double the data.
+#
+# Recommended sequence: run once with apply=false (audit), review the report in
+# the logs, run again with apply=true, then run apply=false once more to confirm
+# it's clean. After a successful apply, run the "Publish comments mirror" workflow
+# so the public files the UI reads are refreshed from the cleaned catalog.
+#
+# Requires: R2_CATALOG_URI, R2_CATALOG_WAREHOUSE, R2_CATALOG_TOKEN (+ optional
+# R2_CATALOG_NAMESPACE) — read and write the catalog table.
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Rebuild the table deduplicated (off = read-only audit)'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: dedupe-comments-catalog
+  cancel-in-progress: false
+
+jobs:
+  dedupe:
+    runs-on: ubuntu-latest
+    # A full-table rebuild of tens of millions of rows; give it headroom.
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Audit / dedupe the catalog
+        env:
+          R2_CATALOG_URI: ${{ secrets.R2_CATALOG_URI }}
+          R2_CATALOG_WAREHOUSE: ${{ secrets.R2_CATALOG_WAREHOUSE }}
+          R2_CATALOG_TOKEN: ${{ secrets.R2_CATALOG_TOKEN }}
+          R2_CATALOG_NAMESPACE: ${{ secrets.R2_CATALOG_NAMESPACE }}
+        run: |
+          ARGS=""
+          if [ "${{ inputs.apply }}" = "true" ]; then
+            ARGS="$ARGS --apply"
+          fi
+          echo "Running: uv run python scripts/dedupe_comments_catalog.py $ARGS"
+          uv run python scripts/dedupe_comments_catalog.py $ARGS
