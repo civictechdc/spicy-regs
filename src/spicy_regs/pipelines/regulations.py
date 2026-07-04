@@ -45,6 +45,7 @@ from spicy_regs.transforms import (
     merge_comments_partitioned,
     merge_staging_files,
     update_comments_index,
+    write_staging,
 )
 
 load_dotenv()
@@ -70,6 +71,7 @@ class RegulationsPipeline(Pipeline):
         max_workers: int = 4,
         use_iceberg: bool = False,
         enrich_text: bool = True,
+        chunk_size: int = 0,
         verbose: bool = False,
     ) -> None:
         self.agency = agency
@@ -84,6 +86,7 @@ class RegulationsPipeline(Pipeline):
         self.max_workers = max_workers
         self.use_iceberg = use_iceberg
         self.enrich_text = enrich_text
+        self.chunk_size = chunk_size
         self.verbose = verbose
 
     def run(self) -> None:
@@ -93,6 +96,18 @@ class RegulationsPipeline(Pipeline):
 
         record_types = self._record_types()
         agencies = self._agencies()
+
+        # Chunked comments path: for an agency too large to buffer whole (millions
+        # of comments would OOM), ingest its comments in bounded key-chunks,
+        # committing each into the catalog. Only meaningful for the iceberg
+        # comments-only case (the catalog is a row-level upsert surface).
+        if self.chunk_size and self.only_comments and self.use_iceberg:
+            manifest = Manifest.empty() if self.full_refresh else Manifest.load(output_dir)
+            for agency in agencies:
+                self._ingest_comments_chunked(agency, output_dir, staging_dir, manifest)
+            rmtree(staging_dir, ignore_errors=True)
+            logger.info("Done!")
+            return
 
         # 1. Prime: load processed-key manifest + existing output for incremental work.
         if self.full_refresh:
@@ -160,6 +175,42 @@ class RegulationsPipeline(Pipeline):
                     r2.upload_file(index_file, remote_key="comments_index.parquet")
 
         logger.info("Done!")
+
+    def _ingest_comments_chunked(self, agency: str, output_dir: Path, staging_dir: Path, manifest: Manifest) -> None:
+        """Ingest one agency's comments in bounded key-chunks, committing each.
+
+        Downloads at most ``chunk_size`` comment files at a time, stages them,
+        MERGEs them into the catalog, then frees memory before the next chunk —
+        so a multi-million-comment agency (which would otherwise buffer every
+        record and OOM) ingests in even, durable pieces. Deleting the staging
+        chunk between iterations keeps peak memory ~one chunk.
+        """
+        comment_rt = RECORD_TYPES["comments"]
+        resource = mirrulations.s3_resource()
+        keys = mirrulations.list_agency_files_by_type(
+            resource,
+            mirrulations.BUCKET,
+            mirrulations.PREFIX,
+            agency,
+            [comment_rt],
+            processed_keys=manifest,
+            since_year=self.since_year,
+            verbose=self.verbose,
+        )["comments"]
+        transform = self._transform_for(comment_rt)
+        total = len(keys)
+        logger.info("[{}] comments: {} files, ingesting in chunks of {}", agency, total, self.chunk_size)
+
+        for start in range(0, total, self.chunk_size):
+            chunk = keys[start : start + self.chunk_size]
+            label = f"[{agency}] comments {start + len(chunk)}/{total}"
+            payloads = mirrulations.download_keys(resource, mirrulations.BUCKET, chunk, label=label)
+            records = list(transform.apply(payloads))
+            write_staging(agency, comment_rt.name, records, staging_dir, comment_rt.schema)
+            iceberg.merge_comments(staging_dir, output_dir, comment_rt)
+            rmtree(staging_dir / comment_rt.name, ignore_errors=True)
+            manifest.record(chunk)
+            logger.info("[{}] comments: committed {}/{}", agency, start + len(chunk), total)
 
     # -- regulations-specific wiring ---------------------------------------
 
@@ -308,6 +359,13 @@ def main(
         bool,
         Parameter(help="Fill comment text_content inline from Mirrulations derived-data extracted text"),
     ] = True,
+    chunk_size: Annotated[
+        int,
+        Parameter(
+            help="Ingest comments in bounded key-chunks of this size (0 = whole agency at once). "
+            "Use for agencies too large to buffer in memory; requires --only-comments --use-iceberg."
+        ),
+    ] = 0,
     verbose: Annotated[bool, Parameter(name=["--verbose", "-v"], help="Verbose logging")] = False,
 ) -> None:
     """Run the regulations.gov ETL pipeline."""
@@ -324,6 +382,7 @@ def main(
         max_workers=max_workers,
         use_iceberg=use_iceberg,
         enrich_text=enrich_text,
+        chunk_size=chunk_size,
         verbose=verbose,
     ).run()
 

@@ -221,6 +221,22 @@ def test_reader_factory_scans_each_agency_once() -> None:
     assert len(keys_by_type["comments"]) == 1
 
 
+def test_download_keys_yields_payloads() -> None:
+    """download_keys concurrently downloads a given key list and yields payloads.
+
+    This is the shared download engine used by both iter_records and the chunked
+    ingest path (which downloads one bounded key-chunk at a time).
+    """
+    from spicy_regs.sources.mirrulations import download_keys
+
+    store = _make_store()
+    keys = [_docket_key("EPA-2024-0001"), _docket_key("EPA-2025-0002")]
+    payloads = list(download_keys(_FakeS3Resource(store), BUCKET, keys, workers=4))
+
+    ids = sorted(p["data"]["id"] for p in payloads)
+    assert ids == ["EPA-2024-0001", "EPA-2025-0002"]
+
+
 def test_download_and_parse_closes_body_on_read_error() -> None:
     """A failed download must still close the response body.
 

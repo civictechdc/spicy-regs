@@ -21,6 +21,7 @@ from typing import Any
 import boto3
 from botocore import UNSIGNED
 from botocore.config import Config as BotoConfig
+from loguru import logger
 from tqdm import tqdm
 
 from spicy_regs.schemas import RecordType
@@ -36,6 +37,11 @@ PREFIX = "raw-data"
 # anonymous resource is shared across the pool: unsigned read-only GetObject has
 # no credential-refresh race, and botocore's connection pool is thread-safe.
 DEFAULT_DOWNLOAD_WORKERS = 16
+
+# Emit a download-progress line every this many files, so a large agency's
+# multi-hour download reports how far along it is (small agencies finish before
+# the first mark and just log their staged total).
+_PROGRESS_EVERY = 25_000
 
 
 def s3_resource(max_pool_connections: int = DEFAULT_DOWNLOAD_WORKERS) -> Any:
@@ -212,6 +218,43 @@ def _identity(payload: dict) -> dict:
     return payload
 
 
+def download_keys(
+    s3_resource: Any,
+    bucket_name: str,
+    keys: list[str],
+    workers: int = DEFAULT_DOWNLOAD_WORKERS,
+    *,
+    label: str = "",
+) -> Iterator[dict]:
+    """Concurrently download + parse the given keys, yielding raw payloads.
+
+    The shared download engine for both :class:`MirrulationsReader` (whole
+    agency) and the chunked ingest path (one bounded key-chunk at a time, so a
+    huge agency never buffers all its records at once). Order is not preserved —
+    dedup happens later by key. With ``label`` set, emits a progress line every
+    ``_PROGRESS_EVERY`` files.
+    """
+    total = len(keys)
+    n = max(1, min(workers, total)) if total else 1
+    if n <= 1:
+        for key in keys:
+            payload = download_and_parse(s3_resource, bucket_name, key, _identity)
+            if payload is not None:
+                yield payload
+        return
+
+    done = 0
+    with ThreadPoolExecutor(max_workers=n) as executor:
+        futures = [executor.submit(download_and_parse, s3_resource, bucket_name, key, _identity) for key in keys]
+        for future in as_completed(futures):
+            done += 1
+            if label and done % _PROGRESS_EVERY == 0:
+                logger.info("{}: downloaded {}/{}", label, done, total)
+            payload = future.result()
+            if payload is not None:
+                yield payload
+
+
 class MirrulationsReader(Reader):
     """Reads one agency's records of a single record type from Mirrulations S3.
 
@@ -267,25 +310,10 @@ class MirrulationsReader(Reader):
                 self.verbose,
                 self.since_year,
             )
-        # Fan the per-file GETs out across a thread pool — they are independent,
-        # I/O-bound round trips. Order is irrelevant (dedup happens later by key).
-        workers = max(1, min(self.download_workers, len(self.last_keys)))
-        if workers <= 1:
-            for key in self.last_keys:
-                payload = download_and_parse(self.s3_resource, self.bucket, key, _identity)
-                if payload is not None:
-                    yield payload
-            return
-
-        with ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = [
-                executor.submit(download_and_parse, self.s3_resource, self.bucket, key, _identity)
-                for key in self.last_keys
-            ]
-            for future in as_completed(futures):
-                payload = future.result()
-                if payload is not None:
-                    yield payload
+        # Fan the per-file GETs across a thread pool via the shared engine —
+        # independent, I/O-bound round trips; order is irrelevant (dedup by key).
+        label = f"[{self.agency}] {self.record_type.name}"
+        yield from download_keys(self.s3_resource, self.bucket, self.last_keys, self.download_workers, label=label)
 
 
 class _AgencyListingCache:
