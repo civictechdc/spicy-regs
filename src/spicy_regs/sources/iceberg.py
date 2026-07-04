@@ -337,6 +337,42 @@ def merge_comments(staging_dir: Path, output_dir: Path, record_type: RecordType)
         con.close()
 
 
+def export_public_comments(output_dir: Path, record_type: RecordType) -> dict[str, Path]:
+    """Rebuild the public comments read-mirror from the catalog.
+
+    The browser UI can't reach the credentialed catalog, so it reads comments as
+    public Parquet on R2. :func:`merge_comments` only republishes the tiny index,
+    so the public monolith + per-agency tree the UI reads otherwise go stale. This
+    regenerates that mirror from the catalog — the write-side system of record —
+    restoring the dual model for comments:
+
+    * ``comments.parquet``       — the flat monolith the UI full-scans
+    * ``comments_index.parquet`` — per-partition row counts
+
+    The caller derives the per-agency tree the UI reads for scoped queries
+    (``comments/agency/agency_code={X}/part-0.parquet``) from the monolith via
+    :func:`spicy_regs.transforms.partition_comments`. Returns the written paths
+    keyed ``"comments"`` and ``"index"``.
+    """
+    con = _connect()
+    try:
+        # Full-table export of tens of millions of rows. Cap memory and disable
+        # insertion-order preservation so the sort in _export_parquet spills to
+        # disk instead of OOM-ing the CI runner (temp_directory defaults to a
+        # writable dir here — this never runs on the read-only serverless host).
+        con.execute("SET preserve_insertion_order=false")
+        con.execute("SET memory_limit='6GB'")
+        _ensure_table(con, record_type)
+        total = con.execute(f"SELECT count(*) FROM {_qualified(record_type)}").fetchone()[0]
+        logger.info("iceberg: exporting {:,} catalog rows to the public comments mirror", total)
+        monolith = _export_parquet(con, record_type, output_dir)
+        index_file = _build_comments_index(con, record_type, output_dir)
+        logger.info("iceberg: wrote public monolith {} and index {}", monolith, index_file)
+        return {"comments": monolith, "index": index_file}
+    finally:
+        con.close()
+
+
 def merge_and_export(staging_dir: Path, output_dir: Path, record_type: RecordType) -> Path | None:
     """Upsert staged rows into the catalog table, then export the public Parquet.
 
