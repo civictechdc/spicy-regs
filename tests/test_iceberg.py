@@ -436,3 +436,48 @@ def test_export_public_comments_rebuilds_mirror(tmp_path, local_catalog, monkeyp
     omb_part = partition_dir / "agency_code=OMB" / "part-0.parquet"
     assert omb_part.exists()
     assert pl.read_parquet(omb_part).height == 1
+
+
+def test_audit_and_dedupe_table(tmp_path, local_catalog) -> None:
+    """audit_duplicates flags agencies with duplicate keys; dedupe_table collapses
+    the table to one row per comment_id, keeping the latest modify_date."""
+    con = local_catalog
+    iceberg._ensure_table(con, COMMENT)
+
+    base = tmp_path / "seed.parquet"
+    pl.DataFrame(
+        [
+            _comment("c1", "EPA-1", "EPA", "2025-01-01T00:00:00Z", modify_date="2025-01-01T00:00:00Z"),
+            _comment("c2", "EPA-1", "EPA", "2025-01-02T00:00:00Z", modify_date="2025-01-02T00:00:00Z"),
+            _comment("c3", "OMB-1", "OMB", "2025-02-01T00:00:00Z", modify_date="2025-02-01T00:00:00Z"),
+        ],
+        schema=COMMENT.schema,
+    ).write_parquet(base)
+
+    # seed_comments_from_parquet is a plain INSERT (no dedup) — loading twice
+    # duplicates every row, mimicking the historical seed-into-catalog bug.
+    iceberg.seed_comments_from_parquet(con, str(base), COMMENT)
+    iceberg.seed_comments_from_parquet(con, str(base), COMMENT)
+
+    # A newer version of c1 so dedupe must keep the latest modify_date, not just any copy.
+    newer = tmp_path / "newer.parquet"
+    pl.DataFrame(
+        [_comment("c1", "EPA-1", "EPA", "2025-03-09T00:00:00Z", modify_date="2025-03-09T00:00:00Z")],
+        schema=COMMENT.schema,
+    ).write_parquet(newer)
+    iceberg.seed_comments_from_parquet(con, str(newer), COMMENT)
+
+    # State: c1 x3 (two old + one newer), c2 x2, c3 x2 = 7 rows, 3 distinct ids.
+    audit = {a: (rows, distinct) for a, rows, distinct in iceberg.audit_duplicates(con, COMMENT)}
+    assert audit == {"EPA": (5, 2), "OMB": (2, 1)}
+
+    before, after = iceberg.dedupe_table(con, COMMENT)
+    assert before == 7
+    assert after == 3
+
+    # Clean afterward, and c1 kept its latest modify_date.
+    assert iceberg.audit_duplicates(con, COMMENT) == []
+    kept = con.execute(
+        f"SELECT modify_date FROM {iceberg._qualified(COMMENT)} WHERE comment_id = 'c1'"
+    ).fetchone()[0]
+    assert kept == "2025-03-09T00:00:00Z"

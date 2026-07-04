@@ -373,6 +373,68 @@ def export_public_comments(output_dir: Path, record_type: RecordType) -> dict[st
         con.close()
 
 
+def audit_duplicates(con, record_type: RecordType) -> list[tuple[str, int, int]]:
+    """Per-agency (agency_code, rows, distinct_keys) where rows exceed distinct keys.
+
+    A read-only duplication report over the catalog table: any agency whose row
+    count is above its distinct ``dedup_key`` count carries duplicate rows. Sorted
+    by the number of duplicate rows, worst first. Empty when the table is clean.
+    """
+    key = record_type.dedup_key
+    tbl = _qualified(record_type)
+    rows = con.execute(
+        f"""
+        SELECT agency_code,
+               count(*) AS rows,
+               count(DISTINCT "{key}") AS distinct_keys
+        FROM {tbl}
+        WHERE agency_code IS NOT NULL
+        GROUP BY agency_code
+        HAVING count(*) > count(DISTINCT "{key}")
+        ORDER BY count(*) - count(DISTINCT "{key}") DESC
+        """
+    ).fetchall()
+    return [(r[0], r[1], r[2]) for r in rows]
+
+
+def dedupe_table(con, record_type: RecordType) -> tuple[int, int]:
+    """Collapse the catalog table to one row per ``dedup_key`` (latest modify_date).
+
+    Rebuilds the table with ``CREATE OR REPLACE TABLE`` from a materialized temp
+    rather than ``DELETE`` + reinsert. This is deliberate: the historical
+    duplication came from loads whose ``DELETE`` did not remove prior rows on the
+    R2 Data Catalog, so a DELETE-based cleanup could double the problem instead of
+    fixing it. ``CREATE OR REPLACE`` is atomic — it either swaps in the clean
+    snapshot or fails without destroying the existing data — and never depends on
+    delete semantics. The temp is materialized first so the replace doesn't read
+    the table it is rewriting.
+
+    Returns ``(rows_before, rows_after)``; ``rows_after`` equals the number of
+    distinct keys when the rebuild succeeds.
+    """
+    key = record_type.dedup_key
+    tbl = _qualified(record_type)
+    col_list = ", ".join(f'"{c}"' for c in record_type.schema)
+    tmp = f"_dedup_{record_type.name}"
+
+    before = con.execute(f"SELECT count(*) FROM {tbl}").fetchone()[0]
+    con.execute(
+        f"""
+        CREATE OR REPLACE TEMP TABLE {tmp} AS
+        SELECT {col_list}
+        FROM {tbl}
+        QUALIFY ROW_NUMBER() OVER (
+            PARTITION BY "{key}"
+            ORDER BY modify_date DESC NULLS LAST
+        ) = 1;
+        """
+    )
+    con.execute(f"CREATE OR REPLACE TABLE {tbl} AS SELECT {col_list} FROM {tmp};")
+    con.execute(f"DROP TABLE IF EXISTS {tmp};")
+    after = con.execute(f"SELECT count(*) FROM {tbl}").fetchone()[0]
+    return before, after
+
+
 def merge_and_export(staging_dir: Path, output_dir: Path, record_type: RecordType) -> Path | None:
     """Upsert staged rows into the catalog table, then export the public Parquet.
 
