@@ -145,21 +145,47 @@ def test_run_dedups_on_merge_keeping_latest_modify_date(tmp_output: Path, monkey
     }
     monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
 
-    RegulationsPipeline(
-        agency=AGENCY, output_dir=tmp_output, skip_comments=True, skip_upload=True
-    ).run()
+    RegulationsPipeline(agency=AGENCY, output_dir=tmp_output, skip_comments=True, skip_upload=True).run()
 
     df = pl.read_parquet(tmp_output / "dockets.parquet")
     assert df.height == 1
     assert df["modify_date"].to_list() == ["2024-09-09"]
 
 
+def test_chunked_comments_commit_per_chunk(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """With chunk_size set, comments ingest in bounded key-chunks and the catalog
+    MERGE runs once per chunk (so a huge agency commits in pieces, never buffering
+    everything in memory)."""
+    monkeypatch.delenv("R2_PUBLIC_URL", raising=False)
+    # 5 comment files, chunk_size 2 -> chunks [2,2,1] -> 3 merges.
+    store = {
+        _comment_key(f"c{i}", "EPA-2026-0001"): dumps(
+            _comment_payload(f"c{i}", "EPA-2026-0001", "2026-01-01T00:00:00Z")
+        ).encode()
+        for i in range(5)
+    }
+    monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
+
+    merge_calls: list = []
+    monkeypatch.setattr(regulations.iceberg, "merge_comments", lambda sd, od, rt: merge_calls.append(1))
+
+    RegulationsPipeline(
+        agency=AGENCY,
+        output_dir=tmp_output,
+        only_comments=True,
+        use_iceberg=True,
+        enrich_text=False,
+        chunk_size=2,
+        skip_upload=True,
+    ).run()
+
+    assert len(merge_calls) == 3  # ceil(5 / 2)
+
+
 def test_run_with_no_records_is_noop(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource({}))
 
-    RegulationsPipeline(
-        agency=AGENCY, output_dir=tmp_output, skip_comments=True, skip_upload=True
-    ).run()
+    RegulationsPipeline(agency=AGENCY, output_dir=tmp_output, skip_comments=True, skip_upload=True).run()
 
     assert not (tmp_output / "dockets.parquet").exists()
 
