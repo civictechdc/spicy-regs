@@ -113,11 +113,24 @@ def partition_comments(output_dir: Path) -> Path:
             con.execute("SET preserve_insertion_order=false")
             con.execute("SET threads=2")
             con.execute(f"SET temp_directory='{spill_dir}'")
+            # ROW_GROUP_SIZE is small on purpose. These per-agency files are the
+            # browser UI's read surface for *scoped* queries — it reads one
+            # docket's comments at a time (WHERE docket_id = ?) over HTTP range
+            # requests. Since rows are sorted by docket_id, a docket lands in a
+            # contiguous span of row groups, and the row group is the granularity
+            # at which DuckDB(-WASM) fetches column chunks. A large row group
+            # (e.g. 500k) forced a per-docket read to pull the whole group's
+            # comment/text_content chunks — seconds over the network even for a
+            # handful of matching rows. 20k rows/group prunes far tighter (a
+            # small docket reads ~one group) at negligible file-size cost
+            # (measured <1% larger, since zstd + the column data dominate). Full
+            # scans (the monolith comments.parquet) are unaffected — that file is
+            # exported separately.
             con.execute(f"""
             COPY (
                 SELECT {select_cols} FROM read_parquet('{part_path}', hive_partitioning=false)
                 ORDER BY docket_id, posted_date
-            ) TO '{tmp_path}' (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 500000);
+            ) TO '{tmp_path}' (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 20000);
             """)
         finally:
             con.close()
