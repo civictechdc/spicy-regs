@@ -400,8 +400,8 @@ def audit_duplicates(con, record_type: RecordType) -> list[tuple[str, int, int]]
 def dedupe_table(con, record_type: RecordType) -> tuple[int, int]:
     """Collapse the catalog table to one row per ``dedup_key`` (latest modify_date).
 
-    Builds a fresh sibling table by writing the deduped rows **one agency at a
-    time**, then swaps it in by ``RENAME``. Two constraints drive this shape:
+    Builds a fresh deduped sibling table one agency at a time, then replaces the
+    live table with it. Three constraints drive the shape:
 
     * Never ``DELETE``. The historical duplication came from loads whose ``DELETE``
       didn't remove prior rows on the R2 Data Catalog, so a delete-based cleanup
@@ -413,10 +413,14 @@ def dedupe_table(con, record_type: RecordType) -> tuple[int, int]:
       ever write per-agency slices, which fit — so this does the same. Duplicates
       only ever occur within one agency (a ``comment_id`` belongs to one agency),
       so per-agency dedup equals a global one here.
-
-    The swap is ordered so that if the catalog doesn't support ``ALTER TABLE
-    RENAME`` the very first rename fails with the live table still in place (the
-    fresh table is only a harmless sibling at that point).
+    * Never ``ALTER TABLE RENAME``. DuckDB's Iceberg REST integration does not
+      implement it (``NotImplementedException: Alter Schema Entry``), so the swap
+      replaces the live table by ``DROP`` + ``CREATE`` + per-agency ``INSERT``
+      from the sibling — all operations this catalog supports. The sibling is the
+      durable copy: it is dropped only after the rebuilt table's row count is
+      verified, so an interruption mid-swap loses nothing. A re-run detects the
+      live table missing (but the sibling present) and resumes from the sibling
+      instead of rebuilding it from a table that no longer exists.
 
     Returns ``(rows_before, rows_after)``; ``rows_after`` equals the number of
     distinct keys when the rebuild succeeds.
@@ -425,13 +429,49 @@ def dedupe_table(con, record_type: RecordType) -> tuple[int, int]:
     name = record_type.name
     tbl = _qualified(record_type)
     dedup_tbl = f'{_schema_ref()}."{name}_dedup"'
-    stale_tbl = f'{_schema_ref()}."{name}_stale"'
     col_defs = ", ".join(f'"{c}" VARCHAR' for c in record_type.schema)
     col_list = ", ".join(f'"{c}"' for c in record_type.schema)
 
+    def _exists(ident: str) -> bool:
+        try:
+            con.execute(f"SELECT 1 FROM {ident} LIMIT 1")
+            return True
+        except Exception:
+            return False
+
+    def _replace_live_from_sibling() -> int:
+        # Swap without RENAME: rebuild the live table from the deduped sibling
+        # using DROP/CREATE/INSERT (per-agency, so no whole-table statement). The
+        # sibling still holds every row throughout, so this is safe to re-run if
+        # interrupted; it is dropped only once the rebuilt row count matches.
+        expected = con.execute(f"SELECT count(*) FROM {dedup_tbl}").fetchone()[0]
+        sibling_agencies = [r[0] for r in con.execute(f"SELECT DISTINCT agency_code FROM {dedup_tbl}").fetchall()]
+        con.execute(f"DROP TABLE IF EXISTS {tbl};")
+        con.execute(f"CREATE TABLE {tbl} ({col_defs});")
+        for agency in sibling_agencies:
+            where = "agency_code IS NULL" if agency is None else f"agency_code = '{_sql_str(agency)}'"
+            con.execute(f"INSERT INTO {tbl} ({col_list}) SELECT {col_list} FROM {dedup_tbl} WHERE {where};")
+        rebuilt = con.execute(f"SELECT count(*) FROM {tbl}").fetchone()[0]
+        if rebuilt != expected:
+            raise RuntimeError(
+                f"dedupe rebuild mismatch: {tbl} has {rebuilt:,} rows, expected {expected:,}; "
+                f"{dedup_tbl} left in place as the safe copy — re-run to retry the swap"
+            )
+        con.execute(f"DROP TABLE IF EXISTS {dedup_tbl};")
+        return rebuilt
+
+    # Resume an interrupted swap: the live table is gone but the deduped sibling
+    # is intact. Rebuild from the sibling rather than rebuilding the sibling from
+    # a missing table (which would destroy the only good copy).
+    if not _exists(tbl) and _exists(dedup_tbl):
+        logger.warning("iceberg: {} missing but {} present — resuming interrupted dedupe swap", tbl, dedup_tbl)
+        after = _replace_live_from_sibling()
+        return after, after
+
     before = con.execute(f"SELECT count(*) FROM {tbl}").fetchone()[0]
 
-    # Fresh sibling table (clear any stray from a prior aborted run).
+    # Build the deduped sibling fresh (discarding any partial one from an aborted
+    # run), one agency at a time.
     con.execute(f"DROP TABLE IF EXISTS {dedup_tbl};")
     con.execute(f"CREATE TABLE {dedup_tbl} ({col_defs});")
 
@@ -454,12 +494,9 @@ def dedupe_table(con, record_type: RecordType) -> tuple[int, int]:
 
     after = con.execute(f"SELECT count(*) FROM {dedup_tbl}").fetchone()[0]
 
-    # Swap by rename (metadata only — no bulk rewrite). Renaming the live table
-    # first means an unsupported RENAME fails here, before anything destructive.
-    con.execute(f"DROP TABLE IF EXISTS {stale_tbl};")
-    con.execute(f'ALTER TABLE {tbl} RENAME TO "{name}_stale";')
-    con.execute(f'ALTER TABLE {dedup_tbl} RENAME TO "{name}";')
-    con.execute(f"DROP TABLE IF EXISTS {stale_tbl};")
+    # Replace the live table with the deduped sibling (no RENAME — see docstring).
+    logger.info("iceberg: swapping deduped {} into place ({:,} -> {:,} rows)", name, before, after)
+    _replace_live_from_sibling()
     return before, after
 
 

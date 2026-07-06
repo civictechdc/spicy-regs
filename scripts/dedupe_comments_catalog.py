@@ -11,11 +11,14 @@ Default mode is a **read-only audit**: it reports every agency whose row count
 exceeds its distinct ``comment_id`` count, plus totals. Nothing is written.
 
 ``--apply`` rebuilds the table deduplicated (one row per ``comment_id``, latest
-``modify_date``): it writes a fresh sibling table **one agency at a time** and
-swaps it in by ``RENAME``. It never uses ``DELETE`` (the operation that left the
-duplicates) and never rewrites the whole table in one statement (which OOMs the
-runner on both the read and Iceberg-write sides) — only bounded per-agency
-writes, then a metadata-only rename. After a successful apply, re-run the mirror
+``modify_date``): it writes a fresh sibling table **one agency at a time**, then
+replaces the live table with it via ``DROP`` + per-agency ``INSERT`` (DuckDB's
+Iceberg REST integration does not support ``ALTER TABLE RENAME``). It never uses
+``DELETE`` (the operation that left the duplicates) and never rewrites the whole
+table in one statement (which OOMs the runner on both the read and Iceberg-write
+sides) — only bounded per-agency writes. The sibling is kept until the rebuilt
+table's row count is verified, so an interrupted swap loses nothing and re-running
+resumes it. After a successful apply, re-run the mirror
 (``publish_comments_mirror.py``) so the public files the UI reads are refreshed.
 
 Safe rollout: run with no flags first (audit), eyeball the report, then ``--apply``,
@@ -33,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import tempfile
+from os import getenv
 
 from loguru import logger
 
@@ -56,11 +60,17 @@ def main() -> int:
     comments_rt = RECORD_TYPES["comments"]
     con = iceberg._connect()
     try:
-        # Keep peak memory bounded on the CI runner: fewer threads, a firm memory
-        # cap, and on-disk spill for the per-agency dedup windows.
+        # Keep peak memory bounded: fewer threads, a firm memory cap, and on-disk
+        # spill for the per-agency dedup windows. The defaults suit the CI runner;
+        # override via DEDUP_MEMORY_LIMIT / DEDUP_THREADS on a bigger host (a large
+        # agency's window sort buffers whole rows, comment text included, so 5GB is
+        # tight for the worst agency).
+        mem_limit = getenv("DEDUP_MEMORY_LIMIT", "5GB")
+        threads = getenv("DEDUP_THREADS", "2")
+        logger.info("duckdb dedup limits: memory_limit={} threads={}", mem_limit, threads)
         con.execute("SET preserve_insertion_order=false")
-        con.execute("SET memory_limit='5GB'")
-        con.execute("SET threads=2")
+        con.execute(f"SET memory_limit='{mem_limit}'")
+        con.execute(f"SET threads={threads}")
         con.execute(f"SET temp_directory='{tempfile.gettempdir()}/duckdb_dedup_spill'")
 
         dupes = iceberg.audit_duplicates(con, comments_rt)

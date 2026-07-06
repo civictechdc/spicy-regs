@@ -481,3 +481,42 @@ def test_audit_and_dedupe_table(tmp_path, local_catalog) -> None:
         f"SELECT modify_date FROM {iceberg._qualified(COMMENT)} WHERE comment_id = 'c1'"
     ).fetchone()[0]
     assert kept == "2025-03-09T00:00:00Z"
+
+
+def test_dedupe_table_resumes_interrupted_swap(tmp_path, local_catalog) -> None:
+    """If a prior run built the deduped sibling but died before the swap finished
+    (live table dropped), dedupe_table rebuilds the live table from the sibling
+    instead of rebuilding the sibling from a table that no longer exists."""
+    con = local_catalog
+    iceberg._ensure_table(con, COMMENT)
+
+    base = tmp_path / "seed.parquet"
+    pl.DataFrame(
+        [
+            _comment("c1", "EPA-1", "EPA", "2025-01-01T00:00:00Z", modify_date="2025-01-01T00:00:00Z"),
+            _comment("c2", "EPA-1", "EPA", "2025-01-02T00:00:00Z", modify_date="2025-01-02T00:00:00Z"),
+            _comment("c3", "OMB-1", "OMB", "2025-02-01T00:00:00Z", modify_date="2025-02-01T00:00:00Z"),
+        ],
+        schema=COMMENT.schema,
+    ).write_parquet(base)
+    iceberg.seed_comments_from_parquet(con, str(base), COMMENT)
+
+    # Simulate the interrupted-swap state: a complete deduped sibling exists but
+    # the live table has already been dropped (as happens after DROP + before the
+    # per-agency INSERTs finish).
+    tbl = iceberg._qualified(COMMENT)
+    dedup_tbl = f'{iceberg._schema_ref()}."comments_dedup"'
+    col_defs = ", ".join(f'"{c}" VARCHAR' for c in COMMENT.schema)
+    col_list = ", ".join(f'"{c}"' for c in COMMENT.schema)
+    con.execute(f"CREATE TABLE {dedup_tbl} ({col_defs});")
+    con.execute(f"INSERT INTO {dedup_tbl} ({col_list}) SELECT {col_list} FROM {tbl};")
+    con.execute(f"DROP TABLE {tbl};")
+
+    before, after = iceberg.dedupe_table(con, COMMENT)
+    assert (before, after) == (3, 3)
+
+    # Live table restored, clean, and the sibling consumed.
+    assert iceberg.audit_duplicates(con, COMMENT) == []
+    assert con.execute(f"SELECT count(*) FROM {tbl}").fetchone()[0] == 3
+    with pytest.raises(duckdb.Error):
+        con.execute(f"SELECT 1 FROM {dedup_tbl} LIMIT 1")
