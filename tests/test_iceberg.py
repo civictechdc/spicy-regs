@@ -483,6 +483,72 @@ def test_audit_and_dedupe_table(tmp_path, local_catalog) -> None:
     assert kept == "2025-03-09T00:00:00Z"
 
 
+def test_upsert_comment_text_fills_in_place(tmp_path, local_catalog) -> None:
+    """upsert_comment_text sets text_content + text_extraction_status for the
+    matched rows, preserves other columns, never duplicates rows, and COALESCE
+    keeps the existing text when _new_text is NULL."""
+    con = local_catalog
+    iceberg._ensure_table(con, COMMENT)
+
+    base = tmp_path / "seed.parquet"
+    rows = [
+        _comment("c1", "EPA-1", "EPA", "2025-01-01T00:00:00Z"),
+        _comment("c2", "EPA-1", "EPA", "2025-01-02T00:00:00Z"),
+        # c3 already has text; a NULL _new_text must not clobber it (COALESCE).
+        _comment("c3", "EPA-1", "EPA", "2025-01-03T00:00:00Z"),
+        # A different agency's row must be untouched.
+        _comment("d1", "DOL-1", "DOL", "2025-02-01T00:00:00Z"),
+    ]
+    rows[2]["text_content"] = "existing text"
+    rows[2]["text_extraction_status"] = "ok"
+    pl.DataFrame(rows, schema=COMMENT.schema).write_parquet(base)
+    iceberg.seed_comments_from_parquet(con, str(base), COMMENT)
+
+    updates = pl.DataFrame(
+        {
+            "comment_id": ["c1", "c2", "c3"],
+            "_new_text": ["filled one", "filled two", None],
+            "_new_status": ["ok", "ok", None],
+        },
+        schema={"comment_id": pl.Utf8, "_new_text": pl.Utf8, "_new_status": pl.Utf8},
+    )
+    iceberg.upsert_comment_text(con, COMMENT, "EPA", updates)
+
+    tbl = iceberg._qualified(COMMENT)
+    # No row duplication (4 rows in, 4 rows out).
+    assert con.execute(f"SELECT count(*) FROM {tbl}").fetchone()[0] == 4
+
+    got = dict(con.execute(f"SELECT comment_id, text_content FROM {tbl} ORDER BY comment_id").fetchall())
+    assert got == {
+        "c1": "filled one",
+        "c2": "filled two",
+        "c3": "existing text",  # COALESCE kept the existing text (NULL _new_text)
+        "d1": None,  # other agency untouched
+    }
+
+    statuses = dict(con.execute(f"SELECT comment_id, text_extraction_status FROM {tbl} ORDER BY comment_id").fetchall())
+    assert statuses == {"c1": "ok", "c2": "ok", "c3": "ok", "d1": None}
+
+    # Other columns preserved (posted_date on a filled row).
+    posted = con.execute(f"SELECT posted_date FROM {tbl} WHERE comment_id = 'c1'").fetchone()[0]
+    assert posted == "2025-01-01T00:00:00Z"
+
+
+def test_upsert_comment_text_noop_on_empty(tmp_path, local_catalog) -> None:
+    """An empty updates frame leaves the table untouched (and creates no temp tables)."""
+    con = local_catalog
+    iceberg._ensure_table(con, COMMENT)
+    base = tmp_path / "seed.parquet"
+    pl.DataFrame([_comment("c1", "EPA-1", "EPA", "2025-01-01T00:00:00Z")], schema=COMMENT.schema).write_parquet(base)
+    iceberg.seed_comments_from_parquet(con, str(base), COMMENT)
+
+    empty = pl.DataFrame(schema={"comment_id": pl.Utf8, "_new_text": pl.Utf8, "_new_status": pl.Utf8})
+    iceberg.upsert_comment_text(con, COMMENT, "EPA", empty)
+
+    tbl = iceberg._qualified(COMMENT)
+    assert con.execute(f"SELECT count(*) FROM {tbl}").fetchone()[0] == 1
+
+
 def test_dedupe_table_resumes_interrupted_swap(tmp_path, local_catalog) -> None:
     """If a prior run built the deduped sibling but died before the swap finished
     (live table dropped), dedupe_table rebuilds the live table from the sibling

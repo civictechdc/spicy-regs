@@ -336,46 +336,13 @@ def _backfill_agency_in_catalog(
     if updates.is_empty():
         return stats
 
-    cols = list(record_type.schema)
-    col_list = ", ".join(f'"{c}"' for c in cols)
-
-    # Build the replacement rows as a SELF-CONTAINED temp table, then swap them
-    # in — mirroring the proven upsert in iceberg._merge, whose INSERT reads from
-    # a plain temp table and never projects over the live catalog table.
-    #
-    # The earlier version projected the overrides straight off `{tbl} t JOIN
-    # updates` in the INSERT's SELECT; on the R2 Data Catalog that did NOT persist
-    # text_extraction_status (text_content landed, status came back NULL — see the
-    # NARA smoke run), so incremental re-runs kept re-selecting already-filled
-    # rows. Snapshotting the affected rows into an independent temp table and
-    # overriding the two columns in place removes the live-table reference from
-    # the write path and fixes it. (Plain DuckDB doesn't reproduce the catalog
-    # behavior, so this is validated by a scoped catalog run, not the unit test.)
-    con.register("_bf_updates_src", updates.to_arrow())
-    try:
-        con.execute("CREATE OR REPLACE TEMP TABLE _bf_updates AS SELECT * FROM _bf_updates_src;")
-    finally:
-        con.unregister("_bf_updates_src")
-    con.execute(
-        f"""
-        CREATE OR REPLACE TEMP TABLE _bf_replacement AS
-        SELECT {col_list} FROM {tbl}
-        WHERE agency_code = '{ag}' AND comment_id IN (SELECT comment_id FROM _bf_updates);
-        """
-    )
-    con.execute(
-        """
-        UPDATE _bf_replacement AS r
-        SET text_content = u._new_text,
-            text_extraction_status = u._new_status
-        FROM _bf_updates u
-        WHERE r.comment_id = u.comment_id;
-        """
-    )
-    con.execute(f"DELETE FROM {tbl} WHERE agency_code = '{ag}' AND comment_id IN (SELECT comment_id FROM _bf_replacement);")
-    con.execute(f"INSERT INTO {tbl} ({col_list}) SELECT {col_list} FROM _bf_replacement;")
-    con.execute("DROP TABLE IF EXISTS _bf_updates;")
-    con.execute("DROP TABLE IF EXISTS _bf_replacement;")
+    # Durable per-agency upsert into the catalog. The shared helper builds the
+    # replacement rows in a self-contained temp table before the INSERT — a rule
+    # that matters on the R2 Data Catalog (see iceberg.upsert_comment_text / PR
+    # #117). The derived-text `updates` frame only ever carries non-null
+    # _new_text / _new_status (rows are appended only when text was found), so the
+    # helper's COALESCE is equivalent to a direct assignment here.
+    iceberg.upsert_comment_text(con, record_type, agency, updates)
 
     logger.info("catalog[{}]: upserted {} filled row(s) ({} missing)", agency, stats["ok"], stats["missing"])
     return stats
