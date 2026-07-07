@@ -32,6 +32,7 @@ from pathlib import Path
 import polars as pl
 from loguru import logger
 
+from spicy_regs.schemas import RecordType
 from spicy_regs.sources.pdf import fetch_pdf_bytes
 from spicy_regs.transforms.pdf_text import (
     PAGE_SEPARATOR,
@@ -127,6 +128,80 @@ def _extract_combined_text(urls: list[str], fetch: FetchFn, extract: ExtractFn) 
     return None, PdfTextStatus.EMPTY.value
 
 
+def _pdf_text_updates(
+    df: pl.DataFrame,
+    *,
+    id_col: str,
+    url_cols: list[str],
+    urls_fn: UrlsFn,
+    fetch: FetchFn,
+    extract: ExtractFn,
+    limit: int | None,
+    max_workers: int,
+    overwrite: bool,
+) -> tuple[pl.DataFrame, dict[str, int]]:
+    """Fetch + extract PDF text for a frame's candidate rows.
+
+    Returns ``(updates, stats)`` where ``updates`` is an
+    ``(id_col, _new_text, _new_status)`` frame of every row processed (including
+    empty/encrypted/error, so a re-run skips them). Shared core of both write
+    paths: :func:`_enrich_with_pdf_text` joins it onto the whole frame; the
+    catalog path upserts exactly these rows. Requires ``text_extraction_status``
+    to be present on ``df`` (the caller ensures it or SELECTs it).
+    """
+    candidates = df.select(id_col, *url_cols, "text_extraction_status").unique(subset=id_col, keep="first")
+
+    work: list[tuple[str, list[str]]] = []
+    for row in candidates.iter_rows(named=True):
+        row_id = row[id_col]
+        if row_id is None:
+            continue
+        if not overwrite and row["text_extraction_status"] is not None:
+            continue
+        urls = urls_fn(row)
+        if urls:
+            work.append((row_id, urls))
+
+    if limit is not None:
+        work = work[:limit]
+
+    stats = {"selected": len(work), "ok": 0, "empty": 0, "encrypted": 0, "error": 0}
+    empty = pl.DataFrame(schema={id_col: pl.Utf8, "_new_text": pl.Utf8, "_new_status": pl.Utf8})
+    if not work:
+        logger.info("No PDF attachments to enrich")
+        return empty, stats
+
+    logger.info("Enriching {} rows with PDF text ({} workers)...", len(work), max_workers)
+
+    def _process(item: tuple[str, list[str]]) -> tuple[str, str | None, str]:
+        row_id, urls = item
+        text, status = _extract_combined_text(urls, fetch, extract)
+        return row_id, text, status
+
+    ids: list[str] = []
+    texts: list[str | None] = []
+    statuses: list[str] = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        for row_id, text, status in executor.map(_process, work):
+            ids.append(row_id)
+            texts.append(text)
+            statuses.append(status)
+            stats[status] = stats.get(status, 0) + 1
+
+    updates = pl.DataFrame(
+        {id_col: ids, "_new_text": texts, "_new_status": statuses},
+        schema={id_col: pl.Utf8, "_new_text": pl.Utf8, "_new_status": pl.Utf8},
+    )
+    logger.info(
+        "PDF enrichment: {} ok, {} empty, {} encrypted, {} error",
+        stats["ok"],
+        stats["empty"],
+        stats["encrypted"],
+        stats["error"],
+    )
+    return updates, stats
+
+
 def _enrich_with_pdf_text(
     df: pl.DataFrame,
     *,
@@ -150,48 +225,19 @@ def _enrich_with_pdf_text(
         if col not in df.columns:
             df = df.with_columns(pl.lit(None, dtype=pl.Utf8).alias(col))
 
-    candidates = df.select(id_col, *url_cols, "text_extraction_status").unique(subset=id_col, keep="first")
-
-    work: list[tuple[str, list[str]]] = []
-    for row in candidates.iter_rows(named=True):
-        row_id = row[id_col]
-        if row_id is None:
-            continue
-        if not overwrite and row["text_extraction_status"] is not None:
-            continue
-        urls = urls_fn(row)
-        if urls:
-            work.append((row_id, urls))
-
-    if limit is not None:
-        work = work[:limit]
-
-    stats = {"selected": len(work), "ok": 0, "empty": 0, "encrypted": 0, "error": 0}
-    if not work:
-        logger.info("No PDF attachments to enrich")
-        return df, stats
-
-    logger.info("Enriching {} rows with PDF text ({} workers)...", len(work), max_workers)
-
-    def _process(item: tuple[str, list[str]]) -> tuple[str, str | None, str]:
-        row_id, urls = item
-        text, status = _extract_combined_text(urls, fetch, extract)
-        return row_id, text, status
-
-    ids: list[str] = []
-    texts: list[str | None] = []
-    statuses: list[str] = []
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        for row_id, text, status in executor.map(_process, work):
-            ids.append(row_id)
-            texts.append(text)
-            statuses.append(status)
-            stats[status] = stats.get(status, 0) + 1
-
-    updates = pl.DataFrame(
-        {id_col: ids, "_new_text": texts, "_new_status": statuses},
-        schema={id_col: pl.Utf8, "_new_text": pl.Utf8, "_new_status": pl.Utf8},
+    updates, stats = _pdf_text_updates(
+        df,
+        id_col=id_col,
+        url_cols=url_cols,
+        urls_fn=urls_fn,
+        fetch=fetch,
+        extract=extract,
+        limit=limit,
+        max_workers=max_workers,
+        overwrite=overwrite,
     )
+    if updates.is_empty():
+        return df, stats
 
     enriched = (
         df.join(updates, on=id_col, how="left")
@@ -200,14 +246,6 @@ def _enrich_with_pdf_text(
             text_extraction_status=pl.coalesce(["_new_status", "text_extraction_status"]),
         )
         .drop("_new_text", "_new_status")
-    )
-
-    logger.info(
-        "PDF enrichment: {} ok, {} empty, {} encrypted, {} error",
-        stats["ok"],
-        stats["empty"],
-        stats["encrypted"],
-        stats["error"],
     )
     return enriched, stats
 
@@ -337,6 +375,156 @@ def enrich_comment_partitions(
     return totals
 
 
+def _enrich_comment_agency_in_catalog(
+    con,
+    record_type: RecordType,
+    agency: str,
+    *,
+    fetch: FetchFn = fetch_pdf_bytes,
+    extract: ExtractFn = extract_pdf_text,
+    limit: int | None = None,
+    max_workers: int = 8,
+    overwrite: bool = False,
+) -> dict[str, int]:
+    """PDF-enrich one agency's comment attachments directly in the catalog.
+
+    The catalog counterpart of :func:`enrich_comment_partitions`: selects the
+    agency's attachment-bearing comments with no ``text_extraction_status``,
+    extracts their PDF text, and upserts the results with the per-agency
+    DELETE+INSERT idiom of ``iceberg._merge`` (mirrors the durable derived-text
+    backfill). Writing the catalog — the system of record — is what makes the
+    fill survive the daily ``publish-comments-mirror`` regeneration. ``con`` is
+    injected so this is testable against a local ``reg_catalog``-aliased DuckDB.
+    """
+    from spicy_regs.sources import iceberg
+
+    tbl = iceberg._qualified(record_type)
+    ag = iceberg._sql_str(agency)
+    status_filter = "" if overwrite else "AND (text_extraction_status IS NULL OR text_extraction_status = '')"
+    limit_sql = f" LIMIT {int(limit)}" if limit is not None else ""
+    candidates = con.execute(
+        f"""
+        SELECT comment_id, docket_id, agency_code, attachments_json, text_extraction_status
+        FROM {tbl}
+        WHERE agency_code = '{ag}'
+          AND attachments_json IS NOT NULL AND TRIM(attachments_json) NOT IN ('', '[]')
+          {status_filter}
+        {limit_sql}
+        """
+    ).pl()
+    empty_stats = {"selected": 0, "ok": 0, "empty": 0, "encrypted": 0, "error": 0}
+    if candidates.is_empty():
+        return empty_stats
+
+    updates, stats = _pdf_text_updates(
+        candidates,
+        id_col="comment_id",
+        url_cols=["attachments_json"],
+        urls_fn=lambda row: pdf_urls_for_comment(_opt_str(row["attachments_json"])),
+        fetch=fetch,
+        extract=extract,
+        limit=limit,
+        max_workers=max_workers,
+        overwrite=overwrite,
+    )
+    if updates.is_empty():
+        return stats
+
+    cols = list(record_type.schema)
+    other_sel = ", ".join(f't."{c}"' for c in cols if c not in ("text_content", "text_extraction_status"))
+    col_list = ", ".join(f'"{c}"' for c in cols)
+
+    # COALESCE so a non-ok result (text=None) records its status without nulling
+    # any pre-existing text_content. Then replace exactly these keys, per agency.
+    con.register("_pdf_updates_src", updates.to_arrow())
+    try:
+        con.execute("CREATE OR REPLACE TEMP TABLE _pdf_updates AS SELECT * FROM _pdf_updates_src;")
+    finally:
+        con.unregister("_pdf_updates_src")
+    con.execute(
+        f"""
+        CREATE OR REPLACE TEMP TABLE _pdf_winners AS
+        SELECT {other_sel},
+               COALESCE(u._new_text, t.text_content) AS text_content,
+               COALESCE(u._new_status, t.text_extraction_status) AS text_extraction_status
+        FROM {tbl} t JOIN _pdf_updates u ON t.comment_id = u.comment_id
+        WHERE t.agency_code = '{ag}';
+        """
+    )
+    con.execute(f"DELETE FROM {tbl} WHERE agency_code = '{ag}' AND comment_id IN (SELECT comment_id FROM _pdf_winners);")
+    con.execute(f"INSERT INTO {tbl} ({col_list}) SELECT {col_list} FROM _pdf_winners;")
+    con.execute("DROP TABLE IF EXISTS _pdf_updates;")
+    con.execute("DROP TABLE IF EXISTS _pdf_winners;")
+
+    logger.info(
+        "catalog[{}]: PDF-enriched {} row(s) (ok={}, empty={}, encrypted={}, error={})",
+        agency, stats["selected"], stats["ok"], stats["empty"], stats["encrypted"], stats["error"],
+    )
+    return stats
+
+
+def enrich_comments_catalog(
+    record_type: RecordType,
+    *,
+    agencies: list[str] | None = None,
+    fetch: FetchFn = fetch_pdf_bytes,
+    extract: ExtractFn = extract_pdf_text,
+    limit: int | None = None,
+    max_workers: int = 8,
+    overwrite: bool = False,
+) -> dict[str, int]:
+    """PDF-enrich comment attachments directly in the R2 Data Catalog (durable path).
+
+    Iterates agencies (all in the table, or the given subset) and upserts each
+    one's extracted text via :func:`_enrich_comment_agency_in_catalog`, honoring a
+    global ``limit`` budget. Writing the catalog means the fill survives the daily
+    ``publish-comments-mirror`` regeneration (a mirror-only enrich does not). Run
+    ``publish-comments-mirror`` afterward to surface it. Returns aggregate stats.
+    """
+    from spicy_regs.sources import iceberg
+
+    con = iceberg._connect()
+    try:
+        iceberg._ensure_table(con, record_type)
+        tbl = iceberg._qualified(record_type)
+        if agencies:
+            agency_list = [a.strip().upper() for a in agencies if a.strip()]
+        else:
+            agency_list = [
+                r[0]
+                for r in con.execute(
+                    f"SELECT DISTINCT agency_code FROM {tbl} WHERE agency_code IS NOT NULL ORDER BY 1"
+                ).fetchall()
+            ]
+
+        totals = {"selected": 0, "ok": 0, "empty": 0, "encrypted": 0, "error": 0}
+        remaining = limit
+        for agency in agency_list:
+            if remaining is not None and remaining <= 0:
+                logger.info("Reached --limit budget; {} agency bucket(s) left unprocessed", len(agency_list))
+                break
+            stats = _enrich_comment_agency_in_catalog(
+                con,
+                record_type,
+                agency,
+                fetch=fetch,
+                extract=extract,
+                limit=remaining,
+                max_workers=max_workers,
+                overwrite=overwrite,
+            )
+            for key, value in stats.items():
+                totals[key] = totals.get(key, 0) + value
+            if remaining is not None:
+                remaining -= stats["selected"]
+
+        logger.info("Catalog PDF enrichment totals: {} across {} agency bucket(s)", totals, len(agency_list))
+        logger.info("Next: run publish-comments-mirror so the extracted text reaches the public read mirror.")
+        return totals
+    finally:
+        con.close()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Backfill documents/comments text_content from PDF attachments.")
     parser.add_argument("--output-dir", type=Path, default=Path("output"))
@@ -349,7 +537,37 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=None, help="Max rows to process this run")
     parser.add_argument("--max-workers", type=int, default=8)
     parser.add_argument("--overwrite", action="store_true", help="Re-extract rows that already have a status")
+    parser.add_argument(
+        "--use-iceberg",
+        action="store_true",
+        help="Comments only: write extracted text into the R2 Data Catalog (durable; survives the "
+        "mirror republish). Needs R2_CATALOG_*. Run publish-comments-mirror afterwards.",
+    )
+    parser.add_argument(
+        "--agency",
+        default=None,
+        help="Comma-separated agency codes to limit the --use-iceberg comment run (default: all)",
+    )
     args = parser.parse_args()
+
+    # Durable comment path: write the catalog (the mirror is regenerated from it).
+    # Documents are published as a whole-file monolith, not via the catalog, so
+    # their in-place enrichment below is already durable — --use-iceberg is
+    # comments-only.
+    if args.use_iceberg:
+        if args.target != "comments":
+            parser.error("--use-iceberg applies to --target comments (documents are a monolith, not in the catalog)")
+        from spicy_regs.schemas.regulations import RECORD_TYPES
+
+        agencies = [a for a in args.agency.split(",")] if args.agency else None
+        enrich_comments_catalog(
+            RECORD_TYPES["comments"],
+            agencies=agencies,
+            limit=args.limit,
+            max_workers=args.max_workers,
+            overwrite=args.overwrite,
+        )
+        return
 
     if args.target == "documents":
         enrich_documents_parquet(
