@@ -9,12 +9,16 @@ from __future__ import annotations
 
 import json
 
+import duckdb
 import polars as pl
 
 from spicy_regs.backfill_derived_text import (
+    _backfill_agency_in_catalog,
     backfill_comment_partitions,
     enrich_comments_with_derived_text,
 )
+from spicy_regs.schemas import COMMENT
+from spicy_regs.sources import iceberg
 from tests.conftest import COMMENT_SCHEMA
 
 # Reuse the fake S3 surface from the derived-text unit tests.
@@ -110,3 +114,65 @@ def test_backfill_partitions_reads_agency_from_path(tmp_path) -> None:
     written = pl.read_parquet(part_dir / "part-0.parquet")
     assert "agency_code" not in written.columns  # schema preserved
     assert written.row(0, named=True)["text_content"] == "Wisconsin DCF comment body"
+
+
+def _seed_catalog(con, rows: list[dict]) -> None:
+    """Insert comment rows into the local catalog table (all COMMENT columns)."""
+    iceberg._ensure_table(con, COMMENT)
+    frame = pl.DataFrame(
+        [{**{c: None for c in COMMENT.schema}, **r} for r in rows], schema=COMMENT.schema
+    )
+    col_list = ", ".join(f'"{c}"' for c in COMMENT.schema)
+    con.register("_seed_src", frame.to_arrow())
+    con.execute(f"INSERT INTO {iceberg._qualified(COMMENT)} ({col_list}) SELECT {col_list} FROM _seed_src;")
+    con.unregister("_seed_src")
+
+
+def test_catalog_backfill_upserts_filled_rows_in_place() -> None:
+    # Local DuckDB standing in for the attached R2 catalog (same alias the
+    # connector uses), so the DELETE+INSERT upsert is exercised without network.
+    con = duckdb.connect()
+    con.execute(f"ATTACH ':memory:' AS {iceberg._CATALOG_ALIAS};")
+    try:
+        _seed_catalog(
+            con,
+            [
+                # found in the fake derived-data store → gets filled
+                {"comment_id": "ACF-2025-0038-0004", "docket_id": "ACF-2025-0038", "agency_code": "ACF",
+                 "attachments_json": _attach(), "modify_date": "2025-01-01", "comment": "orig body"},
+                # attachment but no derived text → counts as missing, stays NULL
+                {"comment_id": "ACF-2025-0038-9999", "docket_id": "ACF-2025-0038", "agency_code": "ACF",
+                 "attachments_json": _attach(), "modify_date": "2025-01-01"},
+                # no attachment → not a candidate at all
+                {"comment_id": "ACF-2025-0038-0007", "docket_id": "ACF-2025-0038", "agency_code": "ACF",
+                 "attachments_json": None, "modify_date": "2025-01-01"},
+            ],
+        )
+
+        stats = _backfill_agency_in_catalog(con, COMMENT, "ACF", resource_factory=_factory())
+        assert stats == {"selected": 2, "ok": 1, "missing": 1}
+
+        out = dict(
+            con.execute(
+                f"SELECT comment_id, text_content FROM {iceberg._qualified(COMMENT)} ORDER BY comment_id"
+            ).fetchall()
+        )
+        assert out["ACF-2025-0038-0004"] == "Wisconsin DCF comment body"
+        assert out["ACF-2025-0038-9999"] is None  # missing left NULL for the PDF fallback
+        assert out["ACF-2025-0038-0007"] is None  # non-candidate untouched
+
+        # Upsert preserves other columns and doesn't duplicate the row.
+        row = con.execute(
+            f"SELECT comment, text_extraction_status FROM {iceberg._qualified(COMMENT)} "
+            f"WHERE comment_id = 'ACF-2025-0038-0004'"
+        ).fetchall()
+        assert len(row) == 1
+        assert row[0] == ("orig body", "ok")
+        count = con.execute(f"SELECT count(*) FROM {iceberg._qualified(COMMENT)}").fetchone()
+        assert count is not None and count[0] == 3
+
+        # Idempotent: a second run finds nothing new (the filled row now has a status).
+        again = _backfill_agency_in_catalog(con, COMMENT, "ACF", resource_factory=_factory())
+        assert again == {"selected": 1, "ok": 0, "missing": 1}
+    finally:
+        con.close()
