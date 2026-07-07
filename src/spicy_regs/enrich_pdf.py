@@ -431,11 +431,15 @@ def _enrich_comment_agency_in_catalog(
         return stats
 
     cols = list(record_type.schema)
-    other_sel = ", ".join(f't."{c}"' for c in cols if c not in ("text_content", "text_extraction_status"))
     col_list = ", ".join(f'"{c}"' for c in cols)
 
-    # COALESCE so a non-ok result (text=None) records its status without nulling
-    # any pre-existing text_content. Then replace exactly these keys, per agency.
+    # Build the replacement rows as a SELF-CONTAINED temp table, then swap them in
+    # — mirroring the proven upsert in iceberg._merge (the INSERT reads a plain
+    # temp table, never a projection over the live catalog table). Projecting the
+    # overrides straight off `{tbl} t JOIN updates` did not persist
+    # text_extraction_status on the R2 Data Catalog (see the NARA smoke run), so
+    # we snapshot the affected rows and override the two columns in place.
+    # COALESCE keeps a pre-existing text_content when a non-ok result has no text.
     con.register("_pdf_updates_src", updates.to_arrow())
     try:
         con.execute("CREATE OR REPLACE TEMP TABLE _pdf_updates AS SELECT * FROM _pdf_updates_src;")
@@ -443,18 +447,24 @@ def _enrich_comment_agency_in_catalog(
         con.unregister("_pdf_updates_src")
     con.execute(
         f"""
-        CREATE OR REPLACE TEMP TABLE _pdf_winners AS
-        SELECT {other_sel},
-               COALESCE(u._new_text, t.text_content) AS text_content,
-               COALESCE(u._new_status, t.text_extraction_status) AS text_extraction_status
-        FROM {tbl} t JOIN _pdf_updates u ON t.comment_id = u.comment_id
-        WHERE t.agency_code = '{ag}';
+        CREATE OR REPLACE TEMP TABLE _pdf_replacement AS
+        SELECT {col_list} FROM {tbl}
+        WHERE agency_code = '{ag}' AND comment_id IN (SELECT comment_id FROM _pdf_updates);
         """
     )
-    con.execute(f"DELETE FROM {tbl} WHERE agency_code = '{ag}' AND comment_id IN (SELECT comment_id FROM _pdf_winners);")
-    con.execute(f"INSERT INTO {tbl} ({col_list}) SELECT {col_list} FROM _pdf_winners;")
+    con.execute(
+        """
+        UPDATE _pdf_replacement AS r
+        SET text_content = COALESCE(u._new_text, r.text_content),
+            text_extraction_status = COALESCE(u._new_status, r.text_extraction_status)
+        FROM _pdf_updates u
+        WHERE r.comment_id = u.comment_id;
+        """
+    )
+    con.execute(f"DELETE FROM {tbl} WHERE agency_code = '{ag}' AND comment_id IN (SELECT comment_id FROM _pdf_replacement);")
+    con.execute(f"INSERT INTO {tbl} ({col_list}) SELECT {col_list} FROM _pdf_replacement;")
     con.execute("DROP TABLE IF EXISTS _pdf_updates;")
-    con.execute("DROP TABLE IF EXISTS _pdf_winners;")
+    con.execute("DROP TABLE IF EXISTS _pdf_replacement;")
 
     logger.info(
         "catalog[{}]: PDF-enriched {} row(s) (ok={}, empty={}, encrypted={}, error={})",
