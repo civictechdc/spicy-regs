@@ -2,16 +2,20 @@
 
 import json
 
+import duckdb
 import polars as pl
 
 from tests.pdf_fixtures import make_pdf, make_textless_pdf
 
 from spicy_regs.enrich_pdf import (
+    _enrich_comment_agency_in_catalog,
     enrich_comments_with_pdf_text,
     enrich_documents_with_pdf_text,
     pdf_urls_for_comment,
     pdf_urls_for_document,
 )
+from spicy_regs.schemas import COMMENT
+from spicy_regs.sources import iceberg
 
 
 def test_pdf_urls_prefers_pdf_renditions() -> None:
@@ -188,3 +192,70 @@ def test_enrich_comments_fills_attachment_text() -> None:
     # Comment with no attachment is never selected.
     assert by_id["C-plain"]["text_extraction_status"] is None
     assert stats == {"selected": 1, "ok": 1, "empty": 0, "encrypted": 0, "error": 0}
+
+
+def _pdf_attach(url: str) -> str:
+    return json.dumps([{"title": "Letter", "formats": [{"url": url, "format": "pdf"}]}])
+
+
+def _seed_catalog(con, rows: list[dict]) -> None:
+    """Insert comment rows into the local catalog table (all COMMENT columns)."""
+    iceberg._ensure_table(con, COMMENT)
+    frame = pl.DataFrame([{**{c: None for c in COMMENT.schema}, **r} for r in rows], schema=COMMENT.schema)
+    col_list = ", ".join(f'"{c}"' for c in COMMENT.schema)
+    con.register("_seed_src", frame.to_arrow())
+    con.execute(f"INSERT INTO {iceberg._qualified(COMMENT)} ({col_list}) SELECT {col_list} FROM _seed_src;")
+    con.unregister("_seed_src")
+
+
+def test_catalog_pdf_enrich_upserts_extracted_text_in_place() -> None:
+    # Local DuckDB standing in for the attached R2 catalog (same alias the
+    # connector uses), so the DELETE+INSERT upsert runs without network.
+    con = duckdb.connect()
+    con.execute(f"ATTACH ':memory:' AS {iceberg._CATALOG_ALIAS};")
+    try:
+        _seed_catalog(
+            con,
+            [
+                {"comment_id": "ACF-1", "docket_id": "ACF-2025-0001", "agency_code": "ACF",
+                 "attachments_json": _pdf_attach("https://x/c1.pdf"), "comment": "See attached file(s)"},
+                # attachment but the download fails → status recorded (error), text stays NULL
+                {"comment_id": "ACF-2", "docket_id": "ACF-2025-0001", "agency_code": "ACF",
+                 "attachments_json": _pdf_attach("https://x/c2.pdf")},
+                # no attachment → never a candidate
+                {"comment_id": "ACF-3", "docket_id": "ACF-2025-0001", "agency_code": "ACF",
+                 "attachments_json": None},
+            ],
+        )
+
+        # Deterministic by URL (extraction runs on a thread pool): c1 downloads,
+        # c2 is missing from the map → fetch returns None → error status.
+        pdfs = {"https://x/c1.pdf": make_pdf(["Comment attachment body"])}
+        stats = _enrich_comment_agency_in_catalog(con, COMMENT, "ACF", fetch=lambda url: pdfs.get(url))
+        assert stats["selected"] == 2  # two attachment-bearing, no status
+        assert stats["ok"] == 1
+        assert stats["error"] == 1
+
+        out = dict(
+            con.execute(
+                f"SELECT comment_id, text_content FROM {iceberg._qualified(COMMENT)} ORDER BY comment_id"
+            ).fetchall()
+        )
+        assert out["ACF-1"] is not None and "Comment attachment body" in out["ACF-1"]
+        assert out["ACF-2"] is None  # download failed → text stays NULL (status marks it attempted)
+        assert out["ACF-3"] is None  # non-candidate untouched
+
+        # Other columns preserved, no duplication.
+        row = con.execute(
+            f"SELECT comment, text_extraction_status FROM {iceberg._qualified(COMMENT)} WHERE comment_id = 'ACF-1'"
+        ).fetchall()
+        assert len(row) == 1
+        assert row[0] == ("See attached file(s)", "ok")
+        count = con.execute(f"SELECT count(*) FROM {iceberg._qualified(COMMENT)}").fetchone()
+        assert count is not None and count[0] == 3
+
+        # Idempotent: every attachment row now carries a status, so nothing is re-selected.
+        again = _enrich_comment_agency_in_catalog(con, COMMENT, "ACF", fetch=lambda url: pdfs.get(url))
+        assert again == {"selected": 0, "ok": 0, "empty": 0, "encrypted": 0, "error": 0}
+    finally:
+        con.close()
