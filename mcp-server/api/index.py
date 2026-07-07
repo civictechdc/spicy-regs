@@ -47,7 +47,10 @@ TABLES = (
     "agency_stats",
     "agency_monthly_volume",
 )
-STATEMENT_TIMEOUT = os.environ.get("SPICY_REGS_STATEMENT_TIMEOUT", "30s")
+# Kept just under the Vercel ``maxDuration`` (300s) so a runaway query trips
+# this watchdog and returns a clean ``TimeoutError`` before the platform hard
+# kills the function. Override with ``SPICY_REGS_STATEMENT_TIMEOUT``.
+STATEMENT_TIMEOUT = os.environ.get("SPICY_REGS_STATEMENT_TIMEOUT", "290s")
 
 logger = logging.getLogger(__name__)
 

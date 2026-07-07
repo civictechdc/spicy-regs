@@ -139,9 +139,12 @@ Then point a client at `http://localhost:8000/mcp`.
 
 ## Limitations
 
-- Vercel serverless functions cap at 60s. The first query in a cold container
-  pays a few seconds to install the DuckDB `httpfs` extension and fetch parquet
-  metadata; subsequent queries within the same container are fast.
+- Vercel functions here cap at 300s (`maxDuration` in `vercel.json`, the Pro
+  plan ceiling). A DuckDB statement-timeout watchdog trips at `290s` (override
+  with `SPICY_REGS_STATEMENT_TIMEOUT`) so runaway queries return a clean
+  `TimeoutError` just before the platform kill. The first query in a cold
+  container pays a few seconds to install the DuckDB `httpfs` extension and
+  fetch parquet metadata; subsequent queries within the same container are fast.
 - The `find_duplicate_regulations.py` helper isn't exposed over MCP — its
   pairwise scan can exceed the function timeout. For that workload, use the
   local script via `uv run --script` (see the skill's SKILL.md).

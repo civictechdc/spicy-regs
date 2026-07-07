@@ -47,7 +47,9 @@ TABLES = (
     "agency_stats",
     "agency_monthly_volume",
 )
-STATEMENT_TIMEOUT = os.environ.get("SPICY_REGS_STATEMENT_TIMEOUT", "30s")
+# Matches the Vercel copy's default (kept just under that deploy's 300s
+# ``maxDuration``). Override with ``SPICY_REGS_STATEMENT_TIMEOUT``.
+STATEMENT_TIMEOUT = os.environ.get("SPICY_REGS_STATEMENT_TIMEOUT", "290s")
 
 logger = logging.getLogger(__name__)
 
