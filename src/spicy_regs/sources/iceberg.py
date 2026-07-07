@@ -305,6 +305,65 @@ def seed_comments_from_parquet(
     return con.execute(f"SELECT count(*) FROM {_qualified(record_type)}").fetchone()[0]
 
 
+def upsert_comment_text(con, record_type: RecordType, agency: str, updates) -> None:
+    """Upsert filled ``text_content`` / ``text_extraction_status`` for one agency.
+
+    Shared helper for the durable text-fill paths (derived-data backfill and PDF
+    enrichment). ``updates`` is a polars DataFrame with columns
+    ``comment_id, _new_text, _new_status``; every row whose ``comment_id`` matches
+    the agency's rows gets ``text_content`` / ``text_extraction_status`` refreshed
+    (``COALESCE`` keeps the existing value when the incoming column is NULL). The
+    upsert is scoped to a single ``agency_code`` so it never touches the whole
+    tens-of-millions-row table, and is expressed as DELETE+INSERT because DuckDB's
+    Iceberg engine has no ``MERGE INTO`` (see :func:`_merge`). No-ops on an empty
+    frame; the caller is expected to have handled that case already.
+
+    CRITICAL — self-contained temp table: the INSERT reads from an independent
+    ``_uct_replacement`` temp table (a full snapshot of the affected rows with the
+    two columns overridden in place), **never** from a projection over the live
+    catalog table. An earlier version projected the overrides straight off
+    ``{tbl} t JOIN updates`` in the INSERT's SELECT; on the R2 Data Catalog that
+    dropped column writes — ``text_content`` landed but ``text_extraction_status``
+    came back NULL, so incremental re-runs kept re-selecting already-filled rows.
+    Snapshotting into a self-contained temp table removes the live-table reference
+    from the write path and fixes it (see PR #117). Plain DuckDB does not reproduce
+    the catalog behavior, so this invariant is verified by a scoped catalog run,
+    not the unit test — keep the ``_uct_replacement`` indirection intact.
+    """
+    if updates.is_empty():
+        return
+
+    tbl = _qualified(record_type)
+    ag = _sql_str(agency)
+    col_list = ", ".join(f'"{c}"' for c in record_type.schema)
+
+    con.register("_uct_updates_src", updates.to_arrow())
+    try:
+        con.execute("CREATE OR REPLACE TEMP TABLE _uct_updates AS SELECT * FROM _uct_updates_src;")
+    finally:
+        con.unregister("_uct_updates_src")
+    con.execute(
+        f"""
+        CREATE OR REPLACE TEMP TABLE _uct_replacement AS
+        SELECT {col_list} FROM {tbl}
+        WHERE agency_code = '{ag}' AND comment_id IN (SELECT comment_id FROM _uct_updates);
+        """
+    )
+    con.execute(
+        """
+        UPDATE _uct_replacement AS r
+        SET text_content = COALESCE(u._new_text, r.text_content),
+            text_extraction_status = COALESCE(u._new_status, r.text_extraction_status)
+        FROM _uct_updates u
+        WHERE r.comment_id = u.comment_id;
+        """
+    )
+    con.execute(f"DELETE FROM {tbl} WHERE agency_code = '{ag}' AND comment_id IN (SELECT comment_id FROM _uct_replacement);")
+    con.execute(f"INSERT INTO {tbl} ({col_list}) SELECT {col_list} FROM _uct_replacement;")
+    con.execute("DROP TABLE IF EXISTS _uct_updates;")
+    con.execute("DROP TABLE IF EXISTS _uct_replacement;")
+
+
 def merge_comments(staging_dir: Path, output_dir: Path, record_type: RecordType) -> Path | None:
     """Upsert staged comments into the catalog, then rebuild the comments index.
 
