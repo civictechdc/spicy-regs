@@ -1,0 +1,140 @@
+name: Backfill comment attachment text (manual)
+
+# One-off / re-runnable historical load of comment `text_content` (the extracted
+# text of attachment files) into the R2 Data Catalog — the durable path.
+#
+# Two sources, run in order, both writing the catalog (the system of record) so
+# the fill survives the daily publish-comments-mirror regeneration:
+#   1. backfill-comment-text --use-iceberg  — Mirrulations' pre-extracted text
+#      (no downloads; covers ~83% of attachment comments)
+#   2. enrich-pdf-text --target comments --use-iceberg  — downloads the remaining
+#      attachment PDFs and extracts their text
+#   3. publish-comments-mirror  — rebuilds the public read files so the UI /
+#      dashboard see the newly-filled text
+#
+# Manual dispatch only — it WRITES the production catalog and republishes the
+# public mirror, so it never runs on a schedule. Defaults to a single-agency
+# smoke test (NARA — small, has attachment comments, verified ~83% fill); flip
+# `full_load` on for every agency once the smoke test looks right. Both backfills
+# are incremental (rows with a text_extraction_status are skipped), so a re-run
+# only does new work. Attachments are ~0.4% of comments, so even the full load
+# touches only tens of thousands of rows.
+#
+# Requires these repo secrets:
+#   R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT, R2_BUCKET_NAME, R2_PUBLIC_URL
+#   R2_CATALOG_URI, R2_CATALOG_WAREHOUSE, R2_CATALOG_TOKEN  (write the catalog table)
+on:
+  workflow_dispatch:
+    inputs:
+      agency:
+        description: 'Backfill only this agency_code (smoke test). Ignored when full_load is true.'
+        required: false
+        default: 'NARA'
+        type: string
+      full_load:
+        description: 'Backfill ALL agencies (overrides agency)'
+        required: false
+        default: false
+        type: boolean
+      limit:
+        description: 'Max comments to process this run (0 = no cap). A small cap is a safe first check.'
+        required: false
+        default: '0'
+        type: string
+      run_pdf_fallback:
+        description: 'Also run the PDF-download extraction for attachments Mirrulations did not pre-extract'
+        required: false
+        default: true
+        type: boolean
+      publish_mirror:
+        description: 'Republish the public comments mirror afterward so the fill is visible to the UI'
+        required: false
+        default: true
+        type: boolean
+      overwrite:
+        description: 'Re-process rows that already have a text_extraction_status'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  # Serialize with the daily mirror publish so a backfill and a republish don't
+  # race on the public files.
+  group: comments-catalog-write
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    # The full load reads/writes tens of thousands of rows and, with the PDF
+    # fallback, downloads attachment PDFs — give it ample headroom.
+    timeout-minutes: 360
+
+    env:
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+      R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+      R2_CATALOG_URI: ${{ secrets.R2_CATALOG_URI }}
+      R2_CATALOG_WAREHOUSE: ${{ secrets.R2_CATALOG_WAREHOUSE }}
+      R2_CATALOG_TOKEN: ${{ secrets.R2_CATALOG_TOKEN }}
+      R2_CATALOG_NAMESPACE: ${{ secrets.R2_CATALOG_NAMESPACE }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      # Inputs are passed through env: (never interpolated into the script text)
+      # and assembled into a quoted bash array, so an agency/limit value can't
+      # inject shell — see the GitHub Actions workflow-injection guidance.
+      - name: Backfill text_content from Mirrulations derived-data (catalog)
+        env:
+          FULL_LOAD: ${{ inputs.full_load }}
+          AGENCY: ${{ inputs.agency }}
+          LIMIT: ${{ inputs.limit }}
+          OVERWRITE: ${{ inputs.overwrite }}
+        run: |
+          args=()
+          if [ "$FULL_LOAD" != "true" ] && [ -n "$AGENCY" ]; then args+=(--agency "$AGENCY"); fi
+          if [ -n "$LIMIT" ] && [ "$LIMIT" != "0" ]; then args+=(--limit "$LIMIT"); fi
+          if [ "$OVERWRITE" = "true" ]; then args+=(--overwrite); fi
+          echo "Running: uv run backfill-comment-text --use-iceberg ${args[*]}"
+          uv run backfill-comment-text --use-iceberg "${args[@]}"
+
+      - name: Extract remaining attachment text from PDFs (catalog)
+        if: ${{ inputs.run_pdf_fallback }}
+        env:
+          FULL_LOAD: ${{ inputs.full_load }}
+          AGENCY: ${{ inputs.agency }}
+          LIMIT: ${{ inputs.limit }}
+          OVERWRITE: ${{ inputs.overwrite }}
+        run: |
+          args=()
+          if [ "$FULL_LOAD" != "true" ] && [ -n "$AGENCY" ]; then args+=(--agency "$AGENCY"); fi
+          if [ -n "$LIMIT" ] && [ "$LIMIT" != "0" ]; then args+=(--limit "$LIMIT"); fi
+          if [ "$OVERWRITE" = "true" ]; then args+=(--overwrite); fi
+          echo "Running: uv run enrich-pdf-text --target comments --use-iceberg ${args[*]}"
+          uv run enrich-pdf-text --target comments --use-iceberg "${args[@]}"
+
+      - name: Republish the public comments mirror
+        if: ${{ inputs.publish_mirror }}
+        # Same shrink-guard bypass the scheduled mirror job uses: a re-export from
+        # the catalog re-sorts + re-compresses, so partitions can shrink on disk
+        # while holding more rows; the script enforces a row-count floor instead.
+        env:
+          R2_ALLOW_SHRINK: '1'
+        run: |
+          echo "Running: uv run python scripts/publish_comments_mirror.py"
+          uv run python scripts/publish_comments_mirror.py
