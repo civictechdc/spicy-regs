@@ -168,7 +168,8 @@ def test_catalog_backfill_upserts_filled_rows_in_place() -> None:
         ).fetchall()
         assert len(row) == 1
         assert row[0] == ("orig body", "ok")
-        assert con.execute(f"SELECT count(*) FROM {iceberg._qualified(COMMENT)}").fetchone()[0] == 3
+        count = con.execute(f"SELECT count(*) FROM {iceberg._qualified(COMMENT)}").fetchone()
+        assert count is not None and count[0] == 3
 
         # Idempotent: a second run finds nothing new (the filled row now has a status).
         again = _backfill_agency_in_catalog(con, COMMENT, "ACF", resource_factory=_factory())
