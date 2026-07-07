@@ -16,6 +16,16 @@ from loguru import logger
 DEFAULT_MAX_BYTES = 100 * 1024 * 1024
 DEFAULT_TIMEOUT = 30.0
 
+# downloads.regulations.gov returns 403 Forbidden to the default
+# ``python-httpx/*`` User-Agent (and to a blank one); a browser-like UA gets
+# 200. Send one so batch enrichment can actually fetch the attachments.
+DEFAULT_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+    )
+}
+
 
 def fetch_pdf_bytes(
     url: str,
@@ -34,7 +44,7 @@ def fetch_pdf_bytes(
     owns_client = client is None
     client = client or httpx.Client(timeout=timeout, follow_redirects=True)
     try:
-        resp = client.get(url)
+        resp = client.get(url, headers=DEFAULT_HEADERS)
         resp.raise_for_status()
         content = resp.content
         if len(content) > max_bytes:

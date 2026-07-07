@@ -39,3 +39,19 @@ def test_fetch_returns_none_on_transport_error() -> None:
 
     with _client(handler) as client:
         assert fetch_pdf_bytes("https://example.com/a.pdf", client=client) is None
+
+
+def test_fetch_sends_browser_user_agent() -> None:
+    # downloads.regulations.gov 403s the default python-httpx UA, so a
+    # browser-like User-Agent must be sent on the request.
+    seen: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["ua"] = request.headers.get("user-agent", "")
+        return httpx.Response(200, content=b"%PDF-1.4 fake")
+
+    with _client(handler) as client:
+        fetch_pdf_bytes("https://example.com/a.pdf", client=client)
+
+    assert seen["ua"].startswith("Mozilla/")
+    assert "python-httpx" not in seen["ua"]
