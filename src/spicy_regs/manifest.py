@@ -11,12 +11,16 @@ It plays two composable roles:
   the persisted manifest.
 
 Membership is backed by a Bloom filter loaded from ``manifest.parquet`` (fetched
-from R2 when not present locally). A false positive only means a genuinely new
-file is skipped this run and picked up on the next one — never data loss.
+from R2 when not present locally). Bloom hashing is deterministic, so a false
+positive is *sticky*: the same never-seen key tests positive on every run and is
+skipped until a ``--full-refresh`` rebuilds the filter. At the 1e-7 rate over
+~30M keys the expected count is a handful of keys total — an accepted tradeoff
+for the ~150x memory saving over an exact set, not "picked up next run".
 """
 
 from array import array
 from collections.abc import Container, Iterable
+from datetime import datetime, timezone
 from hashlib import md5, sha1
 from math import log
 from pathlib import Path
@@ -32,10 +36,13 @@ from spicy_regs.sources.r2 import download_from_r2
 # ---------------------------------------------------------------------------
 # Bloom filter — stdlib-only, ~34 MB for 30M keys at 1e-7 FP rate.
 #
-# A false positive only means we skip a file that was actually new; the
-# next run will pick it up. This replaces a Python set that consumed
-# ~5 GB for 27M strings.
+# A false positive skips a genuinely new file *permanently*: the hashes are
+# deterministic, so the same key collides on every run — it is not "picked up
+# next run", only by a ``--full-refresh`` that rebuilds the filter. At 1e-7 over
+# ~30M keys the expected count is ~3 keys total, the accepted cost of replacing a
+# Python set that consumed ~5 GB for 27M strings with this ~34 MB bit array.
 # ---------------------------------------------------------------------------
+
 
 class BloomFilter:
     """Memory-efficient probabilistic set membership using a bit array."""
@@ -100,6 +107,41 @@ def save_manifest(output_dir: Path, new_keys: set[str]) -> None:
 
     total = existing_rows + len(new_keys)
     logger.info("Saved manifest: {:,} keys ({:,} existing + {:,} new)", total, existing_rows, len(new_keys))
+
+
+def save_failed_keys(output_dir: Path, transient: Iterable[str], parse: Iterable[str]) -> None:
+    """Write this run's failed keys to a local ``failed_keys.parquet`` diagnostic.
+
+    Deliberately *not* uploaded to R2 and overwritten every run: transient keys
+    already retry automatically via manifest exclusion, so the file's only jobs
+    are alerting (a nonzero ``transient`` count means downloads are failing) and
+    giving a replay list for ``parse`` keys (deterministically corrupt files a
+    future ``--replay-failed`` flag can reprocess). When both lists are empty any
+    stale file is removed so its mere presence signals "last run had failures".
+    """
+    transient = list(transient)
+    parse = list(parse)
+    failed_file = output_dir / "failed_keys.parquet"
+    if not transient and not parse:
+        failed_file.unlink(missing_ok=True)
+        return
+
+    run_at = datetime.now(timezone.utc).isoformat()
+    keys = transient + parse
+    kinds = ["transient"] * len(transient) + ["parse"] * len(parse)
+    table = pa.table(
+        {
+            "key": pa.array(keys, pa.large_string()),
+            "kind": pa.array(kinds, pa.string()),
+            "run_at": pa.array([run_at] * len(keys), pa.string()),
+        }
+    )
+    pq.write_table(table, failed_file, compression="zstd")
+    logger.info(
+        "Saved failed_keys.parquet: {} transient (retry next run) + {} parse (marked processed)",
+        len(transient),
+        len(parse),
+    )
 
 
 class Manifest:

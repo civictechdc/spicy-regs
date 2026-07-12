@@ -47,3 +47,23 @@ def test_load_with_no_manifest_is_empty(tmp_output: Path, monkeypatch: pytest.Mo
 def test_empty_save_is_noop(tmp_output: Path) -> None:
     Manifest.empty().save(tmp_output)
     assert not (tmp_output / "manifest.parquet").exists()
+
+
+def test_save_failed_keys_writes_parquet(tmp_output: Path) -> None:
+    import polars as pl
+
+    from spicy_regs.manifest import save_failed_keys
+
+    save_failed_keys(tmp_output, ["t1", "t2"], ["p1"])
+    failed_file = tmp_output / "failed_keys.parquet"
+    assert failed_file.exists()
+
+    df = pl.read_parquet(failed_file)
+    assert set(df["key"].to_list()) == {"t1", "t2", "p1"}
+    kinds = dict(zip(df["key"].to_list(), df["kind"].to_list()))
+    assert kinds == {"t1": "transient", "t2": "transient", "p1": "parse"}
+    assert df["run_at"].n_unique() == 1  # one timestamp for the whole run
+
+    # A clean run removes any stale file so its presence signals "last run failed".
+    save_failed_keys(tmp_output, [], [])
+    assert not failed_file.exists()

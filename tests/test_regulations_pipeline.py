@@ -78,6 +78,38 @@ class _FakeS3Resource:
         return _FakeObj(key, self._store[key])
 
 
+class _RaisingObj:
+    """An S3 object whose body read fails — a transient download error."""
+
+    def get(self) -> dict:
+        class _Body:
+            def read(self) -> bytes:
+                raise OSError("connection reset by peer")
+
+            def close(self) -> None:
+                pass
+
+        return {"Body": _Body()}
+
+
+class _FlakyResource(_FakeS3Resource):
+    """Fake S3 that fails ``read()`` for ``fail_keys`` while ``fail["active"]``.
+
+    A shared mutable flag lets one test flip the failure off between runs, so the
+    same key can fail on run 1 (excluded from the manifest) and succeed on run 2.
+    """
+
+    def __init__(self, store: dict[str, bytes], fail_keys: set[str], active: dict[str, bool]) -> None:
+        super().__init__(store)
+        self._fail_keys = fail_keys
+        self._active = active
+
+    def Object(self, name: str, key: str):  # noqa: N802 — mirrors boto3 API
+        if self._active["active"] and key in self._fail_keys:
+            return _RaisingObj()
+        return _FakeObj(key, self._store[key])
+
+
 def _docket_payload(docket_id: str, modify_date: str, agency: str = AGENCY) -> dict:
     return {
         "data": {
@@ -242,6 +274,99 @@ def test_full_refresh_reprocesses_despite_manifest(tmp_output: Path, monkeypatch
     )
     _run(tmp_output, full_refresh=True)
     assert merge_calls == [1]  # reprocessed even though the key is in the manifest
+
+
+# --- failed-key handling ---------------------------------------------------
+
+
+def test_failed_download_is_not_committed_to_manifest_and_retries_next_run(
+    tmp_output: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A transient download failure must not be marked processed, so the next
+    incremental run re-lists and re-downloads it."""
+    monkeypatch.delenv("R2_PUBLIC_URL", raising=False)
+    good = _docket_key("EPA-2024-0001")
+    flaky = _docket_key("EPA-2025-0002")
+    store = {
+        good: dumps(_docket_payload("EPA-2024-0001", "2024-01-01")).encode(),
+        flaky: dumps(_docket_payload("EPA-2025-0002", "2025-01-01")).encode(),
+    }
+    active = {"active": True}
+    monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FlakyResource(store, {flaky}, active))
+
+    # Run 1: the flaky key fails every attempt -> only the good docket lands.
+    _run(tmp_output)
+    df = pl.read_parquet(tmp_output / "dockets.parquet")
+    assert df["docket_id"].to_list() == ["EPA-2024-0001"]
+    reloaded = Manifest.load(tmp_output)
+    assert good in reloaded
+    assert flaky not in reloaded  # excluded so the next run retries it
+
+    # Run 2: failure cleared -> the previously-failed key is re-listed and lands.
+    active["active"] = False
+    _run(tmp_output)
+    df = pl.read_parquet(tmp_output / "dockets.parquet")
+    assert sorted(df["docket_id"].to_list()) == ["EPA-2024-0001", "EPA-2025-0002"]
+
+
+def test_parse_failure_is_committed_to_manifest(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A deterministically corrupt file is marked processed (so it doesn't retry
+    forever) and recorded in failed_keys.parquet with kind=parse."""
+    monkeypatch.delenv("R2_PUBLIC_URL", raising=False)
+    good = _docket_key("EPA-2024-0001")
+    corrupt = _docket_key("EPA-2025-0002")
+    store = {
+        good: dumps(_docket_payload("EPA-2024-0001", "2024-01-01")).encode(),
+        corrupt: b"{ broken json",
+    }
+    monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
+
+    _run(tmp_output)
+
+    reloaded = Manifest.load(tmp_output)
+    assert corrupt in reloaded  # parse failure stays processed
+    assert good in reloaded
+
+    failed = pl.read_parquet(tmp_output / "failed_keys.parquet")
+    row = failed.filter(pl.col("key") == corrupt)
+    assert row.height == 1
+    assert row["kind"].to_list() == ["parse"]
+
+
+def test_chunked_comments_exclude_failed_keys_from_manifest(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The chunked ingest path excludes transient failures from the manifest too."""
+    monkeypatch.delenv("R2_PUBLIC_URL", raising=False)
+    keys = {f"c{i}": _comment_key(f"c{i}", "EPA-2026-0001") for i in range(3)}
+    store = {
+        keys[f"c{i}"]: dumps(_comment_payload(f"c{i}", "EPA-2026-0001", "2026-01-01T00:00:00Z")).encode()
+        for i in range(3)
+    }
+    flaky = keys["c1"]
+    active = {"active": True}
+    monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FlakyResource(store, {flaky}, active))
+    monkeypatch.setattr(regulations.iceberg, "merge_comments", lambda sd, od, rt: None)
+
+    pipe = RegulationsPipeline(
+        agency=AGENCY,
+        output_dir=tmp_output,
+        only_comments=True,
+        use_iceberg=True,
+        enrich_text=False,
+        chunk_size=2,
+        skip_upload=True,
+    )
+    staging_dir = tmp_output / "staging"
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    manifest = Manifest.empty()
+    pipe._ingest_comments_chunked(AGENCY, tmp_output, staging_dir, manifest)
+
+    recorded = manifest.new_keys
+    assert flaky not in recorded  # excluded -> retried next run
+    assert keys["c0"] in recorded
+    assert keys["c2"] in recorded
+    # The transient failure is surfaced in the local diagnostic.
+    failed = pl.read_parquet(tmp_output / "failed_keys.parquet")
+    assert flaky in failed["key"].to_list()
 
 
 # --- parallelism -----------------------------------------------------------
