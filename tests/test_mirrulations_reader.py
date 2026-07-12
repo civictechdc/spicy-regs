@@ -1,5 +1,6 @@
 """Tests for MirrulationsReader using a fake in-memory S3 resource."""
 
+from collections.abc import Iterable
 from json import dumps
 
 import pytest
@@ -95,7 +96,7 @@ class _FlakyResource(_FakeS3Resource):
     Listing (``Bucket``) is untouched, so the keys still appear in the listing.
     """
 
-    def __init__(self, store: dict[str, bytes], transient_fail: object = (), fail_once: bool = False) -> None:
+    def __init__(self, store: dict[str, bytes], transient_fail: Iterable[str] = (), fail_once: bool = False) -> None:
         super().__init__(store)
         self._transient_fail = set(transient_fail)
         self._fail_once = fail_once
