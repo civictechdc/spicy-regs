@@ -31,7 +31,7 @@ from cyclopts import App, Parameter
 from dotenv import load_dotenv
 from loguru import logger
 
-from spicy_regs.manifest import Manifest
+from spicy_regs.manifest import Manifest, save_failed_keys
 from spicy_regs.pipelines.base import Pipeline
 from spicy_regs.pipelines.staging import stage_agencies
 from spicy_regs.schemas import RECORD_TYPES, RecordType
@@ -138,6 +138,20 @@ class RegulationsPipeline(Pipeline):
             max_workers=self.max_workers,
         )
         manifest.record(result.consumed_keys)
+        # Transient download failures were already excluded from consumed_keys, so
+        # the manifest never marks them processed and the next run retries them;
+        # parse failures were staged as processed. Surface both and persist a
+        # local diagnostic (transient count doubles as a download-health alert).
+        if result.failed_keys or result.parse_failed_keys:
+            logger.warning(
+                "{} keys failed download (excluded from manifest, retried next run); "
+                "{} parse failures (marked processed)",
+                len(result.failed_keys),
+                len(result.parse_failed_keys),
+            )
+        else:
+            logger.info("0 download/parse failures this run")
+        save_failed_keys(output_dir, result.failed_keys, result.parse_failed_keys)
 
         # 3. Transform: merge per-agency staging into the deduplicated dataset.
         staged = result.rows_by_type
@@ -201,16 +215,45 @@ class RegulationsPipeline(Pipeline):
         total = len(keys)
         logger.info("[{}] comments: {} files, ingesting in chunks of {}", agency, total, self.chunk_size)
 
+        # Accumulate failures across chunks so the per-run diagnostic is written
+        # once for the whole agency (save_failed_keys overwrites per run).
+        agency_failures = mirrulations.DownloadFailures()
         for start in range(0, total, self.chunk_size):
             chunk = keys[start : start + self.chunk_size]
             label = f"[{agency}] comments {start + len(chunk)}/{total}"
-            payloads = mirrulations.download_keys(resource, mirrulations.BUCKET, chunk, label=label)
+            failures = mirrulations.DownloadFailures()
+            payloads = mirrulations.download_keys(resource, mirrulations.BUCKET, chunk, label=label, failures=failures)
             records = list(transform.apply(payloads))
+            # One in-run retry over transient failures before committing the chunk,
+            # mirroring the reader path (a huge agency's chunk shouldn't drop a
+            # record to a single transient blip).
+            if failures.transient:
+                retry = mirrulations.DownloadFailures()
+                retried = mirrulations.download_keys(
+                    resource, mirrulations.BUCKET, list(failures.transient), label=f"{label} retry", failures=retry
+                )
+                records.extend(transform.apply(retried))
+                failures.transient = retry.transient
+                failures.parse.extend(retry.parse)
             write_staging(agency, comment_rt.name, records, staging_dir, comment_rt.schema)
             iceberg.merge_comments(staging_dir, output_dir, comment_rt)
             rmtree(staging_dir / comment_rt.name, ignore_errors=True)
-            manifest.record(chunk)
+            # Exclude still-failing transient keys from the manifest so the next
+            # run re-lists them; parse failures stay recorded (marked processed).
+            dropped = set(failures.transient)
+            manifest.record([k for k in chunk if k not in dropped])
+            agency_failures.transient.extend(failures.transient)
+            agency_failures.parse.extend(failures.parse)
             logger.info("[{}] comments: committed {}/{}", agency, start + len(chunk), total)
+
+        if agency_failures.transient or agency_failures.parse:
+            logger.warning(
+                "[{}] comments: {} download failures (retry next run), {} parse failures (marked processed)",
+                agency,
+                len(agency_failures.transient),
+                len(agency_failures.parse),
+            )
+            save_failed_keys(output_dir, agency_failures.transient, agency_failures.parse)
 
     # -- regulations-specific wiring ---------------------------------------
 

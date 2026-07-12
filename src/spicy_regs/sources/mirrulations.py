@@ -14,6 +14,7 @@ into schema-shaped records is the job of the
 import re
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
 from json import loads
 from threading import Lock
 from typing import Any
@@ -182,13 +183,52 @@ def list_agency_files_by_type(
     return result
 
 
+class TransientDownloadError(Exception):
+    """S3 GET/read failed (network, throttle) — the key is retryable.
+
+    Raised when the object could not be fetched off S3 at all. The body was
+    never (fully) read, so the file may well succeed on a later attempt; the
+    caller must therefore *not* record the key as processed, leaving the next
+    incremental run free to re-list and re-download it.
+    """
+
+
+class PayloadParseError(Exception):
+    """Body downloaded but JSON decode / extract failed — deterministic, not retryable.
+
+    The bytes came off S3 fine; they just don't parse. Re-fetching yields the
+    same corrupt payload, so the caller marks the key processed (to stop it
+    retrying forever) and logs it for a deliberate replay after a fix.
+    """
+
+
+@dataclass
+class DownloadFailures:
+    """Per-key download failures, split by whether they're worth retrying.
+
+    ``transient`` keys are excluded from the manifest so the next run retries
+    them for free; ``parse`` keys are recorded as processed but surfaced for a
+    deliberate replay. A caller that doesn't care passes nothing (the default
+    ``failures=None`` on :func:`download_keys` keeps failures uncollected).
+    """
+
+    transient: list[str] = field(default_factory=list)
+    parse: list[str] = field(default_factory=list)
+
+
 def download_and_parse(
     s3_resource: Any,
     bucket_name: str,
     key: str,
     extract_fn: Callable[[dict], dict],
-) -> dict | None:
+) -> dict:
     """Download a single JSON file from S3 and parse it with the given extractor.
+
+    Failures are classified so the caller can retry the retryable ones: a GET or
+    read failure raises :class:`TransientDownloadError` (network/throttle — the
+    key may succeed next time), while a JSON-decode or extract failure raises
+    :class:`PayloadParseError` (the bytes are deterministically bad). Both wrap
+    the original exception and carry the offending key.
 
     The response body is closed on every path — including a failed read — so a
     transient error can't leak the connection into CLOSE_WAIT and starve the
@@ -203,9 +243,12 @@ def download_and_parse(
             content = body.read()
         finally:
             body.close()
+    except Exception as exc:
+        raise TransientDownloadError(key) from exc
+    try:
         return extract_fn(loads(content))
-    except Exception:
-        return None
+    except Exception as exc:
+        raise PayloadParseError(key) from exc
 
 
 def discover_agencies() -> list[str]:
@@ -218,6 +261,25 @@ def _identity(payload: dict) -> dict:
     return payload
 
 
+def _record_failure(exc: Exception, key: str, label: str, failures: DownloadFailures | None) -> None:
+    """Log a per-key download failure and, when collecting, bucket it by kind.
+
+    Transient failures are surfaced at ``warning`` because they cost a retry;
+    parse failures are deterministic corruption the operator may want to replay.
+    A ``TransientDownloadError``/``PayloadParseError`` carries its own key, but
+    ``key`` is passed explicitly so the caller stays authoritative.
+    """
+    where = f"{label}: " if label else ""
+    if isinstance(exc, PayloadParseError):
+        logger.warning("{}parse failure, marking processed: {}", where, key)
+        if failures is not None:
+            failures.parse.append(key)
+    else:
+        logger.warning("{}download failed, will retry: {}", where, key)
+        if failures is not None:
+            failures.transient.append(key)
+
+
 def download_keys(
     s3_resource: Any,
     bucket_name: str,
@@ -225,6 +287,7 @@ def download_keys(
     workers: int = DEFAULT_DOWNLOAD_WORKERS,
     *,
     label: str = "",
+    failures: DownloadFailures | None = None,
 ) -> Iterator[dict]:
     """Concurrently download + parse the given keys, yielding raw payloads.
 
@@ -233,26 +296,35 @@ def download_keys(
     huge agency never buffers all its records at once). Order is not preserved —
     dedup happens later by key. With ``label`` set, emits a progress line every
     ``_PROGRESS_EVERY`` files.
+
+    When ``failures`` is provided, each key that couldn't be produced is appended
+    to it — transient (retryable) vs. parse (deterministic) — instead of being
+    silently dropped, so the caller can exclude the retryable ones from the
+    manifest. ``failures=None`` keeps the historical drop-and-continue behavior
+    for callers that don't track keys.
     """
     total = len(keys)
     n = max(1, min(workers, total)) if total else 1
     if n <= 1:
         for key in keys:
-            payload = download_and_parse(s3_resource, bucket_name, key, _identity)
-            if payload is not None:
-                yield payload
+            try:
+                yield download_and_parse(s3_resource, bucket_name, key, _identity)
+            except (TransientDownloadError, PayloadParseError) as exc:
+                _record_failure(exc, key, label, failures)
         return
 
     done = 0
     with ThreadPoolExecutor(max_workers=n) as executor:
-        futures = [executor.submit(download_and_parse, s3_resource, bucket_name, key, _identity) for key in keys]
-        for future in as_completed(futures):
+        # Map future -> key so as_completed can attribute an exception to its key.
+        submitted = {executor.submit(download_and_parse, s3_resource, bucket_name, key, _identity): key for key in keys}
+        for future in as_completed(submitted):
             done += 1
             if label and done % _PROGRESS_EVERY == 0:
                 logger.info("{}: downloaded {}/{}", label, done, total)
-            payload = future.result()
-            if payload is not None:
-                yield payload
+            try:
+                yield future.result()
+            except (TransientDownloadError, PayloadParseError) as exc:
+                _record_failure(exc, submitted[future], label, failures)
 
 
 class MirrulationsReader(Reader):
@@ -289,6 +361,10 @@ class MirrulationsReader(Reader):
         # single-scan listing); otherwise the reader lists them itself.
         self.key_lister = key_lister
         self.last_keys: list[str] = []
+        # Keys attempted but not consumed, so the caller can keep them out of the
+        # manifest (transient) or surface them for replay (parse).
+        self.failed_keys: list[str] = []
+        self.parse_failed_keys: list[str] = []
 
     def iter_records(self) -> Iterator[dict]:
         if self.record_type.path_pattern is None:
@@ -297,9 +373,9 @@ class MirrulationsReader(Reader):
                 f"but {self.record_type.name!r} has no path_pattern."
             )
         if self.key_lister is not None:
-            self.last_keys = self.key_lister()
+            keys = self.key_lister()
         else:
-            self.last_keys = list_json_files(
+            keys = list_json_files(
                 self.s3_resource,
                 self.bucket,
                 self.prefix,
@@ -310,10 +386,39 @@ class MirrulationsReader(Reader):
                 self.verbose,
                 self.since_year,
             )
+        # Populate immediately so a caller inspecting last_keys before the
+        # generator is fully drained still sees the listing; it's narrowed to the
+        # consumed keys once downloading (and the retry pass) completes.
+        self.last_keys = list(keys)
+
         # Fan the per-file GETs across a thread pool via the shared engine —
         # independent, I/O-bound round trips; order is irrelevant (dedup by key).
         label = f"[{self.agency}] {self.record_type.name}"
-        yield from download_keys(self.s3_resource, self.bucket, self.last_keys, self.download_workers, label=label)
+        failures = DownloadFailures()
+        yield from download_keys(
+            self.s3_resource, self.bucket, keys, self.download_workers, label=label, failures=failures
+        )
+        # One in-run retry pass over transient failures; whatever still fails is
+        # left out of last_keys so the next incremental run re-lists it for free.
+        if failures.transient:
+            retry = DownloadFailures()
+            yield from download_keys(
+                self.s3_resource,
+                self.bucket,
+                list(failures.transient),
+                self.download_workers,
+                label=f"{label} retry",
+                failures=retry,
+            )
+            failures.transient = retry.transient
+            failures.parse.extend(retry.parse)
+
+        self.failed_keys = list(failures.transient)
+        self.parse_failed_keys = list(failures.parse)
+        # Transient failures are excluded (retried next run); parse failures stay
+        # marked processed — a deterministically corrupt file would retry forever.
+        dropped = set(failures.transient)
+        self.last_keys = [k for k in keys if k not in dropped]
 
 
 class _AgencyListingCache:

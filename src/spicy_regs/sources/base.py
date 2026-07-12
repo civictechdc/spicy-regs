@@ -18,12 +18,15 @@ class Reader(ABC):
     and dedup semantics are the subclass's responsibility.
 
     Subclasses that pull from a keyed source (S3 keys, URLs, file paths)
-    should populate ``last_keys`` during ``iter_records`` so the caller
-    can append the consumed keys to a manifest. Default is an empty list
-    for sources without addressable keys.
+    should populate ``last_keys`` during ``iter_records`` with the keys
+    *successfully* consumed, so the caller can append them to a manifest.
+    Keys that were attempted but failed go on ``failed_keys`` instead — the
+    caller must NOT manifest these, so the next run retries them. Both default
+    to empty lists for sources without addressable keys.
     """
 
     last_keys: list[str] = []
+    failed_keys: list[str] = []
 
     @abstractmethod
     def iter_records(self) -> Iterator[dict]: ...

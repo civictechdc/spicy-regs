@@ -1,6 +1,9 @@
 """Tests for MirrulationsReader using a fake in-memory S3 resource."""
 
+from collections.abc import Iterable
 from json import dumps
+
+import pytest
 
 from spicy_regs.schemas import COMMENT, DOCKET, DOCUMENT
 from spicy_regs.sources import MirrulationsReader
@@ -68,6 +71,42 @@ class _FakeS3Resource:
         return _FakeBucket(self._store)
 
     def Object(self, name: str, key: str) -> _FakeObj:  # noqa: N802 — mirrors boto3 API
+        return _FakeObj(key, self._store[key])
+
+
+class _RaisingObj:
+    """An S3 object whose body read fails — a transient download error."""
+
+    def get(self) -> dict:
+        class _Body:
+            def read(self) -> bytes:
+                raise OSError("connection reset by peer")
+
+            def close(self) -> None:
+                pass
+
+        return {"Body": _Body()}
+
+
+class _FlakyResource(_FakeS3Resource):
+    """Fake S3 that fails ``read()`` for chosen keys (all attempts, or just the first).
+
+    ``fail_once`` makes a key fail on its first fetch and succeed thereafter, so a
+    single instance can prove the in-run retry pass recovers a transient blip.
+    Listing (``Bucket``) is untouched, so the keys still appear in the listing.
+    """
+
+    def __init__(self, store: dict[str, bytes], transient_fail: Iterable[str] = (), fail_once: bool = False) -> None:
+        super().__init__(store)
+        self._transient_fail = set(transient_fail)
+        self._fail_once = fail_once
+        self._attempts: dict[str, int] = {}
+
+    def Object(self, name: str, key: str):  # noqa: N802 — mirrors boto3 API
+        self._attempts[key] = self._attempts.get(key, 0) + 1
+        first_attempt = self._attempts[key] == 1
+        if key in self._transient_fail and (not self._fail_once or first_attempt):
+            return _RaisingObj()
         return _FakeObj(key, self._store[key])
 
 
@@ -238,15 +277,17 @@ def test_download_keys_yields_payloads() -> None:
 
 
 def test_download_and_parse_closes_body_on_read_error() -> None:
-    """A failed download must still close the response body.
+    """A failed download raises TransientDownloadError but still closes the body.
 
     If ``read()`` raises (timeout, connection reset) and the body is left open,
     the underlying S3 connection leaks into CLOSE_WAIT instead of returning to
     the pool. Enough leaks exhaust the pool and later downloads block forever
     acquiring a connection — the low-CPU / CLOSE_WAIT-pileup hang seen on large
-    agencies. Closing the body on every path keeps the pool healthy.
+    agencies. Closing the body on every path keeps the pool healthy; raising
+    (rather than returning None) lets the caller keep the key out of the manifest
+    so it's retried next run.
     """
-    from spicy_regs.sources.mirrulations import download_and_parse
+    from spicy_regs.sources.mirrulations import TransientDownloadError, download_and_parse
 
     closed = {"value": False}
 
@@ -265,10 +306,102 @@ def test_download_and_parse_closes_body_on_read_error() -> None:
         def Object(self, bucket: str, key: str) -> _Obj:  # noqa: N802
             return _Obj()
 
-    result = download_and_parse(_Res(), BUCKET, "some/key.json", lambda d: d)
+    with pytest.raises(TransientDownloadError):
+        download_and_parse(_Res(), BUCKET, "some/key.json", lambda d: d)
 
-    assert result is None  # the error is swallowed (record skipped this run)
     assert closed["value"] is True  # ...but the body was closed, so no leak
+
+
+def test_download_and_parse_raises_parse_error_on_bad_json() -> None:
+    """A body that decodes/extracts badly raises PayloadParseError, not transient.
+
+    The bytes came off S3 fine — retrying just re-fetches the same corrupt
+    payload — so this is a distinct, non-retryable failure class.
+    """
+    from spicy_regs.sources.mirrulations import PayloadParseError, download_and_parse
+
+    store = {"bad/key.json": b"{ not valid json"}
+    with pytest.raises(PayloadParseError):
+        download_and_parse(_FakeS3Resource(store), BUCKET, "bad/key.json", lambda d: d)
+
+
+def _mixed_failure_store() -> tuple[dict[str, bytes], str, str, str]:
+    """A store with one good, one parse-failing, and one transient-failing key."""
+    good = _docket_key("EPA-2024-0001")
+    parse_bad = _docket_key("EPA-2025-0002")
+    transient_bad = _docket_key("EPA-2024-0003")
+    store = {
+        good: dumps(_docket_payload("EPA-2024-0001")).encode(),
+        parse_bad: b"{ broken json",
+        transient_bad: dumps(_docket_payload("EPA-2024-0003")).encode(),
+    }
+    return store, good, parse_bad, transient_bad
+
+
+@pytest.mark.parametrize("workers", [1, 4])
+def test_download_keys_reports_failed_keys(workers: int) -> None:
+    """download_keys buckets each unyielded key by failure kind (both branches).
+
+    ``workers=1`` exercises the serial branch, ``workers=4`` the thread-pool
+    branch (future->key attribution) — both must report the same split.
+    """
+    from spicy_regs.sources.mirrulations import DownloadFailures, download_keys
+
+    store, good, parse_bad, transient_bad = _mixed_failure_store()
+    resource = _FlakyResource(store, transient_fail=[transient_bad])
+    failures = DownloadFailures()
+    payloads = list(
+        download_keys(resource, BUCKET, [good, parse_bad, transient_bad], workers=workers, failures=failures)
+    )
+
+    assert [p["data"]["id"] for p in payloads] == ["EPA-2024-0001"]
+    assert failures.transient == [transient_bad]
+    assert failures.parse == [parse_bad]
+
+
+def test_iter_records_excludes_transient_failures_from_last_keys() -> None:
+    """A transient download failure is kept out of last_keys (and reported)."""
+    store = _make_store()
+    bad = _docket_key("EPA-2025-0002")
+    resource = _FlakyResource(store, transient_fail=[bad])
+    reader = MirrulationsReader(resource, BUCKET, PREFIX, AGENCY, DOCKET, download_workers=1)
+
+    records = list(reader.iter_records())
+
+    assert [_raw_id(r) for r in records] == ["EPA-2024-0001"]
+    assert reader.last_keys == [_docket_key("EPA-2024-0001")]  # bad key excluded
+    assert reader.failed_keys == [bad]
+    assert reader.parse_failed_keys == []
+
+
+def test_iter_records_retries_transient_failure_once() -> None:
+    """The in-run retry recovers a key that fails its first fetch, succeeds next."""
+    store = _make_store()
+    flaky = _docket_key("EPA-2025-0002")
+    resource = _FlakyResource(store, transient_fail=[flaky], fail_once=True)
+    reader = MirrulationsReader(resource, BUCKET, PREFIX, AGENCY, DOCKET, download_workers=1)
+
+    records = list(reader.iter_records())
+
+    assert sorted(_raw_id(r) for r in records) == ["EPA-2024-0001", "EPA-2025-0002"]
+    assert reader.failed_keys == []  # recovered on retry
+    assert sorted(reader.last_keys) == sorted([_docket_key("EPA-2024-0001"), flaky])
+
+
+def test_iter_records_keeps_parse_failures_in_last_keys() -> None:
+    """A parse failure stays in last_keys (marked processed) but is reported."""
+    store = _make_store()
+    bad = _docket_key("EPA-2025-0002")
+    store[bad] = b"{ broken json"
+    reader = MirrulationsReader(_FakeS3Resource(store), BUCKET, PREFIX, AGENCY, DOCKET, download_workers=1)
+
+    records = list(reader.iter_records())
+
+    assert [_raw_id(r) for r in records] == ["EPA-2024-0001"]
+    assert reader.parse_failed_keys == [bad]
+    assert reader.failed_keys == []
+    # Deterministically corrupt -> stays processed so it doesn't retry forever.
+    assert sorted(reader.last_keys) == sorted([_docket_key("EPA-2024-0001"), bad])
 
 
 def test_s3_resource_configures_retries() -> None:
