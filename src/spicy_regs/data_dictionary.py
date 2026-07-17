@@ -53,6 +53,7 @@ TABLES: tuple[str, ...] = (
     "congress_bills",
     "unified_agenda",
     "federal_register",
+    "fec_committees",
 )
 
 # Tables the MCP server (list_sources / describe_table / query_sql) exposes.
@@ -71,6 +72,7 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
         "congress_bills",
         "unified_agenda",
         "federal_register",
+        "fec_committees",
     }
 )
 
@@ -185,6 +187,27 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("subtype", "VARCHAR"),
         ("executive_order_number", "VARCHAR"),
         ("modify_date", "VARCHAR"),
+    ],
+    # Ingested from the OpenFEC /committees endpoint (build_fec_committees); a
+    # committee/PAC reference dimension, all columns stored as VARCHAR with array
+    # fields serialized as JSON strings. Keyed by committee_id.
+    "fec_committees": [
+        ("committee_id", "VARCHAR"),
+        ("name", "VARCHAR"),
+        ("committee_type", "VARCHAR"),
+        ("committee_type_full", "VARCHAR"),
+        ("designation", "VARCHAR"),
+        ("designation_full", "VARCHAR"),
+        ("party", "VARCHAR"),
+        ("party_full", "VARCHAR"),
+        ("state", "VARCHAR"),
+        ("treasurer_name", "VARCHAR"),
+        ("organization_type_full", "VARCHAR"),
+        ("filing_frequency", "VARCHAR"),
+        ("first_file_date", "VARCHAR"),
+        ("last_file_date", "VARCHAR"),
+        ("cycles_json", "VARCHAR"),
+        ("candidate_ids_json", "VARCHAR"),
     ],
 }
 
@@ -310,9 +333,7 @@ def check_descriptions(
         if not (entry.get("summary") or "").strip():
             errors.append(f"[{table}] missing a 'summary' in descriptions.yaml")
         desc_cols = list((entry.get("columns") or {}).keys())
-        errors.extend(
-            _reconcile_columns(table, "schema", schema_cols, "descriptions.yaml", desc_cols)
-        )
+        errors.extend(_reconcile_columns(table, "schema", schema_cols, "descriptions.yaml", desc_cols))
         for col in schema_cols:
             text = (entry.get("columns") or {}).get(col)
             if col in desc_cols and not (text or "").strip():
@@ -329,9 +350,7 @@ def check_schema_drift(
     for table in TABLES:
         exp_cols = [c for c, _ in expected.get(table, [])]
         live_cols = [c for c, _ in live.get(table, [])]
-        errors.extend(
-            _reconcile_columns(table, "in-code schema", exp_cols, "live parquet", live_cols)
-        )
+        errors.extend(_reconcile_columns(table, "in-code schema", exp_cols, "live parquet", live_cols))
     return errors
 
 

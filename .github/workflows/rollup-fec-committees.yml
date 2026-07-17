@@ -1,0 +1,20 @@
+name: Rollup — fec_committees
+on:
+  schedule:
+    # 19:30 UTC — ingest the FEC committee reference dimension ahead of the
+    # evening rollup window.
+    - cron: '30 19 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-fec-committees
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}
