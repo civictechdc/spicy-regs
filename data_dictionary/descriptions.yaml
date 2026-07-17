@@ -230,3 +230,28 @@ tables:
       subtype: "FR document subtype, when set. Often null."
       executive_order_number: "Executive order number, for presidential EO documents. Null otherwise."
       modify_date: "Processing/modification date carried from the prior published table; null for rows freshly ingested via the REST API (which does not expose it)."
+  lobbying_filings:
+    summary: >-
+      One row per federal lobbying-disclosure filing, ingested from the U.S.
+      Senate Lobbying Disclosure Act (LDA) REST API (`lda.senate.gov`) by
+      `build_lobbying_filings`. Registrants file quarterly reports naming the
+      clients they lobby for, the money involved, the issues raised, and the
+      government entities (agencies/chambers) lobbied — so this table links the
+      comment campaigns in `comments`/`dockets` to the same organizations'
+      *direct* agency lobbying. Primary / dedup key is `filing_uuid`. All columns
+      are stored as VARCHAR; nested/array fields are JSON strings.
+    columns:
+      filing_uuid: "LDA filing UUID (e.g. `7866327b-c892-4430-b9f0-1f0f679c58c6`). Primary key / dedup key."
+      filing_type: "Filing type code (e.g. `RR` registration, `Q1`–`Q4` quarterly reports, amendments/terminations)."
+      filing_year: "Calendar year the filing reports on."
+      filing_period: "Reporting period within the year (e.g. `first_quarter`, `year_end`)."
+      dt_posted: "Timestamp the filing was posted to the LDA system (ISO 8601 string with timezone). Sort key."
+      registrant_name: "Name of the registrant (the lobbying firm or self-filing organization)."
+      registrant_id: "LDA registrant id. Stable join key across a registrant's filings."
+      client_name: "Name of the client the lobbying was performed for. Joins by name to `organizations`/comment filers."
+      client_id: "LDA client id."
+      income: "Lobbying income reported by a lobbying firm for the period, in USD. Null for self-filers (who report `expenses`)."
+      expenses: "Lobbying expenses reported by a self-filing organization for the period, in USD. Null for firms (who report `income`)."
+      lobbying_activities_json: "JSON array of lobbying activities, each `{general_issue_code, general_issue_code_display, description}` — the issue areas lobbied and their free-text descriptions."
+      government_entities_json: "JSON array of the distinct government entities lobbied (`{id, name}`) — the agencies and chambers (e.g. `HOUSE OF REPRESENTATIVES`, `SENATE`) named across the filing's activities."
+      url: "URL of the filing's printable document page on lda.senate.gov (`filing_document_url`)."

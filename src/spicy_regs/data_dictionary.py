@@ -53,6 +53,7 @@ TABLES: tuple[str, ...] = (
     "congress_bills",
     "unified_agenda",
     "federal_register",
+    "lobbying_filings",
 )
 
 # Tables the MCP server (list_sources / describe_table / query_sql) exposes.
@@ -71,6 +72,7 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
         "congress_bills",
         "unified_agenda",
         "federal_register",
+        "lobbying_filings",
     }
 )
 
@@ -185,6 +187,25 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("subtype", "VARCHAR"),
         ("executive_order_number", "VARCHAR"),
         ("modify_date", "VARCHAR"),
+    ],
+    # Ingested from the Senate LDA REST API (build_lobbying_filings); all columns
+    # are stored as VARCHAR, nested/array fields serialized as JSON strings.
+    # Keyed by filing_uuid.
+    "lobbying_filings": [
+        ("filing_uuid", "VARCHAR"),
+        ("filing_type", "VARCHAR"),
+        ("filing_year", "VARCHAR"),
+        ("filing_period", "VARCHAR"),
+        ("dt_posted", "VARCHAR"),
+        ("registrant_name", "VARCHAR"),
+        ("registrant_id", "VARCHAR"),
+        ("client_name", "VARCHAR"),
+        ("client_id", "VARCHAR"),
+        ("income", "VARCHAR"),
+        ("expenses", "VARCHAR"),
+        ("lobbying_activities_json", "VARCHAR"),
+        ("government_entities_json", "VARCHAR"),
+        ("url", "VARCHAR"),
     ],
 }
 
@@ -310,9 +331,7 @@ def check_descriptions(
         if not (entry.get("summary") or "").strip():
             errors.append(f"[{table}] missing a 'summary' in descriptions.yaml")
         desc_cols = list((entry.get("columns") or {}).keys())
-        errors.extend(
-            _reconcile_columns(table, "schema", schema_cols, "descriptions.yaml", desc_cols)
-        )
+        errors.extend(_reconcile_columns(table, "schema", schema_cols, "descriptions.yaml", desc_cols))
         for col in schema_cols:
             text = (entry.get("columns") or {}).get(col)
             if col in desc_cols and not (text or "").strip():
@@ -329,9 +348,7 @@ def check_schema_drift(
     for table in TABLES:
         exp_cols = [c for c, _ in expected.get(table, [])]
         live_cols = [c for c, _ in live.get(table, [])]
-        errors.extend(
-            _reconcile_columns(table, "in-code schema", exp_cols, "live parquet", live_cols)
-        )
+        errors.extend(_reconcile_columns(table, "in-code schema", exp_cols, "live parquet", live_cols))
     return errors
 
 
