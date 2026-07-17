@@ -182,11 +182,17 @@ def upload_file(local_path: Path, remote_key: str | None = None) -> None:
     remote_size = _get_remote_size(client, bucket, remote_key)
     _assert_upload_safe(local_size_bytes, remote_size, remote_key)
 
+    # Cache-Control makes the objects eligible for Cloudflare edge caching on
+    # the public custom domain (without it every browser range request pays a
+    # full edge->R2 origin round-trip, measured at ~130-180ms each). The corpus
+    # refreshes roughly daily; max-age bounds staleness after a republish and
+    # stale-while-revalidate keeps the edge fast across the refresh boundary.
+    cache_control = getenv("R2_CACHE_CONTROL", "public, max-age=3600, stale-while-revalidate=86400")
     client.upload_file(
         str(local_path),
         bucket,
         remote_key,
-        ExtraArgs={"ContentType": "application/octet-stream"},
+        ExtraArgs={"ContentType": "application/octet-stream", "CacheControl": cache_control},
     )
 
     public_url = getenv("R2_PUBLIC_URL", "")
