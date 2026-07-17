@@ -81,6 +81,13 @@ def merge_staging_files(
         files_sql = ", ".join(f"'{str(p).replace(chr(39), chr(39) * 2)}'" for p in valid_files)
         col_select = ", ".join(f'CAST("{c}" AS VARCHAR) AS "{c}"' for c in target_columns)
 
+        # Cluster the output by docket_id so consumers filtering on it (the UI
+        # docket page reads documents/dockets with `WHERE docket_id = ?` over
+        # HTTP range requests) can prune to a few row groups via the parquet
+        # min/max stats instead of scanning the whole file. Without the sort
+        # every row group spans the full docket_id range and nothing prunes.
+        sort_clause = 'ORDER BY "docket_id"' if "docket_id" in target_columns else ""
+
         query = f"""
         COPY (
             SELECT {col_select}
@@ -89,8 +96,9 @@ def merge_staging_files(
                 PARTITION BY "{key_col}"
                 ORDER BY modify_date DESC NULLS LAST
             ) = 1
+            {sort_clause}
         ) TO '{str(temp_output).replace(chr(39), chr(39) * 2)}'
-        (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 500000);
+        (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 100000);
         """
 
         spill_dir = output_dir / ".duckdb_tmp"
