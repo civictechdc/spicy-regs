@@ -1,43 +1,48 @@
 name: ETL (new pipeline)
 
-# Production daily ETL, running the new Pipeline/Reader/Writer path via the
-# `run-pipeline` CLI (which drives RegulationsPipeline.run()). This is the sole
-# scheduled ETL: the legacy Prefect "Daily ETL Refresh" workflow has been
-# removed.
+# Production daily ETL. Runs RegulationsPipeline.run() via the `run-pipeline` CLI
+# (which reads prime -> extract/stage -> merge -> load). This is the sole
+# scheduled ETL. Rollups (feed_summary, agency_stats, ...) are built by separate
+# `rollup-*.yml` workflows on their own crons reading the base tables this ETL
+# publishes.
 #
-# On `schedule`: 15 batches (21 agencies each = 315) spread across the day; the
-# batch number is derived from the UTC hour, upload to R2 is ON, and the run is
-# routed through the R2 Data Catalog (Iceberg) — the comments read surface the
-# MCP servers query — so the catalog stays current instead of drifting stale.
-# Rollups (feed_summary, agency_stats, ...) are built by separate `rollup-*.yml`
-# workflows, each on its own cron reading the base tables this ETL publishes.
+# ─────────────────────────────────────────────────────────────────────────────
+# Scheduling model (rewritten 2026-07): a single scheduled trigger fans out a
+# MATRIX of all batches, instead of the old design that mapped each batch to its
+# own hourly cron and derived the batch number from the UTC hour at runtime
+# (`batch = hour - 6`).
 #
-# On `workflow_dispatch`: inputs drive a one-off run. `skip_upload` still
-# defaults to true so a manual vetting run cannot write to production R2 — flip
-# it off deliberately.
+# Why it changed: GitHub Actions routinely drops or delays `schedule` events under
+# load, so with 15 separate hourly crons, specific hours were permanently starved.
+# Measured over an 8-day window (105 runs): hours 06/07 (batches 0/1) fired 0×,
+# hour 13 (batch 7 = HHS) fired only 3×, while other hours fired 6–10×. That left
+# whole agency sets stale — batches 0/1 alone cover ACF, AHRQ, AMS, APHIS, ATF
+# (982K comments), ATSDR, BIA, BLM (850K), BOEM, BOP, BSEE, CDC (305K), and HHS
+# (batch 7) fell ~5 days behind. A delayed cron also recomputed the batch from its
+# late runtime hour, colliding with the next batch and skipping its own.
+#
+# A matrix driven by ONE trigger cannot be partially dropped: once the run starts,
+# every batch job runs. `max-parallel: 1` keeps the Iceberg catalog writes
+# serialized (concurrent batches would contend on the single `comments` table, the
+# reason the old design spread batches across hours); `fail-fast: false` means one
+# bad batch never cancels the rest. Two redundant crons (06:25 and 18:25 UTC) mean
+# a single dropped trigger still leaves the day covered — the incremental manifest
+# makes the second run cheap because it skips everything the first already ingested.
+#
+# Coverage: `--batch-size 22` (22 * 15 = 330 slots >= the ~327 discovered agencies)
+# so no agency falls off the end. The old `21 * 15 = 315` left the alphabetical
+# tail (USOPC..WHD, including VA, USPS, USTR, VETS, USUHS) in no batch at all — 12
+# agencies that were NEVER ingested. If the agency count ever exceeds 330, bump the
+# batch size (or add matrix entries); a batch that slices past the end is a no-op.
+#
+# workflow_dispatch: a one-off run. `batch_number` runs just that batch; otherwise
+# (e.g. a single `--agency`) it runs once with no batch slicing. `skip_upload`
+# still defaults to true so a manual vetting run can't write to production R2 —
+# flip it off deliberately.
 on:
   schedule:
-    # Batch 0: ~6 AM UTC, Batch 1: ~7 AM UTC, ..., Batch 14: ~8 PM UTC.
-    # The minute is offset off the top of the hour (:25) on purpose: GitHub
-    # delays or drops `schedule` events during the high-load window at the
-    # start of every hour, so `:00` crons fire late or not at all. The batch
-    # number is still derived from the UTC hour at runtime, so any minute
-    # within the hour maps to the same batch.
-    - cron: '25 6 * * *'   # Batch 0
-    - cron: '25 7 * * *'   # Batch 1
-    - cron: '25 8 * * *'   # Batch 2
-    - cron: '25 9 * * *'   # Batch 3
-    - cron: '25 10 * * *'  # Batch 4
-    - cron: '25 11 * * *'  # Batch 5
-    - cron: '25 12 * * *'  # Batch 6
-    - cron: '25 13 * * *'  # Batch 7
-    - cron: '25 14 * * *'  # Batch 8
-    - cron: '25 15 * * *'  # Batch 9
-    - cron: '25 16 * * *'  # Batch 10
-    - cron: '25 17 * * *'  # Batch 11
-    - cron: '25 18 * * *'  # Batch 12
-    - cron: '25 19 * * *'  # Batch 13
-    - cron: '25 20 * * *'  # Batch 14
+    - cron: '25 6 * * *'   # primary daily sweep (all batches via the matrix)
+    - cron: '25 18 * * *'  # redundant sweep; manifest makes it cheap if the first ran
   workflow_dispatch:
     inputs:
       agency:
@@ -51,7 +56,7 @@ on:
         default: ''
         type: string
       batch_number:
-        description: 'Batch number (0-indexed) or leave empty for all'
+        description: 'Batch number (0-indexed); leave empty to run one job over all agencies'
         required: false
         default: ''
         type: string
@@ -72,34 +77,67 @@ on:
         type: boolean
 
 jobs:
-  etl-new:
+  # Resolve the batch matrix and the upload/iceberg flags once, so the etl job's
+  # matrix can be event-dependent (schedule => all batches; dispatch => the one
+  # requested batch, or a single no-slice job).
+  setup:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+      skip_upload: ${{ steps.gen.outputs.skip_upload }}
+      use_iceberg: ${{ steps.gen.outputs.use_iceberg }}
     steps:
-      - name: Determine run parameters
-        id: params
+      - name: Resolve matrix + flags
+        id: gen
+        # Untrusted-ish inputs are read via env, never interpolated into the shell
+        # body, and batch_number is validated as an integer before it reaches the
+        # matrix JSON (guards against workflow-injection via the free-text input).
+        env:
+          EVENT: ${{ github.event_name }}
+          BATCH_NUMBER: ${{ inputs.batch_number }}
+          SKIP_UPLOAD: ${{ inputs.skip_upload }}
+          USE_ICEBERG: ${{ inputs.use_iceberg }}
         run: |
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            # Map the UTC hour to a batch number (6 AM = batch 0 ... 8 PM = 14).
-            HOUR=$(date -u +%H)
-            BATCH=$((10#$HOUR - 6))
-            echo "batch_number=$BATCH" >> $GITHUB_OUTPUT
-            # Scheduled runs publish to R2.
-            echo "skip_upload=false" >> $GITHUB_OUTPUT
-            # The comments read surface is the Iceberg catalog now, so scheduled
-            # runs MUST route through it — otherwise comments land only in the
-            # partitioned tree and the catalog (what the MCP servers read) drifts
-            # stale again. Dispatch runs still honor their own use_iceberg input.
-            echo "use_iceberg=true" >> $GITHUB_OUTPUT
-            echo "Running scheduled batch $BATCH (hour $HOUR UTC)"
+          set -euo pipefail
+          if [ "$EVENT" = "schedule" ]; then
+            # Every batch, one trigger. Scheduled runs publish to R2 and MUST route
+            # through Iceberg — the comments read surface the MCP servers query is
+            # the catalog now, so a batch that skipped it would drift stale again.
+            echo 'matrix={"batch":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14]}' >> "$GITHUB_OUTPUT"
+            echo 'skip_upload=false' >> "$GITHUB_OUTPUT"
+            echo 'use_iceberg=true' >> "$GITHUB_OUTPUT"
+            echo "Scheduled sweep: all 15 batches (batch-size 22)"
           else
-            echo "batch_number=${{ inputs.batch_number }}" >> $GITHUB_OUTPUT
-            echo "skip_upload=${{ inputs.skip_upload }}" >> $GITHUB_OUTPUT
-            echo "use_iceberg=${{ inputs.use_iceberg }}" >> $GITHUB_OUTPUT
-            echo "Running manual dispatch (skip_upload=${{ inputs.skip_upload }})"
+            if [ -n "$BATCH_NUMBER" ]; then
+              if ! printf '%s' "$BATCH_NUMBER" | grep -Eq '^[0-9]+$'; then
+                echo "batch_number must be a non-negative integer, got: $BATCH_NUMBER" >&2
+                exit 1
+              fi
+              echo "matrix={\"batch\":[$BATCH_NUMBER]}" >> "$GITHUB_OUTPUT"
+              echo "Manual dispatch: batch $BATCH_NUMBER"
+            else
+              # No batch number: one job over all agencies (or the single --agency).
+              # -1 is the "no --batch-number" sentinel consumed by the etl step.
+              echo 'matrix={"batch":[-1]}' >> "$GITHUB_OUTPUT"
+              echo "Manual dispatch: single run (no batch slicing)"
+            fi
+            echo "skip_upload=$SKIP_UPLOAD" >> "$GITHUB_OUTPUT"
+            echo "use_iceberg=$USE_ICEBERG" >> "$GITHUB_OUTPUT"
           fi
 
+  etl-new:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      # Serialize batches: they all write the single Iceberg `comments` table, so
+      # running them concurrently would contend on catalog commits.
+      max-parallel: 1
+      # One bad batch must not cancel the others.
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
+
+    steps:
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -116,7 +154,6 @@ jobs:
 
       - name: Run new pipeline
         env:
-          # Only used if skip_upload is turned off; harmless otherwise.
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
@@ -127,35 +164,37 @@ jobs:
           R2_CATALOG_WAREHOUSE: ${{ secrets.R2_CATALOG_WAREHOUSE }}
           R2_CATALOG_TOKEN: ${{ secrets.R2_CATALOG_TOKEN }}
           R2_CATALOG_NAMESPACE: ${{ secrets.R2_CATALOG_NAMESPACE }}
+          # Free-text inputs via env (never interpolated into the shell body), then
+          # validated below before they reach the command line.
+          AGENCY: ${{ inputs.agency }}
+          SINCE_YEAR: ${{ inputs.since_year }}
+          BATCH: ${{ matrix.batch }}
+          FULL_REFRESH: ${{ inputs.full_refresh }}
+          SKIP_UPLOAD: ${{ needs.setup.outputs.skip_upload }}
+          USE_ICEBERG: ${{ needs.setup.outputs.use_iceberg }}
         run: |
-          ARGS=""
-          if [ -n "${{ inputs.agency }}" ]; then
-            ARGS="$ARGS --agency ${{ inputs.agency }}"
+          set -euo pipefail
+          if [ -n "$AGENCY" ] && ! printf '%s' "$AGENCY" | grep -Eq '^[A-Za-z0-9_-]+$'; then
+            echo "agency must match [A-Za-z0-9_-], got: $AGENCY" >&2; exit 1
           fi
-          if [ -n "${{ inputs.since_year }}" ]; then
-            ARGS="$ARGS --since-year ${{ inputs.since_year }}"
+          if [ -n "$SINCE_YEAR" ] && ! printf '%s' "$SINCE_YEAR" | grep -Eq '^[0-9]{4}$'; then
+            echo "since_year must be a 4-digit year, got: $SINCE_YEAR" >&2; exit 1
           fi
-          if [ -n "${{ steps.params.outputs.batch_number }}" ]; then
-            ARGS="$ARGS --batch-number ${{ steps.params.outputs.batch_number }} --batch-size 21"
-          fi
-          if [ "${{ inputs.full_refresh }}" = "true" ]; then
-            ARGS="$ARGS --full-refresh"
-          fi
-          if [ "${{ steps.params.outputs.skip_upload }}" = "true" ]; then
-            ARGS="$ARGS --skip-upload"
-          else
-            ARGS="$ARGS --no-skip-upload"
-          fi
-          if [ "${{ steps.params.outputs.use_iceberg }}" = "true" ]; then
-            ARGS="$ARGS --use-iceberg"
-          fi
-          echo "Running: uv run run-pipeline $ARGS"
-          uv run run-pipeline $ARGS
+          ARGS=()
+          if [ -n "$AGENCY" ]; then ARGS+=(--agency "$AGENCY"); fi
+          if [ -n "$SINCE_YEAR" ]; then ARGS+=(--since-year "$SINCE_YEAR"); fi
+          # BATCH == -1 is the "no batch slicing" sentinel (single dispatch run).
+          if [ "$BATCH" != "-1" ]; then ARGS+=(--batch-number "$BATCH" --batch-size 22); fi
+          if [ "$FULL_REFRESH" = "true" ]; then ARGS+=(--full-refresh); fi
+          if [ "$SKIP_UPLOAD" = "true" ]; then ARGS+=(--skip-upload); else ARGS+=(--no-skip-upload); fi
+          if [ "$USE_ICEBERG" = "true" ]; then ARGS+=(--use-iceberg); fi
+          echo "Running: uv run run-pipeline ${ARGS[*]}"
+          uv run run-pipeline "${ARGS[@]}"
 
       - name: Upload artifacts (for debugging)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: etl-new-pipeline-output
+          name: etl-new-pipeline-output-batch-${{ matrix.batch }}
           path: output/
           retention-days: 7
