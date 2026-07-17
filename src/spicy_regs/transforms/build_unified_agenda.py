@@ -103,7 +103,10 @@ def _shape(doc: dict) -> dict:
     timetable = doc.get("timetable") or []
     dates = _iso_dates(timetable)
     first_action = dates[0] if dates else None
-    next_action = next((d for d in dates if d > first_action), None) if dates else None
+    next_action = None
+    if dates:
+        earliest = dates[0]  # str, not str | None — keeps the comparison well-typed
+        next_action = next((d for d in dates if d > earliest), None)
 
     rin = _s(doc.get("rin"))
     edition = _s(doc.get("agenda_edition"))

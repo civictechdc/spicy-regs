@@ -11,6 +11,7 @@ so no network is touched.
 from __future__ import annotations
 
 import json
+from unittest.mock import patch
 
 from spicy_regs.sources import unified_agenda
 from spicy_regs.sources.unified_agenda import UnifiedAgendaReader
@@ -100,14 +101,10 @@ def _read_fixture(edition: str = "202510") -> list[dict]:
         return _FIXTURE_XML
 
     # Patch the bound method on the class so iter_records exercises the real
-    # iterparse + _normalize path against the fixture bytes.
-    original = UnifiedAgendaReader._download
-    try:
-        UnifiedAgendaReader._download = fake_download  # type: ignore[method-assign]
-        reader._client = object()  # _download asserts a client is set; it's stubbed
+    # iterparse + _normalize path against the fixture bytes. The stubbed
+    # _download ignores the HTTP client, so none needs to be set.
+    with patch.object(UnifiedAgendaReader, "_download", fake_download):
         return list(reader._fetch_edition(edition))
-    finally:
-        UnifiedAgendaReader._download = original  # type: ignore[method-assign]
 
 
 def test_reader_parses_records_and_stamps_edition():
@@ -187,7 +184,7 @@ def test_download_rejects_non_xml_body(monkeypatch):
         def get(self, url, params=None):
             return _Resp()
 
-    reader._client = _Client()  # type: ignore[assignment]
+    monkeypatch.setattr(reader, "_client", _Client())
     assert reader._download("202510") is None
     assert list(reader._fetch_edition("202510")) == []
 
