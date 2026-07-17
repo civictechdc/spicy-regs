@@ -1,5 +1,6 @@
 from spicy_regs.sources import iceberg, r2
 from spicy_regs.sources.base import Reader, Writer
+from spicy_regs.sources.congress_bills import CongressBillsReader
 from spicy_regs.sources.derived_text import DerivedCommentText
 from spicy_regs.sources.federal_register import FederalRegisterReader
 from spicy_regs.sources.mirrulations import MirrulationsReader
@@ -11,6 +12,7 @@ __all__ = [
     "Reader",
     "Writer",
     "MirrulationsReader",
+    "CongressBillsReader",
     "UnifiedAgendaReader",
     "FederalRegisterReader",
     "DerivedCommentText",

@@ -46,6 +46,7 @@ jobs:
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
           # Passed via env (not interpolated into the command) to keep the run
           # step free of any templated string in an executable position.
           COMMAND: ${{ inputs.command }}
