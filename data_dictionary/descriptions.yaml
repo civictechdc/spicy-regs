@@ -155,3 +155,34 @@ tables:
       first_action_date: "Date of the earliest timetable action, when derivable. Often null."
       next_action_date: "Date of the next planned timetable action, when derivable. Often null."
       url: "URL of the entry's detail page on reginfo.gov."
+  federal_register:
+    summary: >-
+      One row per Federal Register document, ingested from the federalregister.gov
+      REST API by `build_federal_register`. The authoritative rule-publication
+      record — proposed rules, final rules, and notices — complementary to the
+      regulations.gov `dockets`/`documents` view. `regulation_id_numbers_json`
+      (RIN) and `cfr_references_json` are the join keys to the Unified Agenda and
+      the CFR. All columns are stored as VARCHAR; array-valued fields are JSON.
+    columns:
+      document_number: "FR document number (e.g. `2017-07442`). Primary key / dedup key."
+      title: "Document title."
+      abstract: "Agency-written abstract of the document. Often null."
+      document_type: "FR category: `Rule`, `Proposed Rule`, `Notice`, or `Presidential Document`."
+      publication_date: "Date the document was published in the Federal Register (ISO 8601 string). Sort key."
+      effective_on: "Date the action takes effect, when stated. Often null."
+      comments_close_on: "Public comment deadline, for documents that open a comment period. Often null."
+      signing_date: "Date a presidential document was signed. Null for non-presidential documents."
+      agencies_json: "JSON array of the issuing agencies as full FR agency objects (`raw_name`, `name`, `id`, `slug`, `parent_id`, …)."
+      agency_slugs: "Comma-separated FR agency slugs derived from `agencies_json` (e.g. `transportation-department,federal-aviation-administration`)."
+      docket_ids_json: "JSON array of docket identifier strings referenced by the document (e.g. regulations.gov docket numbers). Joins to `dockets`/`documents` via `fr_docket_links`."
+      regulation_id_numbers_json: "JSON array of Regulation Identifier Numbers (RINs). The join key to the Unified Agenda. Often `[]`."
+      cfr_references_json: "JSON array of CFR citations as `{title, part, chapter, citation_url}` objects. The join key to the CFR."
+      html_url: "URL of the document's HTML page on federalregister.gov."
+      pdf_url: "URL of the document's PDF rendition."
+      body_html_url: "URL of the document's full-text HTML body."
+      volume: "Federal Register volume number."
+      start_page: "First FR page of the document."
+      end_page: "Last FR page of the document."
+      subtype: "FR document subtype, when set. Often null."
+      executive_order_number: "Executive order number, for presidential EO documents. Null otherwise."
+      modify_date: "Processing/modification date carried from the prior published table; null for rows freshly ingested via the REST API (which does not expose it)."

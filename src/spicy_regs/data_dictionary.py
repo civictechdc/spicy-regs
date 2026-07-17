@@ -50,6 +50,7 @@ TABLES: tuple[str, ...] = (
     "agency_stats",
     "agency_monthly_volume",
     "unified_agenda",
+    "federal_register",
 )
 
 # Tables the MCP server (list_sources / describe_table / query_sql) exposes.
@@ -65,6 +66,7 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
         "agency_stats",
         "agency_monthly_volume",
         "unified_agenda",
+        "federal_register",
     }
 )
 
@@ -124,6 +126,32 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("first_action_date", "VARCHAR"),
         ("next_action_date", "VARCHAR"),
         ("url", "VARCHAR"),
+    ],
+    # Ingested from federalregister.gov (build_federal_register); all columns are
+    # stored as VARCHAR, array fields serialized as JSON strings.
+    "federal_register": [
+        ("document_number", "VARCHAR"),
+        ("title", "VARCHAR"),
+        ("abstract", "VARCHAR"),
+        ("document_type", "VARCHAR"),
+        ("publication_date", "VARCHAR"),
+        ("effective_on", "VARCHAR"),
+        ("comments_close_on", "VARCHAR"),
+        ("signing_date", "VARCHAR"),
+        ("agencies_json", "VARCHAR"),
+        ("agency_slugs", "VARCHAR"),
+        ("docket_ids_json", "VARCHAR"),
+        ("regulation_id_numbers_json", "VARCHAR"),
+        ("cfr_references_json", "VARCHAR"),
+        ("html_url", "VARCHAR"),
+        ("pdf_url", "VARCHAR"),
+        ("body_html_url", "VARCHAR"),
+        ("volume", "VARCHAR"),
+        ("start_page", "VARCHAR"),
+        ("end_page", "VARCHAR"),
+        ("subtype", "VARCHAR"),
+        ("executive_order_number", "VARCHAR"),
+        ("modify_date", "VARCHAR"),
     ],
 }
 
