@@ -53,6 +53,7 @@ TABLES: tuple[str, ...] = (
     "congress_bills",
     "unified_agenda",
     "federal_register",
+    "sam_entities",
 )
 
 # Tables the MCP server (list_sources / describe_table / query_sql) exposes.
@@ -71,6 +72,7 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
         "congress_bills",
         "unified_agenda",
         "federal_register",
+        "sam_entities",
     }
 )
 
@@ -185,6 +187,28 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("subtype", "VARCHAR"),
         ("executive_order_number", "VARCHAR"),
         ("modify_date", "VARCHAR"),
+    ],
+    # Ingested from the SAM.gov Entity API v4 (build_sam_entities); list-level
+    # fields only, all stored as VARCHAR. Keyed by uei (Unique Entity ID).
+    "sam_entities": [
+        ("uei", "VARCHAR"),
+        ("cage_code", "VARCHAR"),
+        ("legal_business_name", "VARCHAR"),
+        ("dba_name", "VARCHAR"),
+        ("entity_structure_desc", "VARCHAR"),
+        ("entity_type_desc", "VARCHAR"),
+        ("profit_structure_desc", "VARCHAR"),
+        ("state", "VARCHAR"),
+        ("city", "VARCHAR"),
+        ("zip_code", "VARCHAR"),
+        ("congressional_district", "VARCHAR"),
+        ("primary_naics", "VARCHAR"),
+        ("registration_status", "VARCHAR"),
+        ("registration_date", "VARCHAR"),
+        ("registration_expiration_date", "VARCHAR"),
+        ("exclusion_status_flag", "VARCHAR"),
+        ("purpose_of_registration_desc", "VARCHAR"),
+        ("entity_url", "VARCHAR"),
     ],
 }
 
@@ -310,9 +334,7 @@ def check_descriptions(
         if not (entry.get("summary") or "").strip():
             errors.append(f"[{table}] missing a 'summary' in descriptions.yaml")
         desc_cols = list((entry.get("columns") or {}).keys())
-        errors.extend(
-            _reconcile_columns(table, "schema", schema_cols, "descriptions.yaml", desc_cols)
-        )
+        errors.extend(_reconcile_columns(table, "schema", schema_cols, "descriptions.yaml", desc_cols))
         for col in schema_cols:
             text = (entry.get("columns") or {}).get(col)
             if col in desc_cols and not (text or "").strip():
@@ -329,9 +351,7 @@ def check_schema_drift(
     for table in TABLES:
         exp_cols = [c for c, _ in expected.get(table, [])]
         live_cols = [c for c, _ in live.get(table, [])]
-        errors.extend(
-            _reconcile_columns(table, "in-code schema", exp_cols, "live parquet", live_cols)
-        )
+        errors.extend(_reconcile_columns(table, "in-code schema", exp_cols, "live parquet", live_cols))
     return errors
 
 

@@ -50,6 +50,7 @@ TABLES = (
     "congress_bills",
     "unified_agenda",
     "federal_register",
+    "sam_entities",
 )
 # Kept just under the Vercel ``maxDuration`` (300s) so a runaway query trips
 # this watchdog and returns a clean ``TimeoutError`` before the platform hard
@@ -90,9 +91,7 @@ def _parse_timeout_seconds(raw: str) -> float | None:
     try:
         value = float(text)
     except ValueError as exc:
-        raise RuntimeError(
-            f"SPICY_REGS_STATEMENT_TIMEOUT is not a valid duration: {raw!r}"
-        ) from exc
+        raise RuntimeError(f"SPICY_REGS_STATEMENT_TIMEOUT is not a valid duration: {raw!r}") from exc
     if value <= 0:
         return None
     return value * multiplier
@@ -118,9 +117,7 @@ def _resolve_r2_base_url() -> str:
     raw = os.environ.get("SPICY_REGS_R2_URL", DEFAULT_R2_BASE_URL).rstrip("/")
     parsed = urlparse(raw)
     if parsed.scheme != "https" or not parsed.netloc:
-        raise RuntimeError(
-            f"SPICY_REGS_R2_URL must be an https:// URL, got: {raw!r}"
-        )
+        raise RuntimeError(f"SPICY_REGS_R2_URL must be an https:// URL, got: {raw!r}")
     if any(c in raw for c in ("'", "\\", "\x00", "\n", "\r")):
         raise RuntimeError(f"SPICY_REGS_R2_URL contains illegal characters: {raw!r}")
     return raw
@@ -141,9 +138,7 @@ def _resolve_home_directory() -> str:
     """
     raw = os.environ.get("SPICY_REGS_HOME_DIR", tempfile.gettempdir())
     if any(c in raw for c in ("\x00", "\n", "\r")):
-        raise RuntimeError(
-            f"SPICY_REGS_HOME_DIR contains illegal characters: {raw!r}"
-        )
+        raise RuntimeError(f"SPICY_REGS_HOME_DIR contains illegal characters: {raw!r}")
     return raw
 
 
@@ -259,14 +254,8 @@ def _attach_catalog(con: duckdb.DuckDBPyConnection, config: dict[str, str]) -> b
             logger.info("avro not separately provisioned (%s); using iceberg's bundled path", avro_exc)
         con.execute("INSTALL iceberg")
         con.execute("LOAD iceberg")
-        con.execute(
-            "CREATE OR REPLACE SECRET r2_catalog_secret "
-            f"(TYPE ICEBERG, TOKEN '{config['token']}');"
-        )
-        con.execute(
-            f"ATTACH '{config['warehouse']}' AS {CATALOG_ALIAS} "
-            f"(TYPE ICEBERG, ENDPOINT '{config['uri']}');"
-        )
+        con.execute(f"CREATE OR REPLACE SECRET r2_catalog_secret (TYPE ICEBERG, TOKEN '{config['token']}');")
+        con.execute(f"ATTACH '{config['warehouse']}' AS {CATALOG_ALIAS} (TYPE ICEBERG, ENDPOINT '{config['uri']}');")
         return True
     except duckdb.Error as exc:
         logger.warning("R2 catalog attach failed; comments fall back to monolith: %s", exc)
@@ -292,17 +281,12 @@ def _connect() -> duckdb.DuckDBPyConnection:
         if name == "comments" and catalog_attached:
             namespace = catalog["namespace"]  # type: ignore[index]
             try:
-                con.execute(
-                    f'CREATE VIEW comments AS SELECT * FROM '
-                    f'{CATALOG_ALIAS}."{namespace}"."comments"'
-                )
+                con.execute(f'CREATE VIEW comments AS SELECT * FROM {CATALOG_ALIAS}."{namespace}"."comments"')
                 continue
             except duckdb.Error as exc:
                 # Catalog reachable but the table isn't there yet — fall back to
                 # the monolith rather than breaking every query on the server.
-                logger.warning(
-                    "comments not available in catalog; falling back to monolith: %s", exc
-                )
+                logger.warning("comments not available in catalog; falling back to monolith: %s", exc)
         url = f"{R2_BASE_URL}/{name}.parquet"
         try:
             con.execute(f"CREATE VIEW {name} AS SELECT * FROM read_parquet('{url}')")
@@ -339,9 +323,7 @@ def _statement_timeout(con: duckdb.DuckDBPyConnection) -> Iterator[None]:
         yield
     except duckdb.InterruptException as exc:
         if tripped.is_set():
-            raise TimeoutError(
-                f"Query exceeded the {STATEMENT_TIMEOUT} statement timeout"
-            ) from exc
+            raise TimeoutError(f"Query exceeded the {STATEMENT_TIMEOUT} statement timeout") from exc
         raise
     finally:
         timer.cancel()
@@ -357,9 +339,7 @@ mcp = FastMCP(
     # *.vercel.app hosts; FastMCP's default localhost-only DNS-rebinding
     # allowlist would reject all of them with 421. The server is public,
     # stateless, and read-only, so rebinding protection buys nothing here.
-    transport_security=TransportSecuritySettings(
-        enable_dns_rebinding_protection=False
-    ),
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
 )
 
 
@@ -420,9 +400,7 @@ def query_sql(sql: str, max_rows: int = 25) -> dict[str, Any]:
         cursor = con.execute(sql)
         columns = [desc[0] for desc in cursor.description] if cursor.description else []
         rows = cursor.fetchmany(max_rows)
-    result_rows = [
-        {col: _jsonify(val) for col, val in zip(columns, row)} for row in rows
-    ]
+    result_rows = [{col: _jsonify(val) for col, val in zip(columns, row)} for row in rows]
     return {
         "source": "r2",
         "base_url": R2_BASE_URL,
