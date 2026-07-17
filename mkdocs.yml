@@ -44,3 +44,4 @@ nav:
       - feed_summary: tables/feed_summary.md
       - agency_stats: tables/agency_stats.md
       - agency_monthly_volume: tables/agency_monthly_volume.md
+      - federal_register: tables/federal_register.md
