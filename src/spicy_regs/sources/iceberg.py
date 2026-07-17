@@ -456,6 +456,42 @@ def audit_duplicates(con, record_type: RecordType) -> list[tuple[str, int, int]]
     return [(r[0], r[1], r[2]) for r in rows]
 
 
+def _dedup_chunk_rows() -> int:
+    """Target upper bound on the rows any single dedup INSERT buffers.
+
+    Read at call time so ops can tune it via ``DEDUP_CHUNK_ROWS`` without a code
+    change (mirrors ``DEDUP_MEMORY_LIMIT`` / ``DEDUP_THREADS``).
+    """
+    return int(getenv("DEDUP_CHUNK_ROWS", "250000"))
+
+
+def _agency_chunk_count(con, source_tbl: str, where_agency: str) -> int:
+    """How many ``hash(key)`` buckets to split one agency's rows into.
+
+    Per-agency was assumed to fit, but the largest agencies (FDA ~1.8M comments,
+    each carrying full comment text) blow past the runner's memory as a single
+    INSERT — the ROW_NUMBER window sorts whole rows and the Iceberg writer buffers
+    the result. Splitting by ``hash(key) % chunks`` keeps every INSERT bounded.
+    """
+    n = con.execute(f"SELECT count(*) FROM {source_tbl} WHERE {where_agency}").fetchone()[0]
+    chunk = _dedup_chunk_rows()
+    if n <= chunk:
+        return 1
+    return (n + chunk - 1) // chunk
+
+
+def _key_bucket_predicates(where_agency: str, key: str, chunks: int) -> list[str]:
+    """Predicates splitting an agency into ``chunks`` disjoint ``hash(key)`` buckets.
+
+    All rows sharing a ``key`` fall in the same bucket (``hash`` is deterministic),
+    so per-bucket ``ROW_NUMBER() OVER (PARTITION BY key)`` dedup equals a per-agency
+    one. ``chunks == 1`` returns the agency predicate unchanged (no hashing cost).
+    """
+    if chunks <= 1:
+        return [where_agency]
+    return [f'({where_agency}) AND (hash("{key}") % {chunks}) = {k}' for k in range(chunks)]
+
+
 def dedupe_table(con, record_type: RecordType) -> tuple[int, int]:
     """Collapse the catalog table to one row per ``dedup_key`` (latest modify_date).
 
@@ -469,9 +505,11 @@ def dedupe_table(con, record_type: RecordType) -> tuple[int, int]:
       ``ROW_NUMBER() OVER (PARTITION BY key)`` OOMs the runner on the read side,
       and a single ``CREATE OR REPLACE ... AS SELECT`` of the whole table OOMs it
       on the Iceberg *write* side. Both the daily merge and the original seed only
-      ever write per-agency slices, which fit — so this does the same. Duplicates
-      only ever occur within one agency (a ``comment_id`` belongs to one agency),
-      so per-agency dedup equals a global one here.
+      ever write per-agency slices — but the biggest agencies no longer fit in one
+      slice either, so each agency is further split into ``hash(key)`` buckets of
+      at most ``DEDUP_CHUNK_ROWS`` rows. Duplicates only ever occur within one
+      agency (a ``comment_id`` belongs to one agency), and all rows for a key share
+      a bucket, so per-bucket dedup equals a global one here.
     * Never ``ALTER TABLE RENAME``. DuckDB's Iceberg REST integration does not
       implement it (``NotImplementedException: Alter Schema Entry``), so the swap
       replaces the live table by ``DROP`` + ``CREATE`` + per-agency ``INSERT``
@@ -509,7 +547,11 @@ def dedupe_table(con, record_type: RecordType) -> tuple[int, int]:
         con.execute(f"CREATE TABLE {tbl} ({col_defs});")
         for agency in sibling_agencies:
             where = "agency_code IS NULL" if agency is None else f"agency_code = '{_sql_str(agency)}'"
-            con.execute(f"INSERT INTO {tbl} ({col_list}) SELECT {col_list} FROM {dedup_tbl} WHERE {where};")
+            # Chunk large agencies so the Iceberg write buffer stays bounded (the
+            # sibling is already deduped, so this is a plain copy — no QUALIFY).
+            chunks = _agency_chunk_count(con, dedup_tbl, where)
+            for pred in _key_bucket_predicates(where, key, chunks):
+                con.execute(f"INSERT INTO {tbl} ({col_list}) SELECT {col_list} FROM {dedup_tbl} WHERE {pred};")
         rebuilt = con.execute(f"SELECT count(*) FROM {tbl}").fetchone()[0]
         if rebuilt != expected:
             raise RuntimeError(
@@ -538,18 +580,25 @@ def dedupe_table(con, record_type: RecordType) -> tuple[int, int]:
     logger.info("iceberg: rebuilding {} deduplicated across {} agency bucket(s)", name, len(agencies))
     for agency in agencies:
         where = "agency_code IS NULL" if agency is None else f"agency_code = '{_sql_str(agency)}'"
-        con.execute(
-            f"""
-            INSERT INTO {dedup_tbl} ({col_list})
-            SELECT {col_list}
-            FROM {tbl}
-            WHERE {where}
-            QUALIFY ROW_NUMBER() OVER (
-                PARTITION BY "{key}"
-                ORDER BY modify_date DESC NULLS LAST
-            ) = 1;
-            """
-        )
+        # Split large agencies into hash(key) buckets so the window sort + Iceberg
+        # write of one INSERT stays within the runner's memory. All rows for a key
+        # share a bucket, so the per-bucket ROW_NUMBER dedup is still correct.
+        chunks = _agency_chunk_count(con, tbl, where)
+        if chunks > 1:
+            logger.info("iceberg: agency {} split into {} hash(key) bucket(s) for bounded memory", agency, chunks)
+        for pred in _key_bucket_predicates(where, key, chunks):
+            con.execute(
+                f"""
+                INSERT INTO {dedup_tbl} ({col_list})
+                SELECT {col_list}
+                FROM {tbl}
+                WHERE {pred}
+                QUALIFY ROW_NUMBER() OVER (
+                    PARTITION BY "{key}"
+                    ORDER BY modify_date DESC NULLS LAST
+                ) = 1;
+                """
+            )
 
     after = con.execute(f"SELECT count(*) FROM {dedup_tbl}").fetchone()[0]
 

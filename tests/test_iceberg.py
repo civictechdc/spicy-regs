@@ -483,6 +483,65 @@ def test_audit_and_dedupe_table(tmp_path, local_catalog) -> None:
     assert kept == "2025-03-09T00:00:00Z"
 
 
+def test_key_bucket_predicates_and_chunk_count(monkeypatch) -> None:
+    """The bounded-memory helpers: chunk count rounds rows up to DEDUP_CHUNK_ROWS,
+    and the bucket predicates are disjoint hash(key) slices (or a no-op at 1)."""
+    monkeypatch.setenv("DEDUP_CHUNK_ROWS", "100")
+    assert iceberg._dedup_chunk_rows() == 100
+
+    # chunks <= 1 leaves the agency predicate untouched (no hashing overhead).
+    assert iceberg._key_bucket_predicates("agency_code = 'EPA'", "comment_id", 1) == ["agency_code = 'EPA'"]
+
+    preds = iceberg._key_bucket_predicates("agency_code = 'EPA'", "comment_id", 3)
+    assert len(preds) == 3
+    assert all('hash("comment_id") % 3' in p for p in preds)
+    assert preds[0].endswith("= 0") and preds[-1].endswith("= 2")
+
+
+def test_dedupe_table_chunked_matches_unchunked(tmp_path, local_catalog, monkeypatch) -> None:
+    """A tiny DEDUP_CHUNK_ROWS forces each agency to split into several hash(key)
+    buckets. Dedup must still collapse to one row per comment_id and keep the
+    latest modify_date — proving the bounded-memory chunking (added because the
+    largest agencies OOM as a single per-agency INSERT) never changes the result.
+    If same-key rows were split across buckets, a duplicate would survive and
+    audit_duplicates would flag it."""
+    con = local_catalog
+    iceberg._ensure_table(con, COMMENT)
+
+    base = tmp_path / "seed.parquet"
+    pl.DataFrame(
+        [
+            _comment("c1", "EPA-1", "EPA", "2025-01-01T00:00:00Z", modify_date="2025-01-01T00:00:00Z"),
+            _comment("c2", "EPA-1", "EPA", "2025-01-02T00:00:00Z", modify_date="2025-01-02T00:00:00Z"),
+            _comment("c3", "EPA-1", "EPA", "2025-01-03T00:00:00Z", modify_date="2025-01-03T00:00:00Z"),
+            _comment("c4", "EPA-1", "EPA", "2025-01-04T00:00:00Z", modify_date="2025-01-04T00:00:00Z"),
+            _comment("c5", "OMB-1", "OMB", "2025-02-01T00:00:00Z", modify_date="2025-02-01T00:00:00Z"),
+        ],
+        schema=COMMENT.schema,
+    ).write_parquet(base)
+    # Load 3x to duplicate every row, then a newer c1 so dedup must keep the latest.
+    for _ in range(3):
+        iceberg.seed_comments_from_parquet(con, str(base), COMMENT)
+    newer = tmp_path / "newer.parquet"
+    pl.DataFrame(
+        [_comment("c1", "EPA-1", "EPA", "2025-06-01T00:00:00Z", modify_date="2025-06-01T00:00:00Z")],
+        schema=COMMENT.schema,
+    ).write_parquet(newer)
+    iceberg.seed_comments_from_parquet(con, str(newer), COMMENT)
+
+    # 1 row/chunk => the multi-row EPA agency splits into more than one bucket.
+    monkeypatch.setenv("DEDUP_CHUNK_ROWS", "1")
+    assert iceberg._agency_chunk_count(con, iceberg._qualified(COMMENT), "agency_code = 'EPA'") > 1
+
+    before, after = iceberg.dedupe_table(con, COMMENT)
+    assert after == 5  # c1..c5 distinct
+    assert iceberg.audit_duplicates(con, COMMENT) == []
+    kept = con.execute(
+        f"SELECT modify_date FROM {iceberg._qualified(COMMENT)} WHERE comment_id = 'c1'"
+    ).fetchone()[0]
+    assert kept == "2025-06-01T00:00:00Z"
+
+
 def test_upsert_comment_text_fills_in_place(tmp_path, local_catalog) -> None:
     """upsert_comment_text sets text_content + text_extraction_status for the
     matched rows, preserves other columns, never duplicates rows, and COALESCE
