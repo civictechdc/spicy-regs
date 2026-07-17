@@ -3,6 +3,7 @@ from spicy_regs.transforms.build_agency_monthly_volume import build_agency_month
 from spicy_regs.transforms.build_agency_rollups import build_agency_rollups
 from spicy_regs.transforms.build_agency_stats import build_agency_stats
 from spicy_regs.transforms.build_discovery_signals import build_discovery_signals
+from spicy_regs.transforms.build_federal_register import build_federal_register
 from spicy_regs.transforms.build_feed_summary import build_feed_summary
 from spicy_regs.transforms.build_fr_docket_links import build_fr_docket_links
 from spicy_regs.transforms.build_rulemaking_lifecycles import build_rulemaking_lifecycles
@@ -38,6 +39,7 @@ __all__ = [
     "build_agency_monthly_volume",
     "build_discovery_signals",
     "build_rulemaking_lifecycles",
+    "build_federal_register",
     "build_fr_docket_links",
     "build_search_index",
     "INDEX_FILENAME",
