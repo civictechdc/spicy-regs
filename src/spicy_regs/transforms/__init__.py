@@ -8,6 +8,7 @@ from spicy_regs.transforms.build_feed_summary import build_feed_summary
 from spicy_regs.transforms.build_fr_docket_links import build_fr_docket_links
 from spicy_regs.transforms.build_rulemaking_lifecycles import build_rulemaking_lifecycles
 from spicy_regs.transforms.build_search_index import INDEX_FILENAME, build_search_index
+from spicy_regs.transforms.build_unified_agenda import build_unified_agenda
 from spicy_regs.transforms.chain import Chain
 from spicy_regs.transforms.enrich_derived_text import EnrichCommentText
 from spicy_regs.transforms.extract import ExtractRecords
@@ -41,6 +42,7 @@ __all__ = [
     "build_rulemaking_lifecycles",
     "build_federal_register",
     "build_fr_docket_links",
+    "build_unified_agenda",
     "build_search_index",
     "INDEX_FILENAME",
     "extract_pdf_text",

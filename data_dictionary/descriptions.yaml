@@ -127,6 +127,34 @@ tables:
       document_type: "Document category counted in this bucket (e.g. `Rule`, `Notice`)."
       document_count: "Number of documents the agency posted of that type in that month."
 
+  unified_agenda:
+    summary: >-
+      One row per Regulation Identifier Number (RIN) per agenda edition, ingested
+      from the OIRA/OMB Unified Agenda published at reginfo.gov by
+      `build_unified_agenda`. A Tier-1 rulemaking-lifecycle source: the upstream,
+      forward-looking catalog of rulemakings agencies *plan* to pursue, keyed by
+      the same `rin` that appears in `federal_register`
+      (`regulation_id_numbers_json`). Primary / dedup key is (`rin`,
+      `agenda_edition`). All columns are stored as VARCHAR; array-valued fields
+      are JSON strings.
+    columns:
+      rin: "Regulation Identifier Number (e.g. `2060-AV12`). The RIN join key to `federal_register`. Half of the primary/dedup key."
+      agency_code: "Short code of the agency that owns the RIN."
+      agency_name: "Full name of the agency that owns the RIN."
+      title: "Title of the planned rulemaking."
+      abstract: "Agency-written abstract describing the planned action. Often null."
+      rin_status: "Status of the RIN in this edition (e.g. `Active`, `Completed`, `Long-Term`)."
+      rule_stage: "Stage of the rulemaking in this edition (e.g. `Prerule`, `Proposed Rule`, `Final Rule`)."
+      priority_category: "OIRA priority classification (e.g. `Economically Significant`, `Other Significant`, `Substantive, Nonsignificant`)."
+      agenda_edition: "Semiannual agenda edition the row was published in, as `YYYYMM` (MM 04=Spring, 10=Fall). Half of the primary/dedup key."
+      major: "Whether the action is a major rule, as reported by the agenda (e.g. `Yes`/`No`). Often null."
+      publication_id: "reginfo.gov publication identifier for this agenda entry, when present."
+      timetable_json: "JSON array of timetable entries — the planned/actual milestone actions and their dates for the rulemaking."
+      cfr_references_json: "JSON array of CFR citations affected by the rulemaking. The join key to the CFR."
+      legal_authority_json: "JSON array of legal-authority citations the agency cites for the rulemaking."
+      first_action_date: "Date of the earliest timetable action, when derivable. Often null."
+      next_action_date: "Date of the next planned timetable action, when derivable. Often null."
+      url: "URL of the entry's detail page on reginfo.gov."
   federal_register:
     summary: >-
       One row per Federal Register document, ingested from the federalregister.gov

@@ -49,6 +49,7 @@ TABLES: tuple[str, ...] = (
     "feed_summary",
     "agency_stats",
     "agency_monthly_volume",
+    "unified_agenda",
     "federal_register",
 )
 
@@ -64,6 +65,7 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
         "feed_summary",
         "agency_stats",
         "agency_monthly_volume",
+        "unified_agenda",
         "federal_register",
     }
 )
@@ -103,6 +105,27 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("month", "BIGINT"),
         ("document_type", "VARCHAR"),
         ("document_count", "BIGINT"),
+    ],
+    # Ingested from reginfo.gov (build_unified_agenda); all columns are stored as
+    # VARCHAR, array fields serialized as JSON strings. Keyed by (rin, agenda_edition).
+    "unified_agenda": [
+        ("rin", "VARCHAR"),
+        ("agency_code", "VARCHAR"),
+        ("agency_name", "VARCHAR"),
+        ("title", "VARCHAR"),
+        ("abstract", "VARCHAR"),
+        ("rin_status", "VARCHAR"),
+        ("rule_stage", "VARCHAR"),
+        ("priority_category", "VARCHAR"),
+        ("agenda_edition", "VARCHAR"),
+        ("major", "VARCHAR"),
+        ("publication_id", "VARCHAR"),
+        ("timetable_json", "VARCHAR"),
+        ("cfr_references_json", "VARCHAR"),
+        ("legal_authority_json", "VARCHAR"),
+        ("first_action_date", "VARCHAR"),
+        ("next_action_date", "VARCHAR"),
+        ("url", "VARCHAR"),
     ],
     # Ingested from federalregister.gov (build_federal_register); all columns are
     # stored as VARCHAR, array fields serialized as JSON strings.

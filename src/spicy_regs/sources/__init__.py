@@ -5,11 +5,13 @@ from spicy_regs.sources.federal_register import FederalRegisterReader
 from spicy_regs.sources.mirrulations import MirrulationsReader
 from spicy_regs.sources.parquet import StagingWriter
 from spicy_regs.sources.pdf import fetch_pdf_bytes
+from spicy_regs.sources.unified_agenda import UnifiedAgendaReader
 
 __all__ = [
     "Reader",
     "Writer",
     "MirrulationsReader",
+    "UnifiedAgendaReader",
     "FederalRegisterReader",
     "DerivedCommentText",
     "StagingWriter",
