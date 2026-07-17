@@ -47,6 +47,8 @@ TABLES = (
     "agency_stats",
     "agency_monthly_volume",
     "congress_bills",
+    "unified_agenda",
+    "federal_register",
 )
 # Matches the Vercel copy's default (kept just under that deploy's 300s
 # ``maxDuration``). Override with ``SPICY_REGS_STATEMENT_TIMEOUT``.
@@ -300,7 +302,14 @@ def _connect() -> duckdb.DuckDBPyConnection:
                     "comments not available in catalog; falling back to monolith: %s", exc
                 )
         url = f"{R2_BASE_URL}/{name}.parquet"
-        con.execute(f"CREATE VIEW {name} AS SELECT * FROM read_parquet('{url}')")
+        try:
+            con.execute(f"CREATE VIEW {name} AS SELECT * FROM read_parquet('{url}')")
+        except duckdb.Error as exc:
+            # A table registered in TABLES whose parquet isn't published yet
+            # (e.g. a new source whose first upload hasn't run) shouldn't break
+            # every query on the server — skip its view and keep the rest, the
+            # same way the comments-catalog branch degrades above.
+            logger.warning("table %s not available at %s; skipping view: %s", name, url, exc)
     return con
 
 
