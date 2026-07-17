@@ -18,16 +18,15 @@ Instead we:
 
 With no prior table (first run) step 3 keeps only the freshly fetched editions.
 
-.. note::
-   The reginfo.gov endpoint/params are **not** validated against a live run here
-   (see :mod:`spicy_regs.sources.unified_agenda`); the transform is exercised only
-   with hermetic fixtures. Field names read off each raw entry
-   (:func:`_shape`) likewise require confirmation against a real payload.
+The reginfo.gov XML export the reader parses is documented in
+:mod:`spicy_regs.sources.unified_agenda`; :func:`_shape` maps the reader's
+normalized per-RIN dict onto the pinned 17 columns.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pyarrow as pa
@@ -70,38 +69,69 @@ def _s(value: object) -> str | None:
     return str(value)
 
 
-def _first(doc: dict, *keys: str) -> object:
-    """Return the first present, non-None value among ``keys`` (source key drift)."""
-    for key in keys:
-        if key in doc and doc[key] is not None:
-            return doc[key]
-    return None
+# reginfo timetable dates are ``MM/DD/YYYY`` (day may be ``00`` for month-only);
+# anything else (e.g. ``To Be Determined``) is not a real date and is skipped.
+_MDY = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
+
+
+def _iso_dates(timetable: list) -> list[str]:
+    """Return the timetable's parseable action dates as sorted ISO ``YYYY-MM-DD``."""
+    dates: set[str] = set()
+    for entry in timetable:
+        raw = (entry or {}).get("date")
+        if not isinstance(raw, str):
+            continue
+        m = _MDY.match(raw.strip())
+        if not m:
+            continue
+        month, day, year = int(m.group(1)), int(m.group(2)), m.group(3)
+        if not 1 <= month <= 12:
+            continue
+        day = min(max(day, 1), 31)  # clamp; ``00`` (month-only) becomes the 1st
+        dates.add(f"{year}-{month:02d}-{day:02d}")
+    return sorted(dates)
 
 
 def _shape(doc: dict) -> dict:
-    """Map one raw Unified Agenda entry onto the published column shape.
+    """Map one normalized Unified Agenda RIN dict onto the published column shape.
 
-    reginfo.gov's exact field names are unverified (see the source module), so
-    the common casings are accepted and the first present one wins.
+    The reader (:mod:`spicy_regs.sources.unified_agenda`) already normalizes the
+    XML tags onto these keys. ``first_action_date`` / ``next_action_date`` are
+    derived from the timetable (earliest action, then the earliest later action);
+    ``url`` is the deterministic per-RIN reginfo detail page.
     """
+    timetable = doc.get("timetable") or []
+    dates = _iso_dates(timetable)
+    first_action = dates[0] if dates else None
+    next_action = None
+    if dates:
+        earliest = dates[0]  # str, not str | None — keeps the comparison well-typed
+        next_action = next((d for d in dates if d > earliest), None)
+
+    rin = _s(doc.get("rin"))
+    edition = _s(doc.get("agenda_edition"))
+    url = None
+    if rin and edition:
+        url = f"https://www.reginfo.gov/public/do/eAgendaViewRule?pubId={edition}&RIN={rin}"
+
     return {
-        "rin": _s(_first(doc, "rin", "RIN")),
-        "agency_code": _s(_first(doc, "agency_code", "agencyCode")),
-        "agency_name": _s(_first(doc, "agency_name", "agencyName", "agency")),
-        "title": _s(_first(doc, "title", "ruleTitle")),
-        "abstract": _s(_first(doc, "abstract")),
-        "rin_status": _s(_first(doc, "rin_status", "rinStatus", "status")),
-        "rule_stage": _s(_first(doc, "rule_stage", "ruleStage", "stage")),
-        "priority_category": _s(_first(doc, "priority_category", "priorityCategory", "priority")),
-        "agenda_edition": _s(_first(doc, "agenda_edition", "agendaEdition", "publication")),
-        "major": _s(_first(doc, "major")),
-        "publication_id": _s(_first(doc, "publication_id", "publicationId")),
-        "timetable_json": json.dumps(_first(doc, "timetable", "timetables") or []),
-        "cfr_references_json": json.dumps(_first(doc, "cfr_references", "cfrReferences") or []),
-        "legal_authority_json": json.dumps(_first(doc, "legal_authority", "legalAuthority") or []),
-        "first_action_date": _s(_first(doc, "first_action_date", "firstActionDate")),
-        "next_action_date": _s(_first(doc, "next_action_date", "nextActionDate")),
-        "url": _s(_first(doc, "url")),
+        "rin": rin,
+        "agency_code": _s(doc.get("agency_code")),
+        "agency_name": _s(doc.get("agency_name")),
+        "title": _s(doc.get("title")),
+        "abstract": _s(doc.get("abstract")),
+        "rin_status": _s(doc.get("rin_status")),
+        "rule_stage": _s(doc.get("rule_stage")),
+        "priority_category": _s(doc.get("priority_category")),
+        "agenda_edition": edition,
+        "major": _s(doc.get("major")),
+        "publication_id": _s(doc.get("publication_id")),
+        "timetable_json": json.dumps(timetable),
+        "cfr_references_json": json.dumps(doc.get("cfr_references") or []),
+        "legal_authority_json": json.dumps(doc.get("legal_authority") or []),
+        "first_action_date": first_action,
+        "next_action_date": next_action,
+        "url": url,
     }
 
 
