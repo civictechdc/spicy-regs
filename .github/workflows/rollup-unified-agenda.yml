@@ -1,0 +1,19 @@
+name: Rollup — unified_agenda
+on:
+  schedule:
+    # 20:00 UTC — ingest the Unified Agenda ahead of the other RIN-keyed rollups.
+    - cron: '0 20 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-unified-agenda
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}
