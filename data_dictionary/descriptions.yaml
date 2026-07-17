@@ -127,6 +127,30 @@ tables:
       document_type: "Document category counted in this bucket (e.g. `Rule`, `Notice`)."
       document_count: "Number of documents the agency posted of that type in that month."
 
+  cfr_sections:
+    summary: >-
+      One row per Code of Federal Regulations *section* (a GovInfo CFR granule),
+      ingested from the GovInfo API by `build_cfr_sections`. This is the codified,
+      subject-organized body of federal regulations — `cfr_ref`/`title`/`part`/
+      `section` are the join keys back to Federal Register `cfr_references_json`
+      and, transitively, to regulations.gov activity. Scope is section METADATA +
+      CITATIONS only — the full regulatory *text* of each section is deliberately
+      out of scope for this pass (it is far heavier). Requires an api.data.gov key
+      (`DATA_GOV_API_KEY`); a keyless ingest run is a no-op. All columns are stored
+      as VARCHAR. NOTE: the GovInfo traversal + field mapping await live validation
+      with a key.
+    columns:
+      granule_id: "GovInfo granule id for the section. Primary key / dedup key."
+      package_id: "GovInfo package id (the enclosing CFR title-year edition) the granule belongs to."
+      cfr_ref: "Compact CFR citation composed from title/part/section (e.g. `40-60.1`). The join key to Federal Register `cfr_references_json`."
+      title: "CFR title number (e.g. `40`)."
+      part: "CFR part number within the title (e.g. `60`)."
+      section: "CFR section number within the part (e.g. `1`). Often null for non-section granules."
+      heading: "Section heading / caption text as published by GovInfo."
+      structure_level: "GovInfo granule class / structural level (e.g. `SECTION`, `PART`, `APPENDIX`)."
+      edition_year: "Annual CFR edition the granule was issued in (from GovInfo `editionYear`/`dateIssued`). Drives incremental freshness."
+      last_modified: "GovInfo last-modified timestamp for the granule. Drives incremental freshness alongside `edition_year`."
+      url: "Canonical GovInfo details/link URL for the granule."
   congress_bills:
     summary: >-
       One row per congressional bill, ingested from the Congress.gov v3 REST API

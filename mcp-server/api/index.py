@@ -46,6 +46,7 @@ TABLES = (
     "feed_summary",
     "agency_stats",
     "agency_monthly_volume",
+    "cfr_sections",
     "congress_bills",
     "unified_agenda",
     "federal_register",

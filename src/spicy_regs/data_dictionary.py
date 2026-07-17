@@ -49,6 +49,7 @@ TABLES: tuple[str, ...] = (
     "feed_summary",
     "agency_stats",
     "agency_monthly_volume",
+    "cfr_sections",
     "congress_bills",
     "unified_agenda",
     "federal_register",
@@ -66,6 +67,7 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
         "feed_summary",
         "agency_stats",
         "agency_monthly_volume",
+        "cfr_sections",
         "congress_bills",
         "unified_agenda",
         "federal_register",
@@ -107,6 +109,21 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("month", "BIGINT"),
         ("document_type", "VARCHAR"),
         ("document_count", "BIGINT"),
+    ],
+    # Ingested from GovInfo CFR (build_cfr_sections); section metadata + citations
+    # only (not full text). All columns are stored as VARCHAR.
+    "cfr_sections": [
+        ("granule_id", "VARCHAR"),
+        ("package_id", "VARCHAR"),
+        ("cfr_ref", "VARCHAR"),
+        ("title", "VARCHAR"),
+        ("part", "VARCHAR"),
+        ("section", "VARCHAR"),
+        ("heading", "VARCHAR"),
+        ("structure_level", "VARCHAR"),
+        ("edition_year", "VARCHAR"),
+        ("last_modified", "VARCHAR"),
+        ("url", "VARCHAR"),
     ],
     # Ingested from the Congress.gov v3 API (build_congress_bills); list-level
     # fields only, all stored as VARCHAR.
