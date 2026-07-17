@@ -49,3 +49,4 @@ nav:
       - unified_agenda: tables/unified_agenda.md
       - federal_register: tables/federal_register.md
       - lobbying_filings: tables/lobbying_filings.md
+      - fec_committees: tables/fec_committees.md

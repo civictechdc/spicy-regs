@@ -255,3 +255,32 @@ tables:
       lobbying_activities_json: "JSON array of lobbying activities, each `{general_issue_code, general_issue_code_display, description}` — the issue areas lobbied and their free-text descriptions."
       government_entities_json: "JSON array of the distinct government entities lobbied (`{id, name}`) — the agencies and chambers (e.g. `HOUSE OF REPRESENTATIVES`, `SENATE`) named across the filing's activities."
       url: "URL of the filing's printable document page on lda.senate.gov (`filing_document_url`)."
+  fec_committees:
+    summary: >-
+      One row per Federal Election Commission committee/PAC, ingested from the
+      OpenFEC `/committees` endpoint by `build_fec_committees`. A reference
+      dimension of the political committees — PACs, party committees, and
+      campaign committees — that money and endorsements flow through, used to
+      resolve commenters and co-filers against the dashboard's ally/opposition
+      (stance) map. Scope is deliberately committees-only: itemized
+      contributions (hundreds of millions of rows) are out of scope for this
+      pass and could follow as a future bounded-by-organization contributions
+      table keyed on `committee_id`. All columns are stored as VARCHAR;
+      array-valued fields are JSON strings.
+    columns:
+      committee_id: "OpenFEC committee identifier (e.g. `C00684373`). Primary key / dedup key."
+      name: "Committee name as registered with the FEC."
+      committee_type: "Single-letter committee type code (e.g. `P` presidential, `H` House, `S` Senate, `N`/`Q`/`O` PAC variants)."
+      committee_type_full: "Human-readable committee type (e.g. `Presidential`, `PAC - Qualified`)."
+      designation: "Single-letter committee designation code (e.g. `P` principal campaign committee, `A` authorized, `U` unauthorized, `J` joint fundraiser)."
+      designation_full: "Human-readable committee designation (e.g. `Principal campaign committee`)."
+      party: "Political party code, when set (e.g. `DEM`, `REP`, `W`). Often null for non-party committees."
+      party_full: "Human-readable political party (e.g. `DEMOCRATIC PARTY`, `WRITE-IN`). Often null."
+      state: "Two-letter state associated with the committee. Often null."
+      treasurer_name: "Name of the committee's treasurer."
+      organization_type_full: "Human-readable sponsoring organization type (e.g. `Corporation`, `Labor Organization`, `Trade Association`). Often null."
+      filing_frequency: "Single-letter filing frequency code (e.g. `A` administratively terminated, `M` monthly, `Q` quarterly, `T` terminated)."
+      first_file_date: "Date the committee first filed with the FEC (ISO 8601 string)."
+      last_file_date: "Date of the committee's most recent filing (ISO 8601 string)."
+      cycles_json: "JSON array of election-cycle years the committee was active in (e.g. `[2018, 2020, 2022]`)."
+      candidate_ids_json: "JSON array of OpenFEC candidate IDs associated with the committee (e.g. `[\"P00008052\"]`). Often `[]`."
