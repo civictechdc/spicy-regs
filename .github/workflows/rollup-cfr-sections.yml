@@ -1,0 +1,19 @@
+name: Rollup — cfr_sections
+on:
+  schedule:
+    # 20:30 UTC — ingest CFR section metadata ahead of the evening rollup window.
+    - cron: '30 20 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-cfr-sections
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}
