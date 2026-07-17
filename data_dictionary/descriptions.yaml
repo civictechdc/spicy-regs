@@ -171,7 +171,6 @@ tables:
       latest_action_text: "Text describing the most recent action on the bill."
       update_date: "Date the Congress.gov record was last updated (ISO 8601 string). Incremental window key."
       url: "Congress.gov API URL for the bill's detail resource."
-      policy_area: "Congress.gov policy-area label for the bill (e.g. `Health`). Often null."
   unified_agenda:
     summary: >-
       One row per Regulation Identifier Number (RIN) per agenda edition, ingested

@@ -138,7 +138,6 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("latest_action_text", "VARCHAR"),
         ("update_date", "VARCHAR"),
         ("url", "VARCHAR"),
-        ("policy_area", "VARCHAR"),
     ],
     # Ingested from reginfo.gov (build_unified_agenda); all columns are stored as
     # VARCHAR, array fields serialized as JSON strings. Keyed by (rin, agenda_edition).

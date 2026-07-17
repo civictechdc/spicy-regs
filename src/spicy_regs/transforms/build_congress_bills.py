@@ -1,6 +1,6 @@
 """Transform: build ``congress_bills.parquet`` from the Congress.gov REST API.
 
-Produces an 11-column all-VARCHAR schema keyed on ``bill_id`` (e.g.
+Produces a 10-column all-VARCHAR schema keyed on ``bill_id`` (e.g.
 ``118-hr-1234``), the legislative record complementary to the regulations.gov
 ``dockets``/``documents`` view.
 
@@ -38,8 +38,12 @@ OUTPUT = "congress_bills.parquet"
 # updated after our previous run's cutoff are picked up.
 OVERLAP_DAYS = 3
 
-# The published schema: 11 columns, all VARCHAR, in a fixed order. ``bill_id`` is
+# The published schema: 10 columns, all VARCHAR, in a fixed order. ``bill_id`` is
 # the primary / dedup key.
+#
+# ``policy_area`` is intentionally omitted — the ``/bill`` list endpoint doesn't
+# return it (it's a detail-endpoint-only field); it could be added later via a
+# per-bill detail enrichment pass.
 COLUMNS = (
     "bill_id",
     "congress",
@@ -51,7 +55,6 @@ COLUMNS = (
     "latest_action_text",
     "update_date",
     "url",
-    "policy_area",
 )
 _SCHEMA = pa.schema([(c, pa.string()) for c in COLUMNS])
 
@@ -76,7 +79,6 @@ def _bill_id(doc: dict) -> str | None:
 def _shape(doc: dict) -> dict:
     """Map one raw Congress.gov bill onto the published column shape."""
     latest_action = doc.get("latestAction") or {}
-    policy_area = doc.get("policyArea") or {}
     return {
         "bill_id": _bill_id(doc),
         "congress": _s(doc.get("congress")),
@@ -88,7 +90,6 @@ def _shape(doc: dict) -> dict:
         "latest_action_text": latest_action.get("text"),
         "update_date": doc.get("updateDate"),
         "url": doc.get("url"),
-        "policy_area": policy_area.get("name"),
     }
 
 

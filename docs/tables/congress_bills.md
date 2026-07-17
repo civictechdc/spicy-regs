@@ -19,4 +19,3 @@ One row per congressional bill, ingested from the Congress.gov v3 REST API (`/bi
 | `latest_action_text` | `VARCHAR` | Text describing the most recent action on the bill. |
 | `update_date` | `VARCHAR` | Date the Congress.gov record was last updated (ISO 8601 string). Incremental window key. |
 | `url` | `VARCHAR` | Congress.gov API URL for the bill's detail resource. |
-| `policy_area` | `VARCHAR` | Congress.gov policy-area label for the bill (e.g. `Health`). Often null. |
