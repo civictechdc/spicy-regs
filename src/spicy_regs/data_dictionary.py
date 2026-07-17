@@ -50,6 +50,7 @@ TABLES: tuple[str, ...] = (
     "agency_stats",
     "agency_monthly_volume",
     "cfr_sections",
+    "congress_bills",
     "unified_agenda",
     "federal_register",
 )
@@ -67,6 +68,7 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
         "agency_stats",
         "agency_monthly_volume",
         "cfr_sections",
+        "congress_bills",
         "unified_agenda",
         "federal_register",
     }
@@ -122,6 +124,21 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("edition_year", "VARCHAR"),
         ("last_modified", "VARCHAR"),
         ("url", "VARCHAR"),
+    ],
+    # Ingested from the Congress.gov v3 API (build_congress_bills); list-level
+    # fields only, all stored as VARCHAR.
+    "congress_bills": [
+        ("bill_id", "VARCHAR"),
+        ("congress", "VARCHAR"),
+        ("bill_type", "VARCHAR"),
+        ("bill_number", "VARCHAR"),
+        ("title", "VARCHAR"),
+        ("origin_chamber", "VARCHAR"),
+        ("latest_action_date", "VARCHAR"),
+        ("latest_action_text", "VARCHAR"),
+        ("update_date", "VARCHAR"),
+        ("url", "VARCHAR"),
+        ("policy_area", "VARCHAR"),
     ],
     # Ingested from reginfo.gov (build_unified_agenda); all columns are stored as
     # VARCHAR, array fields serialized as JSON strings. Keyed by (rin, agenda_edition).
