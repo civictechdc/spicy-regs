@@ -1,5 +1,6 @@
 from spicy_regs.sources import iceberg, r2
 from spicy_regs.sources.base import Reader, Writer
+from spicy_regs.sources.congress_bills import CongressBillsReader
 from spicy_regs.sources.derived_text import DerivedCommentText
 from spicy_regs.sources.mirrulations import MirrulationsReader
 from spicy_regs.sources.parquet import StagingWriter
@@ -9,6 +10,7 @@ __all__ = [
     "Reader",
     "Writer",
     "MirrulationsReader",
+    "CongressBillsReader",
     "DerivedCommentText",
     "StagingWriter",
     "fetch_pdf_bytes",

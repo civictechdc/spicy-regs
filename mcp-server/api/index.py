@@ -46,6 +46,7 @@ TABLES = (
     "feed_summary",
     "agency_stats",
     "agency_monthly_volume",
+    "congress_bills",
 )
 # Kept just under the Vercel ``maxDuration`` (300s) so a runaway query trips
 # this watchdog and returns a clean ``TimeoutError`` before the platform hard
