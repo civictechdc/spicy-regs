@@ -25,14 +25,14 @@ _RAW_BILL = {
     "latestAction": {"actionDate": "2024-03-01", "text": "Referred to committee."},
     "updateDate": "2024-03-05",
     "url": "https://api.congress.gov/v3/bill/118/hr/1234?format=json",
-    "policyArea": {"name": "Health"},
 }
 
 
 def test_shape_produces_exact_schema():
     row = _shape(_RAW_BILL)
-    # Every published column present, and nothing extra.
+    # Every published column present, and nothing extra (10-column schema).
     assert set(row) == set(COLUMNS)
+    assert len(COLUMNS) == 10
 
 
 def test_shape_maps_and_serializes_fields():
@@ -44,11 +44,10 @@ def test_shape_maps_and_serializes_fields():
     assert row["bill_number"] == "1234"  # int stringified
     assert row["title"] == "A Bill To Do A Thing"
     assert row["origin_chamber"] == "House"
-    # Nested latestAction / policyArea are flattened.
+    # Nested latestAction is flattened.
     assert row["latest_action_date"] == "2024-03-01"
     assert row["latest_action_text"] == "Referred to committee."
     assert row["update_date"] == "2024-03-05"
-    assert row["policy_area"] == "Health"
 
 
 def test_shape_handles_missing_nested_and_scalars():
@@ -57,7 +56,6 @@ def test_shape_handles_missing_nested_and_scalars():
     # Missing nested objects degrade to null, not KeyError.
     assert row["latest_action_date"] is None
     assert row["latest_action_text"] is None
-    assert row["policy_area"] is None
     assert row["origin_chamber"] is None
 
 
