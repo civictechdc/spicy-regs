@@ -21,13 +21,21 @@ Instead we:
 With no prior table (first run) step 2 becomes a full backfill. Incremental
 freshness is driven by ``edition_year`` / ``last_modified``.
 
-IMPORTANT: the GovInfo granule → summary field mapping in ``_shape`` is captured
-from GovInfo's public API docs but has **not** been validated against the live
-service; confirm it with a real api.data.gov key before enabling R2 upload.
+Field derivation (live-validated, no N+1). ``_shape`` derives every published
+column from the granule's **list-level** fields plus the ID grammar — it never
+calls the per-granule ``/summary`` endpoint (the only place ``cfrTitle`` /
+``cfrPart`` / ``heading`` live), which would be an N+1 fetch across thousands of
+granules per package. CFR title comes from the ``title(\\d+)`` token in the
+package/granule ID, edition year from the ``CFR-(\\d{4})`` token, and part /
+section from the ``part(\\d+)`` / ``sec(…)`` tokens on the granule ID (both
+nullable — section granularity varies by CFR title, so ``section`` is often
+null; some titles express sections as ``CONTENT`` granules with no ``part``
+token, leaving ``part`` null too).
 """
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pyarrow as pa
@@ -66,39 +74,67 @@ def _s(value: object) -> str | None:
 
 def _cfr_ref(title: object, part: object, section: object) -> str | None:
     """Compose a compact CFR citation like ``40-60.1`` from title/part/section."""
-    if title is None:
+    if title is None or part is None:
         return None
-    if part is None:
-        return _s(title)
     if section is None:
         return f"{title}-{part}"
     return f"{title}-{part}.{section}"
 
 
-def _shape(granule: dict) -> dict:
-    """Map one raw GovInfo CFR granule (+ merged summary) onto the published shape.
+# ID-grammar parsers. GovInfo CFR IDs look like:
+#   package: CFR-2024-title48-vol5
+#   granule: CFR-2024-title48-vol5-chap7-appA / …-part700 / …-sec60-1
+# Everything the schema needs is derivable from these tokens — no /summary call.
+_EDITION_RE = re.compile(r"CFR-(\d{4})")
+_TITLE_RE = re.compile(r"title(\d+)")
+_PART_RE = re.compile(r"part(\d+)")
+_SECTION_RE = re.compile(r"sec([\w.-]+)")
 
-    NOTE: field names below are from GovInfo's public API docs and need live
-    validation with a key (see module docstring). We read defensively so an
-    unexpected shape yields NULLs rather than raising.
+
+def _first(pattern: re.Pattern[str], text: str | None) -> str | None:
+    """Return the first capture group of ``pattern`` in ``text``, else None."""
+    if not text:
+        return None
+    match = pattern.search(text)
+    return match.group(1) if match else None
+
+
+def _shape(granule: dict) -> dict:
+    """Map one raw GovInfo CFR granule onto the published all-VARCHAR shape.
+
+    Derives everything from **list-level** fields + the ID grammar (no per-granule
+    ``/summary`` call — see module docstring). Reads defensively so an unexpected
+    shape yields NULLs rather than raising.
     """
-    # GovInfo's granule ``title`` field is the section *heading* text; the CFR
-    # title *number* comes from ``cfrTitle`` (falling back to ``titleNumber``).
-    title_num = granule.get("cfrTitle") or granule.get("titleNumber")
-    part = granule.get("cfrPart") or granule.get("part")
-    section = granule.get("cfrSection") or granule.get("section")
+    granule_id = _s(granule.get("granuleId"))
+    package_id = _s(granule.get("_package_id") or granule.get("packageId"))
+
+    # CFR title number + edition year: prefer the package id (always well-formed),
+    # fall back to the granule id, then dateIssued's leading year for the edition.
+    id_for_meta = package_id or granule_id
+    edition_year = _first(_EDITION_RE, id_for_meta)
+    if edition_year is None:
+        date_issued = _s(granule.get("dateIssued"))
+        edition_year = date_issued[:4] if date_issued else None
+    title_num = _first(_TITLE_RE, id_for_meta)
+
+    # Part / section from the granule id (both nullable — see module docstring).
+    part = _first(_PART_RE, granule_id)
+    section = _first(_SECTION_RE, granule_id)
+
     return {
-        "granule_id": _s(granule.get("granuleId")),
-        "package_id": _s(granule.get("_package_id") or granule.get("packageId")),
+        "granule_id": granule_id,
+        "package_id": package_id,
         "cfr_ref": _cfr_ref(title_num, part, section),
-        "title": _s(title_num),
-        "part": _s(part),
-        "section": _s(section),
-        "heading": granule.get("heading") or granule.get("title"),
-        "structure_level": _s(granule.get("granuleClass") or granule.get("structureLevel")),
-        "edition_year": _s(granule.get("editionYear") or granule.get("dateIssued")),
-        "last_modified": _s(granule.get("lastModified") or granule.get("dateModified")),
-        "url": _s(granule.get("detailsLink") or granule.get("granuleLink")),
+        "title": title_num,
+        "part": part,
+        "section": section,
+        # The granule list-level ``title`` field is the heading text.
+        "heading": _s(granule.get("title")),
+        "structure_level": _s(granule.get("granuleClass")),
+        "edition_year": edition_year,
+        "last_modified": _s(granule.get("_package_last_modified") or granule.get("lastModified")),
+        "url": f"https://www.govinfo.gov/app/details/{package_id}/{granule_id}" if package_id and granule_id else None,
     }
 
 
