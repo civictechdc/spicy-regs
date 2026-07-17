@@ -483,6 +483,43 @@ def test_audit_and_dedupe_table(tmp_path, local_catalog) -> None:
     assert kept == "2025-03-09T00:00:00Z"
 
 
+def test_dedupe_table_sub_batches_large_agency(tmp_path, local_catalog, monkeypatch) -> None:
+    """With DEDUP_ROWS_PER_BATCH forcing multiple hash buckets per agency, the
+    rebuild must still collapse to one row per comment_id (keeping the latest
+    modify_date) — bucketing by the key must not drop or duplicate any comment."""
+    con = local_catalog
+    iceberg._ensure_table(con, COMMENT)
+
+    # 20 distinct comments, each seeded twice (a duplicate copy) plus a newer
+    # version of one, so the dedup has real work per bucket.
+    rows = []
+    for i in range(20):
+        rows.append(_comment(f"c{i}", "EPA-1", "EPA", "2025-01-01T00:00:00Z", modify_date="2025-01-01T00:00:00Z"))
+    base = tmp_path / "seed.parquet"
+    pl.DataFrame(rows, schema=COMMENT.schema).write_parquet(base)
+    iceberg.seed_comments_from_parquet(con, str(base), COMMENT)
+    iceberg.seed_comments_from_parquet(con, str(base), COMMENT)  # duplicate every row
+
+    newer = tmp_path / "newer.parquet"
+    pl.DataFrame(
+        [_comment("c0", "EPA-1", "EPA", "2025-06-01T00:00:00Z", modify_date="2025-06-01T00:00:00Z")],
+        schema=COMMENT.schema,
+    ).write_parquet(newer)
+    iceberg.seed_comments_from_parquet(con, str(newer), COMMENT)
+
+    # Force several buckets per agency (41 rows / 5 -> 9 buckets) so the split path runs.
+    monkeypatch.setenv("DEDUP_ROWS_PER_BATCH", "5")
+    before, after = iceberg.dedupe_table(con, COMMENT)
+    assert before == 41  # 20*2 duplicates + 1 newer c0
+    assert after == 20  # one row per distinct comment_id
+
+    assert iceberg.audit_duplicates(con, COMMENT) == []
+    kept = con.execute(
+        f"SELECT modify_date FROM {iceberg._qualified(COMMENT)} WHERE comment_id = 'c0'"
+    ).fetchone()[0]
+    assert kept == "2025-06-01T00:00:00Z"  # newest version survived the bucketed dedup
+
+
 def test_upsert_comment_text_fills_in_place(tmp_path, local_catalog) -> None:
     """upsert_comment_text sets text_content + text_extraction_status for the
     matched rows, preserves other columns, never duplicates rows, and COALESCE

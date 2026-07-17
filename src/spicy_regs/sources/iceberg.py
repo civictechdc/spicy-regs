@@ -468,10 +468,13 @@ def dedupe_table(con, record_type: RecordType) -> tuple[int, int]:
     * Never touch tens of millions of rows in one statement. A global
       ``ROW_NUMBER() OVER (PARTITION BY key)`` OOMs the runner on the read side,
       and a single ``CREATE OR REPLACE ... AS SELECT`` of the whole table OOMs it
-      on the Iceberg *write* side. Both the daily merge and the original seed only
-      ever write per-agency slices, which fit — so this does the same. Duplicates
-      only ever occur within one agency (a ``comment_id`` belongs to one agency),
-      so per-agency dedup equals a global one here.
+      on the Iceberg *write* side. The build works per agency, and — because even
+      one large agency's dedup window buffers whole rows (comment text included)
+      and overflows the runner's memory limit despite on-disk spill — each agency
+      is further split into hash buckets of the dedup key sized to
+      ``DEDUP_ROWS_PER_BATCH`` rows. A key hashes to exactly one bucket and
+      duplicates only ever share a key, so per-bucket dedup equals per-agency
+      equals global dedup here; small agencies stay a single write.
     * Never ``ALTER TABLE RENAME``. DuckDB's Iceberg REST integration does not
       implement it (``NotImplementedException: Alter Schema Entry``), so the swap
       replaces the live table by ``DROP`` + ``CREATE`` + per-agency ``INSERT``
@@ -535,21 +538,33 @@ def dedupe_table(con, record_type: RecordType) -> tuple[int, int]:
     con.execute(f"CREATE TABLE {dedup_tbl} ({col_defs});")
 
     agencies = [r[0] for r in con.execute(f"SELECT DISTINCT agency_code FROM {tbl}").fetchall()]
+    counts = dict(con.execute(f"SELECT agency_code, count(*) FROM {tbl} GROUP BY agency_code").fetchall())
+    # A single agency's dedup window buffers whole rows (comment text included), so
+    # the largest agencies overflow the runner's memory limit even with spilling on.
+    # Split each agency into ceil(rows / DEDUP_ROWS_PER_BATCH) hash buckets of the
+    # dedup key to bound each window's input; a key hashes to one bucket and dupes
+    # share a key, so this doesn't change the result. Small agencies -> 1 bucket.
+    rows_per_batch = int(getenv("DEDUP_ROWS_PER_BATCH", "100000"))
     logger.info("iceberg: rebuilding {} deduplicated across {} agency bucket(s)", name, len(agencies))
     for agency in agencies:
         where = "agency_code IS NULL" if agency is None else f"agency_code = '{_sql_str(agency)}'"
-        con.execute(
-            f"""
-            INSERT INTO {dedup_tbl} ({col_list})
-            SELECT {col_list}
-            FROM {tbl}
-            WHERE {where}
-            QUALIFY ROW_NUMBER() OVER (
-                PARTITION BY "{key}"
-                ORDER BY modify_date DESC NULLS LAST
-            ) = 1;
-            """
-        )
+        n_buckets = max(1, -(-counts.get(agency, 0) // rows_per_batch))  # ceil division
+        for bucket in range(n_buckets):
+            # hash() is UBIGINT, so the modulo is non-negative; skip the filter
+            # entirely for single-bucket agencies to keep their write unchanged.
+            bucket_filter = "" if n_buckets == 1 else f' AND hash("{key}") % {n_buckets} = {bucket}'
+            con.execute(
+                f"""
+                INSERT INTO {dedup_tbl} ({col_list})
+                SELECT {col_list}
+                FROM {tbl}
+                WHERE {where}{bucket_filter}
+                QUALIFY ROW_NUMBER() OVER (
+                    PARTITION BY "{key}"
+                    ORDER BY modify_date DESC NULLS LAST
+                ) = 1;
+                """
+            )
 
     after = con.execute(f"SELECT count(*) FROM {dedup_tbl}").fetchone()[0]
 
