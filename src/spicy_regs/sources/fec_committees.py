@@ -18,9 +18,18 @@ of millions of rows and are deliberately out of scope for this pass; a future
 bounded-by-organization contributions pass could follow, keyed on the
 ``committee_id`` this table establishes.
 
-The endpoint is paginated by ``page``/``per_page`` (``per_page`` caps at 100);
-the response envelope carries ``pagination.page`` / ``pagination.pages`` so the
-reader walks from page 1 to the reported last page.
+**Pagination.** We walk with a stable sort key (``sort=committee_id``) and prefer
+OpenFEC's documented **keyset (seek)** pagination: when the response envelope
+carries a non-null ``pagination.last_indexes`` cursor we pass those keys straight
+back as query params on the next request instead of incrementing ``page``. Not
+every OpenFEC endpoint offers seek pagination — ``/committees`` in particular
+returns ``last_indexes: null`` and is walked by incrementing ``page`` (the sort
+key keeps that walk stable and duplicate-free). Either way the walk terminates
+only when a page comes back **empty** (guarded by ``_MAX_PAGES``); it never stops
+early on a short page. A short page mid-walk was the old bug: OpenFEC's deep
+offset pages occasionally return fewer than ``per_page`` rows even when more
+exist, and the previous ``len(results) < per_page`` early-break truncated the
+backfill at ~26K of ~89K committees.
 
 **API key.** OpenFEC is fronted by api.data.gov, so the same api.data.gov key
 this repo already uses for regulations.gov / Congress.gov / GovInfo works here,
@@ -60,10 +69,28 @@ _TIMEOUT = httpx.Timeout(60.0, connect=30.0)
 _MAX_RETRIES = 5
 _PROGRESS_EVERY = 5_000
 
-# Safety valve: stop paging past this many pages to avoid a runaway loop if the
-# API ever reports a nonsensical page count. ~89K committees / 100 per page is
-# well under 1,000 pages, so this only guards against pathology.
+# Safety valve: stop after this many page fetches to avoid a runaway loop if the
+# API ever fails to return an empty terminal page. ~89K committees / 100 per page
+# is well under 1,000 pages, so this only guards against pathology.
 _MAX_PAGES = 5_000
+
+# The stable, unique sort key we page against. Sorting by the primary key keeps
+# both the offset walk and the keyset (seek) walk deterministic and dup-free.
+_SORT_KEY = "committee_id"
+
+
+def _clean_cursor(last_indexes: object) -> dict[str, object]:
+    """Return a usable keyset cursor from ``pagination.last_indexes``, or ``{}``.
+
+    OpenFEC returns ``last_indexes`` as an object like
+    ``{"last_index": "...", "last_committee_id": "..."}`` on endpoints that
+    support seek pagination, and ``null`` on those that don't (e.g.
+    ``/committees``). Drop null-valued keys; an all-null / non-dict cursor means
+    "no seek pagination — walk by offset page instead".
+    """
+    if not isinstance(last_indexes, dict):
+        return {}
+    return {str(k): v for k, v in last_indexes.items() if v is not None}
 
 
 def _resolve_api_key() -> str | None:
@@ -122,11 +149,20 @@ class FecCommitteesReader(Reader):
     # -- pagination ----------------------------------------------------------
 
     def _paginate(self) -> Iterator[dict]:
-        """Walk ``page``/``per_page`` pages, following ``pagination.pages``."""
+        """Walk every page, preferring keyset (seek) cursors, else offset pages.
+
+        Terminates only on an empty ``results`` page (or the ``_MAX_PAGES`` /
+        ``max_pages`` guard). A short page is *not* a stop signal — that was the
+        bug that truncated the backfill at ~26K of ~89K committees.
+        """
         page = 1
-        last_page = self.max_pages if self.max_pages is not None else _MAX_PAGES
-        while page <= last_page and page <= _MAX_PAGES:
-            payload = self._get_page(page)
+        # Keyset cursor carried forward from ``pagination.last_indexes`` when the
+        # endpoint offers seek pagination; empty means "walk by offset page".
+        keyset: dict[str, object] = {}
+        # Cap the number of *fetches*, honoring a caller-supplied ``max_pages``.
+        max_fetches = _MAX_PAGES if self.max_pages is None else min(self.max_pages, _MAX_PAGES)
+        for _ in range(max_fetches):
+            payload = self._get_page(page, keyset)
             if payload is None:
                 break
             results = payload.get("results") or []
@@ -137,24 +173,29 @@ class FecCommitteesReader(Reader):
                 if self._seen % _PROGRESS_EVERY == 0:
                     logger.info("FEC committees: {:,} committees so far...", self._seen)
                 yield committee
-            # Trust the envelope's reported total page count when the caller
-            # hasn't capped it, so we stop exactly at the last real page.
-            if self.max_pages is None:
-                reported = (payload.get("pagination") or {}).get("pages")
-                if isinstance(reported, int) and reported > 0:
-                    last_page = min(reported, _MAX_PAGES)
-            # A short page also means the server has nothing more to give.
-            if len(results) < self.per_page:
-                break
-            page += 1
+            # Prefer the documented keyset cursor when the envelope provides one;
+            # otherwise fall back to incrementing the offset page (what
+            # ``/committees`` uses — it returns ``last_indexes: null``).
+            last_indexes = (payload.get("pagination") or {}).get("last_indexes")
+            cursor = _clean_cursor(last_indexes)
+            if cursor:
+                keyset = cursor
+            else:
+                keyset = {}
+                page += 1
 
-    def _get_page(self, page: int) -> dict | None:
+    def _get_page(self, page: int, keyset: dict[str, object]) -> dict | None:
         params: dict[str, object] = {
-            "page": page,
             "per_page": self.per_page,
-            "sort": "committee_id",
+            "sort": _SORT_KEY,
             "api_key": self.api_key,
         }
+        if keyset:
+            # Seek pagination: the ``last_indexes`` keys (e.g. ``last_index``,
+            # ``last_committee_id``) are the exact query-param names OpenFEC wants.
+            params.update(keyset)
+        else:
+            params["page"] = page
         return self._get(f"{API_BASE}/committees/", params)
 
     def _get(self, url: str, params: dict | None) -> dict | None:

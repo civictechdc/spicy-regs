@@ -53,9 +53,11 @@ TABLES: tuple[str, ...] = (
     "congress_bills",
     "unified_agenda",
     "federal_register",
+    "sam_entities",
     "lobbying_filings",
     "fec_committees",
     "court_dockets",
+    "usaspending_recipients",
 )
 
 # Tables the MCP server (list_sources / describe_table / query_sql) exposes.
@@ -74,9 +76,11 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
         "congress_bills",
         "unified_agenda",
         "federal_register",
+        "sam_entities",
         "lobbying_filings",
         "fec_committees",
         "court_dockets",
+        "usaspending_recipients",
     }
 )
 
@@ -192,6 +196,28 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("executive_order_number", "VARCHAR"),
         ("modify_date", "VARCHAR"),
     ],
+    # Ingested from the SAM.gov Entity API v4 (build_sam_entities); list-level
+    # fields only, all stored as VARCHAR. Keyed by uei (Unique Entity ID).
+    "sam_entities": [
+        ("uei", "VARCHAR"),
+        ("cage_code", "VARCHAR"),
+        ("legal_business_name", "VARCHAR"),
+        ("dba_name", "VARCHAR"),
+        ("entity_structure_desc", "VARCHAR"),
+        ("entity_type_desc", "VARCHAR"),
+        ("profit_structure_desc", "VARCHAR"),
+        ("state", "VARCHAR"),
+        ("city", "VARCHAR"),
+        ("zip_code", "VARCHAR"),
+        ("congressional_district", "VARCHAR"),
+        ("primary_naics", "VARCHAR"),
+        ("registration_status", "VARCHAR"),
+        ("registration_date", "VARCHAR"),
+        ("registration_expiration_date", "VARCHAR"),
+        ("exclusion_status_flag", "VARCHAR"),
+        ("purpose_of_registration_desc", "VARCHAR"),
+        ("entity_url", "VARCHAR"),
+    ],
     # Ingested from the Senate LDA REST API (build_lobbying_filings); all columns
     # are stored as VARCHAR, nested/array fields serialized as JSON strings.
     # Keyed by filing_uuid.
@@ -258,6 +284,18 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("pacer_case_id", "VARCHAR"),
         ("date_created", "VARCHAR"),
         ("absolute_url", "VARCHAR"),
+    ],
+    # Ingested from the USASpending.gov /api/v2/recipient/ endpoint
+    # (build_usaspending_recipients); a federal-award recipient reference
+    # dimension bounded to the top-N recipients by all-time award amount, all
+    # columns stored as VARCHAR. Keyed by recipient_id.
+    "usaspending_recipients": [
+        ("recipient_id", "VARCHAR"),
+        ("uei", "VARCHAR"),
+        ("duns", "VARCHAR"),
+        ("name", "VARCHAR"),
+        ("recipient_level", "VARCHAR"),
+        ("total_award_amount", "VARCHAR"),
     ],
 }
 

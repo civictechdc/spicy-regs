@@ -1,0 +1,19 @@
+name: Rollup — usaspending_recipients
+on:
+  schedule:
+    # 18:00 UTC — ingest the federal-award recipient reference dimension.
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-usaspending-recipients
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}

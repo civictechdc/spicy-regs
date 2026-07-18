@@ -50,9 +50,11 @@ TABLES = (
     "congress_bills",
     "unified_agenda",
     "federal_register",
+    "sam_entities",
     "lobbying_filings",
     "fec_committees",
     "court_dockets",
+    "usaspending_recipients",
 )
 # Kept just under the Vercel ``maxDuration`` (300s) so a runaway query trips
 # this watchdog and returns a clean ``TimeoutError`` before the platform hard
