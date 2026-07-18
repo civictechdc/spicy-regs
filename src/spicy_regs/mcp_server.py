@@ -50,10 +50,12 @@ TABLES = (
     "congress_bills",
     "unified_agenda",
     "federal_register",
+    "sam_entities",
     "lobbying_filings",
     "fec_committees",
     "gao_reports",
     "crs_reports",
+    "usaspending_recipients",
 )
 # Matches the Vercel copy's default (kept just under that deploy's 300s
 # ``maxDuration``). Override with ``SPICY_REGS_STATEMENT_TIMEOUT``.

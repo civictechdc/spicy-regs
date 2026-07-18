@@ -1,0 +1,19 @@
+name: Rollup — sam_entities
+on:
+  schedule:
+    # 19:00 UTC — ingest the SAM.gov entity registry ahead of the evening rollup window.
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-sam-entities
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}
