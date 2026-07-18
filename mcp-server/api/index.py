@@ -287,7 +287,20 @@ def _connect() -> duckdb.DuckDBPyConnection:
         if name == "comments" and catalog_attached:
             namespace = catalog["namespace"]  # type: ignore[index]
             try:
-                con.execute(f'CREATE VIEW comments AS SELECT * FROM {CATALOG_ALIAS}."{namespace}"."comments"')
+                # Dedup on read: keep one row per comment_id (latest modify_date).
+                # The catalog table can physically carry duplicate comment_id rows —
+                # DuckDB's Iceberg engine has no MERGE INTO, so the ETL upsert uses a
+                # plain DELETE, and DELETE does not reliably remove prior rows on the
+                # R2 Data Catalog, so a re-merged comment_id can leave its old row
+                # behind. This QUALIFY makes the read surface single-valued regardless;
+                # physical compaction reclaims the space out-of-band. Keep in sync with
+                # spicy_regs.mcp_server.
+                con.execute(
+                    f'CREATE VIEW comments AS '
+                    f'SELECT * FROM {CATALOG_ALIAS}."{namespace}"."comments" '
+                    f'QUALIFY ROW_NUMBER() OVER '
+                    f'(PARTITION BY comment_id ORDER BY modify_date DESC NULLS LAST) = 1'
+                )
                 continue
             except duckdb.Error as exc:
                 # Catalog reachable but the table isn't there yet — fall back to

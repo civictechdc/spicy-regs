@@ -286,7 +286,26 @@ def _connect() -> duckdb.DuckDBPyConnection:
         if name == "comments" and catalog_attached:
             namespace = catalog["namespace"]  # type: ignore[index]
             try:
-                con.execute(f'CREATE VIEW comments AS SELECT * FROM {CATALOG_ALIAS}."{namespace}"."comments"')
+                # Dedup on read: keep one row per comment_id (latest modify_date).
+                # The catalog table can physically carry duplicate comment_id rows
+                # because DuckDB's Iceberg engine has no MERGE INTO, so the ETL
+                # upsert (iceberg._merge) removes superseded rows with a plain
+                # DELETE — and DELETE does not reliably remove prior rows on the R2
+                # Data Catalog (the same limitation dedupe_table works around by
+                # never deleting). Any comment_id that is re-merged (a comment whose
+                # modify_date advanced, or a key re-staged by the redundant sweep)
+                # can therefore leave its old row behind next to the new one. This
+                # QUALIFY makes the read surface single-valued regardless, so counts
+                # aren't inflated and comments aren't repeated; physical compaction
+                # (scripts/dedupe_comments_catalog.py) reclaims the space out-of-band.
+                # A filter on agency_code/docket_id pushes down ahead of the window,
+                # so the common point-lookup queries only dedup the rows they touch.
+                con.execute(
+                    f'CREATE VIEW comments AS '
+                    f'SELECT * FROM {CATALOG_ALIAS}."{namespace}"."comments" '
+                    f'QUALIFY ROW_NUMBER() OVER '
+                    f'(PARTITION BY comment_id ORDER BY modify_date DESC NULLS LAST) = 1'
+                )
                 continue
             except duckdb.Error as exc:
                 # Catalog reachable but the table isn't there yet — fall back to
