@@ -2,7 +2,8 @@
 
 Covers the pieces with real logic: the raw-committee → published-schema mapping
 (``_shape`` / ``_json_array``), the API-key resolution fallback chain, and the
-page/per_page pagination with the ``pagination.pages`` walk and short-page stop.
+keyset-preferred / offset-fallback pagination (which must *not* stop early on a
+short page — that was the bug that truncated the backfill at ~26K of ~89K).
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ import json
 from spicy_regs.sources.fec_committees import (
     API_KEY_ENV_VARS,
     FecCommitteesReader,
+    _clean_cursor,
     _resolve_api_key,
 )
 from spicy_regs.transforms.build_fec_committees import COLUMNS, _shape
@@ -122,47 +124,89 @@ def _committee(cid: str) -> dict:
     return {"committee_id": cid}
 
 
-def test_paginate_walks_pages_until_reported_last_page(monkeypatch):
-    """Full pages advance; the envelope's ``pagination.pages`` bounds the walk."""
+def test_clean_cursor_extracts_keyset_or_empty():
+    # A real seek cursor is returned as-is (null-valued keys dropped).
+    assert _clean_cursor({"last_index": "42", "last_committee_id": "C9", "x": None}) == {
+        "last_index": "42",
+        "last_committee_id": "C9",
+    }
+    # /committees returns last_indexes: null -> no cursor -> offset fallback.
+    assert _clean_cursor(None) == {}
+    # An all-null cursor is likewise unusable.
+    assert _clean_cursor({"last_index": None}) == {}
+
+
+def test_paginate_offset_walk_stops_only_on_empty_page(monkeypatch):
+    """With ``last_indexes: null`` (the /committees case) walk by page to empty."""
     reader = FecCommitteesReader(api_key="test", per_page=2)
     pages = {
-        1: {
-            "results": [_committee("C1"), _committee("C2")],
-            "pagination": {"page": 1, "pages": 2},
-        },
-        2: {
-            "results": [_committee("C3"), _committee("C4")],
-            "pagination": {"page": 2, "pages": 2},
-        },
-        # Page 3 exists in the stub but must never be requested.
-        3: {"results": [_committee("C5")], "pagination": {"page": 3, "pages": 2}},
+        1: {"results": [_committee("C1"), _committee("C2")], "pagination": {"page": 1, "last_indexes": None}},
+        2: {"results": [_committee("C3"), _committee("C4")], "pagination": {"page": 2, "last_indexes": None}},
+        3: {"results": [_committee("C5")], "pagination": {"page": 3, "last_indexes": None}},
+        4: {"results": [], "pagination": {"page": 4, "last_indexes": None}},
     }
-    monkeypatch.setattr(reader, "_get_page", lambda page: pages.get(page, {"results": []}))
+    requested: list[tuple[int, dict]] = []
+
+    def stub(page, keyset):
+        requested.append((page, dict(keyset)))
+        return pages.get(page, {"results": []})
+
+    monkeypatch.setattr(reader, "_get_page", stub)
     got = [c["committee_id"] for c in reader._paginate()]
-    assert got == ["C1", "C2", "C3", "C4"]
+    assert got == ["C1", "C2", "C3", "C4", "C5"]
+    # Offset fallback: page increments, no keyset cursor ever passed.
+    assert [p for p, _ in requested] == [1, 2, 3, 4]
+    assert all(ks == {} for _, ks in requested)
 
 
-def test_paginate_stops_on_short_page(monkeypatch):
-    """A page shorter than per_page ends pagination even if pages says more."""
+def test_paginate_does_not_stop_on_short_page(monkeypatch):
+    """Regression: a short mid-walk page must NOT terminate the walk (the bug)."""
     reader = FecCommitteesReader(api_key="test", per_page=3)
     pages = {
-        1: {
-            "results": [_committee("C1"), _committee("C2")],  # short -> stop
-            "pagination": {"page": 1, "pages": 9},
-        },
+        1: {"results": [_committee("C1"), _committee("C2")], "pagination": {"last_indexes": None}},  # short!
+        2: {"results": [_committee("C3"), _committee("C4"), _committee("C5")], "pagination": {"last_indexes": None}},
+        3: {"results": [], "pagination": {"last_indexes": None}},
     }
-    monkeypatch.setattr(reader, "_get_page", lambda page: pages.get(page, {"results": []}))
+    monkeypatch.setattr(reader, "_get_page", lambda page, keyset: pages.get(page, {"results": []}))
     got = [c["committee_id"] for c in reader._paginate()]
-    assert got == ["C1", "C2"]
+    # Old code broke after C1/C2 on the short page; the walk must continue.
+    assert got == ["C1", "C2", "C3", "C4", "C5"]
+
+
+def test_paginate_follows_keyset_cursor_when_present(monkeypatch):
+    """When ``last_indexes`` is present, carry the cursor forward, don't page."""
+    reader = FecCommitteesReader(api_key="test", per_page=2)
+    by_cursor = {
+        None: {
+            "results": [_committee("C1"), _committee("C2")],
+            "pagination": {"last_indexes": {"last_index": "C2", "last_committee_id": "C2"}},
+        },
+        "C2": {
+            "results": [_committee("C3"), _committee("C4")],
+            "pagination": {"last_indexes": {"last_index": "C4", "last_committee_id": "C4"}},
+        },
+        "C4": {"results": [], "pagination": {"last_indexes": None}},
+    }
+    seen_pages: list[int] = []
+
+    def stub(page, keyset):
+        seen_pages.append(page)
+        return by_cursor.get(keyset.get("last_index"), {"results": []})
+
+    monkeypatch.setattr(reader, "_get_page", stub)
+    got = [c["committee_id"] for c in reader._paginate()]
+    assert got == ["C1", "C2", "C3", "C4"]
+    # Keyset walk: page never advances past 1 (the cursor does the seeking).
+    assert seen_pages == [1, 1, 1]
 
 
 def test_paginate_respects_max_pages_cap(monkeypatch):
-    """``max_pages`` caps the walk regardless of the reported page count."""
+    """``max_pages`` caps the number of fetches regardless of more data."""
     reader = FecCommitteesReader(api_key="test", per_page=1, max_pages=1)
     pages = {
-        1: {"results": [_committee("C1")], "pagination": {"page": 1, "pages": 100}},
-        2: {"results": [_committee("C2")], "pagination": {"page": 2, "pages": 100}},
+        1: {"results": [_committee("C1")], "pagination": {"last_indexes": None}},
+        2: {"results": [_committee("C2")], "pagination": {"last_indexes": None}},
     }
-    monkeypatch.setattr(reader, "_get_page", lambda page: pages.get(page, {"results": []}))
+    monkeypatch.setattr(reader, "_get_page", lambda page, keyset: pages.get(page, {"results": []}))
     got = [c["committee_id"] for c in reader._paginate()]
     assert got == ["C1"]
