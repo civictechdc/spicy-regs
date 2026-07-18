@@ -127,10 +127,18 @@ of `dockets`; they join to the corpus (and to each other) on a few shared keys:
 
 === "CLI"
 
+    The bundled [`spicy-regs` CLI](cli.md) downloads the parquet files and runs
+    SQL over every table — by default it reads local downloads when present and
+    streams from the bucket otherwise, so no download is required:
+
     ```bash
-    uvx --from "spicy-regs @ git+https://github.com/civictechdc/spicy-regs" spicy-regs download
-    uv run spicy-regs stats
+    uvx --from "spicy-regs @ git+https://github.com/civictechdc/spicy-regs" \
+      spicy-regs query "SELECT agency_code, count(*) FROM dockets GROUP BY 1 ORDER BY 2 DESC LIMIT 5"
+    uv run spicy-regs tables              # list every table
+    uv run spicy-regs download --all      # take the dataset offline
     ```
+
+    See the [CLI page](cli.md) for the full command reference.
 
 === "DuckDB (SQL)"
 

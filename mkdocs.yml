@@ -36,6 +36,7 @@ markdown_extensions:
 
 nav:
   - Overview: index.md
+  - CLI: cli.md
   - Tables:
       - dockets: tables/dockets.md
       - documents: tables/documents.md
