@@ -50,6 +50,7 @@ TABLES = (
     "congress_bills",
     "unified_agenda",
     "federal_register",
+    "sam_entities",
     "lobbying_filings",
     "fec_committees",
 )

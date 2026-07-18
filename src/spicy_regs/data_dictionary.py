@@ -53,6 +53,7 @@ TABLES: tuple[str, ...] = (
     "congress_bills",
     "unified_agenda",
     "federal_register",
+    "sam_entities",
     "lobbying_filings",
     "fec_committees",
 )
@@ -73,6 +74,7 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
         "congress_bills",
         "unified_agenda",
         "federal_register",
+        "sam_entities",
         "lobbying_filings",
         "fec_committees",
     }
@@ -189,6 +191,28 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("subtype", "VARCHAR"),
         ("executive_order_number", "VARCHAR"),
         ("modify_date", "VARCHAR"),
+    ],
+    # Ingested from the SAM.gov Entity API v4 (build_sam_entities); list-level
+    # fields only, all stored as VARCHAR. Keyed by uei (Unique Entity ID).
+    "sam_entities": [
+        ("uei", "VARCHAR"),
+        ("cage_code", "VARCHAR"),
+        ("legal_business_name", "VARCHAR"),
+        ("dba_name", "VARCHAR"),
+        ("entity_structure_desc", "VARCHAR"),
+        ("entity_type_desc", "VARCHAR"),
+        ("profit_structure_desc", "VARCHAR"),
+        ("state", "VARCHAR"),
+        ("city", "VARCHAR"),
+        ("zip_code", "VARCHAR"),
+        ("congressional_district", "VARCHAR"),
+        ("primary_naics", "VARCHAR"),
+        ("registration_status", "VARCHAR"),
+        ("registration_date", "VARCHAR"),
+        ("registration_expiration_date", "VARCHAR"),
+        ("exclusion_status_flag", "VARCHAR"),
+        ("purpose_of_registration_desc", "VARCHAR"),
+        ("entity_url", "VARCHAR"),
     ],
     # Ingested from the Senate LDA REST API (build_lobbying_filings); all columns
     # are stored as VARCHAR, nested/array fields serialized as JSON strings.

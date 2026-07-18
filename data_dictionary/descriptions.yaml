@@ -230,6 +230,37 @@ tables:
       subtype: "FR document subtype, when set. Often null."
       executive_order_number: "Executive order number, for presidential EO documents. Null otherwise."
       modify_date: "Processing/modification date carried from the prior published table; null for rows freshly ingested via the REST API (which does not expose it)."
+  sam_entities:
+    summary: >-
+      One row per registered federal entity, ingested from the SAM.gov Entity
+      Management API v4 (`/entities` list endpoint) by `build_sam_entities`. The
+      authoritative federal entity registry — the directory of organizations
+      registered to do business with or receive assistance from the U.S.
+      government — keyed by the Unique Entity ID (`uei`). This anchors
+      organization/entity resolution across the corpus: the same UEI ties a
+      commenting organization to its registered identity. Filtered to public
+      active registrations (`registrationStatus=A`). Scope is deliberately
+      list-level only (no per-entity detail fetches), and ingest is bounded and
+      incremental (deduped on `uei`). All columns are stored as VARCHAR.
+    columns:
+      uei: "Unique Entity ID (SAM `ueiSAM`, 12-char alphanumeric, e.g. `Q93HWX24PGA4`). Primary key / dedup key; the entity-resolution join key."
+      cage_code: "Commercial and Government Entity (CAGE) code assigned to the entity. Often null for newly registered entities."
+      legal_business_name: "Legal business name as registered in SAM.gov."
+      dba_name: "'Doing business as' name, when the entity registered one. Often null."
+      entity_structure_desc: "Entity structure description (`coreData.generalInformation.entityStructureDesc`, e.g. `Corporate Entity (Not Tax Exempt)`)."
+      entity_type_desc: "Entity type description (e.g. `Business or Organization`)."
+      profit_structure_desc: "Profit-structure description (e.g. `For Profit Organization`, `Non-Profit Organization`)."
+      state: "State or province code of the physical address (`coreData.physicalAddress.stateOrProvinceCode`). Null for many non-US registrants."
+      city: "City of the physical address."
+      zip_code: "ZIP / postal code of the physical address."
+      congressional_district: "U.S. congressional district of the physical address (`coreData.congressionalDistrict`). Null for non-US registrants."
+      primary_naics: "Primary NAICS industry code the entity asserted (`assertions.goodsAndServices.primaryNaics`). Often null."
+      registration_status: "Registration status as returned by the API (e.g. `Active`). The ingest filters on the request-side `registrationStatus=A`."
+      registration_date: "Date the entity's current registration was recorded (ISO 8601 string)."
+      registration_expiration_date: "Date the current registration expires (ISO 8601 string)."
+      exclusion_status_flag: "Whether the entity has an active exclusion/debarment record (`Y`/`N`)."
+      purpose_of_registration_desc: "Purpose-of-registration description (e.g. `Federal Assistance Awards`, `All Awards`)."
+      entity_url: "Entity's self-reported website URL (`coreData.entityInformation.entityURL`). Often null."
   lobbying_filings:
     summary: >-
       One row per federal lobbying-disclosure filing, ingested from the U.S.
