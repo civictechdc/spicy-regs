@@ -56,6 +56,8 @@ TABLES: tuple[str, ...] = (
     "sam_entities",
     "lobbying_filings",
     "fec_committees",
+    "gao_reports",
+    "crs_reports",
     "court_dockets",
     "usaspending_recipients",
 )
@@ -79,6 +81,8 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
         "sam_entities",
         "lobbying_filings",
         "fec_committees",
+        "gao_reports",
+        "crs_reports",
         "court_dockets",
         "usaspending_recipients",
     }
@@ -257,6 +261,31 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("last_file_date", "VARCHAR"),
         ("cycles_json", "VARCHAR"),
         ("candidate_ids_json", "VARCHAR"),
+    ],
+    # Ingested from the GAO reports RSS feed (build_gao_reports); an append-only
+    # accumulator of recently published products. All columns are stored as
+    # VARCHAR. Keyed by report_id.
+    "gao_reports": [
+        ("report_id", "VARCHAR"),
+        ("title", "VARCHAR"),
+        ("report_type", "VARCHAR"),
+        ("published_date", "VARCHAR"),
+        ("abstract", "VARCHAR"),
+        ("agencies_json", "VARCHAR"),
+        ("topics_json", "VARCHAR"),
+        ("url", "VARCHAR"),
+    ],
+    # Ingested from the Congress.gov v3 API (build_crs_reports); list-level
+    # fields only, all stored as VARCHAR. Keyed by report_id.
+    "crs_reports": [
+        ("report_id", "VARCHAR"),
+        ("title", "VARCHAR"),
+        ("report_type", "VARCHAR"),
+        ("status", "VARCHAR"),
+        ("published_date", "VARCHAR"),
+        ("update_date", "VARCHAR"),
+        ("version", "VARCHAR"),
+        ("url", "VARCHAR"),
     ],
     # Ingested from the CourtListener v4 search API (build_courtlistener); APA /
     # agency-review litigation dockets (nature-of-suit 899). All columns stored as

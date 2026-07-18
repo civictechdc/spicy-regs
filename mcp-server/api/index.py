@@ -53,6 +53,8 @@ TABLES = (
     "sam_entities",
     "lobbying_filings",
     "fec_committees",
+    "gao_reports",
+    "crs_reports",
     "court_dockets",
     "usaspending_recipients",
 )

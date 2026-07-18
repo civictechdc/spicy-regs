@@ -315,6 +315,45 @@ tables:
       last_file_date: "Date of the committee's most recent filing (ISO 8601 string)."
       cycles_json: "JSON array of election-cycle years the committee was active in (e.g. `[2018, 2020, 2022]`)."
       candidate_ids_json: "JSON array of OpenFEC candidate IDs associated with the committee (e.g. `[\"P00008052\"]`). Often `[]`."
+  gao_reports:
+    summary: >-
+      One row per U.S. Government Accountability Office (GAO) product, ingested
+      from the public GAO reports RSS feed by `build_gao_reports`. The federal
+      oversight layer over the rulemakings this dataset tracks — GAO's audits,
+      evaluations, and recommendations on how agencies implement laws and rules.
+      GAO's bulk/search surfaces are bot-blocked, so the RSS feed (a ~25-item
+      recent-products window) is the only anonymous machine-readable source;
+      the table is therefore an **append-only accumulator** that grows into a
+      rolling history over successive daily runs. Deduped on `report_id`. All
+      columns are stored as VARCHAR.
+    columns:
+      report_id: "GAO product id parsed from the product URL (e.g. `gao-26-107974`), lowercased. Primary key / dedup key."
+      title: "Product title as published in the feed."
+      report_type: "GAO product type. The reports feed does not tag a finer type, so this defaults to `Report`."
+      published_date: "Publication date parsed from the feed's `pubDate` to an ISO date string (e.g. `2026-07-17`). Sort key."
+      abstract: "The product summary from the feed (GAO's `What GAO Found` / `Why GAO Did This Study` narrative)."
+      agencies_json: "Reserved JSON array of agencies the product covers. The RSS feed carries no structured agency tags, so this is `[]` pending a future enrichment source."
+      topics_json: "Reserved JSON array of topics/subjects. The RSS feed carries no structured topic tags, so this is `[]` pending a future enrichment source."
+      url: "Canonical gao.gov URL for the product."
+  crs_reports:
+    summary: >-
+      One row per Congressional Research Service (CRS) report, ingested from the
+      Congress.gov v3 REST API (`/crsreport` list endpoint) by
+      `build_crs_reports`. The nonpartisan policy-analysis layer over the same
+      subjects agencies regulate — complementary to `congress_bills` (the
+      legislative record) and `federal_register` (the rule-publication record).
+      Scope is deliberately list-level only (no per-report detail fetches), so
+      every column comes from the list payload. Incremental by `update_date`,
+      deduped on `report_id`. All columns are stored as VARCHAR.
+    columns:
+      report_id: "CRS report id (e.g. `R48641`, `IN12713`). Primary key / dedup key."
+      title: "Report title as returned by the list endpoint."
+      report_type: "CRS product category from `contentType` (e.g. `Reports`, `Posts`)."
+      status: "Report status as reported by Congress.gov (e.g. `Active`)."
+      published_date: "Date the report was published (ISO 8601 string)."
+      update_date: "Date the Congress.gov record was last updated (ISO 8601 string). Incremental window key."
+      version: "Version number of the report as returned by the list endpoint."
+      url: "Congress.gov API URL for the report's detail resource."
   court_dockets:
     summary: >-
       One row per federal court docket challenging agency action under the
