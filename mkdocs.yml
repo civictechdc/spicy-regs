@@ -50,3 +50,5 @@ nav:
       - federal_register: tables/federal_register.md
       - lobbying_filings: tables/lobbying_filings.md
       - fec_committees: tables/fec_committees.md
+      - gao_reports: tables/gao_reports.md
+      - crs_reports: tables/crs_reports.md
