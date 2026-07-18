@@ -147,6 +147,18 @@ def _merge(con, staging_files: list[Path], record_type: RecordType) -> None:
     since-year-filtered run stages only a slice, so an agency-wide delete would
     drop the rows it isn't re-inserting. ``modify_date`` is an ISO-8601 string,
     so the lexical ``>`` comparison orders chronologically.
+
+    CAVEAT — the ``DELETE`` does not reliably remove prior rows on the R2 Data
+    Catalog (the same limitation that made the one-time seed duplicate rows and
+    that :func:`dedupe_table` works around by never deleting). So a key that is
+    *re-merged* — an existing comment whose ``modify_date`` advanced, or a key the
+    redundant daily sweep re-stages — can be left behind next to its replacement,
+    growing physical duplicate ``comment_id`` rows over time. Brand-new keys are
+    unaffected (nothing to delete). This is why the read surface dedups on read
+    (``mcp_server`` wraps the ``comments`` view in a per-``comment_id`` QUALIFY)
+    and physical duplicates are reclaimed out-of-band by ``dedupe_table``; a
+    delete-free incremental upsert is not possible here because the only reliable
+    removal primitive on this catalog is a whole-table ``DROP`` + rebuild.
     """
     cols = list(record_type.schema)
     key = record_type.dedup_key

@@ -4,8 +4,15 @@
 The one-time seed that loaded the pre-existing R2 partition tree into the catalog
 duplicated rows for agencies that were loaded more than once — its per-agency
 ``DELETE`` did not remove prior rows on the R2 Data Catalog, so re-loads
-accumulated exact copies (e.g. OMB ~2.5x, NARA ~3.8x; FWS/EPA/DOT clean). Comments
-added later by the daily merge are unaffected — this is historical, not ongoing.
+accumulated exact copies (e.g. OMB ~2.5x, NARA ~3.8x; FWS/EPA/DOT clean).
+
+The daily merge is affected by the *same* unreliable ``DELETE`` (see
+``iceberg._merge``), just at a far smaller scale: only comment_ids that are
+re-merged — a comment whose ``modify_date`` advanced, or a key re-staged by the
+redundant sweep — can leave their old row behind, so a handful of near-1.00x
+duplicates trickle in per run. The read surface hides them (``mcp_server`` dedups
+the ``comments`` view on read); this job is how the physical rows are reclaimed,
+so it is worth re-running periodically, not only after the seed.
 
 Default mode is a **read-only audit**: it reports every agency whose row count
 exceeds its distinct ``comment_id`` count, plus totals. Nothing is written.
