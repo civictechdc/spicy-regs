@@ -211,6 +211,23 @@ not connectors — don't subclass them.
 - Include a test plan.
 - Ensure CI passes before requesting review.
 
+## Releasing to PyPI (maintainers)
+
+Publishing is automated by `.github/workflows/publish-pypi.yml` via PyPI
+[trusted publishing](https://docs.pypi.org/trusted-publishers/) — no API
+tokens. To cut a release:
+
+1. Bump `version` in `pyproject.toml` and merge to `main`.
+2. Create a GitHub release whose tag is `v<version>` (e.g. `v0.2.0`).
+3. The workflow builds the sdist + wheel, checks the tag matches the version,
+   smoke-tests the wheel in a clean environment, and publishes to PyPI.
+
+One-time setup (already-released projects skip this): add a pending trusted
+publisher on pypi.org (project `spicy-regs`, owner `civictechdc`, repo
+`spicy-regs`, workflow `publish-pypi.yml`, environment `pypi`) and create the
+`pypi` environment in the repo settings. Once published, users can run the CLI
+with just `uvx spicy-regs` — no git URL needed.
+
 ## Reporting issues
 
 Open a GitHub issue with steps to reproduce, expected vs. actual behavior, and environment details. Pick a template from [the issue chooser](https://github.com/civictechdc/spicy-regs/issues/new/choose).

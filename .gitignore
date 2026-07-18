@@ -24,4 +24,4 @@ recovery
 .env.local
 .env*.local
 __pycache__
-notebooks/.cache
+notebooks/.cachedist/

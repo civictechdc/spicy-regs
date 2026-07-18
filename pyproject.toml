@@ -2,6 +2,17 @@
 name = "spicy-regs"
 version = "0.1.0"
 description = "Regulations Data Analysis Tools"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Civic Tech DC" }]
+keywords = ["regulations", "rulemaking", "regulations.gov", "civic-tech", "open-data", "duckdb", "parquet"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
 requires-python = ">=3.10"
 dependencies = [
     "boto3",
@@ -41,6 +52,12 @@ dev = [
 docs = [
     "mkdocs-material",
 ]
+
+[project.urls]
+Homepage = "https://github.com/civictechdc/spicy-regs"
+Documentation = "https://docs.spicy-regs.dev"
+Repository = "https://github.com/civictechdc/spicy-regs"
+Issues = "https://github.com/civictechdc/spicy-regs/issues"
 
 [project.scripts]
 run-pipeline = "spicy_regs.pipelines.regulations:app"
