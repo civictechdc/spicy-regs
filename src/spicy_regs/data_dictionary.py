@@ -54,6 +54,8 @@ TABLES: tuple[str, ...] = (
     "unified_agenda",
     "federal_register",
     "sam_entities",
+    "lobbying_filings",
+    "fec_committees",
 )
 
 # Tables the MCP server (list_sources / describe_table / query_sql) exposes.
@@ -73,6 +75,8 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
         "unified_agenda",
         "federal_register",
         "sam_entities",
+        "lobbying_filings",
+        "fec_committees",
     }
 )
 
@@ -209,6 +213,46 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("exclusion_status_flag", "VARCHAR"),
         ("purpose_of_registration_desc", "VARCHAR"),
         ("entity_url", "VARCHAR"),
+    ],
+    # Ingested from the Senate LDA REST API (build_lobbying_filings); all columns
+    # are stored as VARCHAR, nested/array fields serialized as JSON strings.
+    # Keyed by filing_uuid.
+    "lobbying_filings": [
+        ("filing_uuid", "VARCHAR"),
+        ("filing_type", "VARCHAR"),
+        ("filing_year", "VARCHAR"),
+        ("filing_period", "VARCHAR"),
+        ("dt_posted", "VARCHAR"),
+        ("registrant_name", "VARCHAR"),
+        ("registrant_id", "VARCHAR"),
+        ("client_name", "VARCHAR"),
+        ("client_id", "VARCHAR"),
+        ("income", "VARCHAR"),
+        ("expenses", "VARCHAR"),
+        ("lobbying_activities_json", "VARCHAR"),
+        ("government_entities_json", "VARCHAR"),
+        ("url", "VARCHAR"),
+    ],
+    # Ingested from the OpenFEC /committees endpoint (build_fec_committees); a
+    # committee/PAC reference dimension, all columns stored as VARCHAR with array
+    # fields serialized as JSON strings. Keyed by committee_id.
+    "fec_committees": [
+        ("committee_id", "VARCHAR"),
+        ("name", "VARCHAR"),
+        ("committee_type", "VARCHAR"),
+        ("committee_type_full", "VARCHAR"),
+        ("designation", "VARCHAR"),
+        ("designation_full", "VARCHAR"),
+        ("party", "VARCHAR"),
+        ("party_full", "VARCHAR"),
+        ("state", "VARCHAR"),
+        ("treasurer_name", "VARCHAR"),
+        ("organization_type_full", "VARCHAR"),
+        ("filing_frequency", "VARCHAR"),
+        ("first_file_date", "VARCHAR"),
+        ("last_file_date", "VARCHAR"),
+        ("cycles_json", "VARCHAR"),
+        ("candidate_ids_json", "VARCHAR"),
     ],
 }
 
