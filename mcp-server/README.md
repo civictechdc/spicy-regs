@@ -29,7 +29,10 @@ ETL dependencies (boto3, polars, prefect, ...) — keep the two in sync.
 | `query_sql(sql, max_rows=25)` | Run a SQL query against the R2 views |
 
 Available views: `dockets`, `documents`, `comments`, `comments_index`,
-`feed_summary`, `agency_stats`, `agency_monthly_volume`.
+`feed_summary`, `agency_stats`, `agency_monthly_volume`, `federal_register`,
+`unified_agenda`, `congress_bills`, `cfr_sections`, `sam_entities`,
+`lobbying_filings`, `fec_committees`, `usaspending_recipients`, `court_dockets`,
+`gao_reports`, `crs_reports`. Call `list_sources` for the authoritative list.
 
 ## Landing page
 

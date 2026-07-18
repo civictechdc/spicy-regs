@@ -64,9 +64,19 @@ Use the helper script's `--describe` output for the exact schema. In this repo, 
 - `dockets`: `docket_id`, `agency_code`, `title`, `docket_type`, `modify_date`, `abstract`
 - `documents`: `document_id`, `docket_id`, `agency_code`, `title`, `document_type`, `posted_date`, `modify_date`, `comment_start_date`, `comment_end_date`, `file_url`
 - `comments`: `comment_id`, `docket_id`, `agency_code`, `title`, `comment`, `document_type`, `posted_date`, `modify_date`, `receive_date`, `attachments_json`
-- Optional summaries:
+- Optional summaries / rollups:
   - `comments_index`
   - `feed_summary`
+  - `agency_stats`
+  - `agency_monthly_volume`
+
+Complementary federal sources (all queryable by name; see the Data Dictionary for columns):
+
+- Rulemaking lifecycle: `federal_register` (published rules; RIN + CFR refs), `unified_agenda` (planned actions, keyed by `rin`), `congress_bills`, `cfr_sections`
+- Organizations & influence: `sam_entities` (entity registry, keyed by `uei`), `lobbying_filings`, `fec_committees`
+- Outcomes & context: `usaspending_recipients` (keyed by `uei`), `court_dockets`, `gao_reports`, `crs_reports`
+
+Join keys across sources: `rin` (unified_agenda ↔ federal_register), CFR citations (↔ cfr_sections), `uei` (sam_entities ↔ usaspending_recipients ↔ commenter orgs), and `agency_code`.
 
 ## Query Patterns
 
