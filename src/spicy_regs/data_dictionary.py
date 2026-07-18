@@ -55,6 +55,7 @@ TABLES: tuple[str, ...] = (
     "federal_register",
     "lobbying_filings",
     "fec_committees",
+    "usaspending_recipients",
 )
 
 # Tables the MCP server (list_sources / describe_table / query_sql) exposes.
@@ -75,6 +76,7 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
         "federal_register",
         "lobbying_filings",
         "fec_committees",
+        "usaspending_recipients",
     }
 )
 
@@ -229,6 +231,18 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("last_file_date", "VARCHAR"),
         ("cycles_json", "VARCHAR"),
         ("candidate_ids_json", "VARCHAR"),
+    ],
+    # Ingested from the USASpending.gov /api/v2/recipient/ endpoint
+    # (build_usaspending_recipients); a federal-award recipient reference
+    # dimension bounded to the top-N recipients by all-time award amount, all
+    # columns stored as VARCHAR. Keyed by recipient_id.
+    "usaspending_recipients": [
+        ("recipient_id", "VARCHAR"),
+        ("uei", "VARCHAR"),
+        ("duns", "VARCHAR"),
+        ("name", "VARCHAR"),
+        ("recipient_level", "VARCHAR"),
+        ("total_award_amount", "VARCHAR"),
     ],
 }
 
