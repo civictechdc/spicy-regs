@@ -21,27 +21,50 @@ upload your output to live Cloudflare R2 storage.
 
 ### Download the published data locally
 
-The processed dockets / documents / comments parquet files are published to a
-public Cloudflare R2 bucket. Grab them with the bundled CLI — no credentials
-needed:
+Every published table (see the [data dictionary](https://civictechdc.github.io/spicy-regs/))
+lives as a parquet file in a public Cloudflare R2 bucket. Grab them with the
+bundled CLI — no credentials needed:
 
 ```bash
-uv run spicy-regs download                        # all three (dockets, documents, comments)
-uv run spicy-regs download --types comments       # comments only
+uv run spicy-regs download                        # the core trio (dockets, documents, comments)
+uv run spicy-regs download --tables comments      # comments only
+uv run spicy-regs download --tables feed_summary agency_stats   # any published table
+uv run spicy-regs download --all                  # everything (comments alone is multiple GB)
 uv run spicy-regs download -o ./my-data           # custom output dir
 ```
 
-Files land in `./spicy-regs-data/` by default. Once downloaded, poke around:
+Files land in `./spicy-regs-data/` by default. Downloads are atomic and
+incremental — a file whose size still matches the bucket is skipped (`--force`
+re-downloads).
+
+### Query the data with SQL
+
+`spicy-regs query` runs DuckDB SQL over every published table. By default
+(`--source auto`) each table reads from your local download when present and
+streams from the public bucket otherwise — so it works with no download at all:
 
 ```bash
-uv run spicy-regs stats                # row counts + top agencies per file
-uv run spicy-regs sample comments -n 5 # 5 random rows from comments.parquet
-uv run spicy-regs search "climate"     # substring search across files
+uv run spicy-regs tables                             # list every table + where it resolves
+uv run spicy-regs describe dockets                   # column schema of one table
+uv run spicy-regs query "SELECT agency_code, count(*) FROM dockets GROUP BY 1 ORDER BY 2 DESC LIMIT 5"
+uv run spicy-regs query "SELECT * FROM feed_summary LIMIT 3" --format json   # or csv
+uv run spicy-regs query "SELECT * FROM agency_stats" --output stats.csv --format csv --max-rows 0
+```
+
+Or poke around without writing SQL:
+
+```bash
+uv run spicy-regs stats                # row counts + top agencies per core table
+uv run spicy-regs sample comments -n 5 # 5 random rows from any table
+uv run spicy-regs search "climate"     # substring search across the core tables
 uv run spicy-regs agencies             # list every agency code
 ```
 
+These accept `--source local` (only your downloads) or `--source r2` (only the
+bucket) when you want to pin where data comes from.
+
 > Don't have the repo cloned? You can also run it one-shot with
-> `uvx --from "spicy-regs @ git+https://github.com/civictechdc/spicy-regs" spicy-regs download --types comments`.
+> `uvx --from "spicy-regs @ git+https://github.com/civictechdc/spicy-regs" spicy-regs download --tables comments`.
 
 ### Run the ETL pipeline yourself
 
