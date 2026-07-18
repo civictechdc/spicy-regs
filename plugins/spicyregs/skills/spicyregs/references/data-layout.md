@@ -14,12 +14,24 @@ Use this reference when you need a quick map of the remote or local data files b
 
 ## Expected parquet files
 
+Core regulations.gov tables + rollups:
+
 - `dockets.parquet`
 - `documents.parquet`
 - `comments.parquet`
 - `comments_index.parquet`
 - `feed_summary.parquet`
+- `agency_stats.parquet`
+- `agency_monthly_volume.parquet`
 - Local-only: `comments/` partitioned comment parquet files may exist instead of a monolithic `comments.parquet`
+
+Complementary federal sources (each also queryable by name via the MCP server):
+
+- Rulemaking lifecycle: `federal_register.parquet`, `unified_agenda.parquet`, `congress_bills.parquet`, `cfr_sections.parquet`
+- Organizations & influence: `sam_entities.parquet`, `lobbying_filings.parquet`, `fec_committees.parquet`
+- Outcomes & context: `usaspending_recipients.parquet`, `court_dockets.parquet`, `gao_reports.parquet`, `crs_reports.parquet`
+
+See the [Data Dictionary](https://civictechdc.github.io/spicy-regs/) for each table's columns, keys, and coverage/scope notes.
 
 > **Comments read surface.** `comments_index.parquet` (per-partition counts) is
 > always the source for comment *counts*. The row-level `comments` table is
