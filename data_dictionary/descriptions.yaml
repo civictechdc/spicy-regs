@@ -315,6 +315,42 @@ tables:
       last_file_date: "Date of the committee's most recent filing (ISO 8601 string)."
       cycles_json: "JSON array of election-cycle years the committee was active in (e.g. `[2018, 2020, 2022]`)."
       candidate_ids_json: "JSON array of OpenFEC candidate IDs associated with the committee (e.g. `[\"P00008052\"]`). Often `[]`."
+  court_dockets:
+    summary: >-
+      One row per federal court docket challenging agency action under the
+      Administrative Procedure Act, ingested from the CourtListener v4 search API
+      (`courtlistener.com`, RECAP dockets with nature-of-suit 899) by
+      `build_courtlistener`. When an agency finalizes a rule it is frequently
+      sued; these are those suits — the litigation counterpart to the rulemakings
+      in `dockets`/`documents`. There is no machine RIN/FR key on a court docket,
+      so it links to the corpus by name and topic: the defendant agency appears in
+      `case_name` and `parties_json` (joinable by name to `agency_stats` / the FR
+      `agency_slugs`), and `cause` names the statute invoked. Primary / dedup key
+      is `cl_docket_id`. All columns are stored as VARCHAR; array fields are JSON
+      strings.
+    columns:
+      cl_docket_id: "CourtListener docket id (e.g. `73613631`). Primary key / dedup key. Distinct from the regulations.gov `docket_id`."
+      case_name: "Short case name (e.g. `HENNEPIN COUNTY, MINNESOTA v. U.S. DEPARTMENT OF HEALTH AND HUMAN SERVICES`). Names the defendant agency."
+      case_name_full: "Full case caption when available; often blank."
+      court_id: "CourtListener court identifier (e.g. `dcd` D.D.C., `cadc` D.C. Circuit, `akd` D. Alaska)."
+      court: "Human-readable court name (e.g. `District Court, District of Columbia`)."
+      court_citation_string: "Court citation abbreviation (e.g. `D.D.C.`)."
+      docket_number: "Court docket number (e.g. `1:26-cv-02460`)."
+      date_filed: "Date the case was filed (ISO 8601 string). Sort key and incremental watermark."
+      date_terminated: "Date the case was terminated, if closed (ISO 8601 string). Null for pending cases."
+      date_argued: "Date of oral argument, if any (ISO 8601 string). Often null."
+      nature_of_suit: "Nature-of-suit label; scoped to `899 Other Statutes: Administrative Procedures Act/Review or Appeal of Agency Decision`."
+      cause: "Statutory cause of action as recorded in PACER (e.g. `05:551 Administrative Procedure Act`)."
+      jurisdiction_type: "Basis of federal jurisdiction (e.g. `U.S. Government Defendant`)."
+      jury_demand: "Jury demand recorded on the docket (e.g. `None`)."
+      assigned_to: "Name of the judge assigned to the case."
+      referred_to: "Name of the magistrate/referral judge, if any. Often null."
+      parties_json: "JSON array of party names on the docket (plaintiffs and defendants, including the defendant agency)."
+      attorneys_json: "JSON array of attorney names appearing on the docket."
+      firms_json: "JSON array of law-firm / legal-organization names appearing on the docket."
+      pacer_case_id: "PACER case id for the docket in its court's CM/ECF system."
+      date_created: "Timestamp CourtListener first indexed the docket (ISO 8601 string, from the search-result `meta.date_created`)."
+      absolute_url: "Absolute URL of the docket page on courtlistener.com."
   usaspending_recipients:
     summary: >-
       One row per federal-award recipient, ingested from the USASpending.gov

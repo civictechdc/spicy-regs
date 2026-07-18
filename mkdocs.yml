@@ -51,4 +51,5 @@ nav:
       - sam_entities: tables/sam_entities.md
       - lobbying_filings: tables/lobbying_filings.md
       - fec_committees: tables/fec_committees.md
+      - court_dockets: tables/court_dockets.md
       - usaspending_recipients: tables/usaspending_recipients.md

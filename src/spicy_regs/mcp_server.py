@@ -53,6 +53,7 @@ TABLES = (
     "sam_entities",
     "lobbying_filings",
     "fec_committees",
+    "court_dockets",
     "usaspending_recipients",
 )
 # Matches the Vercel copy's default (kept just under that deploy's 300s
