@@ -52,6 +52,7 @@ TABLES = (
     "federal_register",
     "lobbying_filings",
     "fec_committees",
+    "court_dockets",
 )
 # Kept just under the Vercel ``maxDuration`` (300s) so a runaway query trips
 # this watchdog and returns a clean ``TimeoutError`` before the platform hard

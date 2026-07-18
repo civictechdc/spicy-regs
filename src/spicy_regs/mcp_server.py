@@ -52,6 +52,7 @@ TABLES = (
     "federal_register",
     "lobbying_filings",
     "fec_committees",
+    "court_dockets",
 )
 # Matches the Vercel copy's default (kept just under that deploy's 300s
 # ``maxDuration``). Override with ``SPICY_REGS_STATEMENT_TIMEOUT``.
