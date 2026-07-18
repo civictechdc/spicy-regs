@@ -55,6 +55,7 @@ TABLES = (
     "fec_committees",
     "gao_reports",
     "crs_reports",
+    "court_dockets",
     "usaspending_recipients",
 )
 # Kept just under the Vercel ``maxDuration`` (300s) so a runaway query trips

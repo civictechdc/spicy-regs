@@ -50,6 +50,9 @@ jobs:
           # Optional: raises the Senate LDA API rate limit. The lobbying-filings
           # rollup is fully functional keyless, so an unset secret is fine.
           LDA_API_KEY: ${{ secrets.LDA_API_KEY }}
+          # Optional: raises the CourtListener API rate limit. The court_dockets
+          # rollup is fully functional keyless, so an unset secret is fine.
+          COURTLISTENER_API_TOKEN: ${{ secrets.COURTLISTENER_API_TOKEN }}
           # Passed via env (not interpolated into the command) to keep the run
           # step free of any templated string in an executable position.
           COMMAND: ${{ inputs.command }}

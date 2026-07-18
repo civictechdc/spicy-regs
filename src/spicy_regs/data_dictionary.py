@@ -58,6 +58,7 @@ TABLES: tuple[str, ...] = (
     "fec_committees",
     "gao_reports",
     "crs_reports",
+    "court_dockets",
     "usaspending_recipients",
 )
 
@@ -82,6 +83,7 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
         "fec_committees",
         "gao_reports",
         "crs_reports",
+        "court_dockets",
         "usaspending_recipients",
     }
 )
@@ -284,6 +286,33 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("update_date", "VARCHAR"),
         ("version", "VARCHAR"),
         ("url", "VARCHAR"),
+    ],
+    # Ingested from the CourtListener v4 search API (build_courtlistener); APA /
+    # agency-review litigation dockets (nature-of-suit 899). All columns stored as
+    # VARCHAR, array fields serialized as JSON strings. Keyed by cl_docket_id.
+    "court_dockets": [
+        ("cl_docket_id", "VARCHAR"),
+        ("case_name", "VARCHAR"),
+        ("case_name_full", "VARCHAR"),
+        ("court_id", "VARCHAR"),
+        ("court", "VARCHAR"),
+        ("court_citation_string", "VARCHAR"),
+        ("docket_number", "VARCHAR"),
+        ("date_filed", "VARCHAR"),
+        ("date_terminated", "VARCHAR"),
+        ("date_argued", "VARCHAR"),
+        ("nature_of_suit", "VARCHAR"),
+        ("cause", "VARCHAR"),
+        ("jurisdiction_type", "VARCHAR"),
+        ("jury_demand", "VARCHAR"),
+        ("assigned_to", "VARCHAR"),
+        ("referred_to", "VARCHAR"),
+        ("parties_json", "VARCHAR"),
+        ("attorneys_json", "VARCHAR"),
+        ("firms_json", "VARCHAR"),
+        ("pacer_case_id", "VARCHAR"),
+        ("date_created", "VARCHAR"),
+        ("absolute_url", "VARCHAR"),
     ],
     # Ingested from the USASpending.gov /api/v2/recipient/ endpoint
     # (build_usaspending_recipients); a federal-award recipient reference
