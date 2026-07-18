@@ -76,6 +76,18 @@ on:
         default: false
         type: boolean
 
+concurrency:
+  # Serialize every writer to the Iceberg `comments` table. The upsert is a
+  # DELETE + INSERT (DuckDB's Iceberg engine has no MERGE INTO), which is not
+  # safe under concurrent writers, so two overlapping runs can duplicate rows.
+  # `max-parallel: 1` only serializes batches within one run; this group also
+  # keeps two ETL runs (the redundant 06:25/18:25 sweeps, or a dispatch over a
+  # scheduled run) — and the dedupe/backfill workflows, which share this group —
+  # from ever writing the catalog at the same time. cancel-in-progress:false so a
+  # queued run waits for the in-flight one instead of cancelling it mid-write.
+  group: comments-catalog-write
+  cancel-in-progress: false
+
 jobs:
   # Resolve the batch matrix and the upload/iceberg flags once, so the etl job's
   # matrix can be event-dependent (schedule => all batches; dispatch => the one
