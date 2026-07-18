@@ -13,9 +13,15 @@ published 18-column schema is the job of
 :func:`~spicy_regs.transforms.build_sam_entities.build_sam_entities`.
 
 The ``/entities`` list endpoint is paginated by a 0-based ``page`` and a ``size``
-(the API caps a synchronous page at 10 records). We filter to public active
-registrations (``registrationStatus=A``) so the published table stays to the
-public-display surface.
+(the API caps a synchronous page at 10 records — ``size`` values above 10 are
+rejected with HTTP 400). Each response carries a ``links.nextLink`` pointing at
+the next page; the reader follows that link until it is absent (or a page comes
+back empty), so a full run can walk the entire active registry. We filter to
+public active registrations (``registrationStatus=A``) so the published table
+stays to the public-display surface.
+
+Note: SAM masks the ``api_key`` in the returned ``nextLink`` (it comes back as a
+placeholder), so the reader re-injects the real key when following it.
 
 **API key.** SAM.gov requires an api.data.gov key sent as the ``api_key`` query
 param — but note the key must additionally be *associated with a SAM.gov account
@@ -26,9 +32,12 @@ invalid key. We resolve the key from a fallback chain of the env vars this repo
 already uses (:func:`_resolve_api_key`). If no key is set the reader logs a clear
 warning and yields nothing — a keyless CI run is a no-op, not a crash.
 
-**Bounded by design.** A full extract is ~hundreds of thousands of entities and
-rate-limited, so the reader stops after ``max_records`` (the transform passes a
-bounded default); a full backfill is never run implicitly.
+**Unbounded by default, bounded on request.** The reader walks every page by
+default (a full extract is ~hundreds of thousands of entities, capped only by the
+runaway page guard). Callers that only need a bounded slice — the transform's
+scheduled window, validation probes, tests — pass ``max_records`` to stop early;
+a full backfill is never run implicitly by the scheduled transform, which always
+passes a bounded ``max_records``.
 """
 
 from __future__ import annotations
@@ -36,6 +45,7 @@ from __future__ import annotations
 import os
 import time
 from collections.abc import Iterator
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import httpx
 from loguru import logger
@@ -47,11 +57,14 @@ API_BASE = "https://api.sam.gov/entity-information/v4"
 # Max records the synchronous /entities page accepts per request.
 PER_PAGE = 10
 
-# Env vars checked in order for the api.data.gov key. The same key format works
-# across regulations.gov, Congress.gov, and SAM.gov (once SAM-authorized).
+# Env vars checked in order for the api.data.gov key. SAM.gov needs a key that is
+# specifically associated with a SAM.gov account holding the Entity API role, so
+# the SAM-dedicated var is preferred first; a generic api.data.gov key (which
+# works against regulations.gov / Congress.gov) is only a fallback and returns a
+# bare 404 here if it isn't SAM-authorized.
 API_KEY_ENV_VARS = (
-    "DATA_GOV_API_KEY",
     "SAM_API_KEY",
+    "DATA_GOV_API_KEY",
     "REGULATIONS_GOV_API_KEY",
 )
 
@@ -121,9 +134,24 @@ class SamEntitiesReader(Reader):
     # -- pagination ----------------------------------------------------------
 
     def _paginate(self) -> Iterator[dict]:
-        """Walk 0-based pages until exhausted, ``max_records``, or the safety cap."""
-        for page in range(_MAX_PAGES):
-            payload = self._get_page(page)
+        """Follow ``links.nextLink`` until exhausted, ``max_records``, or the cap.
+
+        The first request is built from ``page=0``; every subsequent page is the
+        server-provided ``nextLink`` (with the real api_key re-injected, since SAM
+        masks it in the returned link). Walking stops when a page is empty, when
+        there is no ``nextLink``, or at the ``_MAX_PAGES`` runaway backstop.
+        """
+        url = f"{API_BASE}/entities"
+        params: dict[str, object] | None = {
+            "api_key": self.api_key,
+            "page": 0,
+            "size": self.per_page,
+        }
+        if self.registration_status:
+            params["registrationStatus"] = self.registration_status
+
+        for _ in range(_MAX_PAGES):
+            payload = self._get(url, params)
             if payload is None:
                 break
             records = payload.get("entityData") or []
@@ -138,19 +166,27 @@ class SamEntitiesReader(Reader):
                 if self._seen % _PROGRESS_EVERY == 0:
                     logger.info("SAM entities: {:,} entities so far...", self._seen)
                 yield record
-            # A short final page means the server has nothing more to give.
-            if len(records) < self.per_page:
+            # Prefer the server's own pagination link; fall back to page-count
+            # exhaustion when a short page signals there is nothing more.
+            next_link = (payload.get("links") or {}).get("nextLink")
+            if not next_link or len(records) < self.per_page:
                 break
+            url = self._authorize_next_link(next_link)
+            params = None  # nextLink already carries page/size/filter as a query string
+        else:
+            logger.warning("SAM entities: hit the _MAX_PAGES={} runaway guard — stopping", _MAX_PAGES)
 
-    def _get_page(self, page: int) -> dict | None:
-        params: dict[str, object] = {
-            "api_key": self.api_key,
-            "page": page,
-            "size": self.per_page,
-        }
-        if self.registration_status:
-            params["registrationStatus"] = self.registration_status
-        return self._get(f"{API_BASE}/entities", params)
+    def _authorize_next_link(self, next_link: str) -> str:
+        """Return ``next_link`` with the real api_key re-injected.
+
+        SAM returns the ``nextLink`` with its ``api_key`` masked as a placeholder,
+        so following it verbatim would 404. We overwrite that query param with the
+        configured key and leave the rest of the link (page/size/filter) intact.
+        """
+        parts = urlparse(next_link)
+        query = parse_qs(parts.query, keep_blank_values=True)
+        query["api_key"] = [self.api_key or ""]
+        return urlunparse(parts._replace(query=urlencode(query, doseq=True)))
 
     def _get(self, url: str, params: dict | None) -> dict | None:
         """GET with bounded retries + exponential backoff. Returns parsed JSON or None."""

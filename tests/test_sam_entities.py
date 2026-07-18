@@ -108,12 +108,19 @@ def test_shape_coerces_int_scalars_to_str():
 # -- API-key resolution ------------------------------------------------------
 
 
-def test_resolve_api_key_prefers_first_env_var(monkeypatch):
+def test_resolve_api_key_prefers_sam_specific_key(monkeypatch):
+    # SAM.gov needs a SAM-authorized key, so SAM_API_KEY must win over the
+    # generic api.data.gov key (which 404s on SAM) when both are set.
     for var in API_KEY_ENV_VARS:
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("DATA_GOV_API_KEY", "data-gov-key")
     monkeypatch.setenv("SAM_API_KEY", "sam-key")
-    assert _resolve_api_key() == "data-gov-key"
+    assert _resolve_api_key() == "sam-key"
+
+
+def test_api_key_env_var_precedence_order():
+    # Explicit contract: SAM-specific first, generic data.gov next, regs last.
+    assert API_KEY_ENV_VARS == ("SAM_API_KEY", "DATA_GOV_API_KEY", "REGULATIONS_GOV_API_KEY")
 
 
 def test_resolve_api_key_falls_back_in_order(monkeypatch):
@@ -150,22 +157,74 @@ def _entity(uei: str) -> dict:
     return {"entityRegistration": {"ueiSAM": uei}}
 
 
-def test_paginate_walks_pages_until_short_page(monkeypatch):
-    """Full pages advance the page counter; a short page ends pagination."""
+def _page(records: list[dict], *, next_link: str | None) -> dict:
+    links: dict[str, str] = {}
+    if next_link is not None:
+        links["nextLink"] = next_link
+    return {"entityData": records, "links": links}
+
+
+def _by_page_get(pages: dict[int, dict]):
+    """Fake ``_get`` that dispatches on the ``page`` value (from params or URL query)."""
+
+    def _get(url, params):
+        if params is not None:
+            page = int(params["page"])
+        else:
+            from urllib.parse import parse_qs, urlparse
+
+            page = int(parse_qs(urlparse(url).query)["page"][0])
+        return pages.get(page, _page([], next_link=None))
+
+    return _get
+
+
+def test_paginate_follows_nextlink_until_absent(monkeypatch):
+    """The walk follows ``links.nextLink`` across pages and stops when it is gone."""
     reader = SamEntitiesReader(api_key="test", per_page=2)
+    base = "https://api.sam.gov/entity-information/v4/entities"
     pages = {
-        0: {"entityData": [_entity("A"), _entity("B")]},
-        1: {"entityData": [_entity("C")]},  # short page -> stop
+        0: _page([_entity("A"), _entity("B")], next_link=f"{base}?api_key=MASKED&page=1&size=2"),
+        1: _page([_entity("C"), _entity("D")], next_link=f"{base}?api_key=MASKED&page=2&size=2"),
+        2: _page([_entity("E")], next_link=f"{base}?api_key=MASKED&page=3&size=2"),  # short -> stop
     }
-    monkeypatch.setattr(reader, "_get_page", lambda page: pages.get(page, {"entityData": []}))
+    monkeypatch.setattr(reader, "_get", _by_page_get(pages))
     got = [r["entityRegistration"]["ueiSAM"] for r in reader._paginate()]
-    assert got == ["A", "B", "C"]
+    assert got == ["A", "B", "C", "D", "E"]
+
+
+def test_paginate_stops_when_nextlink_missing(monkeypatch):
+    """A full final page with no ``nextLink`` ends the walk (no extra fetch)."""
+    reader = SamEntitiesReader(api_key="test", per_page=2)
+    base = "https://api.sam.gov/entity-information/v4/entities"
+    pages = {
+        0: _page([_entity("A"), _entity("B")], next_link=f"{base}?api_key=MASKED&page=1&size=2"),
+        1: _page([_entity("C"), _entity("D")], next_link=None),  # full page, no nextLink -> stop
+    }
+    monkeypatch.setattr(reader, "_get", _by_page_get(pages))
+    got = [r["entityRegistration"]["ueiSAM"] for r in reader._paginate()]
+    assert got == ["A", "B", "C", "D"]
 
 
 def test_paginate_stops_at_max_records(monkeypatch):
     """``max_records`` bounds the walk mid-page (no full backfill)."""
     reader = SamEntitiesReader(api_key="test", per_page=3, max_records=2)
-    pages = {0: {"entityData": [_entity("A"), _entity("B"), _entity("C")]}}
-    monkeypatch.setattr(reader, "_get_page", lambda page: pages.get(page, {"entityData": []}))
+    base = "https://api.sam.gov/entity-information/v4/entities"
+    pages = {0: _page([_entity("A"), _entity("B"), _entity("C")], next_link=f"{base}?api_key=MASKED&page=1&size=3")}
+    monkeypatch.setattr(reader, "_get", _by_page_get(pages))
     got = [r["entityRegistration"]["ueiSAM"] for r in reader._paginate()]
     assert got == ["A", "B"]
+
+
+def test_authorize_next_link_reinjects_real_key():
+    """SAM masks the api_key in nextLink; the reader swaps in the configured key."""
+    reader = SamEntitiesReader(api_key="real-secret")
+    masked = "https://api.sam.gov/entity-information/v4/entities?api_key=REPLACE_WITH_API_KEY&page=5&size=10&registrationStatus=A"
+    out = reader._authorize_next_link(masked)
+    from urllib.parse import parse_qs, urlparse
+
+    q = parse_qs(urlparse(out).query)
+    assert q["api_key"] == ["real-secret"]
+    assert q["page"] == ["5"]
+    assert q["size"] == ["10"]
+    assert q["registrationStatus"] == ["A"]
