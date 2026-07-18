@@ -36,6 +36,7 @@ markdown_extensions:
 
 nav:
   - Overview: index.md
+  - Querying with Python: querying-python.md
   - Tables:
       - dockets: tables/dockets.md
       - documents: tables/documents.md
