@@ -53,6 +53,7 @@ TABLES: tuple[str, ...] = (
     "congress_bills",
     "unified_agenda",
     "federal_register",
+    "lobbying_filings",
     "fec_committees",
 )
 
@@ -72,6 +73,7 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
         "congress_bills",
         "unified_agenda",
         "federal_register",
+        "lobbying_filings",
         "fec_committees",
     }
 )
@@ -187,6 +189,25 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("subtype", "VARCHAR"),
         ("executive_order_number", "VARCHAR"),
         ("modify_date", "VARCHAR"),
+    ],
+    # Ingested from the Senate LDA REST API (build_lobbying_filings); all columns
+    # are stored as VARCHAR, nested/array fields serialized as JSON strings.
+    # Keyed by filing_uuid.
+    "lobbying_filings": [
+        ("filing_uuid", "VARCHAR"),
+        ("filing_type", "VARCHAR"),
+        ("filing_year", "VARCHAR"),
+        ("filing_period", "VARCHAR"),
+        ("dt_posted", "VARCHAR"),
+        ("registrant_name", "VARCHAR"),
+        ("registrant_id", "VARCHAR"),
+        ("client_name", "VARCHAR"),
+        ("client_id", "VARCHAR"),
+        ("income", "VARCHAR"),
+        ("expenses", "VARCHAR"),
+        ("lobbying_activities_json", "VARCHAR"),
+        ("government_entities_json", "VARCHAR"),
+        ("url", "VARCHAR"),
     ],
     # Ingested from the OpenFEC /committees endpoint (build_fec_committees); a
     # committee/PAC reference dimension, all columns stored as VARCHAR with array

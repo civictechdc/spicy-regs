@@ -9,6 +9,7 @@ from spicy_regs.transforms.build_fec_committees import build_fec_committees
 from spicy_regs.transforms.build_federal_register import build_federal_register
 from spicy_regs.transforms.build_feed_summary import build_feed_summary
 from spicy_regs.transforms.build_fr_docket_links import build_fr_docket_links
+from spicy_regs.transforms.build_lobbying_filings import build_lobbying_filings
 from spicy_regs.transforms.build_rulemaking_lifecycles import build_rulemaking_lifecycles
 from spicy_regs.transforms.build_search_index import INDEX_FILENAME, build_search_index
 from spicy_regs.transforms.build_unified_agenda import build_unified_agenda
@@ -48,6 +49,7 @@ __all__ = [
     "build_rulemaking_lifecycles",
     "build_federal_register",
     "build_fr_docket_links",
+    "build_lobbying_filings",
     "build_unified_agenda",
     "build_search_index",
     "INDEX_FILENAME",

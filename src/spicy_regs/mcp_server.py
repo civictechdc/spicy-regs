@@ -50,6 +50,7 @@ TABLES = (
     "congress_bills",
     "unified_agenda",
     "federal_register",
+    "lobbying_filings",
     "fec_committees",
 )
 # Matches the Vercel copy's default (kept just under that deploy's 300s

@@ -50,6 +50,7 @@ TABLES = (
     "congress_bills",
     "unified_agenda",
     "federal_register",
+    "lobbying_filings",
     "fec_committees",
 )
 # Kept just under the Vercel ``maxDuration`` (300s) so a runaway query trips
