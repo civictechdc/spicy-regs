@@ -47,6 +47,10 @@ jobs:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
           DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
+          # SAM.gov Entity API key. Unlike the generic DATA_GOV_API_KEY, SAM
+          # requires a key provisioned by a SAM.gov account (api.data.gov-backed);
+          # the sam-entities rollup is a no-op without it.
+          SAM_API_KEY: ${{ secrets.SAM_API_KEY }}
           # Optional: raises the Senate LDA API rate limit. The lobbying-filings
           # rollup is fully functional keyless, so an unset secret is fine.
           LDA_API_KEY: ${{ secrets.LDA_API_KEY }}
