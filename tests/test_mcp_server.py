@@ -241,6 +241,46 @@ def test_sandbox_locks_configuration():
         con.execute("SET allow_unsigned_extensions=true")
 
 
+def test_comments_catalog_view_dedups_on_read():
+    """The catalog-backed ``comments`` view keeps one row per comment_id.
+
+    The R2 Data Catalog can physically carry duplicate comment_id rows: the ETL
+    upsert removes superseded rows with a plain ``DELETE``, which does not reliably
+    take on the catalog, so a re-merged comment_id can leave its old row behind.
+    ``_connect`` wraps the catalog table in a per-comment_id QUALIFY so the read
+    surface stays single-valued regardless. This locks in that dedup expression:
+    the newest ``modify_date`` wins, exactly one row survives per id, and
+    non-duplicated ids are untouched — which is also the ``count(*) ==
+    count(DISTINCT comment_id)`` invariant the freshness check relies on.
+    """
+    con = duckdb.connect()
+    con.execute(
+        """
+        CREATE TABLE raw (comment_id VARCHAR, modify_date VARCHAR, comment VARCHAR);
+        INSERT INTO raw VALUES
+            ('c1', '2024-01-01', 'old'),
+            ('c1', '2024-03-01', 'new'),
+            ('c1', '2024-02-01', 'mid'),
+            ('c2', NULL, 'only-null'),
+            ('c3', '2024-05-01', 'unique');
+        """
+    )
+    # The exact dedup wrapper used by the catalog `comments` view in `_connect`.
+    con.execute(
+        "CREATE VIEW comments AS SELECT * FROM raw "
+        "QUALIFY ROW_NUMBER() OVER "
+        "(PARTITION BY comment_id ORDER BY modify_date DESC NULLS LAST) = 1"
+    )
+    rows = con.execute("SELECT comment_id, comment FROM comments ORDER BY comment_id").fetchall()
+    assert rows == [("c1", "new"), ("c2", "only-null"), ("c3", "unique")]
+    counts = con.execute(
+        "SELECT count(*), count(DISTINCT comment_id) FROM comments"
+    ).fetchone()
+    assert counts is not None
+    total, distinct = counts
+    assert total == distinct == 3
+
+
 @pytest.mark.integration
 def test_connect_queries_r2_end_to_end():
     """Live: the real ``_connect`` (httpfs + R2 views) serves the MCP tools.

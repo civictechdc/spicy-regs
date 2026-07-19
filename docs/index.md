@@ -151,6 +151,23 @@ of `dockets`; they join to the corpus (and to each other) on a few shared keys:
     LIMIT 20;
     ```
 
+=== "Python"
+
+    ```python
+    import duckdb
+    con = duckdb.connect()
+    con.execute("INSTALL httpfs; LOAD httpfs")
+    con.execute(
+        "SELECT agency_code, docket_count "
+        "FROM read_parquet('https://r2.spicy-regs.dev/agency_stats.parquet') "
+        "ORDER BY docket_count DESC LIMIT 20"
+    ).df()   # -> pandas DataFrame
+    ```
+
+    See **[Querying with Python](querying-python.md)** for a full walkthrough,
+    including cross-source joins (RIN, UEI) and working with the large
+    `comments` table.
+
 !!! note "Keeping this current"
     Column names and types are the source of truth in code
     (`RECORD_TYPES` for the core tables, `DERIVED_SCHEMAS` for the rollups). The
