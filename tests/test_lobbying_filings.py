@@ -8,9 +8,10 @@ reader's DRF ``next``-following pagination + ``max_records`` bound.
 from __future__ import annotations
 
 import json
+from datetime import date
 
-from spicy_regs.sources.lobbying_filings import LobbyingFilingsReader
-from spicy_regs.transforms.build_lobbying_filings import COLUMNS, _shape
+from spicy_regs.sources.lobbying_filings import API_BASE, LobbyingFilingsReader
+from spicy_regs.transforms.build_lobbying_filings import COLUMNS, _bounded_until, _shape
 
 _RAW_FILING = {
     "filing_uuid": "7866327b-c892-4430-b9f0-1f0f679c58c6",
@@ -42,6 +43,10 @@ _RAW_FILING = {
         },
     ],
 }
+
+
+def test_uses_post_sunset_lda_api_host():
+    assert API_BASE == "https://lda.gov/api/v1"
 
 
 def test_shape_produces_exact_schema():
@@ -120,3 +125,32 @@ def test_pagination_respects_max_records(monkeypatch):
     monkeypatch.setattr(reader, "_get", fake_get)
     got = [f["filing_uuid"] for f in reader._paginate()]
     assert got == ["a", "b", "c"]
+
+
+def test_pagination_sends_bounded_date_window(monkeypatch):
+    reader = LobbyingFilingsReader(since=date(2026, 4, 1), until=date(2026, 5, 1))
+    seen_params: dict[str, object] = {}
+
+    def fake_get(url: str, params: dict | None) -> dict | None:
+        assert params is not None
+        seen_params.update(params)
+        return _page([], None)
+
+    monkeypatch.setattr(reader, "_get", fake_get)
+    assert list(reader._paginate()) == []
+    assert seen_params["filing_dt_posted_after"] == "2026-04-01"
+    assert seen_params["filing_dt_posted_before"] == "2026-05-01"
+    assert seen_params["ordering"] == "dt_posted"
+
+
+def test_lagging_window_is_capped_to_thirty_days():
+    assert _bounded_until(
+        date(2026, 4, 1),
+        None,
+        today=date(2026, 7, 20),
+    ) == date(2026, 5, 1)
+    assert _bounded_until(
+        date(2026, 7, 1),
+        None,
+        today=date(2026, 7, 20),
+    ) == date(2026, 7, 20)

@@ -21,18 +21,16 @@ class TestUploadShrinkGuard:
         any HEAD and records upload_file calls on ``uploads``."""
         from botocore.exceptions import ClientError
 
-        uploads: list[tuple[str, str]] = []
+        uploads: list[tuple[str, str, dict | None]] = []
         fake = MagicMock()
 
         if remote_size is None:
-            fake.head_object.side_effect = ClientError(
-                {"Error": {"Code": "404", "Message": "Not Found"}}, "HeadObject"
-            )
+            fake.head_object.side_effect = ClientError({"Error": {"Code": "404", "Message": "Not Found"}}, "HeadObject")
         else:
             fake.head_object.return_value = {"ContentLength": remote_size}
 
         def fake_upload_file(local, bucket, key, ExtraArgs=None):
-            uploads.append((local, key))
+            uploads.append((local, key, ExtraArgs))
 
         fake.upload_file.side_effect = fake_upload_file
 
@@ -54,6 +52,27 @@ class TestUploadShrinkGuard:
 
         upload_to_r2(local)
         assert len(uploads) == 1
+
+    def test_parquet_upload_requires_cache_revalidation(self, tmp_path, monkeypatch):
+        self._setup_env(monkeypatch)
+        _, uploads = self._mock_r2_client(monkeypatch, remote_size=None)
+        local = tmp_path / "rollup.parquet"
+        local.write_bytes(b"parquet")
+
+        upload_to_r2(local)
+
+        assert uploads[0][2]["CacheControl"] == "public, no-cache, must-revalidate"
+
+    def test_cache_control_env_override_wins(self, tmp_path, monkeypatch):
+        self._setup_env(monkeypatch)
+        monkeypatch.setenv("R2_CACHE_CONTROL", "no-store")
+        _, uploads = self._mock_r2_client(monkeypatch, remote_size=None)
+        local = tmp_path / "rollup.parquet"
+        local.write_bytes(b"parquet")
+
+        upload_to_r2(local)
+
+        assert uploads[0][2]["CacheControl"] == "no-store"
 
     def test_allows_upload_when_new_file_is_larger(self, tmp_path, monkeypatch):
         """Normal incremental growth should succeed."""

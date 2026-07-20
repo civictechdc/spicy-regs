@@ -10,6 +10,11 @@ on:
         required: false
         default: false
         type: boolean
+      since:
+        description: 'Backfill bills updated since this date (YYYY-MM-DD); blank uses the stored watermark'
+        required: false
+        default: ''
+        type: string
 jobs:
   run:
     uses: ./.github/workflows/_rollup.yml
@@ -17,3 +22,4 @@ jobs:
     with:
       command: run-rollup-congress-bills
       skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}
+      congress_since: ${{ inputs.since || '' }}

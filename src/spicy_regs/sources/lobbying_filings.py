@@ -33,7 +33,9 @@ from loguru import logger
 
 from spicy_regs.sources.base import Reader
 
-API_BASE = "https://lda.senate.gov/api/v1"
+# The Senate-hosted API sunsets on 2026-07-31. lda.gov is its official,
+# API-compatible successor and is already live.
+API_BASE = "https://lda.gov/api/v1"
 
 # Max the API accepts per page.
 PER_PAGE = 25
@@ -59,16 +61,16 @@ def _resolve_api_key() -> str | None:
 class LobbyingFilingsReader(Reader):
     """Yields raw LDA filing dicts from the ``/filings/`` list endpoint.
 
-    ``since`` scopes the fetch to filings posted on/after a date (server-side via
-    ``filing_dt_posted_after``); incremental runs pass the max ``dt_posted``
-    already stored. ``filing_year`` and ``max_records`` bound the fetch for
-    validation. With no key configured the reader still fetches, just slower.
+    ``since``/``until`` scope the fetch by posting date (server-side via the
+    API's before/after filters). Bounded windows let a stale incremental ingest
+    catch up monotonically without exceeding its scheduled-run timeout.
     """
 
     def __init__(
         self,
         *,
         since: date | None = None,
+        until: date | None = None,
         filing_year: int | None = None,
         max_records: int | None = None,
         page_size: int = PER_PAGE,
@@ -76,6 +78,7 @@ class LobbyingFilingsReader(Reader):
         verbose: bool = False,
     ) -> None:
         self.since = since
+        self.until = until
         self.filing_year = filing_year
         self.max_records = max_records
         self.page_size = min(page_size, PER_PAGE)
@@ -87,9 +90,10 @@ class LobbyingFilingsReader(Reader):
     def iter_records(self) -> Iterator[dict]:
         keyed = "with API key" if self.api_key else "keyless (lower rate limit)"
         logger.info(
-            "LDA filings: fetching {} (since={}, filing_year={}, max_records={})",
+            "LDA filings: fetching {} (since={}, until={}, filing_year={}, max_records={})",
             keyed,
             self.since or "the beginning",
+            self.until or "today",
             self.filing_year or "any",
             self.max_records or "unbounded",
         )
@@ -110,6 +114,11 @@ class LobbyingFilingsReader(Reader):
             params["filing_year"] = self.filing_year
         if self.since is not None:
             params["filing_dt_posted_after"] = self.since.isoformat()
+        if self.until is not None:
+            params["filing_dt_posted_before"] = self.until.isoformat()
+        # Oldest-first makes a partial/retried catch-up run move its watermark
+        # forward instead of repeatedly spending its budget on the newest page.
+        params["ordering"] = "dt_posted"
         url = f"{API_BASE}/filings/"
         first = True
         while url:
