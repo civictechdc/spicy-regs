@@ -58,6 +58,7 @@ def build_fr_docket_links(output_dir: Path) -> Path:
             fr.signing_date,
             fr.agency_slugs,
             fr.docket_ids_json,
+            fr.regulation_id_numbers_json,
             fr.html_url,
             fr.pdf_url,
             fr.executive_order_number

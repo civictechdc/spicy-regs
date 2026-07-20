@@ -62,10 +62,7 @@ def download_from_r2(remote_key: str, local_path: Path) -> bool:
                 logger.info("{} not found on R2 (404)", remote_key)
                 return False
             if response.status_code != 200:
-                raise RuntimeError(
-                    f"Failed to download {remote_key} from R2: HTTP "
-                    f"{response.status_code}"
-                )
+                raise RuntimeError(f"Failed to download {remote_key} from R2: HTTP {response.status_code}")
             with open(temp_path, "wb") as f:
                 for chunk in response.iter_bytes():
                     f.write(chunk)
@@ -132,18 +129,14 @@ def _assert_upload_safe(
     if remote_size is None or remote_size == 0:
         return
     if getenv("R2_ALLOW_SHRINK") == "1":
-        logger.warning(
-            "R2_ALLOW_SHRINK=1: bypassing shrink guard for {}", remote_key
-        )
+        logger.warning("R2_ALLOW_SHRINK=1: bypassing shrink guard for {}", remote_key)
         return
 
     ratio_env = getenv("R2_MIN_SIZE_RATIO", "0.5")
     try:
         min_ratio = float(ratio_env)
     except ValueError:
-        raise RuntimeError(
-            f"Invalid R2_MIN_SIZE_RATIO={ratio_env!r}; expected a float"
-        )
+        raise RuntimeError(f"Invalid R2_MIN_SIZE_RATIO={ratio_env!r}; expected a float")
 
     ratio = local_size / remote_size
     if ratio < min_ratio:
@@ -182,12 +175,17 @@ def upload_file(local_path: Path, remote_key: str | None = None) -> None:
     remote_size = _get_remote_size(client, bucket, remote_key)
     _assert_upload_safe(local_size_bytes, remote_size, remote_key)
 
-    # Cache-Control makes the objects eligible for Cloudflare edge caching on
-    # the public custom domain (without it every browser range request pays a
-    # full edge->R2 origin round-trip, measured at ~130-180ms each). The corpus
-    # refreshes roughly daily; max-age bounds staleness after a republish and
-    # stale-while-revalidate keeps the edge fast across the refresh boundary.
-    cache_control = getenv("R2_CACHE_CONTROL", "public, max-age=3600, stale-while-revalidate=86400")
+    # Parquet readers issue many byte-range requests. Serving stale ranges across
+    # an object replacement can mix two versions and corrupt the read, so Parquet
+    # may be stored by caches but must be revalidated before reuse. Small immutable-
+    # enough auxiliary artifacts retain the prior edge-cache policy. Operators can
+    # override either policy globally when testing a Cloudflare rule.
+    configured_cache_control = getenv("R2_CACHE_CONTROL")
+    cache_control = configured_cache_control or (
+        "public, no-cache, must-revalidate"
+        if remote_key.endswith(".parquet")
+        else "public, max-age=3600, stale-while-revalidate=86400"
+    )
     client.upload_file(
         str(local_path),
         bucket,

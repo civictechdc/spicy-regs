@@ -35,6 +35,17 @@ OUTPUT = "lobbying_filings.parquet"
 # Re-scan this many days before the last stored dt_posted on each run, so
 # filings posted/amended after the watermark are picked up.
 OVERLAP_DAYS = 7
+MAX_WINDOW_DAYS = 30
+
+
+def _bounded_until(since: date | None, until: date | None, *, today: date | None = None) -> date | None:
+    """Return a deterministic end date no more than one catch-up window ahead."""
+    if since is None:
+        return until
+    if until is not None and until < since:
+        raise ValueError(f"LDA until date {until} precedes since date {since}")
+    return min(until or today or date.today(), since + timedelta(days=MAX_WINDOW_DAYS))
+
 
 # The published schema: all VARCHAR, keyed by filing_uuid. Array/nested fields
 # are JSON strings.
@@ -144,6 +155,7 @@ def build_lobbying_filings(
     output_dir: Path,
     *,
     since: date | None = None,
+    until: date | None = None,
     filing_year: int | None = None,
     max_records: int | None = None,
 ) -> Path:
@@ -164,10 +176,19 @@ def build_lobbying_filings(
     if since is None:
         prior_max = _prior_max_dt_posted(prior_file) if have_prior else None
         since = (prior_max - timedelta(days=OVERLAP_DAYS)) if prior_max else None
-    logger.info("LDA: fetching filings posted since {}", since or "the beginning")
+    # A stale watermark must not create an ever-growing request that repeatedly
+    # hits the 30-minute CI timeout. Walk toward today in bounded windows; the
+    # overlap makes each successive merge resilient to late/amended filings.
+    until = _bounded_until(since, until)
+    logger.info("LDA: fetching filings posted {} through {}", since or "the beginning", until or "today")
 
     # 3. Fetch + shape into a "new rows" parquet.
-    reader = LobbyingFilingsReader(since=since, filing_year=filing_year, max_records=max_records)
+    reader = LobbyingFilingsReader(
+        since=since,
+        until=until,
+        filing_year=filing_year,
+        max_records=max_records,
+    )
     rows = [_shape(f) for f in reader.iter_records()]
     new_file = output_dir / "_lda_new.parquet"
     table = pa.Table.from_pylist(rows, schema=_SCHEMA) if rows else _SCHEMA.empty_table()

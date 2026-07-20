@@ -18,6 +18,21 @@ on:
         required: false
         default: false
         type: boolean
+      lda_since:
+        description: 'Optional LDA catch-up start date (YYYY-MM-DD)'
+        required: false
+        default: ''
+        type: string
+      lda_until:
+        description: 'Optional LDA catch-up end date (YYYY-MM-DD; still capped to a 30-day run)'
+        required: false
+        default: ''
+        type: string
+      congress_since:
+        description: 'Optional Congress.gov backfill start date (YYYY-MM-DD)'
+        required: false
+        default: ''
+        type: string
 
 jobs:
   rollup:
@@ -54,6 +69,9 @@ jobs:
           # Optional: raises the Senate LDA API rate limit. The lobbying-filings
           # rollup is fully functional keyless, so an unset secret is fine.
           LDA_API_KEY: ${{ secrets.LDA_API_KEY }}
+          LDA_SINCE: ${{ inputs.lda_since }}
+          LDA_UNTIL: ${{ inputs.lda_until }}
+          CONGRESS_SINCE: ${{ inputs.congress_since }}
           # Optional: raises the CourtListener API rate limit. The court_dockets
           # rollup is fully functional keyless, so an unset secret is fine.
           COURTLISTENER_API_TOKEN: ${{ secrets.COURTLISTENER_API_TOKEN }}
