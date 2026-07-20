@@ -13,6 +13,7 @@ import argparse
 import json
 import os
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
@@ -20,6 +21,8 @@ from pathlib import Path
 import duckdb
 
 DEFAULT_BASE_URL = "https://r2.spicy-regs.dev"
+FreshnessRow = tuple[str, str, str | None, int]
+FreshnessState = dict[str, dict[str, int | str]]
 
 
 @dataclass(frozen=True)
@@ -82,7 +85,7 @@ def _parse_latest(raw: str | None) -> date | None:
             return None
 
 
-def evaluate_date_rows(rows: list[tuple[str, str, str | None, int]], today: date) -> list[str]:
+def evaluate_date_rows(rows: Sequence[FreshnessRow], today: date) -> list[str]:
     """Return human-readable failures for the date-backed result rows."""
     budgets = {(c.table, c.label or c.column): c.budget_days for c in DATE_CHECKS}
     failures: list[str] = []
@@ -103,8 +106,8 @@ def evaluate_date_rows(rows: list[tuple[str, str, str | None, int]], today: date
 
 
 def evaluate_row_changes(
-    rows: list[tuple[str, str, str | None, int]],
-    state: dict[str, dict[str, object]],
+    rows: Sequence[FreshnessRow],
+    state: FreshnessState,
     today: date,
 ) -> list[str]:
     """Update row-count state and flag tables unchanged beyond their budget."""
