@@ -1,0 +1,85 @@
+# Publishes the package to PyPI when a GitHub release is published.
+#
+# Uses PyPI "trusted publishing" (OIDC) — no API token secrets. One-time setup
+# a maintainer must do before the first release:
+#   1. On pypi.org (logged in as the owning account): Account → Publishing →
+#      add a pending publisher with project name `spicy-regs`, owner
+#      `civictechdc`, repository `spicy-regs`, workflow `publish-pypi.yml`,
+#      environment `pypi`.
+#   2. In this repo's Settings → Environments: create an environment named
+#      `pypi` (optionally require reviewers so releases need an approval).
+#
+# Release flow: bump `version` in pyproject.toml, merge to main, then create a
+# GitHub release whose tag is `v<version>` (e.g. v0.2.0). The tag/version
+# guard below fails the build if the two drift.
+
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Check release tag matches the project version
+        run: |
+          VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          TAG="${GITHUB_REF_NAME}"
+          if [ "v${VERSION}" != "${TAG}" ]; then
+            echo "::error::Release tag ${TAG} does not match pyproject.toml version ${VERSION} (expected v${VERSION})."
+            exit 1
+          fi
+
+      - name: Build sdist and wheel
+        run: uv build
+
+      - name: Smoke-test the wheel in a clean environment
+        run: |
+          uv venv /tmp/smoke
+          VIRTUAL_ENV=/tmp/smoke uv pip install dist/*.whl
+          /tmp/smoke/bin/spicy-regs --help
+          /tmp/smoke/bin/spicy-regs tables --source r2
+          /tmp/smoke/bin/spicy-regs-dict --help
+          /tmp/smoke/bin/python -c "import spicy_regs.mcp_server"
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/p/spicy-regs
+    permissions:
+      # Required for PyPI trusted publishing (OIDC token exchange).
+      id-token: write
+
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

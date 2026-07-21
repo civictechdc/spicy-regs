@@ -58,12 +58,17 @@ processed output from the public R2 bucket:
 
 ```bash
 uv run spicy-regs download                       # dockets + documents + comments
-uv run spicy-regs download --types comments      # just comments
+uv run spicy-regs download --tables comments     # just comments
 uv run spicy-regs stats                          # sanity-check what you got
 uv run spicy-regs sample comments -n 5           # peek at a few rows
+uv run spicy-regs query "SELECT count(*) FROM dockets"   # arbitrary SQL (works pre-download too)
 ```
 
-Files default to `./spicy-regs-data/`; override with `-o some/dir`.
+Files default to `./spicy-regs-data/`; override with `-o some/dir`. The query
+commands (`tables`, `describe`, `query`, and friends) default to `--source
+auto`: they read your local downloads when present and stream from the public
+R2 bucket otherwise, so you can explore the full dataset before downloading
+anything.
 
 **B. Run the ETL pipeline yourself (slower, but it's the real thing).**
 Reads JSON from the Mirrulations S3 mirror, flattens it, writes Parquet to
@@ -112,7 +117,10 @@ Some terms you'll see throughout the codebase:
 
 ```
 src/spicy_regs/
-├── cli.py                # main CLI entrypoint (`spicy-regs` script)
+├── cli/                  # main CLI (`spicy-regs` script) — one module per subcommand
+│   ├── _registry.py      #   the COMMANDS list; add your module here
+│   ├── engine.py         #   shared DuckDB engine (views over R2 or local parquet)
+│   └── download.py, query.py, …   # subcommands: register() + run()
 ├── schemas/              # RecordType definitions — one per data shape
 ├── sources/              # Reader and Writer subclasses (S3, R2, parquet, …)
 ├── transforms/           # Transform subclasses + bulk-transform helpers
@@ -175,6 +183,12 @@ not connectors — don't subclass them.
 
 ### Recipes
 
+- **Add a CLI command:** copy `src/spicy_regs/cli/tables.py` as a template,
+  implement `register(subparsers)` and `run(args) -> int` in a new module under
+  `src/spicy_regs/cli/`, then add the module to `COMMANDS` in
+  `src/spicy_regs/cli/_registry.py`. Use `spicy_regs.cli.engine` for anything
+  that reads the published tables (it handles local vs. R2 resolution for you),
+  and add tests next to `tests/test_cli_commands.py`.
 - **Add a record shape:** construct a new `RecordType` in `schemas/` (set
   `path_pattern` only if your source addresses files by path).
 - **Add a source:** subclass `Reader`, implement `iter_records()` to yield raw
@@ -196,6 +210,23 @@ not connectors — don't subclass them.
 - Describe the problem and the solution.
 - Include a test plan.
 - Ensure CI passes before requesting review.
+
+## Releasing to PyPI (maintainers)
+
+Publishing is automated by `.github/workflows/publish-pypi.yml` via PyPI
+[trusted publishing](https://docs.pypi.org/trusted-publishers/) — no API
+tokens. To cut a release:
+
+1. Bump `version` in `pyproject.toml` and merge to `main`.
+2. Create a GitHub release whose tag is `v<version>` (e.g. `v0.2.0`).
+3. The workflow builds the sdist + wheel, checks the tag matches the version,
+   smoke-tests the wheel in a clean environment, and publishes to PyPI.
+
+One-time setup (already-released projects skip this): add a pending trusted
+publisher on pypi.org (project `spicy-regs`, owner `civictechdc`, repo
+`spicy-regs`, workflow `publish-pypi.yml`, environment `pypi`) and create the
+`pypi` environment in the repo settings. Once published, users can run the CLI
+with just `uvx spicy-regs` — no git URL needed.
 
 ## Reporting issues
 
