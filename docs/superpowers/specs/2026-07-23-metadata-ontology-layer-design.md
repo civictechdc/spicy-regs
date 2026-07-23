@@ -2,6 +2,7 @@
 
 - **Date:** 2026-07-23
 - **Status:** Draft for review
+- **Parent:** `docs/superpowers/specs/2026-07-23-regulatory-ontology-program-overview.md`
 - **Scope:** Spec 1 of 2. This spec covers the spicy-regs metadata layer: a rule-identity spine, statutory-authority edges, and an iterative concept-tagging system, all with explicit provenance. Spec 2 (separate, later) covers restructuring [Formspec-Labs/rulespec](https://github.com/Formspec-Labs/rulespec) into vocabulary modules, informed by what this implementation proves.
 
 ## Goal
