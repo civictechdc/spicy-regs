@@ -409,3 +409,59 @@ tables:
       name: "Recipient name as recorded by USASpending (e.g. `LOCKHEED MARTIN CORP`). The name-resolution key."
       recipient_level: "Recipient rollup level: `P` (parent), `C` (child), or `R` (standalone recipient with no parent). The same UEI can appear at multiple levels."
       total_award_amount: "All-time federal award dollars for the recipient at this level, as a numeric string (e.g. `63465270734.15`). The bounding sort key (top-N by amount)."
+  fcc_proceedings:
+    summary: >-
+      One row per FCC proceeding (the FCC's docket equivalent, e.g. `17-108`),
+      ingested from the FCC ECFS public API (`/proceedings`) by
+      `build_fcc_proceedings`. The FCC does not participate in regulations.gov —
+      its rulemaking dockets and public comments live in ECFS — so this table
+      extends the dataset's docket universe to the FCC. Requires an api.data.gov
+      key (`DATA_GOV_API_KEY`). Incremental by `date_created`, deduped on
+      `name`. Proceedings with no created date are unreachable through the
+      API's date-range queries and are not included (legacy shells with no
+      filing activity). All columns are stored as VARCHAR.
+    columns:
+      name: "Proceeding (docket) number, e.g. `17-108` or `23-320`. Primary key / dedup key, and the join key to `fcc_filings.proceeding_names_json`."
+      id_proceeding: "ECFS internal numeric id for the proceeding."
+      description: "Proceeding title/subject (ECFS `description_display`, falling back to `description`), e.g. `Restoring Internet Freedom`."
+      bureau_code: "Code of the FCC bureau that owns the proceeding (e.g. `WC`)."
+      bureau_name: "Name of the FCC bureau that owns the proceeding (e.g. `Wireline Competition Bureau`)."
+      rulemaking_or_docket: "ECFS `flag_rulemaking_or_docket`: `R` for rulemakings (RM- numbers), `D` for dockets."
+      filing_status: "ECFS filing-window status for the proceeding (e.g. `OPENALL`)."
+      date_created: "Timestamp the proceeding was created in ECFS (ISO 8601 string). Incremental cursor and sort key."
+      date_closed: "Timestamp the proceeding was closed, if it has been (open proceedings carry null or a far-future sentinel like `2099-12-31`)."
+      comment_start_date: "Start of the initial comment window, when ECFS records one. Often null."
+      comment_end_date: "End of the initial comment window, when ECFS records one. Often null."
+      reply_comment_start_date: "Start of the reply-comment window, when ECFS records one. Often null."
+      reply_comment_end_date: "End of the reply-comment window, when ECFS records one. Often null."
+      filed_by: "ECFS account that created the proceeding. An internal FCC username; occasionally useful for spotting bureau conventions."
+  fcc_filings:
+    summary: >-
+      One row per FCC ECFS filing — the FCC's comment equivalent: comments,
+      reply comments, ex-parte notices, letters, and other submissions —
+      ingested from the FCC ECFS public API (`/filings`) by `build_fcc_filings`.
+      Requires an api.data.gov key (`DATA_GOV_API_KEY`). Incremental by
+      `date_received`, deduped on `id_submission`. Because ECFS holds tens of
+      millions of filings, a first run with no prior table is bounded to the
+      trailing 30 days; deeper history is backfilled in slices via `FCC_SINCE`
+      and/or scoped to specific proceedings via `FCC_PROCEEDINGS`. All columns
+      are stored as VARCHAR, array fields serialized as JSON strings.
+    columns:
+      id_submission: "ECFS submission id (e.g. `26109947027`). Primary key / dedup key."
+      proceeding_names_json: "JSON array of proceeding (docket) numbers the filing was submitted to (e.g. `[\"17-108\"]`). Join key to `fcc_proceedings.name`."
+      submission_type: "ECFS submission type description, e.g. `COMMENT`, `REPLY TO COMMENTS`, `NOTICE OF EXPARTE`."
+      express_comment: "`1` if the filing is an express comment (text-only, entered in the web form), `0` for standard filings with uploaded documents."
+      date_received: "Timestamp ECFS records the filing as received (ISO 8601 string). Incremental cursor and sort key."
+      date_submission: "Timestamp the filer submitted the filing (ISO 8601 string)."
+      date_disseminated: "Timestamp the filing was disseminated (made public) by ECFS (ISO 8601 string)."
+      filing_status: "ECFS workflow status description (e.g. `DISSEMINATED`)."
+      viewing_status: "ECFS viewing status description (e.g. `Unrestricted`, `Confidential`)."
+      exparte_or_late_filed: "`Y` if the filing is ex-parte or late-filed, else `N`."
+      filers_json: "JSON array of filer names (individuals or organizations) on the filing."
+      authors_json: "JSON array of author names on the filing, when distinct from the filers. Often empty."
+      lawfirms_json: "JSON array of law-firm names on the filing. Often empty."
+      bureaus_json: "JSON array of FCC bureau names the filing was routed to. Often empty."
+      text_data: "The filing's inline text — for express comments this is the full comment text. Null for document-only filings."
+      total_page_count: "Total page count across the filing's attached documents, as a numeric string."
+      documents_json: "JSON array of attached documents as `{filename, src}` objects, where `src` is the fcc.gov download URL."
+      filing_url: "Canonical fcc.gov URL for the filing (`https://www.fcc.gov/ecfs/filing/<id_submission>`)."
