@@ -83,6 +83,7 @@ Parses `unified_agenda.legal_authority_json` free text into U.S.C. citations. Ke
 | `rin` | RIN whose agenda entry cites the authority. |
 | `authority_raw` | Original citation string, always retained. |
 | `usc_title`, `usc_section` | Parsed citation (e.g. `42`, `7401`). Null when unparsed. |
+| `pl_number` | Parsed public-law number (e.g. `117-58`) when `authority_type=public_law`. Join key to `congress_bills`; carries the `us-pl` identifier scheme — without this column the scheme would freeze unexercised. |
 | `authority_type` | `usc`, `public_law`, `statute_at_large`, `eo`, `other`. |
 | `parse_status` | `ok`, `partial`, `failed`. Failed rows are kept — the raw string still supports search. |
 | `agenda_edition` | Edition the citation came from. |
@@ -133,6 +134,15 @@ One row per structural change: `merge`, `split`, `rename`, `deprecate`, `promote
 
 New column on the existing table: the FR API's `topics` field (Thesaurus terms per document), currently dropped at ingest. Cheap, deterministic, and it powers both seeding and evaluation of the subject facet.
 
+### 7. Follow-on: `proceedings` + `comment_periods` (proves spec 2's rulemaking module)
+
+Spicy-regs already publishes two rollups absent from the data dictionary: `rulemaking_lifecycles` (proto-proceeding threading) and `fr_docket_links` (used by `rule_targets` above). This follow-on promotes them into first-class tables:
+
+- **`proceedings`** — one row per rulemaking proceeding: `rin`, associated docket id(s) (a proceeding MAY span multiple dockets), current stage, and stage-event history. Built by promoting `rulemaking_lifecycles` into the documented surface.
+- **`comment_periods`** — one row per comment period, including reopenings: proceeding/docket keys, open and close dates, source (`documents.comment_end_date`, `federal_register.comments_close_on`), plus attestation columns.
+
+This deliverable does three jobs at once: it documents already-published rollups into the data dictionary; it is the **corpus-scale consumer exercise** for spec 2's Deliverable C entities (`Proceeding`, `proceedingStage`, `CommentPeriod`, `publishedInProceeding`) — the reference corpus is a fixture, not a consumer, so C's stabilization gate depends on this table shipping; and it delivers cross-cutting goal 4 (comment-window awareness), the driving use case's highest-value item.
+
 ## Provenance model (attestation columns)
 
 Every AI- or rule-derived row carries the same column block, aligned with rulespec's attestation terms (mapping table maintained in `docs/ontology.md`):
@@ -174,15 +184,16 @@ Batch, not streaming — each phase is a rollup-style job:
 
 ## Out of scope (v1)
 
-- Rulespec modular restructure and rulemaking-process entities (spec 2).
+- Rulespec modular restructure and rulemaking-process *vocabulary* (spec 2). The consumer tables that exercise that vocabulary are in scope here as the follow-on (§7).
 - Facets beyond `subject` and `regulated_entity`; promotion of tags to decision-grade concepts.
 - Comment-level tagging, campaign detection, commenter entity resolution.
 - CFR section full text; OCR; any UI beyond MCP/SQL access.
 
 ## Delivery order
 
-1. Rulespec: identifier-conventions page + Level-0 tier definition (prerequisite, ~1 page each).
+1. Rulespec: identifier-conventions page + Level-0 tier definition (prerequisite, ~1 page each). **Cadence fallback:** if this release slips, steps 2–3 may ship with provisional `x-` prefixed local terms and a committed rename in the release that follows — tables before vocabulary applies to the schedule too.
 2. `rule_targets` + `docs/ontology.md` — immediate filtering payoff, zero AI.
-3. `authority_edges` + `congress_bills` join validation.
+3. `authority_edges` (including `pl_number`) + `congress_bills` join validation on both U.S.C. and PL keys.
 4. FR `topics_json` enrichment; seed `concepts`.
 5. `concept_assignments` generate pass; then merge, validation, re-score jobs.
+6. `proceedings` + `comment_periods` (§7) — blocks spec 2's Deliverable C stabilization; deliverable to rulespec is the full-corpus friction report.
