@@ -33,6 +33,16 @@ on:
         required: false
         default: ''
         type: string
+      fcc_since:
+        description: 'Optional FCC ECFS backfill start date (YYYY-MM-DD)'
+        required: false
+        default: ''
+        type: string
+      fcc_proceedings:
+        description: 'Optional comma-separated FCC proceeding names to scope the filings fetch (e.g. 17-108,23-320)'
+        required: false
+        default: ''
+        type: string
 
 jobs:
   rollup:
@@ -72,6 +82,8 @@ jobs:
           LDA_SINCE: ${{ inputs.lda_since }}
           LDA_UNTIL: ${{ inputs.lda_until }}
           CONGRESS_SINCE: ${{ inputs.congress_since }}
+          FCC_SINCE: ${{ inputs.fcc_since }}
+          FCC_PROCEEDINGS: ${{ inputs.fcc_proceedings }}
           # Optional: raises the CourtListener API rate limit. The court_dockets
           # rollup is fully functional keyless, so an unset secret is fine.
           COURTLISTENER_API_TOKEN: ${{ secrets.COURTLISTENER_API_TOKEN }}

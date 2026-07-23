@@ -57,6 +57,8 @@ TABLES = (
     "crs_reports",
     "court_dockets",
     "usaspending_recipients",
+    "fcc_proceedings",
+    "fcc_filings",
 )
 # Matches the Vercel copy's default (kept just under that deploy's 300s
 # ``maxDuration``). Override with ``SPICY_REGS_STATEMENT_TIMEOUT``.

@@ -7,6 +7,7 @@ from spicy_regs.transforms.build_congress_bills import build_congress_bills
 from spicy_regs.transforms.build_crs_reports import build_crs_reports
 from spicy_regs.transforms.build_courtlistener import build_courtlistener
 from spicy_regs.transforms.build_discovery_signals import build_discovery_signals
+from spicy_regs.transforms.build_fcc_ecfs import build_fcc_filings, build_fcc_proceedings
 from spicy_regs.transforms.build_fec_committees import build_fec_committees
 from spicy_regs.transforms.build_federal_register import build_federal_register
 from spicy_regs.transforms.build_feed_summary import build_feed_summary
@@ -52,6 +53,8 @@ __all__ = [
     "build_crs_reports",
     "build_courtlistener",
     "build_discovery_signals",
+    "build_fcc_proceedings",
+    "build_fcc_filings",
     "build_fec_committees",
     "build_rulemaking_lifecycles",
     "build_sam_entities",

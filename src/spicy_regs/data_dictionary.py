@@ -60,6 +60,8 @@ TABLES: tuple[str, ...] = (
     "crs_reports",
     "court_dockets",
     "usaspending_recipients",
+    "fcc_proceedings",
+    "fcc_filings",
 )
 
 # Tables the MCP server (list_sources / describe_table / query_sql) exposes.
@@ -85,6 +87,8 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
         "crs_reports",
         "court_dockets",
         "usaspending_recipients",
+        "fcc_proceedings",
+        "fcc_filings",
     }
 )
 
@@ -325,6 +329,48 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("name", "VARCHAR"),
         ("recipient_level", "VARCHAR"),
         ("total_award_amount", "VARCHAR"),
+    ],
+    # Ingested from the FCC ECFS public API (build_fcc_proceedings); the FCC's
+    # docket equivalent — the FCC does not participate in regulations.gov. All
+    # columns stored as VARCHAR. Keyed by name (the docket number).
+    "fcc_proceedings": [
+        ("name", "VARCHAR"),
+        ("id_proceeding", "VARCHAR"),
+        ("description", "VARCHAR"),
+        ("bureau_code", "VARCHAR"),
+        ("bureau_name", "VARCHAR"),
+        ("rulemaking_or_docket", "VARCHAR"),
+        ("filing_status", "VARCHAR"),
+        ("date_created", "VARCHAR"),
+        ("date_closed", "VARCHAR"),
+        ("comment_start_date", "VARCHAR"),
+        ("comment_end_date", "VARCHAR"),
+        ("reply_comment_start_date", "VARCHAR"),
+        ("reply_comment_end_date", "VARCHAR"),
+        ("filed_by", "VARCHAR"),
+    ],
+    # Ingested from the FCC ECFS public API (build_fcc_filings); the FCC's
+    # comment equivalent. All columns stored as VARCHAR, array fields
+    # serialized as JSON strings. Keyed by id_submission.
+    "fcc_filings": [
+        ("id_submission", "VARCHAR"),
+        ("proceeding_names_json", "VARCHAR"),
+        ("submission_type", "VARCHAR"),
+        ("express_comment", "VARCHAR"),
+        ("date_received", "VARCHAR"),
+        ("date_submission", "VARCHAR"),
+        ("date_disseminated", "VARCHAR"),
+        ("filing_status", "VARCHAR"),
+        ("viewing_status", "VARCHAR"),
+        ("exparte_or_late_filed", "VARCHAR"),
+        ("filers_json", "VARCHAR"),
+        ("authors_json", "VARCHAR"),
+        ("lawfirms_json", "VARCHAR"),
+        ("bureaus_json", "VARCHAR"),
+        ("text_data", "VARCHAR"),
+        ("total_page_count", "VARCHAR"),
+        ("documents_json", "VARCHAR"),
+        ("filing_url", "VARCHAR"),
     ],
 }
 

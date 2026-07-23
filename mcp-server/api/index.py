@@ -57,6 +57,8 @@ TABLES = (
     "crs_reports",
     "court_dockets",
     "usaspending_recipients",
+    "fcc_proceedings",
+    "fcc_filings",
 )
 # Kept just under the Vercel ``maxDuration`` (300s) so a runaway query trips
 # this watchdog and returns a clean ``TimeoutError`` before the platform hard
