@@ -23,7 +23,7 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --frozen
 
       - name: Lint (ruff check)
         run: uv run ruff check .
@@ -48,7 +48,7 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --frozen
 
       - name: Run tests
         run: uv run pytest
@@ -75,7 +75,7 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --frozen
 
       - name: Check descriptions vs schema
         run: uv run spicy-regs-dict check
@@ -85,3 +85,22 @@ jobs:
           uv run spicy-regs-dict generate
           git diff --exit-code docs/tables \
             || { echo "::error::docs/tables is stale. Run 'uv run spicy-regs-dict generate' and commit."; exit 1; }
+
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Build wheel and source distribution
+        run: uv build

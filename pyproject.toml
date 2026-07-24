@@ -76,7 +76,7 @@ spicy-regs-ontology-receipt = "spicy_regs.ontology.receipt:main"
 spicy-regs-evaluate-tags = "spicy_regs.evaluate_tag_quality:main"
 
 [build-system]
-requires = ["uv_build"]
+requires = ["uv_build<0.12"]
 build-backend = "uv_build"
 
 [tool.pytest.ini_options]
