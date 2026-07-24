@@ -63,6 +63,19 @@ class TestUploadShrinkGuard:
 
         assert uploads[0][2]["CacheControl"] == "public, no-cache, must-revalidate"
 
+    def test_materialized_pointer_is_json_and_requires_revalidation(self, tmp_path, monkeypatch):
+        self._setup_env(monkeypatch)
+        _, uploads = self._mock_r2_client(monkeypatch, remote_size=None)
+        local = tmp_path / "latest.json"
+        local.write_text('{"snapshot_id":"snapshot_1"}', encoding="utf-8")
+
+        upload_to_r2(local, remote_key="materialized/ontology/latest.json")
+
+        assert uploads[0][2] == {
+            "ContentType": "application/json",
+            "CacheControl": "public, no-cache, must-revalidate",
+        }
+
     def test_cache_control_env_override_wins(self, tmp_path, monkeypatch):
         self._setup_env(monkeypatch)
         monkeypatch.setenv("R2_CACHE_CONTROL", "no-store")

@@ -1,0 +1,88 @@
+name: Materialize — ontology dataset
+
+# Identity tables refresh Monday-Saturday. Sunday runs the complete concept
+# convergence/tagging DAG. A shared concurrency group prevents two generations
+# from racing to replace the atomic latest.json pointer.
+on:
+  schedule:
+    - cron: '0 2 * * 1-6'
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      full_refresh:
+        description: 'Refresh concept state as well as identity tables'
+        required: false
+        default: true
+        type: boolean
+      skip_upload:
+        description: 'Build and validate without publishing'
+        required: false
+        default: false
+        type: boolean
+      allow_bootstrap:
+        description: 'Allow the first publication when no prior generation exists'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: materialize-ontology
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Materialize one ontology generation
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          FULL_REFRESH: ${{ github.event_name == 'schedule' && github.event.schedule == '0 2 * * 0' || inputs.full_refresh }}
+          SKIP_UPLOAD: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}
+          ALLOW_BOOTSTRAP: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_bootstrap || false }}
+        run: |
+          ARGS=()
+          if [ "$FULL_REFRESH" = "true" ]; then
+            ARGS+=(--full-refresh)
+          else
+            ARGS+=(--no-full-refresh)
+          fi
+          if [ "$SKIP_UPLOAD" = "true" ]; then
+            ARGS+=(--skip-upload)
+          else
+            ARGS+=(--no-skip-upload)
+          fi
+          if [ "$ALLOW_BOOTSTRAP" = "true" ]; then
+            ARGS+=(--allow-bootstrap)
+          else
+            ARGS+=(--no-allow-bootstrap)
+          fi
+          uv run materialize-ontology "${ARGS[@]}"
+
+      - name: Upload failed generation for debugging
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ontology-generation
+          path: output/
+          retention-days: 7

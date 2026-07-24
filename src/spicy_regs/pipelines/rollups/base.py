@@ -14,10 +14,10 @@ re-run or backfilled on its own, and a failure is isolated to a single artifact.
     3. Load  — publish the single artifact to R2 (shrink-guarded), off by
        default while vetting.
 
-**Contract:** a rollup reads only the ETL's *published base tables*
-(``dockets``, ``documents``, ``comments_index``, ``federal_register``) — never
-another rollup's output — so pipelines stay independently schedulable with no
-cross-pipeline race.
+**Contract:** a rollup publishes exactly one independently schedulable artifact.
+Its declared inputs are source snapshots, not outputs from a sibling rollup that
+must run first. Cross-derived dependencies, prior state, or multi-artifact
+publication belong to ``MaterializedDatasetPipeline`` instead.
 """
 
 from abc import abstractmethod
