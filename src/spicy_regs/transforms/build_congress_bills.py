@@ -1,8 +1,8 @@
 """Transform: build ``congress_bills.parquet`` from the Congress.gov REST API.
 
-Produces a 10-column all-VARCHAR schema keyed on ``bill_id`` (e.g.
-``118-hr-1234``), the legislative record complementary to the regulations.gov
-``dockets``/``documents`` view.
+Produces an all-VARCHAR schema keyed on ``bill_id`` (e.g. ``118-hr-1234``),
+including the enacted public-law number exposed by the list payload. That
+``pl_number`` is the direct join key from ``authority_edges``.
 
 Incremental by design. A full re-fetch of the entire bill archive every run
 would be wasteful *and* would trip the R2 catastrophic-shrink guard on any short
@@ -22,6 +22,7 @@ list payload, so there are no per-bill detail fetches (no N+1).
 
 from __future__ import annotations
 
+import re
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -38,7 +39,7 @@ OUTPUT = "congress_bills.parquet"
 # updated after our previous run's cutoff are picked up.
 OVERLAP_DAYS = 3
 
-# The published schema: 10 columns, all VARCHAR, in a fixed order. ``bill_id`` is
+# The published schema: 11 columns, all VARCHAR, in a fixed order. ``bill_id`` is
 # the primary / dedup key.
 #
 # ``policy_area`` is intentionally omitted — the ``/bill`` list endpoint doesn't
@@ -49,6 +50,7 @@ COLUMNS = (
     "congress",
     "bill_type",
     "bill_number",
+    "pl_number",
     "title",
     "origin_chamber",
     "latest_action_date",
@@ -57,6 +59,15 @@ COLUMNS = (
     "url",
 )
 _SCHEMA = pa.schema([(c, pa.string()) for c in COLUMNS])
+_PUBLIC_LAW_ACTION = re.compile(
+    r"\b(?:public\s+law|pub\.?\s*l\.?)\s*(?:no\.?\s*:?\s*)?"
+    r"(?P<congress>[1-9]\d*)\s*[-–—]\s*(?P<number>[1-9]\d*)",
+    re.IGNORECASE,
+)
+_PUBLIC_LAW_ACTION_SQL = (
+    r"(?i)(?:public\s+law|pub\.?\s*l\.?)\s*(?:no\.?\s*:?\s*)?"
+    r"([1-9][0-9]*)\s*[-–—]\s*([1-9][0-9]*)"
+)
 
 
 def _s(value: object) -> str | None:
@@ -76,6 +87,32 @@ def _bill_id(doc: dict) -> str | None:
     return f"{congress}-{str(bill_type).lower()}-{number}"
 
 
+def _public_law_number(doc: dict) -> str | None:
+    """Return the enacted Public Law number as ``<congress>-<number>``.
+
+    The Congress list endpoint exposes enactment in ``latestAction.text``
+    (for example, ``Became Public Law No: 117-108.``). ``laws`` is also
+    accepted for detail/law-endpoint payloads, but no N+1 detail fetch is
+    required to populate the published join key.
+    """
+    congress = _s(doc.get("congress"))
+    for law in doc.get("laws") or []:
+        if not isinstance(law, dict):
+            continue
+        law_type = str(law.get("type") or "").strip().lower().replace(".", "")
+        if law_type not in {"public law", "publ", "public"}:
+            continue
+        raw_number = str(law.get("number") or "").strip().replace("–", "-").replace("—", "-")
+        if re.fullmatch(r"[1-9]\d*-[1-9]\d*", raw_number):
+            return "-".join(str(int(part)) for part in raw_number.split("-", 1))
+        if congress and raw_number.isdigit() and int(raw_number) > 0:
+            return f"{int(congress)}-{int(raw_number)}"
+    action_text = str((doc.get("latestAction") or {}).get("text") or "")
+    if match := _PUBLIC_LAW_ACTION.search(action_text):
+        return f"{int(match.group('congress'))}-{int(match.group('number'))}"
+    return None
+
+
 def _shape(doc: dict) -> dict:
     """Map one raw Congress.gov bill onto the published column shape."""
     latest_action = doc.get("latestAction") or {}
@@ -84,6 +121,7 @@ def _shape(doc: dict) -> dict:
         "congress": _s(doc.get("congress")),
         "bill_type": (str(doc["type"]).lower() if doc.get("type") else None),
         "bill_number": _s(doc.get("number")),
+        "pl_number": _public_law_number(doc),
         "title": doc.get("title"),
         "origin_chamber": doc.get("originChamber"),
         "latest_action_date": latest_action.get("actionDate"),
@@ -106,6 +144,18 @@ def _prior_max_update_date(prior_file: Path) -> date | None:
         return date.fromisoformat(str(row[0])[:10])
     except ValueError:
         return None
+
+
+def _backfilled_pl_number_sql() -> str:
+    """SQL projection that migrates legacy rows without replaying the API."""
+    pattern = _PUBLIC_LAW_ACTION_SQL.replace("'", "''")
+    congress = f"CAST(CAST(regexp_extract(latest_action_text, '{pattern}', 1) AS BIGINT) AS VARCHAR)"
+    number = f"CAST(CAST(regexp_extract(latest_action_text, '{pattern}', 2) AS BIGINT) AS VARCHAR)"
+    parsed = (
+        f"CASE WHEN regexp_matches(coalesce(latest_action_text, ''), '{pattern}') "
+        f"THEN concat({congress}, '-', {number}) END"
+    )
+    return f"coalesce(pl_number, {parsed}) AS pl_number"
 
 
 def build_congress_bills(output_dir: Path, *, since: date | None = None) -> Path:
@@ -146,11 +196,16 @@ def build_congress_bills(output_dir: Path, *, since: date | None = None) -> Path
     con.execute(f"SET temp_directory='{spill_dir}'")
 
     cols = ", ".join(COLUMNS)
+    output_cols = ", ".join(_backfilled_pl_number_sql() if column == "pl_number" else column for column in COLUMNS)
     if have_prior:
+        # A prior table may predate ``pl_number``. UNION BY NAME first adds the
+        # nullable column; the output projection then derives historical values
+        # from latest_action_text already stored in the prior table. This makes
+        # the join-key migration complete without an expensive full API replay.
         union = (
-            f"SELECT {cols}, 0 AS _src FROM read_parquet('{prior_file}') "
+            f"SELECT *, 0 AS _src FROM read_parquet('{prior_file}') "
             f"UNION ALL BY NAME "
-            f"SELECT {cols}, 1 AS _src FROM read_parquet('{new_file}')"
+            f"SELECT *, 1 AS _src FROM read_parquet('{new_file}')"
         )
     else:
         union = f"SELECT {cols}, 1 AS _src FROM read_parquet('{new_file}')"
@@ -158,7 +213,7 @@ def build_congress_bills(output_dir: Path, *, since: date | None = None) -> Path
     con.execute(
         f"""
         COPY (
-            SELECT {cols} FROM (
+            SELECT {output_cols} FROM (
                 SELECT {cols}, ROW_NUMBER() OVER (
                     PARTITION BY bill_id ORDER BY _src DESC
                 ) AS _rn

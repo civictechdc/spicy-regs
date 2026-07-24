@@ -9,12 +9,20 @@ from __future__ import annotations
 
 from datetime import date
 
+import pyarrow as pa
+import pyarrow.parquet as pq
+
 from spicy_regs.sources.congress_bills import (
     API_KEY_ENV_VARS,
     CongressBillsReader,
     _resolve_api_key,
 )
-from spicy_regs.transforms.build_congress_bills import COLUMNS, _bill_id, _shape
+from spicy_regs.transforms.build_congress_bills import (
+    COLUMNS,
+    _bill_id,
+    _shape,
+    build_congress_bills,
+)
 
 _RAW_BILL = {
     "congress": 118,
@@ -22,7 +30,7 @@ _RAW_BILL = {
     "number": 1234,
     "title": "A Bill To Do A Thing",
     "originChamber": "House",
-    "latestAction": {"actionDate": "2024-03-01", "text": "Referred to committee."},
+    "latestAction": {"actionDate": "2024-03-01", "text": "Became Public Law No: 118-42."},
     "updateDate": "2024-03-05",
     "url": "https://api.congress.gov/v3/bill/118/hr/1234?format=json",
 }
@@ -30,9 +38,9 @@ _RAW_BILL = {
 
 def test_shape_produces_exact_schema():
     row = _shape(_RAW_BILL)
-    # Every published column present, and nothing extra (10-column schema).
+    # Every published column present, and nothing extra (11-column schema).
     assert set(row) == set(COLUMNS)
-    assert len(COLUMNS) == 10
+    assert len(COLUMNS) == 11
 
 
 def test_shape_maps_and_serializes_fields():
@@ -42,11 +50,12 @@ def test_shape_maps_and_serializes_fields():
     assert row["congress"] == "118"
     assert row["bill_type"] == "hr"  # lowercased
     assert row["bill_number"] == "1234"  # int stringified
+    assert row["pl_number"] == "118-42"
     assert row["title"] == "A Bill To Do A Thing"
     assert row["origin_chamber"] == "House"
     # Nested latestAction is flattened.
     assert row["latest_action_date"] == "2024-03-01"
-    assert row["latest_action_text"] == "Referred to committee."
+    assert row["latest_action_text"] == "Became Public Law No: 118-42."
     assert row["update_date"] == "2024-03-05"
 
 
@@ -57,6 +66,7 @@ def test_shape_handles_missing_nested_and_scalars():
     assert row["latest_action_date"] is None
     assert row["latest_action_text"] is None
     assert row["origin_chamber"] is None
+    assert row["pl_number"] is None
 
 
 def test_bill_id_requires_all_parts():
@@ -65,6 +75,29 @@ def test_bill_id_requires_all_parts():
     assert _bill_id({"type": "hr", "number": 1}) is None
     assert _bill_id({"congress": 118, "number": 1}) is None
     assert _bill_id({"congress": 118, "type": "hr"}) is None
+
+
+def test_legacy_table_backfills_public_law_join_key_without_api_replay(
+    tmp_path,
+    monkeypatch,
+):
+    legacy_columns = tuple(column for column in COLUMNS if column != "pl_number")
+    legacy_row = {
+        **_shape(_RAW_BILL),
+        "latest_action_text": "Became Pub. L. 118-42.",
+    }
+    legacy_row.pop("pl_number")
+    pq.write_table(
+        pa.Table.from_pylist([legacy_row]).select(legacy_columns),
+        tmp_path / "_congress_prior.parquet",
+    )
+    monkeypatch.setattr(CongressBillsReader, "iter_records", lambda self: iter(()))
+
+    output = build_congress_bills(tmp_path, since=date(2026, 7, 23))
+
+    rows = pq.read_table(output).to_pylist()
+    assert pq.ParquetFile(output).schema_arrow.names == list(COLUMNS)
+    assert rows[0]["pl_number"] == "118-42"
 
 
 # -- API-key resolution ------------------------------------------------------
