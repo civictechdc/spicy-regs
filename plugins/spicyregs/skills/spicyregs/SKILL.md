@@ -24,13 +24,17 @@ Keep this workflow provider-neutral.
 
 ## Sources
 
-- Structured querying helper:
+- Structured querying helper for the core regulations.gov surface:
   - `uv run --script plugins/spicyregs/skills/spicyregs/scripts/query_spicy_regs.py --source r2 --list-sources`
   - `uv run --script plugins/spicyregs/skills/spicyregs/scripts/query_spicy_regs.py --source r2 --describe dockets`
   - `uv run --script plugins/spicyregs/skills/spicyregs/scripts/query_spicy_regs.py --source r2 --sql "<SQL>"`
   - `uv run --script plugins/spicyregs/skills/spicyregs/scripts/find_duplicate_regulations.py --source r2 --limit 20`
-- Remote MCP equivalent (when running without a local Python toolchain, e.g. claude.ai):
+- Remote MCP surface, including complementary and materialized tables (when
+  running without a local Python toolchain, e.g. claude.ai):
   - `list_sources`, `describe_table`, `query_sql` tools exposed by the Spicy Regs MCP server in `mcp-server/`.
+  - The seven materialized ontology tables appear only after their first
+    complete production generation; trust `list_sources` for current
+    availability.
   - Prefer the MCP tools when the skill is loaded in a chat surface that has the connector attached; prefer the `uv` scripts when running locally where they're faster and cover the duplicate-finder workflow.
 - Optional alternate sources, only when explicitly requested:
   - `uv run --script plugins/spicyregs/skills/spicyregs/scripts/query_spicy_regs.py --source local --list-sources`
@@ -70,20 +74,30 @@ Use the helper script's `--describe` output for the exact schema. In this repo, 
   - `agency_stats`
   - `agency_monthly_volume`
 
-Complementary federal sources (all queryable by name; see the Data Dictionary for columns):
+Complementary federal sources (queryable by name through MCP when published;
+see the Data Dictionary for columns):
 
-- Rulemaking lifecycle: `federal_register` (published rules; RIN + CFR refs), `unified_agenda` (planned actions, keyed by `rin`), `congress_bills`, `cfr_sections`
+- Rulemaking identity: `rule_targets` (normalized docket/CFR/RIN evidence), `authority_edges` (U.S.C./Public Law citations), `proceedings`, `comment_periods`
+- Retrieval ontology: `concepts`, append-only `concept_assignments`, and structural `concept_events`
+- Source lifecycle: `federal_register` (published rules; RIN + CFR refs), `unified_agenda` (planned actions), `fr_docket_links`, `rulemaking_lifecycles`, `congress_bills`, `cfr_sections`
 - Organizations & influence: `sam_entities` (entity registry, keyed by `uei`), `lobbying_filings`, `fec_committees`
 - Outcomes & context: `usaspending_recipients` (keyed by `uei`), `court_dockets`, `gao_reports`, `crs_reports`
 
-Join keys across sources: `rin` (unified_agenda ↔ federal_register), CFR citations (↔ cfr_sections), `uei` (sam_entities ↔ usaspending_recipients ↔ commenter orgs), and `agency_code`.
+Join keys across sources: `docket_id`, `rin`, and `cfr_ref` through
+`rule_targets`; statutory citations through `authority_edges`; `pl_number`
+joins enacted authorities to `congress_bills`, while U.S.C. citations do not
+claim a bill crosswalk; `proceeding_id`; polymorphic
+`(subject_type, subject_id)`; `uei` (sam_entities ↔ usaspending_recipients ↔
+commenter orgs); and `agency_code`.
 
 ## Query Patterns
 
 - Counts by agency: group on `agency_code`
 - Questions about a docket's timeline: join `dockets` and `documents` on `docket_id`
 - Questions about public feedback: query `comments` by `docket_id`, date, or keywords in `title` and `comment`
-- Questions about open comment windows: inspect `documents.comment_start_date` and `documents.comment_end_date`
+- Questions about open or reopened comment windows: query `comment_periods`
+- Questions spanning dockets by regulation or statute: start with `rule_targets` or `authority_edges`
+- Questions by topic regardless of agency/CFR location: resolve current `concept_assignments` through `concepts.replaced_by`
 - Follow notebook-style access patterns from `notebooks/query_data.ipynb` and `notebooks/cross_docket_analysis.ipynb` when the question spans agencies or dockets.
 - Questions about duplicate or coordinated rulemaking across agencies: use `find_duplicate_regulations.py` first, then verify promising clusters with targeted SQL against `dockets` or `documents`.
 

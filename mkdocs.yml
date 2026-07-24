@@ -38,6 +38,8 @@ nav:
   - Overview: index.md
   - Changelog: changelog.md
   - Querying with Python: querying-python.md
+  - Ontology and Rulespec L0: ontology.md
+  - Full-corpus ontology report: ontology-friction-report.md
   - Tables:
       - dockets: tables/dockets.md
       - documents: tables/documents.md
@@ -46,10 +48,19 @@ nav:
       - feed_summary: tables/feed_summary.md
       - agency_stats: tables/agency_stats.md
       - agency_monthly_volume: tables/agency_monthly_volume.md
+      - rulemaking_lifecycles: tables/rulemaking_lifecycles.md
+      - fr_docket_links: tables/fr_docket_links.md
       - cfr_sections: tables/cfr_sections.md
       - congress_bills: tables/congress_bills.md
       - unified_agenda: tables/unified_agenda.md
       - federal_register: tables/federal_register.md
+      - rule_targets: tables/rule_targets.md
+      - authority_edges: tables/authority_edges.md
+      - proceedings: tables/proceedings.md
+      - comment_periods: tables/comment_periods.md
+      - concepts: tables/concepts.md
+      - concept_assignments: tables/concept_assignments.md
+      - concept_events: tables/concept_events.md
       - sam_entities: tables/sam_entities.md
       - lobbying_filings: tables/lobbying_filings.md
       - fec_committees: tables/fec_committees.md

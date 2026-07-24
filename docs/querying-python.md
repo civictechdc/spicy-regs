@@ -1,29 +1,47 @@
 # Querying with Python
 
-Every table is published as public Apache Parquet at
-`https://r2.spicy-regs.dev/<table>.parquet` — **no credentials, no download
-required**. The easiest way to query it from Python is [DuckDB](https://duckdb.org)
-with the `httpfs` extension, which reads the remote Parquet directly (and only
-fetches the byte ranges your query touches).
+Spicy Regs publishes public Apache Parquet — **no credentials or bulk download
+required**. Most tables live at
+`https://r2.spicy-regs.dev/<table>.parquet`. The seven related ontology tables
+resolve through one atomic materialized-generation manifest. The easiest query
+engine is [DuckDB](https://duckdb.org) with `httpfs`, which reads only the
+remote byte ranges a query needs.
 
 ```bash
-pip install duckdb          # or: uv add duckdb
+pip install duckdb "spicy-regs @ git+https://github.com/civictechdc/spicy-regs"
 ```
 
 ## Setup
 
 ```python
 import duckdb
+from spicy_regs.published import (
+    MATERIALIZED_TABLES,
+    resolve_materialized_table_urls,
+)
 
 con = duckdb.connect()
 con.execute("INSTALL httpfs; LOAD httpfs")
 
 BASE = "https://r2.spicy-regs.dev"
+_materialized_urls = None
 
 def table(name: str) -> str:
     """Return a read_parquet(...) expression for a published table."""
-    return f"read_parquet('{BASE}/{name}.parquet')"
+    global _materialized_urls
+    if name in MATERIALIZED_TABLES:
+        if _materialized_urls is None:
+            _materialized_urls = resolve_materialized_table_urls(BASE)
+        url = _materialized_urls[name]
+    else:
+        url = f"{BASE}/{name}.parquet"
+    return f"read_parquet('{url}')"
 ```
+
+Resolving the materialized pointer once per session keeps every ontology-table
+join on one generation. The hosted MCP server applies the same rule. Until the
+first production ontology generation is published, calls for those seven
+tables fail rather than falling back to unrelated root objects.
 
 ## Query a single table
 

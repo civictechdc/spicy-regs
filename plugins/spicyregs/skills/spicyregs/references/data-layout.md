@@ -23,15 +23,28 @@ Core regulations.gov tables + rollups:
 - `feed_summary.parquet`
 - `agency_stats.parquet`
 - `agency_monthly_volume.parquet`
+- `rulemaking_lifecycles.parquet`
+- `fr_docket_links.parquet`
 - Local-only: `comments/` partitioned comment parquet files may exist instead of a monolithic `comments.parquet`
 
-Complementary federal sources (each also queryable by name via the MCP server):
+Complementary federal sources (each queryable by name through the MCP server
+when published):
 
-- Rulemaking lifecycle: `federal_register.parquet`, `unified_agenda.parquet`, `congress_bills.parquet`, `cfr_sections.parquet`
+- Rulemaking identity: `rule_targets`, `authority_edges`, `proceedings`, `comment_periods`
+- Retrieval ontology: `concepts`, `concept_assignments`, `concept_events`
+- Source lifecycle: `federal_register.parquet`, `unified_agenda.parquet`, `congress_bills.parquet`, `cfr_sections.parquet`
 - Organizations & influence: `sam_entities.parquet`, `lobbying_filings.parquet`, `fec_committees.parquet`
 - Outcomes & context: `usaspending_recipients.parquet`, `court_dockets.parquet`, `gao_reports.parquet`, `crs_reports.parquet`
 
 See the [Data Dictionary](https://civictechdc.github.io/spicy-regs/) for each table's columns, keys, and coverage/scope notes.
+
+> **Atomic ontology surface.** The seven extensionless logical names above do
+> not identify loose root objects. MCP resolves
+> `materialized/ontology/latest.json` once and creates every view from the
+> immutable artifact URLs in that generation's manifest. Direct clients must do
+> the same; never assemble an ontology join from independently guessed
+> `<table>.parquet` URLs. Until the first complete production generation,
+> `list_sources` omits those seven names.
 
 > **Comments read surface.** `comments_index.parquet` (per-partition counts) is
 > always the source for comment *counts*. The row-level `comments` table is

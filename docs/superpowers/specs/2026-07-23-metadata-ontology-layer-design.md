@@ -1,9 +1,10 @@
 # SpicyRegs Metadata & Ontology Layer — Design
 
 - **Date:** 2026-07-23
-- **Status:** Draft for review
+- **Status:** Implemented locally; publication pending
+- **Implementation:** [`docs/ontology.md`](../../ontology.md), `conformance/rulespec-l0.yaml`, and the [`full-corpus friction report`](../../ontology-friction-report.md)
 - **Parent:** `docs/superpowers/specs/2026-07-23-regulatory-ontology-program-overview.md`
-- **Scope:** Spec 1 of 2. This spec covers the spicy-regs metadata layer: a rule-identity spine, statutory-authority edges, and an iterative concept-tagging system, all with explicit provenance. Spec 2 (separate, later) covers restructuring [Formspec-Labs/rulespec](https://github.com/Formspec-Labs/rulespec) into vocabulary modules, informed by what this implementation proves.
+- **Scope:** Spec 1 of 2. This spec covers the spicy-regs metadata layer: a rule-identity spine, statutory-authority edges, proceeding and comment-period identity, and an iterative concept-tagging system, all with explicit provenance. The sibling Rulespec spec defines the upstream vocabulary contract consumed here.
 
 ## Goal
 
@@ -30,18 +31,39 @@ Spicy-regs already holds the raw material, scattered:
 
 ## Vocabulary posture
 
-We own both repos. Rulespec is the vocabulary home; spicy-regs is its first consumer. This spec depends on two small rulespec deliverables (each roughly a page of spec, done first):
+Rulespec is the upstream vocabulary home; spicy-regs is a Level-0 consumer. The
+implementation is pinned to the frozen Rulespec contract with content digest
+`sha256:836968b28f3b86283f53c57ae5c9ab8ebd77e96531cd4751476f1a5ee3d296f2`.
+That contract supplies:
 
-1. **Identifier conventions:** canonical IRI templates for CFR citations, U.S.C. sections, RINs, FR document numbers, and regulations.gov docket IDs. Parquet stores compact keys (e.g. `cfr_ref` `40-60.1`); the conventions page defines the IRI each key expands to.
-2. **Level-0 conformance tier:** "vocabulary-only" adoption — use the terms and identifier schemes in flat/tabular data, no JSON-LD graph or SHACL/CUE validation required. Spicy-regs conforms at Level 0.
+1. **Identifier conventions:** canonical IRI templates for CFR citations,
+   U.S.C. sections, RINs, Federal Register document numbers,
+   regulations.gov docket IDs, and Public Laws. Parquet stores compact keys
+   such as `cfr_ref=40-60.1`; the contract defines their expansion.
+2. **Level-0 conformance:** vocabulary-only adoption in a non-JSON-LD carrier,
+   with a machine-auditable mapping for every claimed term.
+3. **Experimental rulemaking terms:** distinct `Proceeding`, `Docket`,
+   `Artifact`, and `CommentPeriod` entities, with evidence-bearing comment
+   periods and optional proceeding stages.
 
-Rulespec attestation and concept terms are reused where they fit; docket-process terms we mint are documented in `docs/ontology.md` (new) with their intended future home in rulespec's rulemaking-process module (spec 2). The full rulespec runtime (Rust/CUE/SHACL) is never a spicy-regs dependency.
+Spicy-regs does not mint or redefine Rulespec terms. Its local carrier mechanics
+are documented in `docs/ontology.md` and omitted from the L0 claim where a flat
+column cannot preserve a Rulespec term's subject, range, or direction. The
+Rulespec runtime (Rust/CUE/SHACL) is not a spicy-regs runtime dependency.
 
-Descriptive tags (this spec) are retrieval-grade and live outside rulespec's decision-grade concept machinery. Two touchpoints only: attestation terms wrap tag assignments, and tags may link to decision-grade concepts via `skos:exactMatch`. Promotion of a tag into a decision-grade concept is a rare, human-reviewed, attested event (out of scope for v1).
+Descriptive tags are retrieval-grade and live outside Rulespec's decision-grade
+concept machinery. V1 makes no Rulespec concept or attestation claim for those
+flat rows. A later, typed graph construction may wrap assignments in attestation
+nodes, and a rare human-reviewed promotion may create a distinct decision-grade
+concept with an explicit `skos:exactMatch` link.
 
 ## Architecture
 
-Five new parquet tables, built as rollup pipelines in the existing `RollupPipeline` pattern (one module per table under `src/spicy_regs/pipelines/rollups/`, GitHub Actions workflow per rollup, published to R2, queryable via MCP `query_sql`). All columns VARCHAR, matching house style. One enrichment to an existing table.
+Seven related Parquet tables are built by one materialized-dataset DAG and
+published as one atomic generation. Ordinary `RollupPipeline` jobs retain their
+single, independently schedulable output contract. One deterministic enrichment
+adds Federal Register topics to an existing source table. All published columns
+are VARCHAR, matching house style.
 
 ```
                     ┌─────────────┐
@@ -50,12 +72,39 @@ Five new parquet tables, built as rollup pipelines in the existing `RollupPipeli
   fr_docket_links  ─┤             │
   dockets/documents─┴─────────────┘
                     ┌───────────────┐
-  unified_agenda ───┤authority_edges├─ congress_bills (via U.S.C./PL keys)
+  unified_agenda ───┤authority_edges├─ congress_bills (via Public Law only)
                     └───────────────┘
+  rule_targets + authority_edges ──→ proceedings ──→ comment_periods
   concepts ←── concept_assignments ──→ dockets / documents / cfr_sections
       ↑                                (polymorphic subjects)
   concept_events (audit log of the tagging loop)
 ```
+
+### Materialized-dataset contract
+
+`OntologyDatasetPipeline` owns the dependency and publication boundary:
+
+- each upstream source is downloaded once and hashed; every stage reads those
+  same local bytes;
+- an explicit, cycle-checked DAG orders identity, proceeding, comment-period,
+  concept, assignment, and event stages;
+- all stateful inputs come from one prior immutable manifest and are verified by
+  SHA-256, never from independently moving "latest" files;
+- every output and its manifest are uploaded below one immutable snapshot
+  prefix whose id binds the input, DAG, and output hashes; only after they are
+  durable is `materialized/ontology/latest.json` replaced;
+- MCP and data-dictionary readers resolve that pointer once and use only the
+  artifact URLs in the referenced manifest.
+
+A failed build or upload leaves the prior pointer intact. Readers therefore see
+the complete old generation or the complete new generation, never a mixture.
+Publishing also fails before the build when R2 configuration is incomplete,
+refreshes remote inputs even when a local work directory is reused, and refuses
+to treat a missing prior pointer as an implicit state reset. The first
+publication or an intentional recovery must opt in with `--allow-bootstrap`.
+Monday-through-Saturday runs refresh deterministic identity tables while
+copying concept state from the same prior generation; Sunday runs the complete
+concept DAG.
 
 ### 1. `rule_targets` — the spine (deterministic, no AI)
 
@@ -134,32 +183,63 @@ One row per structural change: `merge`, `split`, `rename`, `deprecate`, `promote
 
 New column on the existing table: the FR API's `topics` field (Thesaurus terms per document), currently dropped at ingest. Cheap, deterministic, and it powers both seeding and evaluation of the subject facet.
 
-### 7. Follow-on: `proceedings` + `comment_periods` (proves spec 2's rulemaking module)
+### 7. `proceedings` + `comment_periods`
 
-Spicy-regs already publishes two rollups absent from the data dictionary: `rulemaking_lifecycles` (proto-proceeding threading) and `fr_docket_links` (used by `rule_targets` above). This follow-on promotes them into first-class tables:
+These are first-class derived tables built directly from docket, document,
+Federal Register, Unified Agenda, rule-target, and authority evidence. The
+existing `rulemaking_lifecycles` table remains a separate duration rollup; it is
+not treated as a proceeding and is not promoted into one.
 
-- **`proceedings`** — one row per rulemaking proceeding: `rin`, associated docket id(s) (a proceeding MAY span multiple dockets), current stage, and stage-event history. Built by promoting `rulemaking_lifecycles` into the documented surface.
-- **`comment_periods`** — one row per comment period, including reopenings: proceeding/docket keys, open and close dates, source (`documents.comment_end_date`, `federal_register.comments_close_on`), plus attestation columns.
+- **`proceedings`** — one row per evidence-connected proceeding component:
+  optional `rin`, one or more associated docket ids, current evidenced stage,
+  stage-event history, and identity-lineage fields.
+- **`comment_periods`** — one row per continuous or reopened comment window:
+  proceeding/docket keys, open and close dates, source
+  (`documents.comment_end_date`, `federal_register.comments_close_on`), and
+  evidence-bearing provenance.
 
-This deliverable does three jobs at once: it documents already-published rollups into the data dictionary; it is the **corpus-scale consumer exercise** for spec 2's Deliverable C entities (`Proceeding`, `proceedingStage`, `CommentPeriod`, `publishedInProceeding`) — the reference corpus is a fixture, not a consumer, so C's stabilization gate depends on this table shipping; and it delivers cross-cutting goal 4 (comment-window awareness), the driving use case's highest-value item.
+Proceeding identity is persistent state:
 
-## Provenance model (attestation columns)
+- a RIN is strong evidence but not globally unique, so dockets sharing a reused
+  RIN remain separate unless one Federal Register document explicitly
+  co-identifies them;
+- ambiguous RIN-only or docket-only evidence remains unattached instead of
+  fanning out across candidate proceedings;
+- a new generation reuses the prior partner-scoped `proceeding_id` with the
+  strongest compatible docket overlap, so a backfill or lexically earlier
+  docket does not rename an existing proceeding;
+- a docket-less RIN component keeps its id when it gains a first docket only if
+  that RIN has one prior and one current component;
+- `identity_predecessors_json` records every matched prior id across merges or
+  splits, while one-to-one reuse remains deterministic.
 
-Every AI- or rule-derived row carries the same column block, aligned with rulespec's attestation terms (mapping table maintained in `docs/ontology.md`):
+The full-corpus run in `docs/ontology-friction-report.md` is the consumer
+exercise for Rulespec's experimental `Proceeding`, `CommentPeriod`,
+`proceedingStage`, and `publishedInProceeding` terms. Publication remains
+separate from that local validation.
 
-| Column | Rulespec alignment | Description |
+## Provenance model (carrier columns)
+
+Every AI- or rule-derived row carries the same local column block. Uniform
+storage does not imply that every column is a direct Rulespec predicate:
+Rulespec places provenance across typed `Assertion`, `ConfidenceRecord`, and
+`Finding` nodes. `docs/ontology.md` claims only mappings whose subject, range,
+direction, and value kind survive the flat carrier.
+
+| Column | L0 status | Description |
 | --- | --- | --- |
-| `method` | attestation method | `deterministic`, `llm`, `embedding`, `human`. |
-| `actor_id` | `rkaf:detectedBy` | Model id + version, ruleset version, or human identifier. |
-| `run_id` | evidence binding | Pipeline run that produced the row. |
-| `asserted_at` | attestation timestamp | ISO 8601. |
-| `supersedes_id` | lineage | Prior assignment/row this one revises. Null for first assertion. |
+| `method` | local method | `deterministic`, `llm`, `embedding`, `human`. |
+| `actor_id` | local actor identifier | Model id + version, ruleset version, or human identifier; not mapped directly to `rkaf:detectedBy`. |
+| `run_id` | local run identifier | Pipeline run that produced the row. |
+| `asserted_at` | local timestamp | ISO 8601 assertion time. |
+| `supersedes_id` | local lineage | Prior assignment/row this one revises. Null for a first assertion. |
 
 `rule_targets` and `authority_edges` are fully deterministic in v1; their `method` is `deterministic` and `actor_id` is the ruleset version, so the whole layer has uniform provenance from day one.
 
 ## The tagging loop
 
-Batch, not streaming — each phase is a rollup-style job:
+Batch, not streaming — the materialized dataset executes these dependent
+stages:
 
 1. **Generate:** LLM tags new/changed dockets and FR documents. Constraint: match an existing concept first; proposing a new one requires a justification and creates it as `status=candidate`.
 2. **Merge pass:** over the grown cloud, propose merges from label/embedding similarity plus co-assignment evidence. Apply above threshold: loser → `deprecated` + `replaced_by`, labels absorbed into `alt_labels_json`, `merge` event logged. High-usage merges below threshold go to a human review queue (a report, not a UI, in v1).
@@ -173,27 +253,44 @@ Batch, not streaming — each phase is a rollup-style job:
 - Citation parse failures: row retained with `parse_status=failed` and raw text; never dropped.
 - Malformed JSON in source columns: skipped rows counted and logged in the rollup summary, consistent with existing pipelines.
 - Missing API keys (FR topics enrichment): keyless run is a no-op, matching `cfr_sections` behavior.
-- LLM failures mid-batch: the run is resumable by `run_id`; partial output is valid because assignments are append-only.
+- LLM failures mid-batch: local checkpoints remain reusable by `run_id`, but no
+  partial generation is published. The public pointer changes only after every
+  required artifact and the generation manifest are durable.
 
 ## Testing
 
 - **Citation parsers:** fixture suites of real messy strings for CFR and U.S.C. forms (`42 U.S.C. 7401 et seq.`, `sec. 553 of title 5`, PL numbers), asserting parsed keys and `parse_status`.
-- **Spine joins:** golden-file tests per rollup (existing pattern) over a small fixture parquet set; known dockets must produce known edges from each `source`.
+- **Spine joins:** golden-file tests per DAG stage over a small fixture Parquet
+  set; known dockets must produce known edges from each `source`.
+- **Generation contract:** tests reject stage cycles and unknown dependencies,
+  bind source hashes into the snapshot id, verify prior hashes, and require the
+  public pointer to upload last.
+- **Proceeding continuity:** generation-to-generation fixtures prove that
+  backfills preserve ids and that reused RINs and ambiguous evidence do not
+  collapse or fan out.
 - **Loop invariants:** property-style tests for the acyclicity and append-only rules above.
 - **Tag quality:** evaluation harness comparing generated `subject` tags against `federal_register.topics_json` on documents that have both — Thesaurus terms are imperfect ground truth but catch drift cheaply.
 
 ## Out of scope (v1)
 
-- Rulespec modular restructure and rulemaking-process *vocabulary* (spec 2). The consumer tables that exercise that vocabulary are in scope here as the follow-on (§7).
+- Rulespec vocabulary or runtime changes. The frozen contract is an upstream
+  dependency, not code owned by this repository.
 - Facets beyond `subject` and `regulated_entity`; promotion of tags to decision-grade concepts.
 - Comment-level tagging, campaign detection, commenter entity resolution.
 - CFR section full text; OCR; any UI beyond MCP/SQL access.
 
-## Delivery order
+## Implemented order and release gates
 
-1. Rulespec: identifier-conventions page + Level-0 tier definition (prerequisite, ~1 page each). **Cadence fallback:** if this release slips, steps 2–3 may ship with provisional `x-` prefixed local terms and a committed rename in the release that follows — tables before vocabulary applies to the schedule too.
-2. `rule_targets` + `docs/ontology.md` — immediate filtering payoff, zero AI.
-3. `authority_edges` (including `pl_number`) + `congress_bills` join validation on both U.S.C. and PL keys.
-4. FR `topics_json` enrichment; seed `concepts`.
-5. `concept_assignments` generate pass; then merge, validation, re-score jobs.
-6. `proceedings` + `comment_periods` (§7) — blocks spec 2's Deliverable C stabilization; deliverable to rulespec is the full-corpus friction report.
+1. The sibling Rulespec branch froze the identifier, L0, and experimental
+   rulemaking contract at the digest above. It is not yet an upstream release.
+2. `rule_targets`, `authority_edges`, `proceedings`, and `comment_periods` were
+   built and exercised against the full corpus. `authority_edges.pl_number`
+   joins Congress bills through Public Law numbers; no U.S.C.-to-bill crosswalk
+   is claimed.
+3. Federal Register topics, the concept registry, assignments, validation, and
+   event reconciliation were implemented as the stateful half of the same DAG.
+4. The L0 audit and full-corpus friction report record the consumer evidence.
+5. Public deployment waits for review of this repository and a reachable,
+   versioned Rulespec contract. The first production run must be a reviewed,
+   explicit `--allow-bootstrap` publication; the local implementation does not
+   claim to have published either repository.

@@ -23,28 +23,41 @@ One sentence per repo:
 | --- | --- | --- |
 | Identifier schemes (CFR, U.S.C., RIN, FR doc, regs.gov, PL) | Rulespec (spec 2, Deliverable A) | Closed enum, release-versioned, reusable beyond spicy-regs |
 | L0 vocabulary-only conformance tier | Rulespec (spec 2, Deliverable B) | Conformance ladder is rulespec's contract |
-| Rulemaking-process entities (Proceeding, CommentPeriod) | Rulespec (spec 2, Deliverable C — experimental) | Vocabulary; stabilizes only after spicy-regs proves it |
+| Rulemaking-process entities (Proceeding, CommentPeriod) | Rulespec (spec 2, Deliverable C — experimental) | Vocabulary; stabilizes only after the corpus exercise and independent consumer review |
 | Rule-identity spine tables (`rule_targets`, `authority_edges`) | Spicy-regs (spec 1) | Data product; deterministic ETL over the corpus |
 | Descriptive tagging (SKOS facets, merge/validation loop) | Spicy-regs (spec 1) | Retrieval-grade, fast-churn — deliberately outside rulespec's decision-grade concept registry |
-| Provenance columns on derived rows | Spicy-regs (spec 1), terms from rulespec | Carrier is parquet; semantics are rulespec's attestation/confidence terms |
+| Provenance columns on derived rows | Spicy-regs (spec 1) | Carrier is Parquet; only domain-safe, direction-safe Rulespec relationships enter the L0 map |
 | Reference corpus + partner self-certification | Both (spec 2, Deliverable D) | The falsifiability loop between the repos |
-| Proceeding + comment-period tables (`proceedings`, `comment_periods`) | Spicy-regs (spec 1 §7, follow-on) | Corpus-scale consumer exercise that gates the rulemaking module's stabilization; promotes the existing `rulemaking_lifecycles` rollup; delivers the comment-window goal |
+| Proceeding + comment-period tables (`proceedings`, `comment_periods`) | Spicy-regs (spec 1 §7) | Corpus-scale consumer exercise built from source evidence; the separate `rulemaking_lifecycles` duration rollup is not a proceeding |
 
 ## Interface contract
 
-What spec 1 consumes from spec 2 (blocking): the identifier schemes and the L0 tier — nothing else. What spec 2 receives from spec 1 (feedback): compact↔canonical identifier expansion friction, shape feedback on the rulemaking module before it freezes, one curated real proceeding as `reference-corpora/us-rulemaking/`, `conformance/partners/spicy-regs.yaml`, and the full-corpus `proceedings`/`comment_periods` exercise that gates the rulemaking module's stabilization.
+Spec 1 consumes the identifier schemes, L0 tier, and experimental rulemaking
+terms from the frozen sibling Rulespec contract. Spicy-regs pins that contract
+by content digest:
+`sha256:836968b28f3b86283f53c57ae5c9ab8ebd77e96531cd4751476f1a5ee3d296f2`.
+It receives no Rulespec runtime dependency. Rulespec receives compact-to-
+canonical identifier friction, rulemaking shape feedback, a curated reference
+proceeding, a partner self-certification, and the full-corpus
+`proceedings`/`comment_periods` exercise.
 
 The mapping between the two lives in **`docs/ontology.md`** (spicy-regs, created by spec 1): every column that carries rulespec semantics, its term IRI, and the enum-value correspondences. That document is simultaneously spec 1's design artifact and spec 2's L0 self-certification input — one file, both obligations. Its machine-readable format is defined by spec 2 (Deliverable B, the fenced `rkaf-l0-mapping` blocks) so the document and the audit tool cannot drift.
 
-## Combined sequencing
+## Current sequencing and gates
 
-1. Rulespec lands its in-flight `v0.2.0-pre.7` consolidation (pre-existing TODO; not this program).
-2. **Rulespec release N+1:** identifier schemes + L0 tier (spec 2, A+B). *Unblocks everything below.* Cadence fallback: if N+1 slips, spicy-regs proceeds on provisional `x-` local terms with a committed rename after release — tables before vocabulary applies to the schedule too.
-3. **Spicy-regs:** `rule_targets` + `docs/ontology.md`, then `authority_edges` including `pl_number` (spec 1, deterministic layer). File L0 self-certification.
-4. **Spicy-regs:** FR `topics_json` enrichment, concept seeding, tagging loop (spec 1, derived layer).
-5. **Rulespec release N+2:** rulemaking module (experimental) + reference corpus, shaped by step 3–4 friction (spec 2, C+D).
-6. **Spicy-regs:** `proceedings` + `comment_periods` follow-on (spec 1 §7) — the corpus-scale consumer run for the rulemaking module.
-7. Rulemaking module stabilizes after step 6 and one non-spicy-regs review (candidate: the Axiom Foundation corpus pipeline — also the natural third consumer of the identifier schemes).
+1. The sibling Rulespec branch has frozen its identifier, L0, and experimental
+   rulemaking contract at the digest above. That state is local and unreleased.
+2. Spicy-regs has implemented the deterministic identity layer, proceeding and
+   comment-period tables, Federal Register topic enrichment, concept registry,
+   assignment loop, and L0 self-certification.
+3. The seven related tables build from one local input snapshot and publish as
+   one manifest-addressed generation. No individual table workflow can expose a
+   mixed generation.
+4. The full-corpus run has been recorded in
+   `docs/ontology-friction-report.md`; it changed both the implementation and
+   the frozen Rulespec contract.
+5. Publication waits for repository review and a reachable versioned Rulespec
+   contract. Stabilization still requires a non-originating consumer review.
 
 ## Long-term goals (beyond these specs)
 
@@ -59,4 +72,6 @@ Horizon items the two specs deliberately do not schedule. They are the program's
 - **Tables before vocabulary:** no term freezes until a real consumer has exercised it.
 - **Compose, don't reinvent:** SKOS for concepts, PROV-O-aligned attestation, existing rulespec primitives before new ones (rulespec core §9.4 discipline, honored on both sides).
 - **Decision-grade vs retrieval-grade stay separated:** promotion from tag to registered concept is a rare, attested, human-reviewed event — never a bulk migration.
-- **Provenance from day one:** deterministic rows carry attestation columns too, so uniform provenance is a property of the layer, not an aspiration.
+- **Provenance from day one:** deterministic rows carry the same local
+  provenance block, while Rulespec mappings are claimed only when a typed graph
+  construction preserves the term's domain, range, and direction.
