@@ -15,6 +15,7 @@ from spicy_regs.ontology.citations import (
     canonical_rin_iri,
     canonical_usc_iri,
     federal_register_identifier,
+    normalize_regsgov_identifier,
     parse_authority_citation,
     parse_cfr_citation,
 )
@@ -32,6 +33,7 @@ __all__ = [
     "canonical_rin_iri",
     "canonical_usc_iri",
     "federal_register_identifier",
+    "normalize_regsgov_identifier",
     "parse_authority_citation",
     "parse_cfr_citation",
     "stable_id",

@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from pathlib import Path
 
 import pytest
 import yaml
 
+from spicy_regs.data_dictionary import expected_schemas
 from spicy_regs.ontology.citations import (
     AuthorityCitation,
     CfrCitation,
@@ -18,6 +20,7 @@ from spicy_regs.ontology.citations import (
     canonical_rin_iri,
     canonical_usc_iri,
     federal_register_identifier,
+    normalize_regsgov_identifier,
     parse_authority_citation,
     parse_cfr_citation,
 )
@@ -32,6 +35,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
         ({"title": 40, "part": 60}, [CfrCitation("40", "60")]),
         ({"title": "40", "part": "60", "section": "1"}, [CfrCitation("40", "60", "1")]),
         ("40-60.1", [CfrCitation("40", "60", "1")]),
+        ("40-60.5375a", [CfrCitation("40", "60", "5375a")]),
+        ("40 C.F.R. § 60.5375a(a)(1)", [CfrCitation("40", "60", "5375a")]),
         ("40 CFR 60", [CfrCitation("40", "60")]),
         ("40 C.F.R. § 60.1", [CfrCitation("40", "60", "1")]),
         ("Title 40, Part 60", [CfrCitation("40", "60")]),
@@ -91,11 +96,25 @@ def test_parse_multiple_authorities_returns_one_partial_edge_each():
 def test_rulespec_identifier_expansion():
     assert canonical_cfr_iri("40", "60") == "urn:rkaf:us:cfr:40:60"
     assert canonical_cfr_iri("40", "60", "1") == "urn:rkaf:us:cfr:40:60.1"
+    assert canonical_cfr_iri("40", "60", "5375A(a)(1)") == "urn:rkaf:us:cfr:40:60.5375a"
     assert canonical_usc_iri("42", "7401(a)") == "urn:rkaf:us:usc:42:7401"
     assert canonical_rin_iri("2060-av16") == "urn:rkaf:us:rin:2060-AV16"
     assert canonical_frdoc_iri("2024-00366") == "urn:rkaf:us:frdoc:2024-00366"
     assert canonical_regsgov_iri("epa-hq-oar-2021-0317") == "urn:rkaf:us:regsgov:EPA-HQ-OAR-2021-0317"
     assert canonical_pl_iri("117–58") == "urn:rkaf:us:pl:117-58"
+
+
+def test_regulations_gov_identifier_normalization_matches_repaired_grammar():
+    assert normalize_regsgov_identifier(" epa-hq-oar-2021-0317 ") == "EPA-HQ-OAR-2021-0317"
+    assert normalize_regsgov_identifier("epa_frdoc_0001") == "EPA_FRDOC_0001"
+    assert normalize_regsgov_identifier("EPA") == "EPA"
+    assert normalize_regsgov_identifier("Sequence No. 1") is None
+    assert normalize_regsgov_identifier(None) is None
+
+
+def test_invalid_cfr_suffix_is_rejected():
+    with pytest.raises(ValueError):
+        canonical_cfr_iri("40", "60", "appendix-a")
 
 
 @pytest.mark.parametrize(
@@ -152,5 +171,13 @@ def test_invalid_identifier_expansion_fails(function, value):
 
 def test_full_corpus_report_matches_declared_evidence_digest():
     declaration = yaml.safe_load((REPO_ROOT / "conformance" / "rulespec-l0.yaml").read_text())
-    evidence = (REPO_ROOT / "docs" / "ontology-friction-report.md").read_bytes()
+    evidence_path = (REPO_ROOT / "conformance" / declaration["test_evidence_path"]).resolve()
+    evidence = evidence_path.read_bytes()
     assert hashlib.sha256(evidence).hexdigest() == declaration["test_evidence_sha256"]
+
+
+def test_rulespec_profile_inventories_every_public_table():
+    profile = (REPO_ROOT / "docs" / "rulespec-profile.md").read_text()
+    inventory = set(re.findall(r"^\| `([^`]+)` \|", profile, re.MULTILINE))
+
+    assert inventory == set(expected_schemas())

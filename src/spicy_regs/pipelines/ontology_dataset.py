@@ -128,6 +128,20 @@ class OntologyDatasetPipeline(MaterializedDatasetPipeline):
                 )
             copy2(prior, output_dir / output_name)
 
+    def validate_before_publish(self, manifest_path: Path) -> None:
+        """Refuse ontology publication when any mapped carrier row is invalid."""
+        # Imported lazily because the receipt validator binds this concrete
+        # pipeline's declared output set.
+        from spicy_regs.ontology.receipt import validate_generation
+
+        result = validate_generation(manifest_path)
+        if result["status"] != "pass":
+            count = result["failures"]["total"]
+            raise RuntimeError(
+                f"Refusing to publish ontology generation: "
+                f"corpus receipt found {count} validation failure(s)"
+            )
+
     def stages(self) -> tuple[DatasetStage, ...]:
         def rule_targets(output_dir: Path, context: RunContext) -> None:
             build_rule_targets(

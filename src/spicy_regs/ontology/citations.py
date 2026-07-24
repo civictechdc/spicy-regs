@@ -70,6 +70,14 @@ def _section(value: object) -> str | None:
     return text or None
 
 
+def _cfr_section(value: object) -> str | None:
+    """Normalize a Rulespec CFR section suffix, excluding subsection detail."""
+    text = _section(value)
+    if text is None:
+        return None
+    return text if re.fullmatch(r"\d+[a-z]{0,3}(?:-[0-9a-z]+)*", text) else None
+
+
 @dataclass(frozen=True)
 class CfrCitation:
     title: str
@@ -110,9 +118,11 @@ class AuthorityCitation:
 def canonical_cfr_iri(title: object, part: object, section: object = None) -> str:
     title_number = _digits(title)
     part_number = _digits(part)
-    section_number = _section(section)
+    section_number = _cfr_section(section)
     if not title_number or not part_number:
         raise ValueError(f"invalid CFR identifier components: title={title!r}, part={part!r}")
+    if section is not None and section_number is None:
+        raise ValueError(f"invalid CFR section: {section!r}")
     suffix = f".{section_number}" if section_number else ""
     return f"urn:rkaf:us:cfr:{title_number}:{part_number}{suffix}"
 
@@ -160,9 +170,15 @@ def federal_register_identifier(document_number: object) -> tuple[str, str]:
         )
 
 
+def normalize_regsgov_identifier(identifier: object) -> str | None:
+    """Return a canonical Regulations.gov identifier when syntax permits it."""
+    value = str(identifier or "").strip().upper()
+    return value if re.fullmatch(r"[A-Z0-9]+(?:[-_][A-Z0-9]+)*", value) else None
+
+
 def canonical_regsgov_iri(identifier: object) -> str:
-    value = str(identifier).strip().upper()
-    if not value or not re.fullmatch(r"[A-Z0-9]+(?:-[A-Z0-9]+)+", value):
+    value = normalize_regsgov_identifier(identifier)
+    if value is None:
         raise ValueError(f"invalid regulations.gov identifier: {identifier!r}")
     return f"urn:rkaf:us:regsgov:{value}"
 
@@ -178,8 +194,11 @@ def canonical_pl_iri(pl_number: object) -> str:
 def _cfr_from_match(match: re.Match[str]) -> CfrCitation | None:
     title = _digits(match.group("title"))
     part = _digits(match.group("part"))
-    section = _section(match.groupdict().get("section"))
+    raw_section = match.groupdict().get("section")
+    section = _cfr_section(raw_section)
     if not title or not part:
+        return None
+    if raw_section is not None and section is None:
         return None
     return CfrCitation(title=title, part=part, section=section)
 

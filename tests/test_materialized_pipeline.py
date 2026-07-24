@@ -15,17 +15,21 @@ from spicy_regs.pipelines.materialized import DatasetStage, MaterializedDatasetP
 from spicy_regs.sources import r2
 
 
+def _write_parquet(path: Path, values: list[str]) -> None:
+    pq.write_table(pa.table({"value": values}), path)
+
+
 def test_materialized_stages_are_topologically_ordered(tmp_path) -> None:
     calls: list[str] = []
 
     def source(output_dir: Path, context: RunContext) -> None:
         calls.append(f"source:{context.run_id}")
-        (output_dir / "source.parquet").write_bytes(b"source")
+        _write_parquet(output_dir / "source.parquet", ["source"])
 
     def derived(output_dir: Path, context: RunContext) -> None:
         calls.append(f"derived:{context.run_id}")
         assert (output_dir / "source.parquet").exists()
-        (output_dir / "derived.parquet").write_bytes(b"derived")
+        _write_parquet(output_dir / "derived.parquet", ["derived"])
 
     class ExampleDataset(MaterializedDatasetPipeline):
         name = "example-dataset"
@@ -49,6 +53,7 @@ def test_materialized_stages_are_topologically_ordered(tmp_path) -> None:
     manifest = json.loads((tmp_path / "example-dataset-manifest.json").read_text())
     assert [stage["name"] for stage in manifest["stages"]] == ["source", "derived"]
     assert manifest["artifacts"]["derived.parquet"]["sha256"]
+    assert manifest["artifacts"]["derived.parquet"]["rows"] == 1
 
 
 def test_materialized_stage_cycle_fails_before_build(tmp_path) -> None:
@@ -73,8 +78,8 @@ def test_materialized_stage_cycle_fails_before_build(tmp_path) -> None:
 def test_materialized_publication_commits_pointer_last(tmp_path, monkeypatch) -> None:
     def build(output_dir: Path, context: RunContext) -> None:
         del context
-        (output_dir / "one.parquet").write_bytes(b"one")
-        (output_dir / "two.parquet").write_bytes(b"two")
+        _write_parquet(output_dir / "one.parquet", ["one"])
+        _write_parquet(output_dir / "two.parquet", ["two"])
 
     class PublishedDataset(MaterializedDatasetPipeline):
         name = "published-dataset"
@@ -114,6 +119,49 @@ def test_materialized_publication_commits_pointer_last(tmp_path, monkeypatch) ->
     assert uploads[1][0].endswith("/two.parquet")
     snapshot_prefixes = {key.rsplit("/", 1)[0] for key, _ in uploads[:-1]}
     assert len(snapshot_prefixes) == 1
+
+
+def test_materialized_publication_validates_before_first_upload(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    def build(output_dir: Path, context: RunContext) -> None:
+        del context
+        _write_parquet(output_dir / "result.parquet", ["result"])
+
+    class ValidatedDataset(MaterializedDatasetPipeline):
+        name = "validated-dataset"
+        dataset_name = "validated"
+        published_outputs = ("result.parquet",)
+
+        def stages(self):
+            return (
+                DatasetStage(
+                    "build",
+                    (),
+                    ("result.parquet",),
+                    build,
+                ),
+            )
+
+        def validate_before_publish(self, manifest_path: Path) -> None:
+            assert manifest_path.exists()
+            raise RuntimeError("semantic gate failed")
+
+    uploads: list[Path] = []
+    monkeypatch.setenv("R2_ACCESS_KEY_ID", "test-key")
+    monkeypatch.setenv("R2_SECRET_ACCESS_KEY", "test-secret")
+    monkeypatch.setenv("R2_ENDPOINT", "https://test.r2.example")
+    monkeypatch.setattr(
+        r2,
+        "upload_file",
+        lambda path, remote_key=None, allow_shrink=False: uploads.append(path),
+    )
+
+    with pytest.raises(RuntimeError, match="semantic gate failed"):
+        ValidatedDataset(output_dir=tmp_path, skip_upload=False).run()
+
+    assert uploads == []
 
 
 def test_materialized_publication_requires_complete_r2_configuration(tmp_path, monkeypatch) -> None:
@@ -204,11 +252,11 @@ def test_materialized_source_schema_must_include_declared_columns(tmp_path) -> N
 
 
 def test_snapshot_id_changes_when_artifact_bytes_change(tmp_path) -> None:
-    payload = [b"first"]
+    payload = ["first"]
 
     def build(output_dir: Path, context: RunContext) -> None:
         del context
-        (output_dir / "result.parquet").write_bytes(payload[0])
+        _write_parquet(output_dir / "result.parquet", [payload[0]])
 
     class ContentAddressedDataset(MaterializedDatasetPipeline):
         name = "content-addressed-dataset"
@@ -226,7 +274,7 @@ def test_snapshot_id_changes_when_artifact_bytes_change(tmp_path) -> None:
     pipeline.run()
     first = json.loads((tmp_path / "content-addressed-dataset-manifest.json").read_text())["snapshot_id"]
 
-    payload[0] = b"second"
+    payload[0] = "second"
     pipeline.run()
     second = json.loads((tmp_path / "content-addressed-dataset-manifest.json").read_text())["snapshot_id"]
 

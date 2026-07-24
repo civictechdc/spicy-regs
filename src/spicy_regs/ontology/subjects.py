@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from collections import defaultdict, deque
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+from spicy_regs.ontology.citations import normalize_regsgov_identifier
 from spicy_regs.ontology.common import iter_parquet_rows, text_digest
 
 
@@ -15,6 +18,30 @@ class Subject:
     text: str
     fields: dict[str, str]
     digest: str
+
+
+def balanced_subject_batch(subjects: Iterable[Subject], limit: int) -> list[Subject]:
+    """Select a deterministic bounded batch without starving a subject type."""
+    if limit <= 0:
+        return []
+    queues: dict[str, deque[Subject]] = defaultdict(deque)
+    for subject in subjects:
+        queues[subject.subject_type].append(subject)
+
+    selected: list[Subject] = []
+    subject_types = sorted(queues)
+    while len(selected) < limit:
+        advanced = False
+        for subject_type in subject_types:
+            queue = queues[subject_type]
+            if queue:
+                selected.append(queue.popleft())
+                advanced = True
+                if len(selected) == limit:
+                    break
+        if not advanced:
+            break
+    return selected
 
 
 def _clean(value: object) -> str:
@@ -37,8 +64,8 @@ def build_subjects(output_dir: Path) -> list[Subject]:
 
     subjects: list[Subject] = []
     for row in iter_parquet_rows(dockets_file):
-        subject_id = row.get("docket_id")
-        if not subject_id:
+        subject_id = normalize_regsgov_identifier(row.get("docket_id"))
+        if subject_id is None:
             continue
         fields = {
             "dockets.title": _clean(row.get("title")),
@@ -50,7 +77,7 @@ def build_subjects(output_dir: Path) -> list[Subject]:
         subjects.append(
             Subject(
                 subject_type="docket",
-                subject_id=str(subject_id),
+                subject_id=subject_id,
                 text=text,
                 fields=fields,
                 digest=text_digest(text),

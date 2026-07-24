@@ -29,7 +29,7 @@ from spicy_regs.ontology.invariants import (
     assert_concept_graphs,
 )
 from spicy_regs.ontology.llm import OntologyModel, OpenAIOntologyModel, TagProposal
-from spicy_regs.ontology.subjects import build_subjects
+from spicy_regs.ontology.subjects import balanced_subject_batch, build_subjects
 
 OUTPUT = "concept_assignments.parquet"
 
@@ -117,14 +117,17 @@ def build_concept_assignments(
                 (str(row.get("subject_type")), str(row.get("subject_id"))),
                 [],
             ).append(row)
-        pending = [
-            subject
-            for subject in subjects
-            if not any(
-                assignment_subject_digest(row) == subject.digest
-                for row in current_by_subject.get((subject.subject_type, subject.subject_id), ())
-            )
-        ][:limit]
+        pending = balanced_subject_batch(
+            (
+                subject
+                for subject in subjects
+                if not any(
+                    assignment_subject_digest(row) == subject.digest
+                    for row in current_by_subject.get((subject.subject_type, subject.subject_id), ())
+                )
+            ),
+            limit,
+        )
         checkpoint = BatchCheckpoint(output_dir, run_id=context.run_id, phase="assignment-generation")
         for subject in pending:
             cached = checkpoint.get(subject.subject_type, subject.subject_id)

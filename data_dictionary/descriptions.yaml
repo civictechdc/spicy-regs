@@ -330,8 +330,9 @@ tables:
       stage_events_json: "Ordered JSON stage-event history with date, source, evidence id, and Rulespec event kind."
       fr_document_numbers_json: "JSON array of Federal Register documents published in the proceeding."
       cfr_refs_json: "JSON array of compact CFR targets from `rule_targets`."
+      cfr_target_iris_json: "JSON array of Rulespec `rkaf:us-cfr` citation IRIs projected from valid rule-target components."
       authority_refs_json: "JSON array of compact U.S.C., Public Law, or retained raw authority references."
-      identity_predecessors_json: "JSON array of prior-generation proceeding ids whose evidence overlaps this component; records continuity, merges, and splits."
+      identity_predecessors_json: "JSON array of distinct prior-generation proceeding ids whose evidence overlaps this component; records semantic merge/split continuity and excludes the current reused id."
       method: "Derivation method; `deterministic`."
       actor_id: "Versioned proceeding-assembly ruleset."
       run_id: "Pipeline run identifier."
@@ -340,18 +341,20 @@ tables:
 
   comment_periods:
     summary: >-
-      One row per continuous public-comment interval attached to a proceeding
-      and docket. Overlapping deadline extensions coalesce; a closed gap creates
-      a separate reopening row.
+      One row per continuous public-comment interval anchored to one or more
+      proceedings or regulations.gov dockets. Overlapping deadline extensions
+      coalesce; a closed gap creates a separate reopening row. Docket-only rows
+      preserve known intervals while proceeding identity remains unresolved.
     columns:
-      comment_period_id: "Stable opaque id based on proceeding, docket, and opening date. Primary key."
-      proceeding_id: "Owning proceeding. Foreign key to `proceedings.proceeding_id`."
-      rin: "Proceeding RIN, when available."
-      docket_id: "Associated regulations.gov docket, when known."
-      open_date: "First day comments were accepted."
-      close_date: "Last day comments were accepted; never earlier than `open_date`."
+      comment_period_id: "Stable opaque id based on the proceeding/docket anchor set and opening date. Primary key."
+      proceeding_ids_json: "JSON array of uniquely resolved proceeding ids; empty when the interval is retained through docket anchors only."
+      rins_json: "JSON array of valid RIN evidence associated with the interval; evidence only, not an identity assertion."
+      docket_ids_json: "Non-empty JSON array of source-backed regulations.gov docket ids unless `proceeding_ids_json` supplies the sole anchor."
+      open_date: "Inclusive first calendar day comments were accepted in the deadline's governing timezone."
+      close_date: "Inclusive last calendar day comments were accepted in the deadline's governing timezone; never earlier than `open_date`."
       source: "`documents.comment_end_date`, `federal_register.comments_close_on`, or a `+`-joined corroboration."
-      evidence_ids_json: "JSON array of source document ids or FR document numbers."
+      opened_by_artifact_ids_json: "JSON array of canonical permanent URLs for source Artifacts that opened the interval; extension-only Artifacts are excluded."
+      evidence_ids_json: "Non-empty JSON array of source document ids or FR document numbers supporting the interval and extensions."
       method: "Derivation method; `deterministic`."
       actor_id: "Versioned comment-period assembly ruleset."
       run_id: "Pipeline run identifier."

@@ -181,11 +181,15 @@ class MaterializedDatasetPipeline(Pipeline):
                 output_dir,
             )
             return
+        self.validate_before_publish(manifest_path)
         self._publish(
             manifest_path=manifest_path,
             pointer_path=pointer_path,
             artifact_paths=artifact_paths,
         )
+
+    def validate_before_publish(self, manifest_path: Path) -> None:
+        """Run dataset-specific semantic gates before the first remote write."""
 
     def _validate_publication_environment(self) -> None:
         """Reject a purported publication before building if R2 is incomplete."""
@@ -354,7 +358,13 @@ class MaterializedDatasetPipeline(Pipeline):
         input_snapshot: dict,
     ) -> tuple[Path, Path, dict[str, Path]]:
         artifact_paths = {name: output_dir / name for name in self.published_outputs}
-        artifact_records = {name: _file_record(path) for name, path in artifact_paths.items()}
+        artifact_records = {
+            name: {
+                **_file_record(path),
+                "rows": pq.ParquetFile(path).metadata.num_rows,
+            }
+            for name, path in artifact_paths.items()
+        }
         stage_records = [
             {
                 "name": stage.name,

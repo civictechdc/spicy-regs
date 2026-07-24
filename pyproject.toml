@@ -72,6 +72,7 @@ embed = "spicy_regs.vectordb.embed:main"
 spicy-regs = "spicy_regs.cli:main"
 spicy-regs-mcp = "spicy_regs.mcp_server:main"
 spicy-regs-dict = "spicy_regs.data_dictionary:main"
+spicy-regs-ontology-receipt = "spicy_regs.ontology.receipt:main"
 spicy-regs-evaluate-tags = "spicy_regs.evaluate_tag_quality:main"
 
 [build-system]

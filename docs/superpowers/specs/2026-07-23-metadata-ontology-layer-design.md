@@ -210,8 +210,9 @@ Proceeding identity is persistent state:
   docket does not rename an existing proceeding;
 - a docket-less RIN component keeps its id when it gains a first docket only if
   that RIN has one prior and one current component;
-- `identity_predecessors_json` records every matched prior id across merges or
-  splits, while one-to-one reuse remains deterministic.
+- `identity_predecessors_json` records distinct matched prior identities across
+  merges or splits; the current reused id stays in the local row-version
+  `supersedes_id` only, so semantic continuity never becomes a self-edge.
 
 The full-corpus run in `docs/ontology-friction-report.md` is the consumer
 exercise for Rulespec's experimental `Proceeding`, `CommentPeriod`,

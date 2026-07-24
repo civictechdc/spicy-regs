@@ -2,21 +2,22 @@
 
 # `comment_periods`
 
-One row per continuous public-comment interval attached to a proceeding and docket. Overlapping deadline extensions coalesce; a closed gap creates a separate reopening row.
+One row per continuous public-comment interval anchored to one or more proceedings or regulations.gov dockets. Overlapping deadline extensions coalesce; a closed gap creates a separate reopening row. Docket-only rows preserve known intervals while proceeding identity remains unresolved.
 
 - **Parquet file:** `materialized/ontology/latest.json` (atomic snapshot manifest)
 - **Supported by MCP `query_sql` after first publication:** Yes
 
 | Column | Type | Description |
 | --- | --- | --- |
-| `comment_period_id` | `VARCHAR` | Stable opaque id based on proceeding, docket, and opening date. Primary key. |
-| `proceeding_id` | `VARCHAR` | Owning proceeding. Foreign key to `proceedings.proceeding_id`. |
-| `rin` | `VARCHAR` | Proceeding RIN, when available. |
-| `docket_id` | `VARCHAR` | Associated regulations.gov docket, when known. |
-| `open_date` | `VARCHAR` | First day comments were accepted. |
-| `close_date` | `VARCHAR` | Last day comments were accepted; never earlier than `open_date`. |
+| `comment_period_id` | `VARCHAR` | Stable opaque id based on the proceeding/docket anchor set and opening date. Primary key. |
+| `proceeding_ids_json` | `VARCHAR` | JSON array of uniquely resolved proceeding ids; empty when the interval is retained through docket anchors only. |
+| `rins_json` | `VARCHAR` | JSON array of valid RIN evidence associated with the interval; evidence only, not an identity assertion. |
+| `docket_ids_json` | `VARCHAR` | Non-empty JSON array of source-backed regulations.gov docket ids unless `proceeding_ids_json` supplies the sole anchor. |
+| `open_date` | `VARCHAR` | Inclusive first calendar day comments were accepted in the deadline's governing timezone. |
+| `close_date` | `VARCHAR` | Inclusive last calendar day comments were accepted in the deadline's governing timezone; never earlier than `open_date`. |
 | `source` | `VARCHAR` | `documents.comment_end_date`, `federal_register.comments_close_on`, or a `+`-joined corroboration. |
-| `evidence_ids_json` | `VARCHAR` | JSON array of source document ids or FR document numbers. |
+| `opened_by_artifact_ids_json` | `VARCHAR` | JSON array of canonical permanent URLs for source Artifacts that opened the interval; extension-only Artifacts are excluded. |
+| `evidence_ids_json` | `VARCHAR` | Non-empty JSON array of source document ids or FR document numbers supporting the interval and extensions. |
 | `method` | `VARCHAR` | Derivation method; `deterministic`. |
 | `actor_id` | `VARCHAR` | Versioned comment-period assembly ruleset. |
 | `run_id` | `VARCHAR` | Pipeline run identifier. |

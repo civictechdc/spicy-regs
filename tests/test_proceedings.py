@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 import pyarrow.parquet as pq
+import pytest
 
 from spicy_regs.ontology.common import write_parquet_rows
 from spicy_regs.transforms.build_comment_periods import (
@@ -13,12 +14,33 @@ from spicy_regs.transforms.build_comment_periods import (
 )
 from spicy_regs.transforms.build_proceedings import (
     COLUMNS as PROCEEDING_COLUMNS,
+    _current_stage_from_events,
     build_proceedings,
 )
 
 
 def _write(path, columns, rows):
     write_parquet_rows(path, columns=columns, rows=rows)
+
+
+def test_current_stage_requires_unique_latest_stage_family_event():
+    events = [
+        {"stage": "proposed", "event_kind": "proceedingProposed", "effective_date": "2026-01-01"},
+        {"stage": "final", "event_kind": "proceedingFinal", "effective_date": "2026-02-01"},
+    ]
+    assert _current_stage_from_events(events) == "final"
+
+    events.append(
+        {"stage": "withdrawn", "event_kind": "proceedingWithdrawn", "effective_date": "2026-02-01"}
+    )
+    assert _current_stage_from_events(events) is None
+    assert _current_stage_from_events(
+        [{"stage": "final", "event_kind": "proceedingFinal", "effective_date": None}]
+    ) is None
+    with pytest.raises(ValueError, match="disagrees"):
+        _current_stage_from_events(
+            [{"stage": "final", "event_kind": "proceedingProposed", "effective_date": "2026-02-01"}]
+        )
 
 
 def test_reference_proceeding_threads_rinless_docket_and_preserves_reopening(tmp_path):
@@ -167,8 +189,17 @@ def test_reference_proceeding_threads_rinless_docket_and_preserves_reopening(tmp
     )
     _write(
         tmp_path / "rule_targets.parquet",
-        ("docket_id", "rin", "cfr_ref"),
-        [{"docket_id": docket_id, "rin": rin, "cfr_ref": "40-60"}],
+        ("docket_id", "rin", "cfr_ref", "cfr_title", "cfr_part", "cfr_section"),
+        [
+            {
+                "docket_id": docket_id,
+                "rin": rin,
+                "cfr_ref": "40-60",
+                "cfr_title": "40",
+                "cfr_part": "60",
+                "cfr_section": None,
+            }
+        ],
     )
     _write(
         tmp_path / "authority_edges.parquet",
@@ -189,6 +220,7 @@ def test_reference_proceeding_threads_rinless_docket_and_preserves_reopening(tmp
     assert json.loads(proceeding["docket_ids_json"]) == [docket_id]
     assert proceeding["current_stage"] == "final"
     assert json.loads(proceeding["cfr_refs_json"]) == ["40-60"]
+    assert json.loads(proceeding["cfr_target_iris_json"]) == ["urn:rkaf:us:cfr:40:60"]
     assert json.loads(proceeding["authority_refs_json"]) == ["usc:42-7401"]
     stages = {event["stage"] for event in json.loads(proceeding["stage_events_json"])}
     assert {"proposed", "supplemental", "final"} <= stages
@@ -204,8 +236,21 @@ def test_reference_proceeding_threads_rinless_docket_and_preserves_reopening(tmp
         ("2021-11-15", "2022-01-31"),
         ("2022-12-06", "2023-01-05"),
     ]
-    assert all(row["proceeding_id"] == proceeding["proceeding_id"] for row in periods)
+    assert all(
+        json.loads(row["proceeding_ids_json"]) == [proceeding["proceeding_id"]]
+        for row in periods
+    )
+    assert all(json.loads(row["docket_ids_json"]) == [docket_id] for row in periods)
+    assert json.loads(periods[0]["opened_by_artifact_ids_json"]) == [
+        "https://www.federalregister.gov/d/2021-24202",
+        "https://www.regulations.gov/document/D-PROPOSAL",
+    ]
+    assert "D-EXTENSION" in json.loads(periods[0]["evidence_ids_json"])
+    assert "https://www.regulations.gov/document/D-EXTENSION" not in json.loads(
+        periods[0]["opened_by_artifact_ids_json"]
+    )
     assert all(row["method"] == "deterministic" for row in periods)
+    assert all(row["actor_id"] == "spicy-regs:comment-periods:v2" for row in periods)
 
 
 def test_reused_rin_does_not_collapse_or_cross_assign_distinct_dockets(tmp_path):
@@ -321,7 +366,121 @@ def test_reused_rin_does_not_collapse_or_cross_assign_distinct_dockets(tmp_path)
         )
     ).to_pylist()
     assert len(period_rows) == 2
-    assert {row["docket_id"] for row in period_rows} == set(dockets)
+    assert {
+        tuple(json.loads(row["docket_ids_json"])) for row in period_rows
+    } == {(dockets[0],), (dockets[1],)}
+
+
+def test_untrusted_fr_administrative_labels_do_not_become_proceeding_dockets(tmp_path):
+    valid_docket = "EPA-HQ-OAR-2026-0001"
+    rin = "2060-ZZ01"
+    _write(
+        tmp_path / "dockets.parquet",
+        ("docket_id", "rin", "docket_type", "title", "agency_code", "modify_date"),
+        [
+            {
+                "docket_id": valid_docket,
+                "rin": rin,
+                "docket_type": "Rulemaking",
+                "title": "Valid proceeding",
+                "agency_code": "EPA",
+                "modify_date": "2026-01-01",
+            },
+        ],
+    )
+    _write(
+        tmp_path / "documents.parquet",
+        (
+            "document_id",
+            "docket_id",
+            "additional_rins",
+            "document_type",
+            "title",
+            "agency_code",
+            "posted_date",
+            "comment_start_date",
+            "comment_end_date",
+        ),
+        [
+            {
+                "document_id": f"{valid_docket}-0001",
+                "docket_id": valid_docket,
+                "additional_rins": f'["{rin}"]',
+                "document_type": "Proposed Rule",
+                "title": "Valid proposal",
+                "agency_code": "EPA",
+                "posted_date": "2026-01-02",
+                "comment_start_date": "2026-01-02",
+                "comment_end_date": "2026-02-02",
+            }
+        ],
+    )
+    _write(
+        tmp_path / "federal_register.parquet",
+        (
+            "document_number",
+            "regulation_id_numbers_json",
+            "document_type",
+            "title",
+            "publication_date",
+            "comments_close_on",
+        ),
+        [
+            {
+                "document_number": "2026-00001",
+                "regulation_id_numbers_json": f'["{rin}"]',
+                "document_type": "Proposed Rule",
+                "title": "Valid proposal",
+                "publication_date": "2026-01-02",
+                "comments_close_on": "2026-02-02",
+            }
+        ],
+    )
+    _write(
+        tmp_path / "unified_agenda.parquet",
+        ("rin", "agenda_edition", "title", "agency_code", "rule_stage"),
+        [],
+    )
+    _write(
+        tmp_path / "fr_docket_links.parquet",
+        ("document_number", "docket_id"),
+        [
+            {"document_number": "2026-00001", "docket_id": valid_docket},
+            {"document_number": "2026-00001", "docket_id": "AID_FRDOC_0001"},
+            {"document_number": "2026-00001", "docket_id": "Sequence No. 1"},
+            {"document_number": "2026-00001", "docket_id": "A-570-831"},
+        ],
+    )
+    _write(
+        tmp_path / "rule_targets.parquet",
+        ("docket_id", "rin", "cfr_ref"),
+        [{"docket_id": valid_docket, "rin": rin, "cfr_ref": "40-60"}],
+    )
+    _write(
+        tmp_path / "authority_edges.parquet",
+        ("rin", "usc_title", "usc_section", "pl_number", "authority_raw"),
+        [],
+    )
+
+    proceeding_rows = pq.read_table(
+        build_proceedings(
+            tmp_path,
+            run_id="fr-label-boundary",
+            asserted_at="2026-07-24T12:00:00Z",
+        )
+    ).to_pylist()
+    assert len(proceeding_rows) == 1
+    assert json.loads(proceeding_rows[0]["docket_ids_json"]) == [valid_docket]
+
+    period_rows = pq.read_table(
+        build_comment_periods(
+            tmp_path,
+            run_id="fr-label-boundary",
+            asserted_at="2026-07-24T12:00:00Z",
+        )
+    ).to_pylist()
+    assert len(period_rows) == 1
+    assert json.loads(period_rows[0]["docket_ids_json"]) == [valid_docket]
 
 
 def test_rinless_evidence_does_not_fan_out_across_a_multi_proceeding_docket(
@@ -433,7 +592,12 @@ def test_rinless_evidence_does_not_fan_out_across_a_multi_proceeding_docket(
             asserted_at="2026-07-23T12:00:00Z",
         )
     ).to_pylist()
-    assert period_rows == []
+    assert len(period_rows) == 1
+    assert json.loads(period_rows[0]["proceeding_ids_json"]) == []
+    assert json.loads(period_rows[0]["docket_ids_json"]) == [docket_id]
+    assert json.loads(period_rows[0]["opened_by_artifact_ids_json"]) == [
+        "https://www.regulations.gov/document/D-RINLESS-COMMENT"
+    ]
 
 
 def test_proceeding_id_survives_new_earlier_docket_and_records_continuity(tmp_path):
@@ -541,7 +705,7 @@ def test_proceeding_id_survives_new_earlier_docket_and_records_continuity(tmp_pa
         added_docket,
         original_docket,
     ]
-    assert json.loads(second[0]["identity_predecessors_json"]) == [stable_proceeding_id]
+    assert json.loads(second[0]["identity_predecessors_json"]) == []
     assert second[0]["supersedes_id"] == stable_proceeding_id
 
 
@@ -643,4 +807,5 @@ def test_unscoped_rin_keeps_identity_when_one_docket_becomes_known(tmp_path):
     assert len(second) == 1
     assert second[0]["proceeding_id"] == stable_id
     assert json.loads(second[0]["docket_ids_json"]) == [docket_id]
-    assert json.loads(second[0]["identity_predecessors_json"]) == [stable_id]
+    assert json.loads(second[0]["identity_predecessors_json"]) == []
+    assert second[0]["supersedes_id"] == stable_id

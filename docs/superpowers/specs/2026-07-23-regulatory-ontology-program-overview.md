@@ -8,14 +8,38 @@
 
 ## Vision
 
-Give the US federal regulatory corpus machine-readable **identity** (which rule, which statute, which proceeding), **correlation** (dockets grouped and filtered through the rules and concepts they touch), and **provenance** (every derived assertion says how it was made). Rulespec supplies the vocabulary substrate; spicy-regs supplies the data, the pipeline, and the proof that the vocabulary works.
+Give the US federal regulatory corpus machine-readable **identity** (which rule,
+which statute, which proceeding), **correlation** (dockets grouped and filtered
+through the rules and concepts they touch), and **provenance** (every derived
+assertion says how it was made).
+
+Rulespec is the canonical ontological and semantic model behind Spicy Regs.
+Spicy Regs is a Rulespec application profile implemented as Parquet data,
+pipelines, conformance receipts, and query surfaces. Parquet remains the
+authoritative analytical carrier; it need not reproduce Rulespec's JSON-LD
+shape. The profile must nevertheless give every durable entity, relationship,
+assertion, category, event, and provenance field a Rulespec projection, a
+recognized external-standard composition, or an explicitly justified local
+extension.
 
 One sentence per repo:
 
-- **Rulespec** (`Formspec-Labs/rulespec`) is the vocabulary home — identifier schemes, conformance tiers, and the rulemaking-process module live there and are versioned there.
-- **Spicy-regs** (`civictechdc/spicy-regs`) is the first Level-0 consumer — parquet tables that *use* the vocabulary without adopting the JSON-LD carrier or runtime.
+- **Rulespec** (`Formspec-Labs/rulespec`) owns reusable semantic contracts:
+  identifier schemes, entity and relationship meaning, constraints,
+  conformance tiers, projections, and promotion into shared or decision-grade
+  vocabulary.
+- **Spicy Regs** (`civictechdc/spicy-regs`) owns source-specific grains,
+  physical storage, ingestion, model execution, retrieval-grade semantics,
+  ranking, query behavior, and the corpus evidence that tests the shared
+  contract.
 
 **Governance note.** The repos are governed differently: spicy-regs is a Civic Tech DC community project; rulespec is currently maintained by a single maintainer who also contributes to spicy-regs. The blocking dependency below is deliberately minimal partly for this reason, and the overlap is disclosed here so spicy-regs contributors can weigh the dependency with full information.
+
+The current US regulatory ontology is the first vertical slice of this
+relationship, not the final metadata boundary. The same profile discipline
+must eventually cover participation, legislation, litigation, oversight,
+organizations, influence, and spending without flattening their distinct
+containers, artifacts, actors, events, and evidence records.
 
 ## Division of responsibility
 
@@ -30,6 +54,14 @@ One sentence per repo:
 | Reference corpus + partner self-certification | Both (spec 2, Deliverable D) | The falsifiability loop between the repos |
 | Proceeding + comment-period tables (`proceedings`, `comment_periods`) | Spicy-regs (spec 1 §7) | Corpus-scale consumer exercise built from source evidence; the separate `rulemaking_lifecycles` duration rollup is not a proceeding |
 
+Fast-changing, corpus-discovered labels, ranking features, model prompts,
+candidate links, and operational checkpoints remain local to Spicy Regs while
+they are retrieval-grade. Reusable identifiers, semantic roles, relationship
+direction, graph invariants, and decision-grade vocabulary belong in
+Rulespec. Promotion from local to shared meaning is rare, evidence-backed,
+human-reviewed, versioned in Rulespec, and followed by an explicit Spicy Regs
+migration; shared maintainership is never a substitute for independent review.
+
 ## Interface contract
 
 Spec 1 consumes the identifier schemes, L0 tier, and experimental rulemaking
@@ -41,7 +73,13 @@ canonical identifier friction, rulemaking shape feedback, a curated reference
 proceeding, a partner self-certification, and the full-corpus
 `proceedings`/`comment_periods` exercise.
 
-The mapping between the two lives in **`docs/ontology.md`** (spicy-regs, created by spec 1): every column that carries rulespec semantics, its term IRI, and the enum-value correspondences. That document is simultaneously spec 1's design artifact and spec 2's L0 self-certification input — one file, both obligations. Its machine-readable format is defined by spec 2 (Deliverable B, the fenced `rkaf-l0-mapping` blocks) so the document and the audit tool cannot drift.
+The application profile lives in **`docs/rulespec-profile.md`**. It inventories
+the semantic role, identity, version semantics, evidence, projection status,
+and gaps of every published table. The executable carrier mapping lives in
+**`docs/ontology.md`** and **`conformance/rulespec-l0.yaml`**: every column that
+claims Rulespec semantics, its term IRI, transform, and enum correspondence.
+The machine-readable format is defined by Rulespec so prose, the partner
+declaration, and the audit tool cannot silently drift.
 
 ## Current sequencing and gates
 
@@ -56,14 +94,19 @@ The mapping between the two lives in **`docs/ontology.md`** (spicy-regs, created
 4. The full-corpus run has been recorded in
    `docs/ontology-friction-report.md`; it changed both the implementation and
    the frozen Rulespec contract.
-5. Publication waits for repository review and a reachable versioned Rulespec
-   contract. Stabilization still requires a non-originating consumer review.
+5. A maintainer-operated adversarial simulated-consumer review dated 2026-07-24
+   resolved the three open agenda questions but concluded **do not graduate
+   as-is** and defined a repair batch. Because no non-originating consumer
+   operated or ratified it, it does not satisfy the independent-review gate.
+6. Publication waits for repository review and a reachable versioned Rulespec
+   contract. Stabilization requires the adversarial-review preconditions plus a
+   non-originating consumer review or ratification of the repaired contract.
 
 ## Long-term goals (beyond these specs)
 
 Horizon items the two specs deliberately do not schedule. They are the program's direction; each becomes its own spec when its prerequisites exist.
 
-1. **Rulespec stable core (1.0 trajectory).** Once the rulemaking module has survived the full-corpus run and external review, graduate it from experimental to normative, and freeze a small stable vocabulary core — identity schemes (including the US regulatory schemes), attestation, lifecycle, concepts — with the stability guarantee that makes third-party adoption safe. The 2026-07 audit found the modular *structure* largely present (doc-per-module, L-ladder isolating the runtime); what remains long-term is the *stability contract*, informed by what the spicy-regs tables proved.
+1. **Rulespec stable core (1.0 trajectory).** Once the rulemaking module has survived the full-corpus run, the adversarial-review repair batch, and external review, graduate it from experimental to normative, and freeze a small stable vocabulary core — identity schemes (including the US regulatory schemes), attestation, lifecycle, concepts — with the stability guarantee that makes third-party adoption safe. The 2026-07 audit found the modular *structure* largely present (doc-per-module, L-ladder isolating the runtime); what remains long-term is the *stability contract*, informed by what the spicy-regs tables proved.
 2. **The promotion path.** Tooling and governance for the full ladder: descriptive tag (spicy-regs `concepts`) → `rkaf:LocalConcept` → `rkaf:RegisteredConcept`. Every promotion is a rare, human-approved, attested event — `rkaf:AILineage.humanApprover` exists for exactly this, and spicy-regs' `concept_events` `promote` event type is the hook. The payoff: concepts that *emerged* from corpus analysis (e.g. a contested definition of "small entity") become decision-grade registry entries with their discovery provenance intact.
 3. **The eligibility-runtime story (full circle).** Rulespec's original motivating audience — benefits-eligibility systems and other L4/D4+ decision-grade consumers — eventually consume rules whose authority chains trace *through* the rulemaking module *to* the actual proceedings in spicy-regs' corpus. An eligibility decision then cites not just the rule but the docket, comment period, and statutory basis that produced it, and a rule struck down in litigation propagates through the same chain. Neither repo delivers this alone; it is the reason the program exists.
 

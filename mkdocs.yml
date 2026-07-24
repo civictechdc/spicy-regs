@@ -39,7 +39,9 @@ nav:
   - Changelog: changelog.md
   - Querying with Python: querying-python.md
   - Ontology and Rulespec L0: ontology.md
-  - Full-corpus ontology report: ontology-friction-report.md
+  - Rulespec application profile: rulespec-profile.md
+  - Rulemaking stabilization report: rulespec-repair-report.md
+  - Initial full-corpus ontology report: ontology-friction-report.md
   - Tables:
       - dockets: tables/dockets.md
       - documents: tables/documents.md

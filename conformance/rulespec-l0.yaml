@@ -1,23 +1,31 @@
 partner: "Civic Tech DC / Spicy Regs"
 implementation: "spicy-regs@0.1.0"
-rulespec_version: "sha256:836968b28f3b86283f53c57ae5c9ab8ebd77e96531cd4751476f1a5ee3d296f2"
+rulespec_version: "sha256:ea9b899ba92955b83638ece811d7a4b744dd912f72e19290e32c97508674de1c"
 declared_levels: [L0]
 carrier_mapping: "../docs/ontology.md"
 terms_used:
+  - "http://purl.org/dc/terms/hasFormat"
+  - "http://purl.org/dc/terms/isFormatOf"
   - "http://www.w3.org/ns/prov#wasDerivedFrom"
+  - "https://rulespec.org/ns/v1#commentPeriodDocket"
   - "https://rulespec.org/ns/v1#commentPeriodEnd"
   - "https://rulespec.org/ns/v1#commentPeriodFor"
+  - "https://rulespec.org/ns/v1#commentPeriodOpenedBy"
   - "https://rulespec.org/ns/v1#commentPeriodStart"
-  - "https://rulespec.org/ns/v1#hasAuthority"
+  - "https://rulespec.org/ns/v1#hasArtifactIdentifier"
   - "https://rulespec.org/ns/v1#hasDocket"
   - "https://rulespec.org/ns/v1#hasDocketIdentifier"
+  - "https://rulespec.org/ns/v1#hasProceedingEvidenceIdentifier"
   - "https://rulespec.org/ns/v1#hasProceedingIdentifier"
   - "https://rulespec.org/ns/v1#hasRegulatoryIdentifier"
+  - "https://rulespec.org/ns/v1#proceedingAffectsCitation"
   - "https://rulespec.org/ns/v1#proceedingStage"
+  - "https://rulespec.org/ns/v1#proceedingSupersedes"
   - "https://rulespec.org/ns/v1#publishedInProceeding"
-test_corpus_run_at: "2026-07-23"
-test_corpus_version: "local-public-snapshot-2026-07-23"
-test_evidence_sha256: "ee4b72a1f360bf25717a3ed36cf633d0e6a541bb252817e908a1e6992888c899"
+test_corpus_run_at: "2026-07-24"
+test_corpus_version: "snapshot_c0b15c6aee3780c0a40a924f59b591bf-rehearsal"
+test_evidence_path: "../docs/rulespec-repair-report.md"
+test_evidence_sha256: "362bc3bcc018d426ba6871a437dd0f55ce4c9c33896f7a217a3a2bf12de20f64"
 results:
   L0: pass
   L1: not-claimed
@@ -27,13 +35,16 @@ results:
 notes: |
   Parquet is a non-JSON-LD carrier. The Rulespec contract is pinned by content
   digest; every mapped subject, range, direction, value kind, transform, and
-  example is documented in docs/ontology.md. The full-corpus exercise is
-  recorded in docs/ontology-friction-report.md at the evidence digest above.
-  Unversioned CFR and authority rollups are not claimed as
-  immutable Artifact relationships. Federal Register document numbers outside
-  Rulespec's YYYY-NNNNN lexical space retain permanent document URLs without
-  being mislabeled as rkaf:us-frdoc identifiers. Null proceeding stages remain
-  absent. Comment-period evidence identifiers map through prov:wasDerivedFrom;
-  their source qualifier remains in the adjacent carrier field. Retrieval-grade
-  tags and tag assignments remain outside the L0 claim until a human-reviewed
-  promotion creates a distinct Rulespec concept node and alignment link.
+  example is documented in docs/ontology.md. The paired before/after corpus
+  exercise is recorded in docs/rulespec-repair-report.md at the evidence digest
+  above. Unversioned CFR and authority rollups are not claimed as immutable
+  Artifact relationships. Cross-posting links project only when the raw
+  regulations.gov value has exact membership in the Federal Register source
+  snapshot. Null proceeding stages remain absent; non-null stages agree with
+  the latest stage-family event. Agency codes never mint Authority placeholders.
+  Comment periods retain Proceeding or source-backed Docket anchors and map
+  their opening Artifacts separately from prov:wasDerivedFrom evidence.
+  Retrieval-grade tags and assignments remain outside the L0 claim until a
+  human-reviewed promotion creates a distinct Rulespec concept node and
+  alignment link. The digest is an unreleased candidate pin; the module remains
+  Experimental pending release and non-originating-consumer review.

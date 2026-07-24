@@ -18,8 +18,9 @@ One row per rulemaking proceeding, normally RIN-bounded and optionally spanning 
 | `stage_events_json` | `VARCHAR` | Ordered JSON stage-event history with date, source, evidence id, and Rulespec event kind. |
 | `fr_document_numbers_json` | `VARCHAR` | JSON array of Federal Register documents published in the proceeding. |
 | `cfr_refs_json` | `VARCHAR` | JSON array of compact CFR targets from `rule_targets`. |
+| `cfr_target_iris_json` | `VARCHAR` | JSON array of Rulespec `rkaf:us-cfr` citation IRIs projected from valid rule-target components. |
 | `authority_refs_json` | `VARCHAR` | JSON array of compact U.S.C., Public Law, or retained raw authority references. |
-| `identity_predecessors_json` | `VARCHAR` | JSON array of prior-generation proceeding ids whose evidence overlaps this component; records continuity, merges, and splits. |
+| `identity_predecessors_json` | `VARCHAR` | JSON array of distinct prior-generation proceeding ids whose evidence overlaps this component; records semantic merge/split continuity and excludes the current reused id. |
 | `method` | `VARCHAR` | Derivation method; `deterministic`. |
 | `actor_id` | `VARCHAR` | Versioned proceeding-assembly ruleset. |
 | `run_id` | `VARCHAR` | Pipeline run identifier. |

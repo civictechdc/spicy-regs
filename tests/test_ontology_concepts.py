@@ -33,7 +33,7 @@ from spicy_regs.ontology.llm import (
     TagProposal,
     ValidationProposal,
 )
-from spicy_regs.ontology.subjects import Subject
+from spicy_regs.ontology.subjects import Subject, balanced_subject_batch
 from spicy_regs.transforms.build_concept_assignments import build_concept_assignments
 from spicy_regs.transforms.build_concept_events import build_concept_events
 from spicy_regs.transforms.build_concepts import build_concepts
@@ -68,6 +68,21 @@ def _proposal(
         evidence_field="dockets.title",
         justification="The title names PFAS.",
     )
+
+
+def test_bounded_subject_batch_balances_types_without_losing_stable_order():
+    subjects = [replace(_subject(), subject_type="docket", subject_id=f"D-{index}") for index in range(3)] + [
+        replace(_subject(), subject_type="document", subject_id=f"F-{index}") for index in range(2)
+    ]
+
+    selected = balanced_subject_batch(subjects, 4)
+
+    assert [(subject.subject_type, subject.subject_id) for subject in selected] == [
+        ("docket", "D-0"),
+        ("document", "F-0"),
+        ("docket", "D-1"),
+        ("document", "F-1"),
+    ]
 
 
 class _FakeModel:

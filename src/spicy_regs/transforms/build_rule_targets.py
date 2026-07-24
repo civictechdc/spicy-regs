@@ -9,7 +9,11 @@ from pathlib import Path
 import pyarrow.parquet as pq
 from loguru import logger
 
-from spicy_regs.ontology.citations import CfrCitation, parse_cfr_citation
+from spicy_regs.ontology.citations import (
+    CfrCitation,
+    normalize_regsgov_identifier,
+    parse_cfr_citation,
+)
 from spicy_regs.ontology.common import (
     ATTESTATION_COLUMNS,
     JsonReadStats,
@@ -96,6 +100,7 @@ def build_rule_targets(
     # span. ``evidence_id`` remains one concrete (lexicographically stable)
     # source row that can be inspected.
     edges: dict[tuple[str, str | None, str | None, str], dict] = {}
+    trusted_dockets: set[str] = set()
 
     def add_edge(
         *,
@@ -107,8 +112,8 @@ def build_rule_targets(
         first_seen: object = None,
         last_seen: object = None,
     ) -> None:
-        docket = "" if docket_id is None else str(docket_id).strip()
-        if not docket or source not in SOURCES:
+        docket = normalize_regsgov_identifier(docket_id)
+        if docket is None or docket not in trusted_dockets or source not in SOURCES:
             return
         normalized_rin = _rin(rin)
         cfr_ref = citation.cfr_ref if citation else None
@@ -144,10 +149,13 @@ def build_rule_targets(
     # to project Unified Agenda CFR targets down to docket subjects.
     dockets_by_rin: dict[str, set[str]] = defaultdict(set)
     for row in iter_parquet_rows(paths["dockets"]):
-        docket = row.get("docket_id")
+        docket = normalize_regsgov_identifier(row.get("docket_id"))
+        if docket is None:
+            continue
+        trusted_dockets.add(docket)
         rin = _rin(row.get("rin"))
-        if docket and rin:
-            dockets_by_rin[rin].add(str(docket))
+        if rin:
+            dockets_by_rin[rin].add(docket)
             add_edge(
                 docket_id=docket,
                 citation=None,
@@ -160,7 +168,11 @@ def build_rule_targets(
 
     documents_by_fr_doc: dict[str, list[dict]] = defaultdict(list)
     for row in iter_parquet_rows(paths["documents"]):
-        docket = row.get("docket_id")
+        docket = normalize_regsgov_identifier(row.get("docket_id"))
+        if docket is not None:
+            # Documents are themselves sourced from Regulations.gov. They can
+            # legitimately arrive before the corresponding docket record.
+            trusted_dockets.add(docket)
         document_id = row.get("document_id")
         raw_rins = parse_json_list(
             row.get("additional_rins"),
@@ -172,9 +184,9 @@ def build_rule_targets(
         if raw_rins is not None:
             for raw_rin in raw_rins:
                 rin = _rin(raw_rin)
-                if not docket or not rin:
+                if docket is None or not rin:
                     continue
-                dockets_by_rin[rin].add(str(docket))
+                dockets_by_rin[rin].add(docket)
                 add_edge(
                     docket_id=docket,
                     citation=None,
@@ -185,13 +197,14 @@ def build_rule_targets(
                     last_seen=row.get("modify_date") or row.get("posted_date"),
                 )
         fr_doc_num = row.get("fr_doc_num")
-        if fr_doc_num and docket:
-            documents_by_fr_doc[str(fr_doc_num)].append(row)
+        if fr_doc_num and docket is not None:
+            documents_by_fr_doc[str(fr_doc_num)].append({**row, "docket_id": docket})
 
     linked_dockets_by_fr_doc: dict[str, set[str]] = defaultdict(set)
     for row in iter_parquet_rows(paths["fr_docket_links"], columns=("document_number", "docket_id")):
-        if row.get("document_number") and row.get("docket_id"):
-            linked_dockets_by_fr_doc[str(row["document_number"])].add(str(row["docket_id"]))
+        docket = normalize_regsgov_identifier(row.get("docket_id"))
+        if row.get("document_number") and docket in trusted_dockets:
+            linked_dockets_by_fr_doc[str(row["document_number"])].add(docket)
 
     for row in iter_parquet_rows(paths["federal_register"]):
         document_number = row.get("document_number")
