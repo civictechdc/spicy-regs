@@ -182,6 +182,25 @@ archive with bounded compressed and contract-file sizes, recomputes the
 canonical L0 digest from the tagged CUE constraints, context, and range
 registry, and rejects any release/digest mismatch.
 
+### Post-receipt operational hardening
+
+The paired receipt remains bound to the semantic implementation at
+`3a032d26138c0d99d518e1dbfca20fa1a6e4c0b2`. The following commits do not alter
+the seven artifact builders or their carrier projection:
+
+- `0be1861`: require a released Rulespec declaration before upload;
+- `eaec35c`: prevent unit tests from inheriting a production R2 endpoint;
+- `3fa54cb`: require locked CI installs and build wheel plus source artifacts;
+- `48ecd38`: bind the declared digest to the immutable Rulespec tag archive.
+
+A clean detached checkout at `48ecd38` passed the locked Python 3.12 install,
+543 selected tests with three live integrations deselected, Ruff, ty, the
+29-table dictionary gate, strict documentation, the partner L0 audit, candidate
+publication rejection, distribution builds, wheel installation, and console
+entry-point import. A local archive of Rulespec commit
+`878d23ed73891b37e73c39adf9f72e2d1acc2278` independently recomputed to the
+declared digest.
+
 ## Remaining friction and human gates
 
 The following are explicit unknowns or external gates, not skipped work:
