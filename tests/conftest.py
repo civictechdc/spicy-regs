@@ -7,8 +7,11 @@ import pytest
 
 
 @pytest.fixture
-def tmp_output(tmp_path: Path) -> Path:
-    """Return a temporary output directory."""
+def tmp_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Return an offline temporary output directory."""
+    # Unit pipelines must not inherit a developer's production R2 endpoint from
+    # .env. Tests that exercise remote priming set this variable explicitly.
+    monkeypatch.delenv("R2_PUBLIC_URL", raising=False)
     out = tmp_path / "output"
     out.mkdir()
     return out
