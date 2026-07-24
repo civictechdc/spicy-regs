@@ -67,6 +67,7 @@ FIELDS = (
     "docket_ids",
     "regulation_id_numbers",
     "cfr_references",
+    "topics",
     "html_url",
     "pdf_url",
     "body_html_url",

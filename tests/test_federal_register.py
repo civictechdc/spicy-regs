@@ -26,6 +26,7 @@ _RAW_DOC = {
     "docket_ids": ["EPA-HQ-OAR-2024-0001", "FRL-1234-01-OAR"],
     "regulation_id_numbers": ["2060-AV12"],
     "cfr_references": [{"title": 40, "part": 60, "chapter": None, "citation_url": None}],
+    "topics": [{"name": "Air pollution control", "slug": "air-pollution-control"}],
     "agencies": [
         {
             "raw_name": "ENVIRONMENTAL PROTECTION AGENCY",
@@ -56,6 +57,7 @@ def test_shape_maps_and_serializes_fields():
     assert json.loads(row["docket_ids_json"]) == ["EPA-HQ-OAR-2024-0001", "FRL-1234-01-OAR"]
     assert json.loads(row["regulation_id_numbers_json"]) == ["2060-AV12"]
     assert json.loads(row["cfr_references_json"])[0]["part"] == 60
+    assert json.loads(row["topics_json"])[0]["name"] == "Air pollution control"
     # agency_slugs is a comma-joined string of slugs, skipping agencies with none.
     assert row["agency_slugs"] == "environmental-protection-agency"
     # Integer scalars stringify (schema is all-VARCHAR).
@@ -72,6 +74,7 @@ def test_shape_handles_missing_arrays():
     assert row["docket_ids_json"] == "[]"
     assert row["regulation_id_numbers_json"] == "[]"
     assert row["cfr_references_json"] == "[]"
+    assert row["topics_json"] == "[]"
     assert row["agencies_json"] == "[]"
     assert row["agency_slugs"] is None
 

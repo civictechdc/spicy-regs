@@ -1,8 +1,8 @@
 """Transform: build ``federal_register.parquet`` from the FR REST API.
 
-Produces the exact 22 all-VARCHAR columns the existing consumers expect (the
-``fr-docket-links`` rollup and the UI's ``normalizeFRRow``), so bringing FR
-ingestion in-repo is a drop-in replacement for the former external path.
+Produces the existing all-VARCHAR consumer columns plus ``topics_json`` from
+the Federal Register Thesaurus. The extra column is additive for existing
+``fr-docket-links`` and UI consumers and seeds the ontology subject registry.
 
 Incremental by design. A full re-fetch of the ~793K-document archive every run
 would be wasteful *and* would trip the R2 catastrophic-shrink guard on any short
@@ -39,8 +39,8 @@ OUTPUT = "federal_register.parquet"
 # documents added/corrected after their nominal publication date are picked up.
 OVERLAP_DAYS = 7
 
-# The published schema: 22 columns, all VARCHAR, in the exact order the existing
-# table uses.
+# The published schema, all VARCHAR. ``topics_json`` is the FR Thesaurus
+# enrichment used to seed and evaluate the subject-concept facet.
 COLUMNS = (
     "document_number",
     "title",
@@ -55,6 +55,7 @@ COLUMNS = (
     "docket_ids_json",
     "regulation_id_numbers_json",
     "cfr_references_json",
+    "topics_json",
     "html_url",
     "pdf_url",
     "body_html_url",
@@ -93,6 +94,7 @@ def _shape(doc: dict) -> dict:
         "docket_ids_json": json.dumps(doc.get("docket_ids") or []),
         "regulation_id_numbers_json": json.dumps(doc.get("regulation_id_numbers") or []),
         "cfr_references_json": json.dumps(doc.get("cfr_references") or []),
+        "topics_json": json.dumps(doc.get("topics") or []),
         "html_url": doc.get("html_url"),
         "pdf_url": doc.get("pdf_url"),
         "body_html_url": doc.get("body_html_url"),
@@ -120,6 +122,13 @@ def _prior_max_publication_date(prior_file: Path) -> date | None:
         return None
 
 
+def _prior_has_topics(prior_file: Path) -> bool:
+    """Whether the prior table has completed the additive topics migration."""
+    if not prior_file.exists():
+        return False
+    return "topics_json" in pq.ParquetFile(prior_file).schema_arrow.names
+
+
 def build_federal_register(output_dir: Path, *, since: date | None = None) -> Path:
     """Build ``federal_register.parquet`` (incremental merge with the prior table)."""
     import duckdb
@@ -136,8 +145,15 @@ def build_federal_register(output_dir: Path, *, since: date | None = None) -> Pa
 
     # 2. Decide the fetch window start.
     if since is None:
-        prior_max = _prior_max_publication_date(prior_file) if have_prior else None
-        since = (prior_max - timedelta(days=OVERLAP_DAYS)) if prior_max else FR_EPOCH
+        if have_prior and not _prior_has_topics(prior_file):
+            # One full pass is required when upgrading the old schema; otherwise
+            # only the overlap window would receive Thesaurus topics and the
+            # concept seed/evaluation corpus would remain silently incomplete.
+            logger.info("FR: prior table lacks topics_json — running one-time topics backfill")
+            since = FR_EPOCH
+        else:
+            prior_max = _prior_max_publication_date(prior_file) if have_prior else None
+            since = (prior_max - timedelta(days=OVERLAP_DAYS)) if prior_max else FR_EPOCH
     logger.info("FR: fetching documents published since {}", since)
 
     # 3. Fetch + shape into a "new rows" parquet.
@@ -159,10 +175,13 @@ def build_federal_register(output_dir: Path, *, since: date | None = None) -> Pa
 
     cols = ", ".join(COLUMNS)
     if have_prior:
+        # UNION ALL BY NAME supplies NULL for ``topics_json`` when upgrading a
+        # prior 22-column table. Selecting the pinned columns only after the
+        # union makes the enrichment a backwards-compatible schema evolution.
         union = (
-            f"SELECT {cols}, 0 AS _src FROM read_parquet('{prior_file}') "
+            f"SELECT *, 0 AS _src FROM read_parquet('{prior_file}') "
             f"UNION ALL BY NAME "
-            f"SELECT {cols}, 1 AS _src FROM read_parquet('{new_file}')"
+            f"SELECT *, 1 AS _src FROM read_parquet('{new_file}')"
         )
     else:
         union = f"SELECT {cols}, 1 AS _src FROM read_parquet('{new_file}')"

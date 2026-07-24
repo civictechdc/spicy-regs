@@ -4,6 +4,11 @@ from spicy_regs.transforms.build_agency_rollups import build_agency_rollups
 from spicy_regs.transforms.build_agency_stats import build_agency_stats
 from spicy_regs.transforms.build_cfr_sections import build_cfr_sections
 from spicy_regs.transforms.build_congress_bills import build_congress_bills
+from spicy_regs.transforms.build_authority_edges import build_authority_edges
+from spicy_regs.transforms.build_comment_periods import build_comment_periods
+from spicy_regs.transforms.build_concept_assignments import build_concept_assignments
+from spicy_regs.transforms.build_concept_events import build_concept_events
+from spicy_regs.transforms.build_concepts import build_concepts
 from spicy_regs.transforms.build_crs_reports import build_crs_reports
 from spicy_regs.transforms.build_courtlistener import build_courtlistener
 from spicy_regs.transforms.build_discovery_signals import build_discovery_signals
@@ -15,6 +20,8 @@ from spicy_regs.transforms.build_fr_docket_links import build_fr_docket_links
 from spicy_regs.transforms.build_gao_reports import build_gao_reports
 from spicy_regs.transforms.build_lobbying_filings import build_lobbying_filings
 from spicy_regs.transforms.build_rulemaking_lifecycles import build_rulemaking_lifecycles
+from spicy_regs.transforms.build_proceedings import build_proceedings
+from spicy_regs.transforms.build_rule_targets import build_rule_targets
 from spicy_regs.transforms.build_sam_entities import build_sam_entities
 from spicy_regs.transforms.build_search_index import INDEX_FILENAME, build_search_index
 from spicy_regs.transforms.build_unified_agenda import build_unified_agenda
@@ -50,6 +57,11 @@ __all__ = [
     "build_agency_monthly_volume",
     "build_cfr_sections",
     "build_congress_bills",
+    "build_authority_edges",
+    "build_comment_periods",
+    "build_concept_assignments",
+    "build_concept_events",
+    "build_concepts",
     "build_crs_reports",
     "build_courtlistener",
     "build_discovery_signals",
@@ -57,6 +69,8 @@ __all__ = [
     "build_fcc_filings",
     "build_fec_committees",
     "build_rulemaking_lifecycles",
+    "build_proceedings",
+    "build_rule_targets",
     "build_sam_entities",
     "build_federal_register",
     "build_fr_docket_links",

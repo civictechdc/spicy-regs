@@ -17,6 +17,7 @@ dependencies = [
     "mcp>=1.10.0",
     "pypdf",
     "pyyaml",  # data dictionary descriptions (src/spicy_regs/data_dictionary.py)
+    "openai",  # optional-at-runtime structured-output provider for ontology tagging
 ]
 
 [project.optional-dependencies]
@@ -70,6 +71,7 @@ embed = "spicy_regs.vectordb.embed:main"
 spicy-regs = "spicy_regs.cli:main"
 spicy-regs-mcp = "spicy_regs.mcp_server:main"
 spicy-regs-dict = "spicy_regs.data_dictionary:main"
+spicy-regs-evaluate-tags = "spicy_regs.evaluate_tag_quality:main"
 
 [build-system]
 requires = ["uv_build"]
