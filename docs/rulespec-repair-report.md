@@ -171,6 +171,12 @@ Ontology publication now invokes the row-level validator after building the
 manifest and before its first R2 write. A carrier failure therefore leaves the
 remote generation and latest pointer unchanged.
 
+Publication also fails closed before source retrieval while
+`conformance/rulespec-l0.yaml` lacks a released Rulespec semantic version and
+its matching, reachable canonical GitHub release URL. Those fields are
+intentionally null in this candidate. Local `--skip-upload` materialization
+remains available for review.
+
 ## Remaining friction and human gates
 
 The following are explicit unknowns or external gates, not skipped work:
@@ -184,7 +190,8 @@ The following are explicit unknowns or external gates, not skipped work:
 - F-13's comment-period-kind distinction remains a trigger, not vocabulary,
   until an in-scope consumer exposes structured evidence.
 - A maintainer must review and publish the Rulespec release, then update the
-  Spicy Regs version pin from candidate digest to released version plus digest.
+  Spicy Regs declaration from candidate digest only to released version plus
+  digest. Until then, the scheduled publisher stops at the release preflight.
 - A non-originating consumer must review the repaired terms/shapes or ratify the
   simulated review against them.
 - Publication of the candidate corpus requires explicit maintainer approval;

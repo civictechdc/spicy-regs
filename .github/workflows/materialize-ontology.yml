@@ -2,7 +2,9 @@ name: Materialize — ontology dataset
 
 # Identity tables refresh Monday-Saturday. Sunday runs the complete concept
 # convergence/tagging DAG. A shared concurrency group prevents two generations
-# from racing to replace the atomic latest.json pointer.
+# from racing to replace the atomic latest.json pointer. Uploads also require
+# conformance/rulespec-l0.yaml to name a reachable Rulespec release; the
+# unreleased candidate pin deliberately stops scheduled publication.
 on:
   schedule:
     - cron: '0 2 * * 1-6'
@@ -47,7 +49,7 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --frozen
 
       - name: Materialize one ontology generation
         env:

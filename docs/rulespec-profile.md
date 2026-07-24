@@ -121,6 +121,14 @@ without losing domain, range, direction, evidence, or identity. In particular:
 - retrieval concepts remain local even when their labels resemble registered
   concepts.
 
+Production publication has a separate release preflight. The L0 declaration
+keeps the normative contract digest in `rulespec_version` and records the
+released semantic version and canonical GitHub release page in
+`rulespec_release` and `rulespec_release_url`. A real upload fails before source
+retrieval unless the L0 claim passes, both release fields agree, and the release
+page is reachable. `--skip-upload` deliberately bypasses this operational gate
+so an unreleased candidate can still be built and reviewed locally.
+
 ## Compatibility and change governance
 
 ### Stability classes

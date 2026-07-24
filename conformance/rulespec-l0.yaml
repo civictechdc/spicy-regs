@@ -1,6 +1,10 @@
 partner: "Civic Tech DC / Spicy Regs"
 implementation: "spicy-regs@0.1.0"
 rulespec_version: "sha256:ea9b899ba92955b83638ece811d7a4b744dd912f72e19290e32c97508674de1c"
+# Publication remains locked until a maintainer replaces these nulls with the
+# released VERSION and its canonical GitHub release URL.
+rulespec_release: null
+rulespec_release_url: null
 declared_levels: [L0]
 carrier_mapping: "../docs/ontology.md"
 terms_used:
@@ -37,7 +41,9 @@ notes: |
   digest; every mapped subject, range, direction, value kind, transform, and
   example is documented in docs/ontology.md. The machine-readable paired
   before/after receipt is pinned above; docs/rulespec-repair-report.md explains
-  it. Unversioned CFR and authority rollups are not claimed as immutable
+  it. The release fields above intentionally remain null, so production
+  publication fails closed while this contract is an unreleased candidate.
+  Unversioned CFR and authority rollups are not claimed as immutable
   Artifact relationships. Cross-posting links project only when the raw
   regulations.gov value has exact membership in the Federal Register source
   snapshot. Null proceeding stages remain absent; non-null stages agree with
