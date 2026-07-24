@@ -35,6 +35,17 @@ API_BASE = "https://www.federalregister.gov/api/v1"
 # this is only a round-trip-count optimization, not a correctness knob.
 PER_PAGE = 1000
 
+# The API caps both pagination and its reported ``count`` at 10,000. A response
+# with exactly this count is therefore ambiguous and must be subdivided even
+# when all 10,000 visible rows were collected.
+RESULT_CAP = 10_000
+
+# Avoid paying for a capped 10,000-row traversal of the full archive before
+# discovering that it must be split. Quarter-sized top-level windows remain
+# below the cap in normal Federal Register history; unusually busy quarters are
+# still split recursively by ``_fetch_window``.
+MAX_WINDOW_DAYS = 90
+
 # FR's oldest documents. A full backfill with no prior table walks from here.
 FR_EPOCH = date(1994, 1, 1)
 
@@ -102,7 +113,14 @@ class FederalRegisterReader(Reader):
         logger.info("FR: fetching documents published {} .. {}", self.since, self.until)
         with httpx.Client(timeout=_TIMEOUT, headers={"Accept": "application/json"}) as client:
             self._client = client
-            yield from self._fetch_window(self.since, self.until)
+            window_start = self.since
+            while window_start <= self.until:
+                window_end = min(
+                    window_start + timedelta(days=MAX_WINDOW_DAYS - 1),
+                    self.until,
+                )
+                yield from self._fetch_window(window_start, window_end)
+                window_start = window_end + timedelta(days=1)
         logger.info("FR: yielded {:,} documents", self._seen)
 
     # -- window fetching -----------------------------------------------------
@@ -110,7 +128,8 @@ class FederalRegisterReader(Reader):
     def _fetch_window(self, gte: date, lte: date) -> Iterator[dict]:
         """Fetch one publication-date window, subdividing on truncation."""
         collected, count = self._page_window(gte, lte)
-        if len(collected) < count and gte < lte:
+        truncated = len(collected) < count or count >= RESULT_CAP
+        if truncated and gte < lte:
             # The API truncated this window; halve it and recurse so no document
             # in the range is lost.
             mid = gte + (lte - gte) // 2
@@ -121,10 +140,10 @@ class FederalRegisterReader(Reader):
             yield from self._fetch_window(gte, mid)
             yield from self._fetch_window(mid + timedelta(days=1), lte)
             return
-        if len(collected) < count:
-            # A single day still truncated — accept what we have, but make the
-            # gap loud rather than silent.
-            logger.warning("FR: single day {} truncated at {}/{} documents", gte, len(collected), count)
+        if truncated:
+            # A single day cannot be subdivided further. Publishing it would
+            # silently turn a transport/API limit into corpus data loss.
+            raise RuntimeError(f"Federal Register API truncated {gte} at {len(collected)}/{count} documents")
         for doc in collected:
             self._seen += 1
             if self._seen % _PROGRESS_EVERY == 0:
@@ -147,15 +166,13 @@ class FederalRegisterReader(Reader):
         while url:
             payload = self._get(url, params if first else None)
             first = False
-            if payload is None:
-                break
             count = payload.get("count", count)
             docs.extend(payload.get("results", []))
             url = payload.get("next_page_url") or ""
         return docs, count
 
-    def _get(self, url: str, params: dict | None) -> dict | None:
-        """GET with bounded retries + exponential backoff. Returns parsed JSON or None."""
+    def _get(self, url: str, params: dict | None) -> dict:
+        """GET with bounded retries; exhaustions abort the source snapshot."""
         assert self._client is not None
         for attempt in range(1, _MAX_RETRIES + 1):
             try:
@@ -166,9 +183,8 @@ class FederalRegisterReader(Reader):
                 return resp.json()
             except (httpx.HTTPError, ValueError) as exc:
                 if attempt == _MAX_RETRIES:
-                    logger.error("FR: giving up on {} after {} attempts: {}", url, attempt, exc)
-                    return None
+                    raise RuntimeError(f"Federal Register request failed after {attempt} attempts: {url}") from exc
                 backoff = min(2**attempt, 30)
                 logger.warning("FR: {} (attempt {}/{}), retrying in {}s", exc, attempt, _MAX_RETRIES, backoff)
                 time.sleep(backoff)
-        return None
+        raise AssertionError("unreachable")
