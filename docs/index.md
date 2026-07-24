@@ -27,7 +27,7 @@ downstream context can all be queried from one place.
 ## The tables
 
 Most tables below use the stable object
-`https://r2.spicy-regs.dev/<name>.parquet`. The seven rule-identity and ontology
+`https://r2.spicy-regs.dev/<name>.parquet`. The nine rule-identity and ontology
 tables publish together under an immutable snapshot prefix; clients resolve
 `materialized/ontology/latest.json` and use the artifact URLs in its manifest.
 The MCP server (`list_sources` / `describe_table` / `query_sql`) performs that
@@ -72,7 +72,9 @@ materialized generation.
 | --- | --- | --- |
 | [`rule_targets`](tables/rule_targets.md) | one row per docket / CFR target / RIN / evidence source | composite |
 | [`authority_edges`](tables/authority_edges.md) | one row per parsed or retained legal-authority citation | composite |
-| [`proceedings`](tables/proceedings.md) | one row per RIN/docket proceeding component | `proceeding_id` |
+| [`proceedings`](tables/proceedings.md) | one row per independently evidenced regulatory action | `proceeding_id` |
+| [`regulatory_agenda_items`](tables/regulatory_agenda_items.md) | one durable agenda item per RIN | `agenda_item_id` |
+| [`agenda_item_proceedings`](tables/agenda_item_proceedings.md) | one evidence-qualified agenda-item-to-proceeding relationship | `relationship_id` |
 | [`comment_periods`](tables/comment_periods.md) | one row per continuous or reopened comment window | `comment_period_id` |
 | [`concepts`](tables/concepts.md) | one row per retrieval concept | `concept_id` |
 | [`concept_assignments`](tables/concept_assignments.md) | one row per append-only tag assertion | `assignment_id` |
@@ -131,7 +133,9 @@ The complementary sources join through normalized identity tables:
 - **`agency_code` / agency name** appears across nearly every table.
 
 The compact identifiers, provenance mapping, and Rulespec Level-0 posture are
-documented in [Ontology and Rulespec L0](ontology.md).
+documented in [Ontology and Rulespec L0](ontology.md). The
+[RIN ontology revision report](rin-ontology-revision-report.md) records the
+current local agenda-item/Proceeding corpus result.
 
 > Coverage notes: `sam_entities` is a partial sample (~5K of ~765K — the SAM API
 > caps pagination; full coverage needs chunked ingestion), `lobbying_filings`
@@ -144,7 +148,7 @@ documented in [Ontology and Rulespec L0](ontology.md).
 === "AI assistant (MCP)"
 
     The hosted MCP server exposes `list_sources`, `describe_table`, and
-    `query_sql` over the tables currently published above. The seven ontology
+    `query_sql` over the tables currently published above. The nine ontology
     tables appear only after their first complete generation. Add
     `https://mcp.spicy-regs.dev/mcp` as a connector, or run it locally:
 

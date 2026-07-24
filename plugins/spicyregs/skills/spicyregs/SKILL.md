@@ -32,7 +32,7 @@ Keep this workflow provider-neutral.
 - Remote MCP surface, including complementary and materialized tables (when
   running without a local Python toolchain, e.g. claude.ai):
   - `list_sources`, `describe_table`, `query_sql` tools exposed by the Spicy Regs MCP server in `mcp-server/`.
-  - The seven materialized ontology tables appear only after their first
+  - The nine materialized ontology tables appear only after their first
     complete production generation; trust `list_sources` for current
     availability.
   - Prefer the MCP tools when the skill is loaded in a chat surface that has the connector attached; prefer the `uv` scripts when running locally where they're faster and cover the duplicate-finder workflow.
@@ -77,7 +77,7 @@ Use the helper script's `--describe` output for the exact schema. In this repo, 
 Complementary federal sources (queryable by name through MCP when published;
 see the Data Dictionary for columns):
 
-- Rulemaking identity: `rule_targets` (normalized docket/CFR/RIN evidence), `authority_edges` (U.S.C./Public Law citations), `proceedings`, `comment_periods`
+- Rulemaking identity: `rule_targets` (normalized docket/CFR/RIN evidence), `authority_edges` (U.S.C./Public Law citations), `proceedings`, `regulatory_agenda_items`, `agenda_item_proceedings`, `comment_periods`
 - Retrieval ontology: `concepts`, append-only `concept_assignments`, and structural `concept_events`
 - Source lifecycle: `federal_register` (published rules; RIN + CFR refs), `unified_agenda` (planned actions), `fr_docket_links`, `rulemaking_lifecycles`, `congress_bills`, `cfr_sections`
 - Organizations & influence: `sam_entities` (entity registry, keyed by `uei`), `lobbying_filings`, `fec_committees`

@@ -5,6 +5,13 @@
 **Publication:** local only; no R2 upload
 **Rulespec contract:** `sha256:836968b28f3b86283f53c57ae5c9ab8ebd77e96531cd4751476f1a5ee3d296f2`
 
+> **Status:** Historical iteration evidence. This run remains valid for the
+> exact contract and snapshot above. The later
+> [`RIN ontology revision report`](docs/rin-ontology-revision-report.md)
+> supersedes its RIN/Proceeding interpretation: a RIN identifies a durable
+> `RegulatoryAgendaItem`, never a Proceeding. The current local mapping authority
+> is [`docs/ontology.md`](docs/ontology.md).
+
 ## Executive result
 
 Spicy Regs remains compatible with the pinned Rulespec Level-0 contract. The

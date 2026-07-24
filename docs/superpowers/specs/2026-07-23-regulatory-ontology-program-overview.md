@@ -4,7 +4,8 @@
 - **Status:** Reference (parent of two specs; not independently implementable)
 - **Children:**
   - **Spec 1:** `docs/superpowers/specs/2026-07-23-metadata-ontology-layer-design.md` (this repo, `civictechdc/spicy-regs`)
-  - **Spec 2:** `thoughts/specs/2026-07-23-us-regulatory-identifiers-and-rulemaking-module.md` (`Formspec-Labs/rulespec`)
+  - **Spec 2 history:** `thoughts/specs/2026-07-23-us-regulatory-identifiers-and-rulemaking-module.md` (`Formspec-Labs/rulespec`)
+  - **Current RIN authority:** `thoughts/specs/2026-07-24-rin-agenda-item-ontology-decision.md` (`Formspec-Labs/rulespec`)
 
 ## Vision
 
@@ -47,12 +48,12 @@ containers, artifacts, actors, events, and evidence records.
 | --- | --- | --- |
 | Identifier schemes (CFR, U.S.C., RIN, FR doc, regs.gov, PL) | Rulespec (spec 2, Deliverable A) | Closed enum, release-versioned, reusable beyond spicy-regs |
 | L0 vocabulary-only conformance tier | Rulespec (spec 2, Deliverable B) | Conformance ladder is rulespec's contract |
-| Rulemaking-process entities (Proceeding, CommentPeriod) | Rulespec (spec 2, Deliverable C — experimental) | Vocabulary; stabilizes only after the corpus exercise and independent consumer review |
+| Rulemaking-process entities (RegulatoryAgendaItem, Proceeding, CommentPeriod) | Rulespec (spec 2, Deliverable C — experimental) | Vocabulary; stabilizes only after the corpus exercise and independent consumer review |
 | Rule-identity spine tables (`rule_targets`, `authority_edges`) | Spicy-regs (spec 1) | Data product; deterministic ETL over the corpus |
 | Descriptive tagging (SKOS facets, merge/validation loop) | Spicy-regs (spec 1) | Retrieval-grade, fast-churn — deliberately outside rulespec's decision-grade concept registry |
 | Provenance columns on derived rows | Spicy-regs (spec 1) | Carrier is Parquet; only domain-safe, direction-safe Rulespec relationships enter the L0 map |
 | Reference corpus + partner self-certification | Both (spec 2, Deliverable D) | The falsifiability loop between the repos |
-| Proceeding + comment-period tables (`proceedings`, `comment_periods`) | Spicy-regs (spec 1 §7) | Corpus-scale consumer exercise built from source evidence; the separate `rulemaking_lifecycles` duration rollup is not a proceeding |
+| Agenda-item, Proceeding, and comment-period tables (`regulatory_agenda_items`, `agenda_item_proceedings`, `proceedings`, `comment_periods`) | Spicy-regs (spec 1 §7) | Corpus-scale consumer exercise built from source evidence; the separate `rulemaking_lifecycles` duration rollup is not a proceeding |
 
 Fast-changing, corpus-discovered labels, ranking features, model prompts,
 candidate links, and operational checkpoints remain local to Spicy Regs while
@@ -65,9 +66,13 @@ migration; shared maintainership is never a substitute for independent review.
 ## Interface contract
 
 Spec 1 consumes the identifier schemes, L0 tier, and experimental rulemaking
-terms from the frozen sibling Rulespec contract. Spicy-regs pins that contract
+terms from the sibling Rulespec contract. The current local candidate is pinned
 by content digest:
-`sha256:836968b28f3b86283f53c57ae5c9ab8ebd77e96531cd4751476f1a5ee3d296f2`.
+`sha256:2aefd3fad7782a7b16a7fa8fc08e8ceb26b5db741e0371b8fa8a9ccc1982124d`.
+The earlier digest
+`sha256:836968b28f3b86283f53c57ae5c9ab8ebd77e96531cd4751476f1a5ee3d296f2`
+remains bound to the first full-corpus feedback run. Neither digest is a
+released rulemaking-contract claim.
 It receives no Rulespec runtime dependency. Rulespec receives compact-to-
 canonical identifier friction, rulemaking shape feedback, a curated reference
 proceeding, a partner self-certification, and the full-corpus
@@ -88,7 +93,7 @@ declaration, and the audit tool cannot silently drift.
 2. Spicy-regs has implemented the deterministic identity layer, proceeding and
    comment-period tables, Federal Register topic enrichment, concept registry,
    assignment loop, and L0 self-certification.
-3. The seven related tables build from one local input snapshot and publish as
+3. The nine related tables build from one local input snapshot and publish as
    one manifest-addressed generation. No individual table workflow can expose a
    mixed generation.
 4. The full-corpus run has been recorded in

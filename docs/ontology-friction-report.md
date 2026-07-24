@@ -4,6 +4,15 @@ This report records the 2026-07-23 local consumer run of the metadata and
 rulemaking layers against the complete public Spicy Regs Parquet snapshots. No
 objects were uploaded or otherwise published by the exercise.
 
+!!! warning "Historical RIN interpretation"
+
+    The measurements below are preserved as the initial consumer evidence, but
+    the recommendation that an ordinary RIN may identify a Proceeding is
+    superseded. The [RIN ontology revision report](rin-ontology-revision-report.md)
+    models every RIN uniformly as a durable Regulatory Agenda item and relates
+    it to independently identified Proceedings through qualified,
+    provenance-bearing assertions.
+
 ## Corpus and outputs
 
 | Input | Rows |

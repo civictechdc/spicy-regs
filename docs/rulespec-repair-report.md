@@ -6,6 +6,11 @@
 **Publication:** Local only; no R2 upload, Rulespec release, tag, or package publication
 **Independent review:** Open; the maintainer-operated simulation is not a non-originating-consumer review
 
+> Historical evidence: this report pins the earlier stabilization candidate
+> exactly as tested. The 2026-07-24 RIN ontology revision supersedes its
+> Proceeding/RIN interpretation and produces a separate corpus receipt; the
+> hashes below are intentionally not rewritten.
+
 ## Result
 
 The Experimental Rulespec US rulemaking contract and the Spicy Regs projection

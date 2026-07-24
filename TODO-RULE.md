@@ -116,9 +116,10 @@ Execute this slice in this order:
    non-originating consumer reviewed the repaired contract or ratified the
    simulated review against it.
 
-For `RULE-007`, "the corpus" means the seven outputs declared by
+For `RULE-007`, "the corpus" means the nine outputs declared by
 `OntologyDatasetPipeline.published_outputs` at the recorded Spicy Regs commit:
-`rule_targets`, `authority_edges`, `proceedings`, `comment_periods`, `concepts`,
+`rule_targets`, `authority_edges`, `proceedings`, `regulatory_agenda_items`,
+`agenda_item_proceedings`, `comment_periods`, `concepts`,
 `concept_assignments`, and `concept_events`. Bind every run to the generated
 `ontology-dataset-manifest.json` snapshot id and artifact hashes. After
 `RULE-002`, "supported corpus" means the sources listed in

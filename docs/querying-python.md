@@ -2,7 +2,7 @@
 
 Spicy Regs publishes public Apache Parquet — **no credentials or bulk download
 required**. Most tables live at
-`https://r2.spicy-regs.dev/<table>.parquet`. The seven related ontology tables
+`https://r2.spicy-regs.dev/<table>.parquet`. The nine related ontology tables
 resolve through one atomic materialized-generation manifest. The easiest query
 engine is [DuckDB](https://duckdb.org) with `httpfs`, which reads only the
 remote byte ranges a query needs.
@@ -40,7 +40,7 @@ def table(name: str) -> str:
 
 Resolving the materialized pointer once per session keeps every ontology-table
 join on one generation. The hosted MCP server applies the same rule. Until the
-first production ontology generation is published, calls for those seven
+first production ontology generation is published, calls for those nine
 tables fail rather than falling back to unrelated root objects.
 
 ## Query a single table

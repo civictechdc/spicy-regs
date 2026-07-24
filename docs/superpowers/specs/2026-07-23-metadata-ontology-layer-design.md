@@ -2,7 +2,7 @@
 
 - **Date:** 2026-07-23
 - **Status:** Implemented locally; publication pending
-- **Implementation:** [`docs/ontology.md`](../../ontology.md), `conformance/rulespec-l0.yaml`, and the [`full-corpus friction report`](../../ontology-friction-report.md)
+- **Implementation:** [`docs/ontology.md`](../../ontology.md), `conformance/rulespec-l0.yaml`, the current [`RIN ontology revision report`](../../rin-ontology-revision-report.md), and the historical [`full-corpus friction report`](../../ontology-friction-report.md)
 - **Parent:** `docs/superpowers/specs/2026-07-23-regulatory-ontology-program-overview.md`
 - **Scope:** Spec 1 of 2. This spec covers the spicy-regs metadata layer: a rule-identity spine, statutory-authority edges, proceeding and comment-period identity, and an iterative concept-tagging system, all with explicit provenance. The sibling Rulespec spec defines the upstream vocabulary contract consumed here.
 
@@ -32,9 +32,13 @@ Spicy-regs already holds the raw material, scattered:
 ## Vocabulary posture
 
 Rulespec is the upstream vocabulary home; spicy-regs is a Level-0 consumer. The
-implementation is pinned to the frozen Rulespec contract with content digest
-`sha256:836968b28f3b86283f53c57ae5c9ab8ebd77e96531cd4751476f1a5ee3d296f2`.
-That contract supplies:
+current local implementation is pinned to the unreleased Rulespec candidate
+with content digest
+`sha256:2aefd3fad7782a7b16a7fa8fc08e8ceb26b5db741e0371b8fa8a9ccc1982124d`.
+The earlier full-corpus exercise used
+`sha256:836968b28f3b86283f53c57ae5c9ab8ebd77e96531cd4751476f1a5ee3d296f2`;
+that digest remains historical evidence, not the current mapping authority.
+The current candidate supplies:
 
 1. **Identifier conventions:** canonical IRI templates for CFR citations,
    U.S.C. sections, RINs, Federal Register document numbers,
@@ -42,9 +46,10 @@ That contract supplies:
    such as `cfr_ref=40-60.1`; the contract defines their expansion.
 2. **Level-0 conformance:** vocabulary-only adoption in a non-JSON-LD carrier,
    with a machine-auditable mapping for every claimed term.
-3. **Experimental rulemaking terms:** distinct `Proceeding`, `Docket`,
-   `Artifact`, and `CommentPeriod` entities, with evidence-bearing comment
-   periods and optional proceeding stages.
+3. **Experimental rulemaking terms:** distinct `RegulatoryAgendaItem`,
+   `RegulatoryAgendaObservation`, `Proceeding`, `Docket`, `Artifact`, and
+   `CommentPeriod` entities, with qualified agenda-to-Proceeding relationships,
+   evidence-bearing comment periods, and optional proceeding stages.
 
 Spicy-regs does not mint or redefine Rulespec terms. Its local carrier mechanics
 are documented in `docs/ontology.md` and omitted from the L0 claim where a flat
@@ -59,7 +64,7 @@ concept with an explicit `skos:exactMatch` link.
 
 ## Architecture
 
-Seven related Parquet tables are built by one materialized-dataset DAG and
+Nine related Parquet tables are built by one materialized-dataset DAG and
 published as one atomic generation. Ordinary `RollupPipeline` jobs retain their
 single, independently schedulable output contract. One deterministic enrichment
 adds Federal Register topics to an existing source table. All published columns
@@ -75,6 +80,8 @@ are VARCHAR, matching house style.
   unified_agenda ───┤authority_edges├─ congress_bills (via Public Law only)
                     └───────────────┘
   rule_targets + authority_edges ──→ proceedings ──→ comment_periods
+  unified_agenda ──→ regulatory_agenda_items ──→ agenda_item_proceedings
+                                                    └─→ proceedings
   concepts ←── concept_assignments ──→ dockets / documents / cfr_sections
       ↑                                (polymorphic subjects)
   concept_events (audit log of the tagging loop)
@@ -108,7 +115,13 @@ concept DAG.
 
 ### 1. `rule_targets` — the spine (deterministic, no AI)
 
-One row per (docket, CFR reference, source). Normalizes every docket↔CFR↔RIN edge currently latent in JSON columns.
+> **2026-07-24 revision:** the RIN/agenda-item ontology in
+> `2026-07-24-rin-ontology-revision-agent-goal.md` supersedes this section
+> wherever it treats Unified Agenda values as docket or Proceeding facts.
+
+One row per (docket, CFR reference, source). Normalizes action-specific
+docket↔CFR↔RIN evidence. Unified Agenda CFR values remain on the editioned
+agenda observation.
 
 | Column | Description |
 | --- | --- |
@@ -116,8 +129,8 @@ One row per (docket, CFR reference, source). Normalizes every docket↔CFR↔RIN
 | `cfr_ref` | Compact CFR citation (`40-60` part level, `40-60.1` section level). Join key to `cfr_sections`. Null for RIN-only edges. |
 | `cfr_title`, `cfr_part`, `cfr_section` | Decomposed citation. `cfr_section` usually null (FR metadata is part-level). |
 | `rin` | RIN associated with this edge, when known. Join key to `unified_agenda`. |
-| `source` | Provenance enum: `fr_cfr_ref` (via `fr_docket_links` + `federal_register.cfr_references_json`), `ua_cfr_ref` (via RIN + `unified_agenda.cfr_references_json`), `docket_rin`, `document_rin`, `document_fr_doc`. |
-| `evidence_id` | The row that justifies the edge (FR `document_number`, UA `rin`+`agenda_edition`, or `document_id`). |
+| `source` | Provenance enum: `fr_cfr_ref` (via `fr_docket_links` + `federal_register.cfr_references_json`), `docket_rin`, `document_rin`, `document_fr_doc`. |
+| `evidence_id` | The action-specific row that justifies the edge (FR `document_number`, docket id, or `document_id`). |
 | `first_seen`, `last_seen` | Publication-date span of the evidence. |
 | + attestation columns | See provenance model below. |
 
@@ -138,7 +151,10 @@ Parses `unified_agenda.legal_authority_json` free text into U.S.C. citations. Ke
 | `agenda_edition` | Edition the citation came from. |
 | + attestation columns | See provenance model below. |
 
-Docket-level authority queries go through `rule_targets` on `rin`. Parser is rule-based (regex grammar over common citation forms); an LLM fallback for `failed` rows is a possible later pass and would carry attestation columns.
+Authority remains attached to the editioned agenda observation. It must not be
+projected to a docket or Proceeding through RIN equality. Parser is rule-based
+(regex grammar over common citation forms); an LLM fallback for `failed` rows
+is a possible later pass and would carry attestation columns.
 
 ### 3. `concepts` — SKOS-style registry
 

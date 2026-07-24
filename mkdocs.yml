@@ -40,6 +40,7 @@ nav:
   - Querying with Python: querying-python.md
   - Ontology and Rulespec L0: ontology.md
   - Rulespec application profile: rulespec-profile.md
+  - RIN ontology corpus report: rin-ontology-revision-report.md
   - Rulemaking stabilization report: rulespec-repair-report.md
   - Initial full-corpus ontology report: ontology-friction-report.md
   - Tables:
@@ -59,6 +60,8 @@ nav:
       - rule_targets: tables/rule_targets.md
       - authority_edges: tables/authority_edges.md
       - proceedings: tables/proceedings.md
+      - regulatory_agenda_items: tables/regulatory_agenda_items.md
+      - agenda_item_proceedings: tables/agenda_item_proceedings.md
       - comment_periods: tables/comment_periods.md
       - concepts: tables/concepts.md
       - concept_assignments: tables/concept_assignments.md
