@@ -43,7 +43,6 @@ COLUMNS = (
 SOURCES = frozenset(
     {
         "fr_cfr_ref",
-        "ua_cfr_ref",
         "docket_rin",
         "document_rin",
         "document_fr_doc",
@@ -65,13 +64,6 @@ def _date_bounds(*values: object) -> tuple[str | None, str | None]:
     return (dates[0], dates[-1]) if dates else (None, None)
 
 
-def _agenda_date(edition: object) -> str | None:
-    text = "" if edition is None else str(edition).strip()
-    if re.fullmatch(r"\d{6}", text) and 1 <= int(text[4:]) <= 12:
-        return f"{text[:4]}-{text[4:]}-01"
-    return None
-
-
 def _require_inputs(output_dir: Path, names: tuple[str, ...]) -> dict[str, Path]:
     paths = {name: output_dir / f"{name}.parquet" for name in names}
     missing = [path.name for path in paths.values() if not path.exists()]
@@ -86,10 +78,16 @@ def build_rule_targets(
     run_id: str | None = None,
     asserted_at: str | None = None,
 ) -> Path:
-    """Build ``rule_targets.parquet`` from every currently latent identity edge."""
+    """Build action-specific docket-to-RIN and docket-to-CFR evidence.
+
+    Unified Agenda values describe an editioned observation of a durable
+    agenda item. They are deliberately absent here: equality on a RIN does not
+    authorize projecting an agenda-level CFR reference onto every docket that
+    happens to carry that RIN.
+    """
     paths = _require_inputs(
         output_dir,
-        ("dockets", "documents", "federal_register", "unified_agenda", "fr_docket_links"),
+        ("dockets", "documents", "federal_register", "fr_docket_links"),
     )
     context = RunContext.resolve(run_id=run_id, asserted_at=asserted_at, prefix="rule-targets")
     provenance = context.provenance(method="deterministic", actor_id=ACTOR_ID)
@@ -145,9 +143,6 @@ def build_rule_targets(
         evidence = sorted(value for value in (existing.get("evidence_id"), candidate.get("evidence_id")) if value)
         existing["evidence_id"] = evidence[0] if evidence else None
 
-    # Direct docket and document evidence also supplies the RIN→docket map used
-    # to project Unified Agenda CFR targets down to docket subjects.
-    dockets_by_rin: dict[str, set[str]] = defaultdict(set)
     for row in iter_parquet_rows(paths["dockets"]):
         docket = normalize_regsgov_identifier(row.get("docket_id"))
         if docket is None:
@@ -155,7 +150,6 @@ def build_rule_targets(
         trusted_dockets.add(docket)
         rin = _rin(row.get("rin"))
         if rin:
-            dockets_by_rin[rin].add(docket)
             add_edge(
                 docket_id=docket,
                 citation=None,
@@ -186,7 +180,6 @@ def build_rule_targets(
                 rin = _rin(raw_rin)
                 if docket is None or not rin:
                     continue
-                dockets_by_rin[rin].add(docket)
                 add_edge(
                     docket_id=docket,
                     citation=None,
@@ -233,8 +226,6 @@ def build_rule_targets(
 
         linked_dockets = linked_dockets_by_fr_doc.get(str(document_number), set())
         for docket in linked_dockets:
-            for rin in rins:
-                dockets_by_rin[rin].add(docket)
             for citation in citations:
                 for rin in rins or (None,):
                     add_edge(
@@ -261,38 +252,6 @@ def build_rule_targets(
                         first_seen=document.get("posted_date") or publication_date,
                         last_seen=document.get("modify_date") or publication_date,
                     )
-
-    for row in iter_parquet_rows(paths["unified_agenda"]):
-        rin = _rin(row.get("rin"))
-        if not rin:
-            continue
-        raw_cfr = parse_json_list(
-            row.get("cfr_references_json"),
-            stats=json_stats,
-            table="unified_agenda",
-            row_id=f"{rin}:{row.get('agenda_edition')}",
-            column="cfr_references_json",
-        )
-        if raw_cfr is None:
-            continue
-        citations = list(dict.fromkeys(citation for raw in raw_cfr for citation in parse_cfr_citation(raw)))
-        first, last = _date_bounds(
-            row.get("first_action_date"),
-            row.get("next_action_date"),
-            _agenda_date(row.get("agenda_edition")),
-        )
-        evidence_id = f"{rin}:{row.get('agenda_edition') or ''}"
-        for docket in dockets_by_rin.get(rin, ()):
-            for citation in citations:
-                add_edge(
-                    docket_id=docket,
-                    citation=citation,
-                    rin=rin,
-                    source="ua_cfr_ref",
-                    evidence_id=evidence_id,
-                    first_seen=first,
-                    last_seen=last,
-                )
 
     rows = sorted(
         edges.values(),

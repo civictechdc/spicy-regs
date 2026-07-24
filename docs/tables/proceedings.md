@@ -2,7 +2,7 @@
 
 # `proceedings`
 
-One row per rulemaking proceeding, normally RIN-bounded and optionally spanning multiple regulations.gov dockets. It is assembled independently from source identity and publication evidence; the legacy duration rollup remains a separate product.
+One row per independently evidenced rulemaking action. Dockets and Federal Register artifacts establish identity; a RIN never groups rows. One FR artifact may explicitly connect several source-backed dockets. Docket-less action artifacts receive provisional document-based identities.
 
 - **Parquet file:** `materialized/ontology/latest.json` (atomic snapshot manifest)
 - **Supported by MCP `query_sql` after first publication:** Yes
@@ -10,16 +10,16 @@ One row per rulemaking proceeding, normally RIN-bounded and optionally spanning 
 | Column | Type | Description |
 | --- | --- | --- |
 | `proceeding_id` | `VARCHAR` | Stable opaque proceeding id. Primary key. |
-| `rin` | `VARCHAR` | Associated RIN when available; a strong evidence/join key that is not globally unique proceeding identity. |
+| `rin` | `VARCHAR` | The sole action-evidenced RIN when exactly one is observed; null for zero or multiple RINs. Compatibility/query aid only, never identity. |
 | `docket_ids_json` | `VARCHAR` | JSON array of associated regulations.gov dockets; may contain multiple ids. |
-| `title` | `VARCHAR` | Most recent available agenda/docket/publication title. |
+| `title` | `VARCHAR` | Most recent available docket, regulations.gov document, or Federal Register title; Unified Agenda titles are excluded. |
 | `agency_code` | `VARCHAR` | Most frequently observed issuing agency code. |
 | `current_stage` | `VARCHAR` | Latest evidenced stage: `prerule`, `proposed`, `supplemental`, `final`, `withdrawn`, or `longterm`; null when no stage evidence exists. |
 | `stage_events_json` | `VARCHAR` | Ordered JSON stage-event history with date, source, evidence id, and Rulespec event kind. |
 | `fr_document_numbers_json` | `VARCHAR` | JSON array of Federal Register documents published in the proceeding. |
 | `cfr_refs_json` | `VARCHAR` | JSON array of compact CFR targets from `rule_targets`. |
 | `cfr_target_iris_json` | `VARCHAR` | JSON array of Rulespec `rkaf:us-cfr` citation IRIs projected from valid rule-target components. |
-| `authority_refs_json` | `VARCHAR` | JSON array of compact U.S.C., Public Law, or retained raw authority references. |
+| `authority_refs_json` | `VARCHAR` | Reserved JSON array for future action-specific authority evidence. Unified Agenda authority is not copied here. |
 | `identity_predecessors_json` | `VARCHAR` | JSON array of distinct prior-generation proceeding ids whose evidence overlaps this component; records semantic merge/split continuity and excludes the current reused id. |
 | `method` | `VARCHAR` | Derivation method; `deterministic`. |
 | `actor_id` | `VARCHAR` | Versioned proceeding-assembly ruleset. |

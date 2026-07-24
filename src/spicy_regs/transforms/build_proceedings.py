@@ -1,4 +1,4 @@
-"""Transform: promote rulemaking lifecycle evidence into first-class proceedings."""
+"""Transform: promote action-specific evidence into first-class proceedings."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ from spicy_regs.ontology.common import (
 )
 
 OUTPUT = "proceedings.parquet"
-ACTOR_ID = "spicy-regs:proceedings:v1"
+ACTOR_ID = "spicy-regs:proceedings:v2"
 
 COLUMNS = (
     "proceeding_id",
@@ -45,7 +45,9 @@ COLUMNS = (
     *ATTESTATION_COLUMNS,
 )
 
-STAGES = frozenset({"prerule", "proposed", "supplemental", "final", "withdrawn", "longterm"})
+STAGES = frozenset(
+    {"prerule", "proposed", "supplemental", "final", "withdrawn", "longterm"}
+)
 _RIN = re.compile(r"^\d{4}-[A-Z]{2}\d{2}$")
 _STAGE_KIND = {
     "prerule": "proceedingPrerule",
@@ -60,30 +62,6 @@ _STAGE_KIND = {
 def _rin(value: object) -> str | None:
     normalized = str(value or "").strip().upper()
     return normalized if _RIN.fullmatch(normalized) else None
-
-
-def _agenda_date(edition: object) -> str | None:
-    text = str(edition or "")
-    if re.fullmatch(r"\d{6}", text) and 1 <= int(text[4:]) <= 12:
-        return f"{text[:4]}-{text[4:]}-01"
-    return None
-
-
-def _stage_from_agenda(value: object) -> str | None:
-    text = str(value or "").casefold()
-    if "withdraw" in text:
-        return "withdrawn"
-    if "long-term" in text or "long term" in text:
-        return "longterm"
-    if "pre-rule" in text or "prerule" in text:
-        return "prerule"
-    if "supplement" in text:
-        return "supplemental"
-    if "final" in text:
-        return "final"
-    if "proposed" in text:
-        return "proposed"
-    return None
 
 
 def _stage_from_document(document_type: object, title: object) -> str | None:
@@ -101,17 +79,13 @@ def _stage_from_document(document_type: object, title: object) -> str | None:
 
 
 def _current_stage_from_events(events: list[dict]) -> str | None:
-    """Return the unique stage at the latest evidenced date.
-
-    Equal-date disagreement is not resolved by lexical or source ordering.
-    Leaving the current stage absent preserves the conflicting events without
-    asserting a state that would violate Rulespec's latest-event invariant.
-    """
+    """Return the unique stage at the latest evidenced date."""
     for event in events:
         stage = event.get("stage")
         if stage in STAGES and event.get("event_kind") != _STAGE_KIND[stage]:
             raise ValueError(
-                f"stage event kind disagrees with stage: {stage!r} / {event.get('event_kind')!r}"
+                f"stage event kind disagrees with stage: "
+                f"{stage!r} / {event.get('event_kind')!r}"
             )
     dated = [event for event in events if event.get("effective_date")]
     if not dated:
@@ -120,7 +94,8 @@ def _current_stage_from_events(events: list[dict]) -> str | None:
     latest_stages = {
         str(event["stage"])
         for event in dated
-        if str(event["effective_date"]) == latest_date and event.get("stage") in STAGES
+        if str(event["effective_date"]) == latest_date
+        and event.get("stage") in STAGES
     }
     return next(iter(latest_stages)) if len(latest_stages) == 1 else None
 
@@ -129,7 +104,9 @@ def _require_inputs(output_dir: Path, names: tuple[str, ...]) -> dict[str, Path]
     paths = {name: output_dir / f"{name}.parquet" for name in names}
     missing = [path.name for path in paths.values() if not path.exists()]
     if missing:
-        raise FileNotFoundError(f"proceedings inputs missing from {output_dir}: {', '.join(missing)}")
+        raise FileNotFoundError(
+            f"proceedings inputs missing from {output_dir}: {', '.join(missing)}"
+        )
     return paths
 
 
@@ -139,13 +116,14 @@ def build_proceedings(
     run_id: str | None = None,
     asserted_at: str | None = None,
 ) -> Path:
-    """Build docket components within RINs plus docket-identified proceedings.
+    """Build proceedings from dockets and Federal Register action artifacts.
 
-    A RIN is strong identity evidence but is not globally unique to one
-    proceeding: agencies reuse some RINs for recurring rule families. Dockets
-    sharing a RIN are therefore merged only when one Federal Register document
-    explicitly links them. This keeps legitimate multi-docket proceedings
-    together without collapsing thousands of unrelated recurring actions.
+    A RIN identifies a Regulatory Agenda item, not an action. It is retained as
+    denormalized evidence when exactly one RIN is observed for an action, but
+    it never groups dockets, creates an agenda-only proceeding, or preserves a
+    stable proceeding id. One Federal Register artifact may explicitly connect
+    multiple trusted dockets; otherwise docket and artifact identities stay
+    separate.
     """
     paths = _require_inputs(
         output_dir,
@@ -153,16 +131,17 @@ def build_proceedings(
             "dockets",
             "documents",
             "federal_register",
-            "unified_agenda",
             "fr_docket_links",
             "rule_targets",
-            "authority_edges",
         ),
     )
-    context = RunContext.resolve(run_id=run_id, asserted_at=asserted_at, prefix="proceedings")
+    context = RunContext.resolve(
+        run_id=run_id,
+        asserted_at=asserted_at,
+        prefix="proceedings",
+    )
     provenance = context.provenance(method="deterministic", actor_id=ACTOR_ID)
     json_stats = JsonReadStats()
-    ambiguous = Counter()
     prior_file = output_dir / "_proceedings_prior.parquet"
     if not prior_file.exists() and (output_dir / OUTPUT).exists():
         prior_file = output_dir / OUTPUT
@@ -170,68 +149,41 @@ def build_proceedings(
 
     def empty_group(
         *,
-        rin: str | None,
         dockets: set[str],
         identity: tuple[object, ...],
     ) -> dict:
         return {
-            "rin": rin,
             "dockets": set(dockets),
             "identity": identity,
+            "rins": set(),
             "titles": [],
             "agencies": [],
             "events": [],
             "fr_documents": set(),
             "cfr_refs": set(),
             "cfr_target_iris": set(),
-            "authority_refs": set(),
         }
 
-    # First pass: collect every RIN↔docket assertion and strong co-docket links.
-    # A tiny union-find over (RIN, docket) pairs gives deterministic components.
-    parent: dict[tuple[str, str], tuple[str, str]] = {}
-
-    def find(node: tuple[str, str]) -> tuple[str, str]:
-        parent.setdefault(node, node)
-        while parent[node] != node:
-            parent[node] = parent[parent[node]]
-            node = parent[node]
-        return node
-
-    def union(left: tuple[str, str], right: tuple[str, str]) -> None:
-        left_root, right_root = find(left), find(right)
-        if left_root == right_root:
-            return
-        winner, loser = sorted((left_root, right_root))
-        parent[loser] = winner
-
-    rins_by_docket: dict[str, set[str]] = defaultdict(set)
-
+    # Establish source-backed docket membership before trusting FR link rows.
     trusted_dockets: set[str] = set()
-
-    def register(rin: str, docket_id: object) -> tuple[str, str] | None:
-        docket = normalize_regsgov_identifier(docket_id)
-        if docket is None or docket not in trusted_dockets:
-            return None
-        node = (rin, docket)
-        find(node)
-        rins_by_docket[docket].add(rin)
-        return node
-
+    action_dockets: set[str] = set()
     docket_metadata: dict[str, dict] = {}
     for row in iter_parquet_rows(paths["dockets"]):
-        docket_id = normalize_regsgov_identifier(row.get("docket_id"))
-        if docket_id is None:
+        docket = normalize_regsgov_identifier(row.get("docket_id"))
+        if docket is None:
             continue
-        trusted_dockets.add(docket_id)
-        docket_metadata[docket_id] = row
-        if rin := _rin(row.get("rin")):
-            register(rin, docket_id)
+        trusted_dockets.add(docket)
+        docket_metadata[docket] = row
+        if _rin(row.get("rin")) or "rulemaking" in str(
+            row.get("docket_type") or ""
+        ).casefold():
+            action_dockets.add(docket)
 
     for row in iter_parquet_rows(paths["documents"]):
         docket = normalize_regsgov_identifier(row.get("docket_id"))
-        if docket is not None:
-            trusted_dockets.add(docket)
+        if docket is None:
+            continue
+        trusted_dockets.add(docket)
         raw_rins = parse_json_list(
             row.get("additional_rins"),
             stats=json_stats,
@@ -239,98 +191,85 @@ def build_proceedings(
             row_id=row.get("document_id"),
             column="additional_rins",
         )
-        if raw_rins is None:
-            continue
-        for value in raw_rins:
-            if rin := _rin(value):
-                register(rin, docket)
+        has_rin = raw_rins is not None and any(_rin(value) for value in raw_rins)
+        if has_rin or _stage_from_document(
+            row.get("document_type"),
+            row.get("title"),
+        ):
+            action_dockets.add(docket)
 
     linked_dockets_by_fr: dict[str, set[str]] = defaultdict(set)
-    for row in iter_parquet_rows(paths["fr_docket_links"], columns=("document_number", "docket_id")):
+    for row in iter_parquet_rows(
+        paths["fr_docket_links"],
+        columns=("document_number", "docket_id"),
+    ):
         docket = normalize_regsgov_identifier(row.get("docket_id"))
         if row.get("document_number") and docket in trusted_dockets:
-            linked_dockets_by_fr[str(row["document_number"])].add(docket)
+            document_number = str(row["document_number"])
+            linked_dockets_by_fr[document_number].add(docket)
+            action_dockets.add(docket)
 
-    for row in iter_parquet_rows(paths["federal_register"]):
-        document_number = str(row.get("document_number") or "")
-        raw_rins = parse_json_list(
-            row.get("regulation_id_numbers_json"),
-            stats=json_stats,
-            table="federal_register",
-            row_id=document_number,
-            column="regulation_id_numbers_json",
-        )
-        if raw_rins is None:
-            continue
-        dockets = sorted(linked_dockets_by_fr.get(document_number, ()))
-        for value in raw_rins:
-            rin = _rin(value)
-            if not rin:
-                continue
-            nodes = [node for docket in dockets if (node := register(rin, docket))]
-            for node in nodes[1:]:
-                union(nodes[0], node)
+    # Docket identity is action-specific. A Federal Register document is the
+    # only cross-docket union signal used by this carrier.
+    parent: dict[str, str] = {}
 
-    for row in iter_parquet_rows(paths["rule_targets"]):
-        if rin := _rin(row.get("rin")):
-            register(rin, row.get("docket_id"))
+    def find(node: str) -> str:
+        parent.setdefault(node, node)
+        while parent[node] != node:
+            parent[node] = parent[parent[node]]
+            node = parent[node]
+        return node
 
-    members_by_component: dict[tuple[str, tuple[str, str]], set[str]] = defaultdict(set)
-    for node in parent:
-        members_by_component[(node[0], find(node))].add(node[1])
+    def union(left: str, right: str) -> None:
+        left_root, right_root = find(left), find(right)
+        if left_root == right_root:
+            return
+        winner, loser = sorted((left_root, right_root))
+        parent[loser] = winner
+
+    for docket in action_dockets:
+        find(docket)
+    for dockets in linked_dockets_by_fr.values():
+        ordered = sorted(dockets)
+        for docket in ordered:
+            find(docket)
+        for docket in ordered[1:]:
+            union(ordered[0], docket)
+
+    members_by_root: dict[str, set[str]] = defaultdict(set)
+    for docket in parent:
+        members_by_root[find(docket)].add(docket)
 
     groups: dict[str, dict] = {}
-    group_key_by_pair: dict[tuple[str, str], str] = {}
-    group_keys_by_rin: dict[str, list[str]] = defaultdict(list)
-    group_keys_by_docket: dict[str, set[str]] = defaultdict(set)
-    for (rin, _), dockets in sorted(
-        members_by_component.items(),
-        key=lambda item: (item[0][0], min(item[1])),
-    ):
+    group_key_by_docket: dict[str, str] = {}
+    for dockets in sorted(members_by_root.values(), key=lambda values: min(values)):
         anchor = min(dockets)
-        key = f"rin:{rin}:docket:{anchor}"
+        key = f"docket:{anchor}"
         groups[key] = empty_group(
-            rin=rin,
             dockets=dockets,
-            identity=("rin-docket", rin, anchor),
+            identity=("docket", anchor),
         )
-        group_keys_by_rin[rin].append(key)
         for docket in dockets:
-            group_key_by_pair[(rin, docket)] = key
-            group_keys_by_docket[docket].add(key)
+            group_key_by_docket[docket] = key
 
-    def ensure_docket(docket_id: str) -> tuple[str, dict]:
-        key = f"docket:{docket_id}"
-        group_keys_by_docket[docket_id].add(key)
+    def ensure_fr(document_number: str) -> tuple[str, dict]:
+        key = f"fr-document:{document_number}"
         return key, groups.setdefault(
             key,
             empty_group(
-                rin=None,
-                dockets={docket_id},
-                identity=("docket", docket_id),
+                dockets=set(),
+                identity=("fr-document", document_number),
             ),
         )
 
-    def ensure_unscoped_rin(rin: str) -> tuple[str, dict]:
-        key = f"rin:{rin}:unscoped"
-        return key, groups.setdefault(
-            key,
-            empty_group(rin=rin, dockets=set(), identity=("rin", rin)),
-        )
-
-    for docket_id, row in docket_metadata.items():
-        keys = group_keys_by_docket.get(docket_id, set())
-        if not keys and "rulemaking" in str(row.get("docket_type") or "").casefold():
-            key, _ = ensure_docket(docket_id)
-            keys = {key}
-        for key in keys:
-            group = groups[key]
-            if row.get("title"):
-                group["titles"].append((str(row.get("modify_date") or ""), str(row["title"])))
-            if row.get("agency_code"):
-                group["agencies"].append(str(row["agency_code"]))
-
-    def add_event(group: dict, *, stage: str | None, date: object, source: str, evidence_id: object) -> None:
+    def add_event(
+        group: dict,
+        *,
+        stage: str | None,
+        date: object,
+        source: str,
+        evidence_id: object,
+    ) -> None:
         if stage not in STAGES:
             return
         event = {
@@ -343,9 +282,26 @@ def build_proceedings(
         if event not in group["events"]:
             group["events"].append(event)
 
-    # Second pass: attach stage evidence to the now-stable components.
+    for docket, row in docket_metadata.items():
+        key = group_key_by_docket.get(docket)
+        if key is None:
+            continue
+        group = groups[key]
+        if rin := _rin(row.get("rin")):
+            group["rins"].add(rin)
+        if row.get("title"):
+            group["titles"].append(
+                (str(row.get("modify_date") or ""), str(row["title"]))
+            )
+        if row.get("agency_code"):
+            group["agencies"].append(str(row["agency_code"]))
+
     for row in iter_parquet_rows(paths["documents"]):
-        docket = normalize_regsgov_identifier(row.get("docket_id")) or ""
+        docket = normalize_regsgov_identifier(row.get("docket_id"))
+        key = group_key_by_docket.get(docket or "")
+        if key is None:
+            continue
+        group = groups[key]
         raw_rins = parse_json_list(
             row.get("additional_rins"),
             stats=json_stats,
@@ -353,34 +309,31 @@ def build_proceedings(
             row_id=row.get("document_id"),
             column="additional_rins",
         )
-        rins = [] if raw_rins is None else [rin for value in raw_rins if (rin := _rin(value))]
-        target_keys = {key for rin in rins if (key := group_key_by_pair.get((rin, docket)))}
-        if not target_keys:
-            docket_targets = group_keys_by_docket.get(docket, set())
-            if len(docket_targets) == 1:
-                target_keys.update(docket_targets)
-            elif len(docket_targets) > 1:
-                ambiguous["document_without_unique_component"] += 1
-        stage = _stage_from_document(row.get("document_type"), row.get("title"))
-        if not target_keys and docket and stage and not group_keys_by_docket.get(docket):
-            key, group = ensure_docket(str(docket))
-            target_keys.add(key)
-        for key in target_keys:
-            group = groups[key]
-            if row.get("title"):
-                group["titles"].append((str(row.get("posted_date") or ""), str(row["title"])))
-            if row.get("agency_code"):
-                group["agencies"].append(str(row["agency_code"]))
-            add_event(
-                group,
-                stage=stage,
-                date=row.get("posted_date"),
-                source="documents.document_type",
-                evidence_id=row.get("document_id"),
+        if raw_rins is not None:
+            group["rins"].update(
+                rin for value in raw_rins if (rin := _rin(value)) is not None
             )
+        if row.get("title"):
+            group["titles"].append(
+                (str(row.get("posted_date") or ""), str(row["title"]))
+            )
+        if row.get("agency_code"):
+            group["agencies"].append(str(row["agency_code"]))
+        add_event(
+            group,
+            stage=_stage_from_document(
+                row.get("document_type"),
+                row.get("title"),
+            ),
+            date=row.get("posted_date"),
+            source="documents.document_type",
+            evidence_id=row.get("document_id"),
+        )
 
     for row in iter_parquet_rows(paths["federal_register"]):
-        document_number = str(row.get("document_number") or "")
+        document_number = str(row.get("document_number") or "").strip()
+        if not document_number:
+            continue
         raw_rins = parse_json_list(
             row.get("regulation_id_numbers_json"),
             stats=json_stats,
@@ -388,122 +341,72 @@ def build_proceedings(
             row_id=document_number,
             column="regulation_id_numbers_json",
         )
-        if raw_rins is None:
-            continue
-        rins = [rin for value in raw_rins if (rin := _rin(value))]
-        linked_dockets = linked_dockets_by_fr.get(document_number, set())
-        target_keys: set[str] = set()
-        for rin in rins:
-            matched = {key for docket in linked_dockets if (key := group_key_by_pair.get((rin, docket)))}
-            if matched:
-                target_keys.update(matched)
-            elif len(group_keys_by_rin.get(rin, ())) == 1:
-                target_keys.add(group_keys_by_rin[rin][0])
-            elif not group_keys_by_rin.get(rin):
-                key, _ = ensure_unscoped_rin(rin)
-                target_keys.add(key)
-            else:
-                ambiguous["fr_document_without_component"] += 1
-        if not target_keys and not rins:
-            docket_targets: set[str] = set()
-            for docket in linked_dockets:
-                docket_targets.update(group_keys_by_docket.get(docket, set()))
-            if len(docket_targets) == 1:
-                target_keys.update(docket_targets)
-            elif len(docket_targets) > 1:
-                ambiguous["fr_document_without_unique_component"] += 1
+        rins = (
+            set()
+            if raw_rins is None
+            else {rin for value in raw_rins if (rin := _rin(value)) is not None}
+        )
         stage = _stage_from_document(row.get("document_type"), row.get("title"))
-        for key in target_keys:
+        linked_keys = {
+            group_key_by_docket[docket]
+            for docket in linked_dockets_by_fr.get(document_number, ())
+            if docket in group_key_by_docket
+        }
+        if linked_keys:
+            # All trusted dockets named by one FR artifact were unioned above.
+            key = next(iter(linked_keys))
+            if len(linked_keys) != 1:
+                raise RuntimeError(
+                    f"FR document {document_number} spans unmerged docket components"
+                )
             group = groups[key]
-            if document_number:
-                group["fr_documents"].add(str(document_number))
-            if row.get("title"):
-                group["titles"].append((str(row.get("publication_date") or ""), str(row["title"])))
-            add_event(
-                group,
-                stage=stage,
-                date=row.get("publication_date"),
-                source="federal_register.document_type",
-                evidence_id=document_number,
-            )
-
-    for row in iter_parquet_rows(paths["unified_agenda"]):
-        rin = _rin(row.get("rin"))
-        if not rin:
-            continue
-        rin_keys = group_keys_by_rin.get(rin, ())
-        if len(rin_keys) == 1:
-            agenda_target_keys = set(rin_keys)
-        elif not rin_keys:
-            key, _ = ensure_unscoped_rin(rin)
-            agenda_target_keys = {key}
+        elif rins or stage:
+            _, group = ensure_fr(document_number)
         else:
-            ambiguous["unified_agenda_reused_rin"] += 1
             continue
-        edition_date = _agenda_date(row.get("agenda_edition"))
-        for key in agenda_target_keys:
-            group = groups[key]
-            if row.get("title"):
-                group["titles"].append((edition_date or "", str(row["title"])))
-            if row.get("agency_code"):
-                group["agencies"].append(str(row["agency_code"]))
-            add_event(
-                group,
-                stage=_stage_from_agenda(row.get("rule_stage")),
-                date=edition_date or row.get("first_action_date"),
-                source="unified_agenda.rule_stage",
-                evidence_id=f"{rin}:{row.get('agenda_edition') or ''}",
+        group["fr_documents"].add(document_number)
+        group["rins"].update(rins)
+        if row.get("title"):
+            group["titles"].append(
+                (str(row.get("publication_date") or ""), str(row["title"]))
             )
+        add_event(
+            group,
+            stage=stage,
+            date=row.get("publication_date"),
+            source="federal_register.document_type",
+            evidence_id=document_number,
+        )
 
     for row in iter_parquet_rows(paths["rule_targets"]):
-        rin = _rin(row.get("rin"))
-        docket = normalize_regsgov_identifier(row.get("docket_id")) or ""
-        keys: set[str] = set()
-        if rin and (key := group_key_by_pair.get((rin, docket))):
-            keys.add(key)
-        elif docket:
-            keys.update(group_keys_by_docket.get(docket, ()))
-        for key in keys:
-            if key in groups and row.get("cfr_ref"):
-                groups[key]["cfr_refs"].add(str(row["cfr_ref"]))
-                try:
-                    groups[key]["cfr_target_iris"].add(
-                        canonical_cfr_iri(
-                            row.get("cfr_title"),
-                            row.get("cfr_part"),
-                            row.get("cfr_section"),
-                        )
-                    )
-                except ValueError:
-                    logger.warning(
-                        "proceedings: retained compact CFR ref but could not project Rulespec target {}",
-                        row.get("cfr_ref"),
-                    )
-
-    for row in iter_parquet_rows(paths["authority_edges"]):
-        rin = _rin(row.get("rin"))
-        if not rin:
+        docket = normalize_regsgov_identifier(row.get("docket_id"))
+        key = group_key_by_docket.get(docket or "")
+        if key is None:
             continue
-        rin_keys = group_keys_by_rin.get(rin, ())
-        if len(rin_keys) == 1:
-            group = groups[rin_keys[0]]
-        elif not rin_keys:
-            _, group = ensure_unscoped_rin(rin)
-        else:
-            ambiguous["authority_reused_rin"] += 1
-            continue
-        if row.get("usc_title") and row.get("usc_section"):
-            group["authority_refs"].add(f"usc:{row['usc_title']}-{row['usc_section']}")
-        elif row.get("pl_number"):
-            group["authority_refs"].add(f"public_law:{row['pl_number']}")
-        elif row.get("authority_raw"):
-            group["authority_refs"].add(f"raw:{row['authority_raw']}")
+        group = groups[key]
+        if rin := _rin(row.get("rin")):
+            group["rins"].add(rin)
+        if row.get("cfr_ref"):
+            group["cfr_refs"].add(str(row["cfr_ref"]))
+            try:
+                group["cfr_target_iris"].add(
+                    canonical_cfr_iri(
+                        row.get("cfr_title"),
+                        row.get("cfr_part"),
+                        row.get("cfr_section"),
+                    )
+                )
+            except ValueError:
+                logger.warning(
+                    "proceedings: retained compact CFR ref but could not "
+                    "project Rulespec target {}",
+                    row.get("cfr_ref"),
+                )
 
-    # Persistent partner ids are state, not a fresh hash of the current
-    # component. A later backfill can add a lexically earlier docket, and new FR
-    # evidence can merge two components. Reuse prior ids by strongest docket
-    # overlap so those normal corpus changes do not rename a proceeding.
-    prior_identity: list[tuple[str, str | None, set[str]]] = []
+    # Stable partner ids follow action evidence, never RIN equality. Docket
+    # overlap preserves ordinary continuity; FR overlap preserves a provisional
+    # document-based proceeding when its docket is discovered later.
+    prior_identity: list[tuple[str, set[str], set[str]]] = []
     for row in prior_proceedings:
         proceeding_id = str(row.get("proceeding_id") or "")
         if not proceeding_id:
@@ -515,69 +418,55 @@ def build_proceedings(
             row_id=proceeding_id,
             column="docket_ids_json",
         )
+        raw_fr_documents = parse_json_list(
+            row.get("fr_document_numbers_json"),
+            stats=json_stats,
+            table="proceedings_prior",
+            row_id=proceeding_id,
+            column="fr_document_numbers_json",
+        )
         prior_identity.append(
             (
                 proceeding_id,
-                _rin(row.get("rin")),
-                set() if raw_dockets is None else {str(value) for value in raw_dockets},
+                set() if raw_dockets is None else set(map(str, raw_dockets)),
+                (
+                    set()
+                    if raw_fr_documents is None
+                    else set(map(str, raw_fr_documents))
+                ),
             )
         )
 
-    current_groups_by_rin: dict[str, list[str]] = defaultdict(list)
-    for group_key, group in groups.items():
-        if group["rin"]:
-            current_groups_by_rin[group["rin"]].append(group_key)
-    prior_count_by_rin = Counter(prior_rin for _, prior_rin, _ in prior_identity if prior_rin)
     prior_by_id = {
-        prior_id: (prior_rin, prior_dockets)
-        for prior_id, prior_rin, prior_dockets in prior_identity
+        prior_id: (prior_dockets, prior_fr_documents)
+        for prior_id, prior_dockets, prior_fr_documents in prior_identity
     }
-    prior_ids_by_rin: dict[str, set[str]] = defaultdict(set)
     prior_ids_by_docket: dict[str, set[str]] = defaultdict(set)
-    for prior_id, prior_rin, prior_dockets in prior_identity:
-        if prior_rin:
-            prior_ids_by_rin[prior_rin].add(prior_id)
+    prior_ids_by_fr: dict[str, set[str]] = defaultdict(set)
+    for prior_id, prior_dockets, prior_fr_documents in prior_identity:
         for docket in prior_dockets:
             prior_ids_by_docket[docket].add(prior_id)
+        for document_number in prior_fr_documents:
+            prior_ids_by_fr[document_number].add(prior_id)
 
     predecessor_ids_by_group: dict[str, set[str]] = defaultdict(set)
     candidate_edges: list[tuple[int, str, str]] = []
     for group_key, group in groups.items():
-        current_rin = group["rin"]
         current_dockets = set(group["dockets"])
+        current_fr_documents = set(group["fr_documents"])
         plausible_prior_ids: set[str] = set()
         for docket in current_dockets:
             plausible_prior_ids.update(prior_ids_by_docket.get(docket, ()))
-        if current_rin and (
-            not current_dockets
-            or (
-                len(current_groups_by_rin[current_rin]) == 1
-                and prior_count_by_rin[current_rin] == 1
-            )
-        ):
-            # Same-RIN candidates are needed only for docket-less identity
-            # continuity and first-docket scope transitions. Docket-overlap
-            # candidates above cover the ordinary case.
-            plausible_prior_ids.update(prior_ids_by_rin.get(current_rin, ()))
+        for document_number in current_fr_documents:
+            plausible_prior_ids.update(prior_ids_by_fr.get(document_number, ()))
         for prior_id in plausible_prior_ids:
-            prior_rin, prior_dockets = prior_by_id[prior_id]
-            if current_rin and prior_rin and current_rin != prior_rin:
-                continue
-            overlap = len(current_dockets & prior_dockets)
-            same_unscoped_rin = (
-                bool(current_rin) and current_rin == prior_rin and not current_dockets and not prior_dockets
-            )
-            unique_rin_scope_transition = (
-                bool(current_rin)
-                and current_rin == prior_rin
-                and (not current_dockets or not prior_dockets)
-                and len(current_groups_by_rin[current_rin]) == 1
-                and prior_count_by_rin[current_rin] == 1
-            )
-            if not overlap and not same_unscoped_rin and not unique_rin_scope_transition:
+            prior_dockets, prior_fr_documents = prior_by_id[prior_id]
+            docket_overlap = len(current_dockets & prior_dockets)
+            fr_overlap = len(current_fr_documents & prior_fr_documents)
+            if not docket_overlap and not fr_overlap:
                 continue
             predecessor_ids_by_group[group_key].add(prior_id)
-            score = overlap * 100 + int(current_rin == prior_rin)
+            score = docket_overlap * 100 + fr_overlap * 10
             candidate_edges.append((-score, prior_id, group_key))
 
     proceeding_id_by_group: dict[str, str] = {}
@@ -603,50 +492,57 @@ def build_proceedings(
                 event.get("evidence_id") or "",
             ),
         )
-        current_stage = _current_stage_from_events(events)
         titles = sorted(group["titles"])
-        rin = group["rin"]
+        rins = sorted(group["rins"])
         proceeding_id = proceeding_id_by_group[group_key]
         matched_predecessors = predecessor_ids_by_group.get(group_key, set())
-        # Reusing a stable id is row-version continuity, not a semantic
-        # Proceeding-to-Proceeding edge. Only distinct identities belong in the
-        # Rulespec proceedingSupersedes projection.
         predecessors = sorted(matched_predecessors - {proceeding_id})
         rows.append(
             {
                 "proceeding_id": proceeding_id,
-                "rin": rin,
+                # Compatibility/query aid only; never the row's identity.
+                "rin": rins[0] if len(rins) == 1 else None,
                 "docket_ids_json": canonical_json(sorted(group["dockets"])),
                 "title": titles[-1][1] if titles else None,
-                "agency_code": Counter(group["agencies"]).most_common(1)[0][0] if group["agencies"] else None,
-                "current_stage": current_stage,
+                "agency_code": (
+                    Counter(group["agencies"]).most_common(1)[0][0]
+                    if group["agencies"]
+                    else None
+                ),
+                "current_stage": _current_stage_from_events(events),
                 "stage_events_json": canonical_json(events),
-                "fr_document_numbers_json": canonical_json(sorted(group["fr_documents"])),
+                "fr_document_numbers_json": canonical_json(
+                    sorted(group["fr_documents"])
+                ),
                 "cfr_refs_json": canonical_json(sorted(group["cfr_refs"])),
-                "cfr_target_iris_json": canonical_json(sorted(group["cfr_target_iris"])),
-                "authority_refs_json": canonical_json(sorted(group["authority_refs"])),
+                "cfr_target_iris_json": canonical_json(
+                    sorted(group["cfr_target_iris"])
+                ),
+                # Unified Agenda authority belongs to the editioned agenda
+                # observation and is never fanned out to an action.
+                "authority_refs_json": "[]",
                 "identity_predecessors_json": canonical_json(predecessors),
                 **{
                     **provenance,
                     "supersedes_id": (
-                        proceeding_id if proceeding_id in matched_predecessors else None
+                        proceeding_id
+                        if proceeding_id in matched_predecessors
+                        else None
                     ),
                 },
             }
         )
 
-    rows.sort(key=lambda row: (row.get("rin") or "", row["proceeding_id"]))
+    rows.sort(key=lambda row: row["proceeding_id"])
     out_file = write_parquet_rows(output_dir / OUTPUT, columns=COLUMNS, rows=rows)
     json_stats.log("proceedings")
     logger.info(
-        "Proceedings: {:,} rows ({:,} multi-docket)",
+        "Proceedings: {:,} rows ({:,} multi-docket; {:,} FR-only; "
+        "{:,} with one action-evidenced RIN)",
         len(rows),
         sum(len(json.loads(row["docket_ids_json"])) > 1 for row in rows),
+        sum(row["docket_ids_json"] == "[]" for row in rows),
+        sum(row["rin"] is not None for row in rows),
     )
     assert pq.ParquetFile(out_file).schema_arrow.names == list(COLUMNS)
-    if ambiguous:
-        logger.warning(
-            "Proceedings left ambiguous RIN-scoped evidence unattached: {}",
-            ", ".join(f"{name}={count:,}" for name, count in sorted(ambiguous.items())),
-        )
     return out_file

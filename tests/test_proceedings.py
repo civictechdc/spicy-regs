@@ -221,7 +221,7 @@ def test_reference_proceeding_threads_rinless_docket_and_preserves_reopening(tmp
     assert proceeding["current_stage"] == "final"
     assert json.loads(proceeding["cfr_refs_json"]) == ["40-60"]
     assert json.loads(proceeding["cfr_target_iris_json"]) == ["urn:rkaf:us:cfr:40:60"]
-    assert json.loads(proceeding["authority_refs_json"]) == ["usc:42-7401"]
+    assert json.loads(proceeding["authority_refs_json"]) == []
     stages = {event["stage"] for event in json.loads(proceeding["stage_events_json"])}
     assert {"proposed", "supplemental", "final"} <= stages
 
@@ -483,7 +483,7 @@ def test_untrusted_fr_administrative_labels_do_not_become_proceeding_dockets(tmp
     assert json.loads(period_rows[0]["docket_ids_json"]) == [valid_docket]
 
 
-def test_rinless_evidence_does_not_fan_out_across_a_multi_proceeding_docket(
+def test_one_docket_remains_one_proceeding_when_it_reports_multiple_rins(
     tmp_path,
 ):
     docket_id = "EPA-HQ-OAR-2026-9999"
@@ -580,10 +580,10 @@ def test_rinless_evidence_does_not_fan_out_across_a_multi_proceeding_docket(
             asserted_at="2026-07-23T12:00:00Z",
         )
     ).to_pylist()
-    assert len(proceeding_rows) == 2
-    assert {row["rin"] for row in proceeding_rows} == set(rins)
-    assert all(row["current_stage"] is None for row in proceeding_rows)
-    assert all(json.loads(row["stage_events_json"]) == [] for row in proceeding_rows)
+    assert len(proceeding_rows) == 1
+    assert proceeding_rows[0]["rin"] is None
+    assert proceeding_rows[0]["current_stage"] is None
+    assert json.loads(proceeding_rows[0]["stage_events_json"]) == []
 
     period_rows = pq.read_table(
         build_comment_periods(
@@ -593,7 +593,9 @@ def test_rinless_evidence_does_not_fan_out_across_a_multi_proceeding_docket(
         )
     ).to_pylist()
     assert len(period_rows) == 1
-    assert json.loads(period_rows[0]["proceeding_ids_json"]) == []
+    assert json.loads(period_rows[0]["proceeding_ids_json"]) == [
+        proceeding_rows[0]["proceeding_id"]
+    ]
     assert json.loads(period_rows[0]["docket_ids_json"]) == [docket_id]
     assert json.loads(period_rows[0]["opened_by_artifact_ids_json"]) == [
         "https://www.regulations.gov/document/D-RINLESS-COMMENT"

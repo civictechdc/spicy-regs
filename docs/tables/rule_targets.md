@@ -2,7 +2,7 @@
 
 # `rule_targets`
 
-The deterministic rule-identity spine: one row per docket, normalized CFR target, optional RIN, and evidence source. Corroborating sources remain separate rows. Mapped identifier fields use Rulespec Level-0 conventions; local provenance fields remain outside that claim. All columns are VARCHAR.
+Action-specific docket evidence: one row per docket, normalized CFR target, optional RIN, and source. Unified Agenda CFR values stay on their editioned agenda observations and are never projected through RIN equality. Corroborating sources remain separate rows. All columns are VARCHAR.
 
 - **Parquet file:** `materialized/ontology/latest.json` (atomic snapshot manifest)
 - **Supported by MCP `query_sql` after first publication:** Yes
@@ -15,8 +15,8 @@ The deterministic rule-identity spine: one row per docket, normalized CFR target
 | `cfr_part` | `VARCHAR` | Decomposed CFR part number. |
 | `cfr_section` | `VARCHAR` | Decomposed CFR section, usually null for FR part-level metadata. |
 | `rin` | `VARCHAR` | Regulation Identifier Number associated with the edge, when known. |
-| `source` | `VARCHAR` | Evidence path: `fr_cfr_ref`, `ua_cfr_ref`, `docket_rin`, `document_rin`, or `document_fr_doc`. |
-| `evidence_id` | `VARCHAR` | A concrete source row justifying the edge: FR document number, RIN/agenda edition, docket id, or document id. |
+| `source` | `VARCHAR` | Action-evidence path: `fr_cfr_ref`, `docket_rin`, `document_rin`, or `document_fr_doc`. |
+| `evidence_id` | `VARCHAR` | A concrete source row justifying the edge: FR document number, docket id, or document id. |
 | `first_seen` | `VARCHAR` | Earliest publication/action timestamp among folded evidence for this logical edge. |
 | `last_seen` | `VARCHAR` | Latest publication/action timestamp among folded evidence for this logical edge. |
 | `method` | `VARCHAR` | Derivation method; `deterministic` in v1. |

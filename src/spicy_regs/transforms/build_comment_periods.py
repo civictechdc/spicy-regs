@@ -205,12 +205,10 @@ def build_comment_periods(
     proceeding_by_id: dict[str, dict] = {}
     dockets_by_proceeding: dict[str, set[str]] = {}
     proceeding_ids_by_docket: dict[str, set[str]] = defaultdict(set)
-    proceeding_ids_by_rin: dict[str, set[str]] = defaultdict(set)
+    proceeding_ids_by_fr_document: dict[str, set[str]] = defaultdict(set)
     for row in iter_parquet_rows(required["proceedings"]):
         proceeding_id = str(row["proceeding_id"])
         proceeding_by_id[proceeding_id] = row
-        if rin := _rin(row.get("rin")):
-            proceeding_ids_by_rin[rin].add(proceeding_id)
         dockets = parse_json_list(
             row.get("docket_ids_json"),
             stats=json_stats,
@@ -230,6 +228,18 @@ def build_comment_periods(
         dockets_by_proceeding[proceeding_id] = docket_set
         for docket in docket_set:
             proceeding_ids_by_docket[docket].add(proceeding_id)
+        fr_documents = parse_json_list(
+            row.get("fr_document_numbers_json"),
+            stats=json_stats,
+            table="proceedings",
+            row_id=proceeding_id,
+            column="fr_document_numbers_json",
+        )
+        if fr_documents is not None:
+            for document_number in fr_documents:
+                proceeding_ids_by_fr_document[str(document_number)].add(
+                    proceeding_id
+                )
 
     trusted_dockets = {
         normalized
@@ -308,12 +318,9 @@ def build_comment_periods(
             if raw_rins is None
             else {rin for value in raw_rins if (rin := _rin(value)) is not None}
         )
+        # The source-backed docket is action identity. A RIN is retained as
+        # interval metadata but never filters or selects a Proceeding.
         candidates = docket_targets
-        if rins:
-            rin_targets = set().union(
-                *(proceeding_ids_by_rin.get(rin, set()) for rin in rins)
-            )
-            candidates &= rin_targets
         proceeding_ids = candidates if len(candidates) == 1 else set()
         if len(candidates) > 1:
             ambiguous_document_intervals += 1
@@ -353,22 +360,15 @@ def build_comment_periods(
             else {rin for value in raw_rins if (rin := _rin(value)) is not None}
         )
         dockets = set(linked_dockets_by_fr.get(document_number, ()))
-        rin_targets = (
-            set()
-            if not rins
-            else set().union(
-                *(proceeding_ids_by_rin.get(rin, set()) for rin in rins)
-            )
-        )
         docket_targets: set[str] = set()
         for docket in dockets:
             docket_targets.update(proceeding_ids_by_docket.get(docket, ()))
-        if rin_targets and docket_targets:
-            candidates = rin_targets & docket_targets
-        elif docket_targets:
-            candidates = docket_targets
-        else:
-            candidates = rin_targets
+        artifact_targets = set(
+            proceeding_ids_by_fr_document.get(document_number, ())
+        )
+        # Direct artifact membership is strongest. Docket membership is the
+        # fallback for older rows that predate the artifact projection.
+        candidates = artifact_targets or docket_targets
         proceeding_ids = candidates if len(candidates) == 1 else set()
         if len(candidates) > 1:
             ambiguous_fr_intervals += 1

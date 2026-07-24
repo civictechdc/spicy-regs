@@ -2,27 +2,27 @@
 
 # `unified_agenda`
 
-One row per Regulation Identifier Number (RIN) per agenda edition, ingested from the OIRA/OMB Unified Agenda published at reginfo.gov by `build_unified_agenda`. A Tier-1 rulemaking-lifecycle source: the upstream, forward-looking catalog of rulemakings agencies *plan* to pursue, keyed by the same `rin` that appears in `federal_register` (`regulation_id_numbers_json`). Primary / dedup key is (`rin`, `agenda_edition`). All columns are stored as VARCHAR; array-valued fields are JSON strings.
+One row per Regulation Identifier Number (RIN) per agenda edition, ingested from the OIRA/OMB Unified Agenda published at reginfo.gov by `build_unified_agenda`. This is the editioned observation surface for a durable regulatory agenda item; it is not a Proceeding and may describe an ordinary action, a proven recurring family, or unresolved scope. RIN joins to `regulatory_agenda_items`, while direct action evidence lives in `agenda_item_proceedings`. Primary / dedup key is (`rin`, `agenda_edition`). All columns are stored as VARCHAR; array-valued fields are JSON strings.
 
 - **Parquet file:** `unified_agenda.parquet`
 - **Queryable via MCP `query_sql`:** Yes
 
 | Column | Type | Description |
 | --- | --- | --- |
-| `rin` | `VARCHAR` | Regulation Identifier Number (e.g. `2060-AV12`). The RIN join key to `federal_register`. Half of the primary/dedup key. |
+| `rin` | `VARCHAR` | Regulation Identifier Number (e.g. `2060-AV12`). Identifies the durable agenda item and joins to `regulatory_agenda_items.rin`. Half of the primary/dedup key. |
 | `agency_code` | `VARCHAR` | Short code of the agency that owns the RIN. |
 | `agency_name` | `VARCHAR` | Full name of the agency that owns the RIN. |
-| `title` | `VARCHAR` | Title of the planned rulemaking. |
-| `abstract` | `VARCHAR` | Agency-written abstract describing the planned action. Often null. |
+| `title` | `VARCHAR` | Title of the agenda item in this edition. |
+| `abstract` | `VARCHAR` | Agency-written abstract describing the agenda item in this edition. Often null. |
 | `rin_status` | `VARCHAR` | Status of the RIN in this edition (e.g. `Active`, `Completed`, `Long-Term`). |
-| `rule_stage` | `VARCHAR` | Stage of the rulemaking in this edition (e.g. `Prerule`, `Proposed Rule`, `Final Rule`). |
+| `rule_stage` | `VARCHAR` | Agenda stage in this edition; never inherited automatically by child Proceedings. |
 | `priority_category` | `VARCHAR` | OIRA priority classification (e.g. `Economically Significant`, `Other Significant`, `Substantive, Nonsignificant`). |
 | `agenda_edition` | `VARCHAR` | Semiannual agenda edition the row was published in, as `YYYYMM` (MM 04=Spring, 10=Fall). Half of the primary/dedup key. |
 | `major` | `VARCHAR` | Whether the action is a major rule, as reported by the agenda (e.g. `Yes`/`No`). Often null. |
 | `publication_id` | `VARCHAR` | reginfo.gov publication identifier for this agenda entry, when present. |
-| `timetable_json` | `VARCHAR` | JSON array of timetable entries — the planned/actual milestone actions and their dates for the rulemaking. |
-| `cfr_references_json` | `VARCHAR` | JSON array of CFR citations affected by the rulemaking. The join key to the CFR. |
-| `legal_authority_json` | `VARCHAR` | JSON array of legal-authority citations the agency cites for the rulemaking. |
+| `timetable_json` | `VARCHAR` | JSON array of planned/actual milestones reported for the agenda item. |
+| `cfr_references_json` | `VARCHAR` | JSON array of CFR citations reported for the agenda item; not action-specific without additional evidence. |
+| `legal_authority_json` | `VARCHAR` | JSON array of legal-authority citations reported for the agenda item; not copied to child Proceedings. |
 | `first_action_date` | `VARCHAR` | Date of the earliest timetable action, when derivable. Often null. |
 | `next_action_date` | `VARCHAR` | Date of the next planned timetable action, when derivable. Often null. |
 | `url` | `VARCHAR` | URL of the entry's detail page on reginfo.gov. |

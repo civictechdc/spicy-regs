@@ -12,6 +12,8 @@ MATERIALIZED_TABLES = frozenset(
         "rule_targets",
         "authority_edges",
         "proceedings",
+        "regulatory_agenda_items",
+        "agenda_item_proceedings",
         "comment_periods",
         "concepts",
         "concept_assignments",

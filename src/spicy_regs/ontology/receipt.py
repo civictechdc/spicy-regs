@@ -8,12 +8,12 @@ import json
 import re
 import subprocess
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urlparse
+from urllib.parse import quote, unquote, urlparse
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -514,6 +514,278 @@ def _validate_proceedings(
     return proceeding_ids, dict(metrics)
 
 
+def _agenda_observations(directory: Path) -> dict[str, dict[str, Any]]:
+    observations: dict[str, dict[str, Any]] = {}
+    path = directory / "unified_agenda.parquet"
+    if not path.exists():
+        return observations
+    for row in iter_parquet_rows(
+        path,
+        columns=("rin", "agenda_edition", "priority_category", "url"),
+    ):
+        rin = str(row.get("rin") or "").strip().upper()
+        try:
+            canonical_rin_iri(rin)
+        except ValueError:
+            continue
+        edition = str(row.get("agenda_edition") or "").strip()
+        url = str(row.get("url") or "").strip()
+        record = observations.setdefault(
+            rin,
+            {"keys": set(), "latest_edition": "", "latest_priority": ""},
+        )
+        record["keys"].add((edition, url))
+        if edition > record["latest_edition"]:
+            record["latest_edition"] = edition
+            record["latest_priority"] = " ".join(
+                str(row.get("priority_category") or "").casefold().split()
+            )
+    return observations
+
+
+def _validate_regulatory_agenda_items(
+    path: Path,
+    *,
+    observations: dict[str, dict[str, Any]],
+    failures: FailureCollector,
+) -> tuple[dict[str, dict[str, Any]], dict[str, int]]:
+    items: dict[str, dict[str, Any]] = {}
+    metrics = Counter()
+    for row in iter_parquet_rows(path):
+        metrics["rows"] += 1
+        row_id = str(row.get("agenda_item_id") or "")
+        rin = str(row.get("rin") or "")
+        if not row_id or row_id in items:
+            failures.add(
+                "regulatory_agenda_items",
+                row_id,
+                "agenda_item_id",
+                "missing or duplicate id",
+            )
+        try:
+            expected_id = canonical_rin_iri(rin)
+        except ValueError as exc:
+            failures.add(
+                "regulatory_agenda_items",
+                row_id,
+                "rin",
+                str(exc),
+            )
+            expected_id = None
+        if expected_id is not None and row_id != expected_id:
+            failures.add(
+                "regulatory_agenda_items",
+                row_id,
+                "agenda_item_transform",
+                f"expected {expected_id!r}",
+            )
+        scope_status = row.get("scope_status")
+        if scope_status not in {"recurring", "single_observed", "unresolved"}:
+            failures.add(
+                "regulatory_agenda_items",
+                row_id,
+                "scope_status",
+                f"unknown {scope_status!r}",
+            )
+        try:
+            linked_count = int(str(row.get("linked_proceeding_count")))
+            observation_count = int(str(row.get("observation_count")))
+            if linked_count < 0 or observation_count < 0:
+                raise ValueError
+        except ValueError:
+            failures.add(
+                "regulatory_agenda_items",
+                row_id,
+                "counts",
+                "counts must be non-negative integers",
+            )
+            linked_count = -1
+            observation_count = -1
+
+        observed = observations.get(rin)
+        expected_observation_count = (
+            0 if observed is None else len(observed["keys"])
+        )
+        expected_latest = (
+            None
+            if observed is None or not observed["latest_edition"]
+            else observed["latest_edition"]
+        )
+        if observation_count != expected_observation_count:
+            failures.add(
+                "regulatory_agenda_items",
+                row_id,
+                "observation_count",
+                f"expected {expected_observation_count}, found {observation_count}",
+            )
+        if row.get("latest_agenda_edition") != expected_latest:
+            failures.add(
+                "regulatory_agenda_items",
+                row_id,
+                "latest_agenda_edition",
+                f"expected {expected_latest!r}",
+            )
+        items[row_id] = {
+            **row,
+            "_linked_count": linked_count,
+            "_latest_priority": (
+                "" if observed is None else observed["latest_priority"]
+            ),
+        }
+        metrics[f"scope:{scope_status}"] += 1
+    return items, dict(metrics)
+
+
+def _validate_agenda_item_proceedings(
+    path: Path,
+    *,
+    items: dict[str, dict[str, Any]],
+    proceeding_ids: set[str],
+    dockets: set[str],
+    documents: set[str],
+    fr_documents: set[str],
+    failures: FailureCollector,
+) -> dict[str, int]:
+    metrics = Counter()
+    seen_ids: set[str] = set()
+    linked_by_item: dict[str, set[str]] = defaultdict(set)
+    source_members = {
+        "docket_rin": (dockets, "https://www.regulations.gov/docket/"),
+        "document_rin": (
+            documents,
+            "https://www.regulations.gov/document/",
+        ),
+        "federal_register_rin": (
+            fr_documents,
+            "https://www.federalregister.gov/d/",
+        ),
+    }
+    for row in iter_parquet_rows(path):
+        metrics["rows"] += 1
+        row_id = str(row.get("relationship_id") or "")
+        if not row_id or row_id in seen_ids:
+            failures.add(
+                "agenda_item_proceedings",
+                row_id,
+                "relationship_id",
+                "missing or duplicate id",
+            )
+        seen_ids.add(row_id)
+        item_id = str(row.get("agenda_item_id") or "")
+        proceeding_id = str(row.get("proceeding_id") or "")
+        if item_id not in items:
+            failures.add(
+                "agenda_item_proceedings",
+                row_id,
+                "agenda_item_range",
+                f"unknown {item_id!r}",
+            )
+        else:
+            if row.get("rin") != items[item_id].get("rin"):
+                failures.add(
+                    "agenda_item_proceedings",
+                    row_id,
+                    "rin_agreement",
+                    "relationship RIN disagrees with agenda item",
+                )
+            linked_by_item[item_id].add(proceeding_id)
+        if proceeding_id not in proceeding_ids:
+            failures.add(
+                "agenda_item_proceedings",
+                row_id,
+                "proceeding_range",
+                f"unknown {proceeding_id!r}",
+            )
+        if row.get("relationship_role") != "agenda_tracks_proceeding":
+            failures.add(
+                "agenda_item_proceedings",
+                row_id,
+                "relationship_role",
+                "role must be agenda_tracks_proceeding",
+            )
+        source = str(row.get("source") or "")
+        source_spec = source_members.get(source)
+        evidence_id = str(row.get("evidence_id") or "")
+        if source_spec is None:
+            failures.add(
+                "agenda_item_proceedings",
+                row_id,
+                "source",
+                f"unknown {source!r}",
+            )
+        else:
+            members, prefix = source_spec
+            if evidence_id not in members:
+                failures.add(
+                    "agenda_item_proceedings",
+                    row_id,
+                    "evidence_membership",
+                    f"unknown source evidence {evidence_id!r}",
+                )
+            expected_uri = f"{prefix}{quote(evidence_id, safe='-._~')}"
+            if row.get("evidence_uri") != expected_uri:
+                failures.add(
+                    "agenda_item_proceedings",
+                    row_id,
+                    "evidence_uri",
+                    f"expected {expected_uri!r}",
+                )
+        if row.get("evidence_date"):
+            try:
+                date.fromisoformat(str(row["evidence_date"]))
+            except ValueError:
+                failures.add(
+                    "agenda_item_proceedings",
+                    row_id,
+                    "evidence_date",
+                    "invalid calendar date",
+                )
+        metrics[f"source:{source}"] += 1
+
+    for item_id, item in items.items():
+        linked_count = len(linked_by_item.get(item_id, ()))
+        if item["_linked_count"] != linked_count:
+            failures.add(
+                "regulatory_agenda_items",
+                item_id,
+                "linked_proceeding_count",
+                f"expected {linked_count}, found {item['_linked_count']}",
+            )
+        recurring = item["_latest_priority"] == "routine and frequent"
+        expected_scope = (
+            "recurring"
+            if recurring
+            else "single_observed"
+            if linked_count == 1
+            else "unresolved"
+        )
+        expected_basis = (
+            "latest_agenda_priority_routine_and_frequent"
+            if recurring
+            else "one_evidence_linked_proceeding"
+            if linked_count == 1
+            else "zero_evidence_linked_proceedings"
+            if linked_count == 0
+            else "multiple_evidence_linked_proceedings"
+        )
+        if item.get("scope_status") != expected_scope:
+            failures.add(
+                "regulatory_agenda_items",
+                item_id,
+                "scope_derivation",
+                f"expected {expected_scope!r}",
+            )
+        if item.get("scope_basis") != expected_basis:
+            failures.add(
+                "regulatory_agenda_items",
+                item_id,
+                "scope_basis",
+                f"expected {expected_basis!r}",
+            )
+    metrics["linked_items"] = len(linked_by_item)
+    return dict(metrics)
+
+
 def _validate_comment_periods(
     path: Path,
     *,
@@ -739,7 +1011,7 @@ def validate_generation(
     *,
     baseline_manifest_path: Path | None = None,
 ) -> dict[str, Any]:
-    """Validate all seven artifacts and return receipt-ready evidence."""
+    """Validate every ontology artifact and return receipt-ready evidence."""
     manifest_path = manifest_path.resolve()
     manifest = _load_object(manifest_path)
     failures = FailureCollector()
@@ -786,6 +1058,24 @@ def validate_generation(
             failures=failures,
         )
         metrics["proceedings"] = proceeding_metrics
+        observations = _agenda_observations(manifest_path.parent)
+        agenda_items, agenda_metrics = _validate_regulatory_agenda_items(
+            required_paths["regulatory_agenda_items.parquet"],
+            observations=observations,
+            failures=failures,
+        )
+        metrics["regulatory_agenda_items"] = agenda_metrics
+        metrics["agenda_item_proceedings"] = (
+            _validate_agenda_item_proceedings(
+                required_paths["agenda_item_proceedings.parquet"],
+                items=agenda_items,
+                proceeding_ids=proceeding_ids,
+                dockets=dockets,
+                documents=documents,
+                fr_documents=fr_documents,
+                failures=failures,
+            )
+        )
         metrics["comment_periods"] = _validate_comment_periods(
             required_paths["comment_periods.parquet"],
             proceeding_ids=proceeding_ids,

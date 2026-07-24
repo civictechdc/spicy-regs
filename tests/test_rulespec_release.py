@@ -11,7 +11,7 @@ import pytest
 import spicy_regs.ontology.rulespec_release as rulespec_release
 from spicy_regs.ontology.rulespec_release import require_released_rulespec
 
-CONTRACT_DIGEST = "sha256:ea9b899ba92955b83638ece811d7a4b744dd912f72e19290e32c97508674de1c"
+CONTRACT_DIGEST = "sha256:2aefd3fad7782a7b16a7fa8fc08e8ceb26b5db741e0371b8fa8a9ccc1982124d"
 RELEASE_VERSION = "0.2.0-pre.8"
 RELEASE_URL = f"https://github.com/Formspec-Labs/rulespec/releases/tag/v{RELEASE_VERSION}"
 RELEASE_ARCHIVE_URL = (

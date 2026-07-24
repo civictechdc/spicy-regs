@@ -18,6 +18,7 @@ from spicy_regs.transforms import (
     build_concept_events,
     build_concepts,
     build_proceedings,
+    build_regulatory_agenda,
     build_rule_targets,
 )
 
@@ -44,6 +45,8 @@ class OntologyDatasetPipeline(MaterializedDatasetPipeline):
         "rule_targets.parquet",
         "authority_edges.parquet",
         "proceedings.parquet",
+        "regulatory_agenda_items.parquet",
+        "agenda_item_proceedings.parquet",
         "comment_periods.parquet",
         "concepts.parquet",
         "concept_assignments.parquet",
@@ -100,6 +103,7 @@ class OntologyDatasetPipeline(MaterializedDatasetPipeline):
                 "title",
                 "agency_code",
                 "posted_date",
+                "modify_date",
                 "comment_start_date",
                 "comment_end_date",
             ),
@@ -112,7 +116,10 @@ class OntologyDatasetPipeline(MaterializedDatasetPipeline):
                 "title",
                 "agency_code",
                 "rule_stage",
+                "priority_category",
                 "first_action_date",
+                "next_action_date",
+                "url",
             ),
             "fr_docket_links.parquet": (
                 "document_number",
@@ -185,12 +192,28 @@ class OntologyDatasetPipeline(MaterializedDatasetPipeline):
                 asserted_at=context.asserted_at,
             )
 
+        def regulatory_agenda(output_dir: Path, context: RunContext) -> None:
+            build_regulatory_agenda(
+                output_dir,
+                run_id=context.run_id,
+                asserted_at=context.asserted_at,
+            )
+
         stages = [
             DatasetStage(
                 name="proceedings",
-                depends_on=("rule-targets", "authority-edges"),
+                depends_on=("rule-targets",),
                 outputs=("proceedings.parquet",),
                 build=proceedings,
+            ),
+            DatasetStage(
+                name="regulatory-agenda",
+                depends_on=("proceedings",),
+                outputs=(
+                    "regulatory_agenda_items.parquet",
+                    "agenda_item_proceedings.parquet",
+                ),
+                build=regulatory_agenda,
             ),
             DatasetStage(
                 name="comment-periods",

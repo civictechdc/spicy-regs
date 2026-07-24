@@ -47,7 +47,7 @@ def test_publication_checks_rulespec_release_before_materialization(
     declaration.write_text(
         "\n".join(
             (
-                'rulespec_version: "sha256:ea9b899ba92955b83638ece811d7a4b744dd912f72e19290e32c97508674de1c"',
+                'rulespec_version: "sha256:2aefd3fad7782a7b16a7fa8fc08e8ceb26b5db741e0371b8fa8a9ccc1982124d"',
                 "rulespec_release: null",
                 "rulespec_release_url: null",
                 "declared_levels: [L0]",

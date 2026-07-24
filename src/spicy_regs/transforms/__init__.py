@@ -21,6 +21,7 @@ from spicy_regs.transforms.build_gao_reports import build_gao_reports
 from spicy_regs.transforms.build_lobbying_filings import build_lobbying_filings
 from spicy_regs.transforms.build_rulemaking_lifecycles import build_rulemaking_lifecycles
 from spicy_regs.transforms.build_proceedings import build_proceedings
+from spicy_regs.transforms.build_regulatory_agenda import build_regulatory_agenda
 from spicy_regs.transforms.build_rule_targets import build_rule_targets
 from spicy_regs.transforms.build_sam_entities import build_sam_entities
 from spicy_regs.transforms.build_search_index import INDEX_FILENAME, build_search_index
@@ -70,6 +71,7 @@ __all__ = [
     "build_fec_committees",
     "build_rulemaking_lifecycles",
     "build_proceedings",
+    "build_regulatory_agenda",
     "build_rule_targets",
     "build_sam_entities",
     "build_federal_register",

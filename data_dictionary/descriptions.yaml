@@ -213,27 +213,28 @@ tables:
     summary: >-
       One row per Regulation Identifier Number (RIN) per agenda edition, ingested
       from the OIRA/OMB Unified Agenda published at reginfo.gov by
-      `build_unified_agenda`. A Tier-1 rulemaking-lifecycle source: the upstream,
-      forward-looking catalog of rulemakings agencies *plan* to pursue, keyed by
-      the same `rin` that appears in `federal_register`
-      (`regulation_id_numbers_json`). Primary / dedup key is (`rin`,
+      `build_unified_agenda`. This is the editioned observation surface for a
+      durable regulatory agenda item; it is not a Proceeding and may describe
+      an ordinary action, a proven recurring family, or unresolved scope. RIN
+      joins to `regulatory_agenda_items`, while direct action evidence lives in
+      `agenda_item_proceedings`. Primary / dedup key is (`rin`,
       `agenda_edition`). All columns are stored as VARCHAR; array-valued fields
       are JSON strings.
     columns:
-      rin: "Regulation Identifier Number (e.g. `2060-AV12`). The RIN join key to `federal_register`. Half of the primary/dedup key."
+      rin: "Regulation Identifier Number (e.g. `2060-AV12`). Identifies the durable agenda item and joins to `regulatory_agenda_items.rin`. Half of the primary/dedup key."
       agency_code: "Short code of the agency that owns the RIN."
       agency_name: "Full name of the agency that owns the RIN."
-      title: "Title of the planned rulemaking."
-      abstract: "Agency-written abstract describing the planned action. Often null."
+      title: "Title of the agenda item in this edition."
+      abstract: "Agency-written abstract describing the agenda item in this edition. Often null."
       rin_status: "Status of the RIN in this edition (e.g. `Active`, `Completed`, `Long-Term`)."
-      rule_stage: "Stage of the rulemaking in this edition (e.g. `Prerule`, `Proposed Rule`, `Final Rule`)."
+      rule_stage: "Agenda stage in this edition; never inherited automatically by child Proceedings."
       priority_category: "OIRA priority classification (e.g. `Economically Significant`, `Other Significant`, `Substantive, Nonsignificant`)."
       agenda_edition: "Semiannual agenda edition the row was published in, as `YYYYMM` (MM 04=Spring, 10=Fall). Half of the primary/dedup key."
       major: "Whether the action is a major rule, as reported by the agenda (e.g. `Yes`/`No`). Often null."
       publication_id: "reginfo.gov publication identifier for this agenda entry, when present."
-      timetable_json: "JSON array of timetable entries — the planned/actual milestone actions and their dates for the rulemaking."
-      cfr_references_json: "JSON array of CFR citations affected by the rulemaking. The join key to the CFR."
-      legal_authority_json: "JSON array of legal-authority citations the agency cites for the rulemaking."
+      timetable_json: "JSON array of planned/actual milestones reported for the agenda item."
+      cfr_references_json: "JSON array of CFR citations reported for the agenda item; not action-specific without additional evidence."
+      legal_authority_json: "JSON array of legal-authority citations reported for the agenda item; not copied to child Proceedings."
       first_action_date: "Date of the earliest timetable action, when derivable. Often null."
       next_action_date: "Date of the next planned timetable action, when derivable. Often null."
       url: "URL of the entry's detail page on reginfo.gov."
@@ -272,10 +273,10 @@ tables:
 
   rule_targets:
     summary: >-
-      The deterministic rule-identity spine: one row per docket, normalized CFR
-      target, optional RIN, and evidence source. Corroborating sources remain
-      separate rows. Mapped identifier fields use Rulespec Level-0 conventions;
-      local provenance fields remain outside that claim. All columns are
+      Action-specific docket evidence: one row per docket, normalized CFR
+      target, optional RIN, and source. Unified Agenda CFR values stay on their
+      editioned agenda observations and are never projected through RIN
+      equality. Corroborating sources remain separate rows. All columns are
       VARCHAR.
     columns:
       docket_id: "Subject regulations.gov docket."
@@ -284,8 +285,8 @@ tables:
       cfr_part: "Decomposed CFR part number."
       cfr_section: "Decomposed CFR section, usually null for FR part-level metadata."
       rin: "Regulation Identifier Number associated with the edge, when known."
-      source: "Evidence path: `fr_cfr_ref`, `ua_cfr_ref`, `docket_rin`, `document_rin`, or `document_fr_doc`."
-      evidence_id: "A concrete source row justifying the edge: FR document number, RIN/agenda edition, docket id, or document id."
+      source: "Action-evidence path: `fr_cfr_ref`, `docket_rin`, `document_rin`, or `document_fr_doc`."
+      evidence_id: "A concrete source row justifying the edge: FR document number, docket id, or document id."
       first_seen: "Earliest publication/action timestamp among folded evidence for this logical edge."
       last_seen: "Latest publication/action timestamp among folded evidence for this logical edge."
       method: "Derivation method; `deterministic` in v1."
@@ -316,28 +317,73 @@ tables:
 
   proceedings:
     summary: >-
-      One row per rulemaking proceeding, normally RIN-bounded and optionally
-      spanning multiple regulations.gov dockets. It is assembled independently
-      from source identity and publication evidence; the legacy duration rollup
-      remains a separate product.
+      One row per independently evidenced rulemaking action. Dockets and
+      Federal Register artifacts establish identity; a RIN never groups rows.
+      One FR artifact may explicitly connect several source-backed dockets.
+      Docket-less action artifacts receive provisional document-based
+      identities.
     columns:
       proceeding_id: "Stable opaque proceeding id. Primary key."
-      rin: "Associated RIN when available; a strong evidence/join key that is not globally unique proceeding identity."
+      rin: "The sole action-evidenced RIN when exactly one is observed; null for zero or multiple RINs. Compatibility/query aid only, never identity."
       docket_ids_json: "JSON array of associated regulations.gov dockets; may contain multiple ids."
-      title: "Most recent available agenda/docket/publication title."
+      title: "Most recent available docket, regulations.gov document, or Federal Register title; Unified Agenda titles are excluded."
       agency_code: "Most frequently observed issuing agency code."
       current_stage: "Latest evidenced stage: `prerule`, `proposed`, `supplemental`, `final`, `withdrawn`, or `longterm`; null when no stage evidence exists."
       stage_events_json: "Ordered JSON stage-event history with date, source, evidence id, and Rulespec event kind."
       fr_document_numbers_json: "JSON array of Federal Register documents published in the proceeding."
       cfr_refs_json: "JSON array of compact CFR targets from `rule_targets`."
       cfr_target_iris_json: "JSON array of Rulespec `rkaf:us-cfr` citation IRIs projected from valid rule-target components."
-      authority_refs_json: "JSON array of compact U.S.C., Public Law, or retained raw authority references."
+      authority_refs_json: "Reserved JSON array for future action-specific authority evidence. Unified Agenda authority is not copied here."
       identity_predecessors_json: "JSON array of distinct prior-generation proceeding ids whose evidence overlaps this component; records semantic merge/split continuity and excludes the current reused id."
       method: "Derivation method; `deterministic`."
       actor_id: "Versioned proceeding-assembly ruleset."
       run_id: "Pipeline run identifier."
       asserted_at: "UTC assertion timestamp."
       supersedes_id: "The same stable proceeding id when this row replaces its prior-generation assertion; null for a newly assigned id."
+
+  regulatory_agenda_items:
+    summary: >-
+      One durable registry item per RIN. Scope is an evidence-state
+      classification, not identity: official `Routine and Frequent` priority
+      supports `recurring`; exactly one linked action supports
+      `single_observed`; every other case remains `unresolved`.
+    columns:
+      agenda_item_id: "Canonical agenda-item IRI `urn:rkaf:us:rin:<RIN>`. Primary key."
+      rin: "Regulation Identifier Number identifying this durable agenda item."
+      scope_status: "`recurring`, `single_observed`, or `unresolved`."
+      scope_basis: "Explicit rule that produced `scope_status`; multiplicity alone never proves recurrence."
+      linked_proceeding_count: "Count of distinct independently identified Proceedings with direct action evidence for this RIN."
+      observation_count: "Count of edition-specific Unified Agenda observations in the source snapshot."
+      latest_agenda_edition: "Lexically latest `YYYYMM` Unified Agenda edition observed for the item."
+      first_seen: "Earliest dated agenda or action evidence observed for the RIN."
+      last_seen: "Latest dated agenda or action evidence observed for the RIN."
+      method: "Derivation method; `deterministic`."
+      actor_id: "Versioned agenda-item classification ruleset."
+      run_id: "Pipeline run identifier."
+      asserted_at: "UTC assertion timestamp."
+      supersedes_id: "Prior assertion revised by this row, when applicable."
+
+  agenda_item_proceedings:
+    summary: >-
+      Qualified, provenance-bearing links from durable RIN agenda items to
+      independently identified Proceedings. Rows exist only when a docket,
+      regulations.gov document, or Federal Register artifact directly reports
+      the RIN; Unified Agenda equality cannot manufacture a link.
+    columns:
+      relationship_id: "Stable opaque relationship id. Primary key."
+      agenda_item_id: "Canonical agenda-item IRI; joins to `regulatory_agenda_items.agenda_item_id`."
+      rin: "Denormalized RIN for convenient filtering."
+      proceeding_id: "Independently assembled action; joins to `proceedings.proceeding_id`."
+      relationship_role: "Fixed local role `agenda_tracks_proceeding`, mapped to Rulespec `rkaf:agendaTracksProceeding`."
+      source: "`docket_rin`, `document_rin`, or `federal_register_rin`."
+      evidence_id: "Source docket id, regulations.gov document id, or FR document number supporting the relationship."
+      evidence_uri: "Permanent source URL for the evidence artifact or registry record."
+      evidence_date: "Best available source date for the relationship evidence."
+      method: "Derivation method; `deterministic`."
+      actor_id: "Versioned relationship-assembly ruleset."
+      run_id: "Pipeline run identifier."
+      asserted_at: "UTC assertion timestamp."
+      supersedes_id: "Prior assertion revised by this row, when applicable."
 
   comment_periods:
     summary: >-

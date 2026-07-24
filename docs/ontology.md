@@ -7,11 +7,12 @@ L1–L4 parsing, shape, constraint, or runtime conformance.
 
 The implementation targets the repaired candidate US identifier and
 Experimental rulemaking contract whose content digest is
-`sha256:ea9b899ba92955b83638ece811d7a4b744dd912f72e19290e32c97508674de1c`
+`sha256:2aefd3fad7782a7b16a7fa8fc08e8ceb26b5db741e0371b8fa8a9ccc1982124d`
 (2026-07-24). This digest pins the exact local contract used by the carrier
-audit; it is not a release claim. The rulemaking module remains Experimental
-until the paired corpus receipt, maintainer release, and non-originating
-consumer gates are complete.
+audit; it is not a release claim. The local paired corpus receipt is complete.
+The module remains Experimental
+until a maintainer publishes the contract and a non-originating consumer
+reviews or ratifies it.
 
 See the measured [stabilization report](rulespec-repair-report.md) for the
 paired before/after corpus evidence. The earlier
@@ -28,7 +29,7 @@ Parquet keeps the compact join keys users already query. Expand them as follows:
 | CFR `40-60` / `40-60.1` | `rkaf:us-cfr` | `urn:rkaf:us:cfr:40:60` / `urn:rkaf:us:cfr:40:60.1` |
 | U.S.C. title `42` + section `7401` | `rkaf:us-usc` | `urn:rkaf:us:usc:42:7401` |
 | Proceeding id `pr-2060-AV16-0c9a` | `rkaf:partner-defined` | `urn:spicy-regs:proceeding:pr-2060-AV16-0c9a` |
-| RIN `2060-AV16` | `rkaf:us-rin` | `urn:rkaf:us:rin:2060-AV16` (evidence/join key; not identity when reused) |
+| RIN `2060-AV16` | `rkaf:us-rin` | `urn:rkaf:us:rin:2060-AV16` (identity of a durable Regulatory Agenda item, never a Proceeding) |
 | FR document `2024-00366` | `rkaf:us-frdoc` | `urn:rkaf:us:frdoc:2024-00366` |
 | FR document resource, including legacy/correction ids | `rkaf:urn-persistent` | `https://www.federalregister.gov/d/<document-number>` |
 | regulations.gov id `EPA-HQ-OAR-2021-0317` | `rkaf:us-regsgov` | `urn:rkaf:us:regsgov:EPA-HQ-OAR-2021-0317` |
@@ -59,13 +60,23 @@ a known interval while Proceeding identity remains unresolved. Separate
 Artifact that opened a period from later extension evidence. Dates are
 inclusive calendar days in the source deadline's governing timezone.
 
+The document/subject distinction is intentionally broader than regulation.
+An immutable `rkaf:Artifact` may use `foaf:primaryTopic` to name its one
+durable main subject, regardless of document genre. When a relation needs its
+own role or provenance, the carrier uses the DCAT qualified-relation pattern:
+`dcat:qualifiedRelation` → `dcat:Relationship` →
+`dcterms:relation`/`dcat:hadRole`. The US rulemaking profile specializes those
+general seams as `RegulatoryAgendaObservation`,
+`RegulatoryAgendaItem`, and `AgendaProceedingRelationship`; it does not turn
+every document subject into a regulatory agenda item.
+
 ## Carrier mapping
 
 The fenced block below is normative and machine-audited by Rulespec's
 `tools/l0_mapping_audit.py`.
 
 ```yaml rkaf-l0-mapping
-rulespec_version: "sha256:ea9b899ba92955b83638ece811d7a4b744dd912f72e19290e32c97508674de1c"
+rulespec_version: "sha256:2aefd3fad7782a7b16a7fa8fc08e8ceb26b5db741e0371b8fa8a9ccc1982124d"
 mappings:
   - table: rule_targets
     column: docket_id
@@ -95,14 +106,27 @@ mappings:
           cfr_ref: 40-60.5375a
         output: urn:rkaf:us:cfr:40:60.5375a
   - table: authority_edges
+    columns: [rin, agenda_edition]
+    subject_type: https://rulespec.org/ns/v1#RegulatoryAgendaObservation
+    term: https://rulespec.org/ns/v1#hasArtifactIdentifier
+    direction: forward
+    value_kind: iri
+    transform:
+      template: "https://www.reginfo.gov/public/do/eAgendaViewRule?RIN={rin}&pubId={agenda_edition}"
+      identifier_scheme: https://rulespec.org/ns/v1#urn-persistent
+    samples:
+      - input:
+          rin: 2060-AV16
+          agenda_edition: "202510"
+        output: https://www.reginfo.gov/public/do/eAgendaViewRule?RIN=2060-AV16&pubId=202510
+  - table: authority_edges
     columns: [usc_title, usc_section]
-    subject_type: https://rulespec.org/ns/v1#Artifact
-    term: https://rulespec.org/ns/v1#hasRegulatoryIdentifier
+    subject_type: https://rulespec.org/ns/v1#RegulatoryAgendaObservation
+    term: https://rulespec.org/ns/v1#agendaAuthorityCitation
     direction: forward
     value_kind: iri
     transform:
       template: "urn:rkaf:us:usc:{usc_title}:{usc_section}"
-      identifier_scheme: https://rulespec.org/ns/v1#us-usc
     samples:
       - input:
           usc_title: "42"
@@ -110,14 +134,13 @@ mappings:
         output: urn:rkaf:us:usc:42:7411
   - table: authority_edges
     column: pl_number
-    subject_type: https://rulespec.org/ns/v1#Artifact
-    term: https://rulespec.org/ns/v1#hasRegulatoryIdentifier
+    subject_type: https://rulespec.org/ns/v1#RegulatoryAgendaObservation
+    term: https://rulespec.org/ns/v1#agendaAuthorityCitation
     direction: forward
     value_kind: iri
     transform:
       pattern: '^([1-9][0-9]*)-([1-9][0-9]*)$'
       replacement: 'urn:rkaf:us:pl:\1-\2'
-      identifier_scheme: https://rulespec.org/ns/v1#us-pl
     samples:
       - input:
           pl_number: 117-58
@@ -180,6 +203,78 @@ mappings:
       - input:
           fr_doc_num: 2021-24202
         output: https://www.federalregister.gov/d/2021-24202
+  - table: regulatory_agenda_items
+    column: agenda_item_id
+    subject_type: https://rulespec.org/ns/v1#RegulatoryAgendaItem
+    term: https://rulespec.org/ns/v1#hasAgendaItemIdentifier
+    direction: forward
+    value_kind: iri
+    transform:
+      template: "{agenda_item_id}"
+      identifier_scheme: https://rulespec.org/ns/v1#us-rin
+    samples:
+      - input:
+          agenda_item_id: urn:rkaf:us:rin:2060-AV16
+        output: urn:rkaf:us:rin:2060-AV16
+  - table: regulatory_agenda_items
+    column: scope_status
+    subject_type: https://rulespec.org/ns/v1#RegulatoryAgendaItem
+    term: https://rulespec.org/ns/v1#agendaScopeStatus
+    direction: forward
+    value_kind: vocab
+    enum_map:
+      recurring: https://rulespec.org/ns/v1#agendaScopeRecurring
+      single_observed: https://rulespec.org/ns/v1#agendaScopeSingleObserved
+      unresolved: https://rulespec.org/ns/v1#agendaScopeUnresolved
+  - table: unified_agenda
+    column: url
+    subject_type: https://rulespec.org/ns/v1#RegulatoryAgendaObservation
+    term: https://rulespec.org/ns/v1#hasArtifactIdentifier
+    direction: forward
+    value_kind: iri
+    transform:
+      template: "{url}"
+      identifier_scheme: https://rulespec.org/ns/v1#urn-persistent
+    samples:
+      - input:
+          url: https://www.reginfo.gov/public/do/eAgendaViewRule?RIN=2060-AV16&pubId=202510
+        output: https://www.reginfo.gov/public/do/eAgendaViewRule?RIN=2060-AV16&pubId=202510
+  - table: unified_agenda
+    column: rin
+    subject_type: https://rulespec.org/ns/v1#RegulatoryAgendaObservation
+    term: http://xmlns.com/foaf/0.1/primaryTopic
+    direction: forward
+    value_kind: iri
+    transform:
+      template: "urn:rkaf:us:rin:{rin}"
+    samples:
+      - input:
+          rin: 2060-AV16
+        output: urn:rkaf:us:rin:2060-AV16
+  - table: unified_agenda
+    column: rule_stage
+    subject_type: https://rulespec.org/ns/v1#RegulatoryAgendaObservation
+    term: https://rulespec.org/ns/v1#agendaStage
+    direction: forward
+    value_kind: vocab
+    enum_map:
+      "Prerule Stage": https://rulespec.org/ns/v1#agendaPrerule
+      "Proposed Rule Stage": https://rulespec.org/ns/v1#agendaProposed
+      "Final Rule Stage": https://rulespec.org/ns/v1#agendaFinal
+      "Long-Term Actions": https://rulespec.org/ns/v1#agendaLongterm
+      "Completed Actions": https://rulespec.org/ns/v1#agendaCompleted
+  - table: unified_agenda
+    column: priority_category
+    subject_type: https://rulespec.org/ns/v1#RegulatoryAgendaObservation
+    term: https://rulespec.org/ns/v1#agendaPriority
+    direction: forward
+    value_kind: vocab
+    enum_map:
+      "Economically Significant": https://rulespec.org/ns/v1#agendaPriorityEconomicallySignificant
+      "Other Significant": https://rulespec.org/ns/v1#agendaPriorityOtherSignificant
+      "Substantive, Nonsignificant": https://rulespec.org/ns/v1#agendaPrioritySubstantiveNonsignificant
+      "Routine and Frequent": https://rulespec.org/ns/v1#agendaPriorityRoutineFrequent
+      "Info./Admin./Other": https://rulespec.org/ns/v1#agendaPriorityInfoAdminOther
   - table: proceedings
     column: proceeding_id
     subject_type: https://rulespec.org/ns/v1#Proceeding
@@ -193,19 +288,6 @@ mappings:
       - input:
           proceeding_id: pr-2060-AV16-0c9a
         output: urn:spicy-regs:proceeding:pr-2060-AV16-0c9a
-  - table: proceedings
-    column: rin
-    subject_type: https://rulespec.org/ns/v1#Proceeding
-    term: https://rulespec.org/ns/v1#hasProceedingEvidenceIdentifier
-    direction: forward
-    value_kind: iri
-    transform:
-      template: "urn:rkaf:us:rin:{rin}"
-      identifier_scheme: https://rulespec.org/ns/v1#us-rin
-    samples:
-      - input:
-          rin: 2060-AV16
-        output: urn:rkaf:us:rin:2060-AV16
   - table: proceedings
     column: docket_ids_json
     subject_type: https://rulespec.org/ns/v1#Proceeding
@@ -280,6 +362,87 @@ mappings:
           identity_predecessors_json: '["pr-2060-AV16-legacy"]'
         output:
           - urn:spicy-regs:proceeding:pr-2060-AV16-legacy
+  - table: agenda_item_proceedings
+    column: agenda_item_id
+    subject_type: https://rulespec.org/ns/v1#AgendaProceedingRelationship
+    term: http://www.w3.org/ns/dcat#qualifiedRelation
+    direction: inverse
+    object_type: https://rulespec.org/ns/v1#RegulatoryAgendaItem
+    value_kind: iri
+    transform:
+      template: "{agenda_item_id}"
+    samples:
+      - input:
+          agenda_item_id: urn:rkaf:us:rin:2060-AV16
+        output: urn:rkaf:us:rin:2060-AV16
+  - table: agenda_item_proceedings
+    column: proceeding_id
+    subject_type: https://rulespec.org/ns/v1#AgendaProceedingRelationship
+    term: http://purl.org/dc/terms/relation
+    direction: forward
+    object_type: https://rulespec.org/ns/v1#Proceeding
+    value_kind: iri
+    transform:
+      template: "urn:spicy-regs:proceeding:{proceeding_id}"
+    samples:
+      - input:
+          proceeding_id: pr-2060-AV16-0c9a
+        output: urn:spicy-regs:proceeding:pr-2060-AV16-0c9a
+  - table: agenda_item_proceedings
+    column: relationship_role
+    subject_type: https://rulespec.org/ns/v1#AgendaProceedingRelationship
+    term: http://www.w3.org/ns/dcat#hadRole
+    direction: forward
+    value_kind: vocab
+    transform:
+      template: "https://rulespec.org/ns/v1#agendaTracksProceeding"
+    samples:
+      - input:
+          relationship_role: agenda_tracks_proceeding
+        output: https://rulespec.org/ns/v1#agendaTracksProceeding
+  - table: agenda_item_proceedings
+    column: evidence_uri
+    subject_type: https://rulespec.org/ns/v1#AgendaProceedingRelationship
+    term: http://www.w3.org/ns/prov#wasDerivedFrom
+    direction: forward
+    object_type: http://www.w3.org/ns/prov#Entity
+    value_kind: iri
+    transform:
+      template: "{evidence_uri}"
+    samples:
+      - input:
+          evidence_uri: https://www.federalregister.gov/d/2024-00366
+        output: https://www.federalregister.gov/d/2024-00366
+  - table: agenda_item_proceedings
+    column: run_id
+    subject_type: https://rulespec.org/ns/v1#AgendaProceedingRelationship
+    term: http://www.w3.org/ns/prov#wasGeneratedBy
+    direction: forward
+    value_kind: iri
+    transform:
+      template: "urn:spicy-regs:run:{run_id}"
+    samples:
+      - input:
+          run_id: ontology-20260724
+        output: urn:spicy-regs:run:ontology-20260724
+  - table: agenda_item_proceedings
+    column: actor_id
+    subject_type: https://rulespec.org/ns/v1#AgendaProceedingRelationship
+    term: http://www.w3.org/ns/prov#wasAttributedTo
+    direction: forward
+    value_kind: iri
+    transform:
+      template: "urn:spicy-regs:actor:{actor_id}"
+    samples:
+      - input:
+          actor_id: agenda-item-proceedings-v1
+        output: urn:spicy-regs:actor:agenda-item-proceedings-v1
+  - table: agenda_item_proceedings
+    column: asserted_at
+    subject_type: https://rulespec.org/ns/v1#AgendaProceedingRelationship
+    term: http://www.w3.org/ns/prov#generatedAtTime
+    direction: forward
+    value_kind: literal
   - table: comment_periods
     column: proceeding_ids_json
     subject_type: https://rulespec.org/ns/v1#CommentPeriod
@@ -366,10 +529,11 @@ declared RDF semantics without inventing information:
   a row-level column mapping would lose the event subject and evidence. The
   carrier derives `current_stage` only when the latest dated stage-family
   events agree.
-- the uniform attestation columns span `rkaf:Assertion`,
-  `rkaf:ConfidenceRecord`, and `rkaf:Finding`. They remain local carrier
-  provenance until an explicit node-construction map preserves those domains
-  and their links.
+- the relationship table's `run_id`, `actor_id`, and `asserted_at` map directly
+  to PROV properties because each row is already a qualified relationship
+  node. Uniform attestation columns on other tables remain local carrier
+  provenance until an explicit node-construction map preserves their domains
+  and links.
 - `concepts` and `concept_assignments` are retrieval-grade tags, not
   `rkaf:LocalConcept` nodes. Their labels, hierarchy, confidence, and evidence
   remain local until a separate human-reviewed promotion creates a Rulespec
@@ -408,7 +572,7 @@ One materialized-dataset DAG runs the registry stages in dependency order:
 `concepts` refreshes Federal Register Thesaurus seeds and performs
 merge/re-score convergence; `concept_assignments` tags new or changed subjects
 and validates a stable sample; `concept_events` performs an idempotent audit-log
-reconciliation. The seven identity and ontology tables are uploaded under one
+reconciliation. The nine identity and ontology tables are uploaded under one
 immutable snapshot prefix, then one `materialized/ontology/latest.json` pointer
 is replaced. Candidate concepts, events, and assignments therefore become
 visible as one generation rather than through independently scheduled jobs.
@@ -433,23 +597,27 @@ call:
 uv run spicy-regs-evaluate-tags output --minimum-f1 0.50
 ```
 
-Proceeding identity has one additional corpus-derived rule: a RIN is strong
-evidence but not globally unique across time. Some agencies reuse a RIN for
-recurring action families. `proceedings` therefore forms docket components
-within each RIN and merges components only when a single Federal Register
-document explicitly co-identifies their dockets. Evidence without a RIN is
-attached through a docket only when that docket resolves to one component;
-otherwise it remains in the source table instead of being copied across
-proceedings.
+Proceeding identity is independent of RIN. `proceedings` forms components from
+source-backed dockets and merges them only when a single Federal Register
+artifact explicitly co-identifies those dockets. A docket-less rulemaking
+artifact receives a provisional artifact-based Proceeding. RIN values remain
+denormalized evidence only when an action has exactly one; zero or several
+leave `proceedings.rin` null.
+
+`regulatory_agenda_items` is the separate RIN identity layer.
+`agenda_item_proceedings` relates an item to zero or more independently
+identified actions only when a docket, regulations.gov document, or Federal
+Register artifact directly reports that RIN. Unified Agenda stage, priority,
+CFR, and authority remain on the editioned observation. They do not flow to
+child Proceedings through string equality.
 
 The current component shape does not define the public id. Each materialization
 loads the prior `proceedings` artifact from the same atomic generation and
-reuses the strongest compatible predecessor id by docket overlap. This keeps an
-id stable when a backfill adds a lexically earlier docket. Every distinct
-compatible prior identity is retained in `identity_predecessors_json`, so merges
-and splits have explicit semantic continuity without emitting a
+reuses the strongest compatible predecessor id by docket or Federal Register
+artifact overlap. This keeps an id stable when a backfill adds a lexically
+earlier docket or resolves a provisional artifact to its docket. Every distinct
+compatible prior identity is retained in `identity_predecessors_json`, so
+merges and splits have explicit semantic continuity without emitting a
 Proceeding-to-itself `proceedingSupersedes` edge. The reused identity is tracked
-only by the local row-version `supersedes_id`. A docket-less RIN component may
-also retain its id when it gains its first docket, but only when that RIN
-identifies exactly one prior and one current component. `current_stage` is
-likewise null when no stage event is evidenced.
+only by the local row-version `supersedes_id`. `current_stage` is likewise null
+when no action-specific stage event is evidenced.

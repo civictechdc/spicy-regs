@@ -1,0 +1,350 @@
+{
+  "clean_repository_gate": {
+    "baseline_worktree_proven": true,
+    "baseline_worktree_required": false,
+    "required": false,
+    "status": "pass"
+  },
+  "created_at": "2026-07-24T13:44:39.445420+00:00",
+  "format_version": 1,
+  "gates": [],
+  "generation": {
+    "artifacts": {
+      "agenda_item_proceedings.parquet": {
+        "bytes": 5353173,
+        "columns": [
+          "relationship_id",
+          "agenda_item_id",
+          "rin",
+          "proceeding_id",
+          "relationship_role",
+          "source",
+          "evidence_id",
+          "evidence_uri",
+          "evidence_date",
+          "method",
+          "actor_id",
+          "run_id",
+          "asserted_at",
+          "supersedes_id"
+        ],
+        "rows": 120685,
+        "sha256": "e3dea44081313dde9af949220526f25f2d2036ea4d722aa51ef6d8e5d95d824a"
+      },
+      "authority_edges.parquet": {
+        "bytes": 105801,
+        "columns": [
+          "rin",
+          "authority_raw",
+          "usc_title",
+          "usc_section",
+          "pl_number",
+          "authority_type",
+          "parse_status",
+          "agenda_edition",
+          "method",
+          "actor_id",
+          "run_id",
+          "asserted_at",
+          "supersedes_id"
+        ],
+        "rows": 10618,
+        "sha256": "0bc929b6e0b120b52a97d379c4b6c4edd60d34d10cbd58fc18d3af3937efb6eb"
+      },
+      "comment_periods.parquet": {
+        "bytes": 12651439,
+        "columns": [
+          "comment_period_id",
+          "proceeding_ids_json",
+          "rins_json",
+          "docket_ids_json",
+          "open_date",
+          "close_date",
+          "source",
+          "opened_by_artifact_ids_json",
+          "evidence_ids_json",
+          "method",
+          "actor_id",
+          "run_id",
+          "asserted_at",
+          "supersedes_id"
+        ],
+        "rows": 302300,
+        "sha256": "583ca4861ba66311618d315b6744d308ee734ac8ba0847c71d0b996255e62d77"
+      },
+      "concept_assignments.parquet": {
+        "bytes": 7898,
+        "columns": [
+          "assignment_id",
+          "subject_type",
+          "subject_id",
+          "concept_id",
+          "confidence",
+          "evidence_json",
+          "method",
+          "actor_id",
+          "run_id",
+          "asserted_at",
+          "supersedes_id"
+        ],
+        "rows": 24,
+        "sha256": "7b9d122db5b0d6293fe082377fdd5d5a33309948492f21c54789e3d37fe63f77"
+      },
+      "concept_events.parquet": {
+        "bytes": 41343,
+        "columns": [
+          "event_id",
+          "event_type",
+          "payload_json",
+          "method",
+          "actor_id",
+          "run_id",
+          "asserted_at",
+          "supersedes_id"
+        ],
+        "rows": 901,
+        "sha256": "06c4987dd2ec73af084fe0004b16da1d3ea1e8306758f3ea583d611cb26abe99"
+      },
+      "concepts.parquet": {
+        "bytes": 45878,
+        "columns": [
+          "concept_id",
+          "scheme",
+          "pref_label",
+          "alt_labels_json",
+          "definition",
+          "broader_id",
+          "status",
+          "replaced_by",
+          "external_ids_json",
+          "method",
+          "actor_id",
+          "run_id",
+          "asserted_at",
+          "supersedes_id"
+        ],
+        "rows": 901,
+        "sha256": "f338b7c8a1e6aae1f938a50a7b22936085b9e41efd2315c33077a19e903f0ddf"
+      },
+      "proceedings.parquet": {
+        "bytes": 41199998,
+        "columns": [
+          "proceeding_id",
+          "rin",
+          "docket_ids_json",
+          "title",
+          "agency_code",
+          "current_stage",
+          "stage_events_json",
+          "fr_document_numbers_json",
+          "cfr_refs_json",
+          "cfr_target_iris_json",
+          "authority_refs_json",
+          "identity_predecessors_json",
+          "method",
+          "actor_id",
+          "run_id",
+          "asserted_at",
+          "supersedes_id"
+        ],
+        "rows": 511643,
+        "sha256": "e49cb37ac2a97465a79408a0f04df2d5a983dc3bd2e1dbb024720ab62c829682"
+      },
+      "regulatory_agenda_items.parquet": {
+        "bytes": 461530,
+        "columns": [
+          "agenda_item_id",
+          "rin",
+          "scope_status",
+          "scope_basis",
+          "linked_proceeding_count",
+          "observation_count",
+          "latest_agenda_edition",
+          "first_seen",
+          "last_seen",
+          "method",
+          "actor_id",
+          "run_id",
+          "asserted_at",
+          "supersedes_id"
+        ],
+        "rows": 38005,
+        "sha256": "e3b666ba9ccf497514e990fa321cfa6946db05a4d38c4bfc6ec24c0879380a30"
+      },
+      "rule_targets.parquet": {
+        "bytes": 303168,
+        "columns": [
+          "docket_id",
+          "cfr_ref",
+          "cfr_title",
+          "cfr_part",
+          "cfr_section",
+          "rin",
+          "source",
+          "evidence_id",
+          "first_seen",
+          "last_seen",
+          "method",
+          "actor_id",
+          "run_id",
+          "asserted_at",
+          "supersedes_id"
+        ],
+        "rows": 39516,
+        "sha256": "5cec12fb8a7fa1dc6ba9c578654e9575823ff02e594f2c97c4b7c01fa0f2ad3e"
+      }
+    },
+    "baseline": null,
+    "failures": {
+      "by_check": {},
+      "examples": [],
+      "total": 0
+    },
+    "inputs": {
+      "previous_snapshot_id": "snapshot_b40ccfbd464a1bb8ee7b6a2d6f2310df",
+      "prior_artifacts": {
+        "concept_assignments.parquet": {
+          "bytes": 7898,
+          "sha256": "7b9d122db5b0d6293fe082377fdd5d5a33309948492f21c54789e3d37fe63f77"
+        },
+        "concept_events.parquet": {
+          "bytes": 41343,
+          "sha256": "06c4987dd2ec73af084fe0004b16da1d3ea1e8306758f3ea583d611cb26abe99"
+        },
+        "concepts.parquet": {
+          "bytes": 45878,
+          "sha256": "f338b7c8a1e6aae1f938a50a7b22936085b9e41efd2315c33077a19e903f0ddf"
+        },
+        "proceedings.parquet": {
+          "bytes": 20636765,
+          "sha256": "c295b17b06d00a4a43221c82440642a3cbe09bba48cd907bad57f45d6ff7cb29"
+        }
+      },
+      "sources": {
+        "dockets.parquet": {
+          "bytes": 14347053,
+          "sha256": "b14cd488b7898391cff448ac4de19f85936072dcb1aa105da32eea88e6fd7938"
+        },
+        "documents.parquet": {
+          "bytes": 54786110,
+          "sha256": "52f085f9ec2ee0c08fe3fb59bcd789bfef34000f87608ea36af9a6adbacfb04d"
+        },
+        "federal_register.parquet": {
+          "bytes": 155603798,
+          "sha256": "ac18315faa8be4a8d3656e758597d672c5d85c23cc6f8fde0ac53c9295b22bf2"
+        },
+        "fr_docket_links.parquet": {
+          "bytes": 82748978,
+          "sha256": "b3409f0ada792a8c9534edcf87c290a8b39e482e4803f08656bfa9de4504fd45"
+        },
+        "unified_agenda.parquet": {
+          "bytes": 1017503,
+          "sha256": "e6862d5d6a5300f10c70eeaf321f1e82e1f5332f71069d07723cc584ee6a85ae"
+        }
+      }
+    },
+    "manifest": "/Users/mikewolfd/Work/spicy-regs/output/rin-ontology-revision-candidate/ontology-dataset-manifest.json",
+    "metrics": {
+      "agenda_item_proceedings": {
+        "linked_items": 36081,
+        "rows": 120685,
+        "source:docket_rin": 285,
+        "source:document_rin": 29,
+        "source:federal_register_rin": 120371
+      },
+      "authority_edges": {
+        "parse_status:failed": 903,
+        "parse_status:ok": 6285,
+        "parse_status:partial": 3430,
+        "public_law_identifiers": 756,
+        "rows": 10618,
+        "usc_identifiers": 8578
+      },
+      "comment_periods": {
+        "docket_only_intervals": 278,
+        "multi_docket_intervals": 682,
+        "rows": 302300,
+        "unanchored_intervals": 0
+      },
+      "proceedings": {
+        "agency_identified": 275229,
+        "citation_target_iris": 15254,
+        "distinct_predecessor_edges": 48679,
+        "docket_not_in_source": 0,
+        "invalid_docket_syntax": 0,
+        "multi_docket_rows": 259,
+        "placeholder_authority_claims": 0,
+        "rin_evidence": 112893,
+        "rows": 511643,
+        "self_predecessor_edges": 0,
+        "stage:final": 164616,
+        "stage:proposed": 115703,
+        "stage:supplemental": 2836,
+        "stage:withdrawn": 12540,
+        "unresolved_edition_targets": 15254
+      },
+      "regulatory_agenda_items": {
+        "rows": 38005,
+        "scope:recurring": 41,
+        "scope:single_observed": 15200,
+        "scope:unresolved": 22764
+      },
+      "rule_targets": {
+        "citation_targets": 38396,
+        "docket_not_in_source": 0,
+        "invalid_cfr_reference": 0,
+        "invalid_docket_syntax": 0,
+        "rows": 39516,
+        "source:docket_rin": 285,
+        "source:document_fr_doc": 22738,
+        "source:document_rin": 26,
+        "source:fr_cfr_ref": 16467
+      },
+      "source_membership": {
+        "cross_posting_links": 3029,
+        "cross_posting_values": 3061,
+        "cross_posting_values_filtered": 32,
+        "dockets": 277318,
+        "documents": 1987880,
+        "federal_register_documents": 1004233
+      }
+    },
+    "snapshot_id": "snapshot_0e4b4204bdfbd462a9270fcd766fb8dd",
+    "status": "pass"
+  },
+  "kind": "spicy-regs-rulespec-paired-corpus-receipt",
+  "materialization_gates": [],
+  "repositories": {
+    "baseline_spicy_regs": null,
+    "rulespec": {
+      "after_gates": {
+        "branch": "us-regulatory-identifiers",
+        "clean": false,
+        "commit": "878d23ed73891b37e73c39adf9f72e2d1acc2278",
+        "path": "/Users/mikewolfd/Work/rulespec",
+        "status_sha256": "2defb27bb8bb687ccf416d23c15cc6217d1e7acf4daf1bbe1880944bb5ea841e"
+      },
+      "branch": "us-regulatory-identifiers",
+      "clean": false,
+      "commit": "878d23ed73891b37e73c39adf9f72e2d1acc2278",
+      "path": "/Users/mikewolfd/Work/rulespec",
+      "status_sha256": "2defb27bb8bb687ccf416d23c15cc6217d1e7acf4daf1bbe1880944bb5ea841e"
+    },
+    "spicy_regs": {
+      "after_gates": {
+        "branch": "main",
+        "clean": false,
+        "commit": "52bba9978fc13ff359c042d02ee02e5b685bdb98",
+        "path": "/Users/mikewolfd/Work/spicy-regs",
+        "status_sha256": "bb5449010071109fdd53fbc5c545d862619483ec5f24b899b35d4e95087332b0"
+      },
+      "branch": "main",
+      "clean": false,
+      "commit": "52bba9978fc13ff359c042d02ee02e5b685bdb98",
+      "path": "/Users/mikewolfd/Work/spicy-regs",
+      "status_sha256": "bb5449010071109fdd53fbc5c545d862619483ec5f24b899b35d4e95087332b0"
+    }
+  },
+  "rulespec_contract_digest": "sha256:2aefd3fad7782a7b16a7fa8fc08e8ceb26b5db741e0371b8fa8a9ccc1982124d",
+  "status": "pass"
+}

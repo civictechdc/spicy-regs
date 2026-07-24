@@ -1,6 +1,6 @@
 partner: "Civic Tech DC / Spicy Regs"
 implementation: "spicy-regs@0.1.0"
-rulespec_version: "sha256:ea9b899ba92955b83638ece811d7a4b744dd912f72e19290e32c97508674de1c"
+rulespec_version: "sha256:2aefd3fad7782a7b16a7fa8fc08e8ceb26b5db741e0371b8fa8a9ccc1982124d"
 # Publication remains locked until a maintainer replaces these nulls with the
 # released VERSION and its canonical GitHub release URL.
 rulespec_release: null
@@ -10,16 +10,27 @@ carrier_mapping: "../docs/ontology.md"
 terms_used:
   - "http://purl.org/dc/terms/hasFormat"
   - "http://purl.org/dc/terms/isFormatOf"
+  - "http://purl.org/dc/terms/relation"
+  - "http://www.w3.org/ns/dcat#hadRole"
+  - "http://www.w3.org/ns/dcat#qualifiedRelation"
+  - "http://www.w3.org/ns/prov#generatedAtTime"
+  - "http://www.w3.org/ns/prov#wasAttributedTo"
   - "http://www.w3.org/ns/prov#wasDerivedFrom"
+  - "http://www.w3.org/ns/prov#wasGeneratedBy"
+  - "http://xmlns.com/foaf/0.1/primaryTopic"
+  - "https://rulespec.org/ns/v1#agendaAuthorityCitation"
+  - "https://rulespec.org/ns/v1#agendaPriority"
+  - "https://rulespec.org/ns/v1#agendaScopeStatus"
+  - "https://rulespec.org/ns/v1#agendaStage"
   - "https://rulespec.org/ns/v1#commentPeriodDocket"
   - "https://rulespec.org/ns/v1#commentPeriodEnd"
   - "https://rulespec.org/ns/v1#commentPeriodFor"
   - "https://rulespec.org/ns/v1#commentPeriodOpenedBy"
   - "https://rulespec.org/ns/v1#commentPeriodStart"
+  - "https://rulespec.org/ns/v1#hasAgendaItemIdentifier"
   - "https://rulespec.org/ns/v1#hasArtifactIdentifier"
   - "https://rulespec.org/ns/v1#hasDocket"
   - "https://rulespec.org/ns/v1#hasDocketIdentifier"
-  - "https://rulespec.org/ns/v1#hasProceedingEvidenceIdentifier"
   - "https://rulespec.org/ns/v1#hasProceedingIdentifier"
   - "https://rulespec.org/ns/v1#hasRegulatoryIdentifier"
   - "https://rulespec.org/ns/v1#proceedingAffectsCitation"
@@ -27,9 +38,9 @@ terms_used:
   - "https://rulespec.org/ns/v1#proceedingSupersedes"
   - "https://rulespec.org/ns/v1#publishedInProceeding"
 test_corpus_run_at: "2026-07-24"
-test_corpus_version: "snapshot_04ebfb14969691c54af2c3cc31a28be4"
-test_evidence_path: "../docs/evidence/rulespec-stabilization-2026-07-24/paired-receipt.json"
-test_evidence_sha256: "de07c8042c7873c3bb1853ad74566c8e4b60f040160f8357456b531a4ba8219d"
+test_corpus_version: "snapshot_0e4b4204bdfbd462a9270fcd766fb8dd"
+test_evidence_path: "../docs/evidence/rin-ontology-revision-2026-07-24/corpus-receipt.json"
+test_evidence_sha256: "3a609b10ded499578845483febd873b61ca221ecb131044e7f88e86693e58746"
 results:
   L0: pass
   L1: not-claimed
@@ -39,15 +50,21 @@ results:
 notes: |
   Parquet is a non-JSON-LD carrier. The Rulespec contract is pinned by content
   digest; every mapped subject, range, direction, value kind, transform, and
-  example is documented in docs/ontology.md. The machine-readable paired
-  before/after receipt is pinned above; docs/rulespec-repair-report.md explains
-  it. The release fields above intentionally remain null, so production
+  example is documented in docs/ontology.md. The machine-readable corpus
+  receipt is pinned above; docs/rin-ontology-revision-report.md explains it and
+  records the comparison to the prior candidate. The release fields above
+  intentionally remain null, so production
   publication fails closed while this contract is an unreleased candidate.
   Unversioned CFR and authority rollups are not claimed as immutable
   Artifact relationships. Cross-posting links project only when the raw
   regulations.gov value has exact membership in the Federal Register source
   snapshot. Null proceeding stages remain absent; non-null stages agree with
-  the latest stage-family event. Agency codes never mint Authority placeholders.
+  the latest action-specific stage-family event. A RIN identifies a durable
+  Regulatory Agenda item, never a Proceeding. Agenda observations use the
+  general foaf:primaryTopic document-to-subject seam; provenance-bearing action
+  associations use the DCAT qualified-relation pattern. Unified Agenda stage,
+  priority, authority, and CFR context never fan out to Proceedings through RIN
+  equality. Agency codes never mint Authority placeholders.
   Comment periods retain Proceeding or source-backed Docket anchors and map
   their opening Artifacts separately from prov:wasDerivedFrom evidence.
   Retrieval-grade tags and assignments remain outside the L0 claim until a

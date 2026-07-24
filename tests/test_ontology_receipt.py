@@ -1,4 +1,4 @@
-"""Corpus-bound receipt validation for the seven ontology artifacts."""
+"""Corpus-bound receipt validation for the ontology generation."""
 
 from __future__ import annotations
 
@@ -105,6 +105,39 @@ def _fixture_manifest(tmp_path: Path) -> Path:
     )
     _write_table(
         tmp_path,
+        "regulatory_agenda_items",
+        [
+            {
+                "agenda_item_id": "urn:rkaf:us:rin:2060-AV16",
+                "rin": "2060-AV16",
+                "scope_status": "single_observed",
+                "scope_basis": "one_evidence_linked_proceeding",
+                "linked_proceeding_count": "1",
+                "observation_count": "0",
+            }
+        ],
+    )
+    _write_table(
+        tmp_path,
+        "agenda_item_proceedings",
+        [
+            {
+                "relationship_id": "agenda_relationship_fixture",
+                "agenda_item_id": "urn:rkaf:us:rin:2060-AV16",
+                "rin": "2060-AV16",
+                "proceeding_id": proceeding_id,
+                "relationship_role": "agenda_tracks_proceeding",
+                "source": "docket_rin",
+                "evidence_id": docket_id,
+                "evidence_uri": (
+                    f"https://www.regulations.gov/docket/{docket_id}"
+                ),
+                "evidence_date": "2026-01-01",
+            }
+        ],
+    )
+    _write_table(
+        tmp_path,
         "comment_periods",
         [
             {
@@ -193,6 +226,46 @@ def test_generation_receipt_rejects_unknown_comment_period_reference(tmp_path):
     assert result["status"] == "fail"
     assert result["failures"]["by_check"]["comment_periods.proceeding_range"] == 1
     assert result["failures"]["by_check"]["manifest.sha256"] == 1
+
+
+def test_generation_receipt_rejects_unknown_agenda_proceeding_reference(
+    tmp_path,
+):
+    manifest = _fixture_manifest(tmp_path)
+    rows = pq.read_table(
+        tmp_path / "agenda_item_proceedings.parquet"
+    ).to_pylist()
+    rows[0]["proceeding_id"] = "missing"
+    _write_table(tmp_path, "agenda_item_proceedings", rows)
+
+    result = validate_generation(manifest)
+
+    assert result["status"] == "fail"
+    assert (
+        result["failures"]["by_check"][
+            "agenda_item_proceedings.proceeding_range"
+        ]
+        == 1
+    )
+
+
+def test_generation_receipt_rejects_inconsistent_agenda_scope_basis(tmp_path):
+    manifest = _fixture_manifest(tmp_path)
+    rows = pq.read_table(
+        tmp_path / "regulatory_agenda_items.parquet"
+    ).to_pylist()
+    rows[0]["scope_basis"] = "multiple_evidence_linked_proceedings"
+    _write_table(tmp_path, "regulatory_agenda_items", rows)
+
+    result = validate_generation(manifest)
+
+    assert result["status"] == "fail"
+    assert (
+        result["failures"]["by_check"][
+            "regulatory_agenda_items.scope_basis"
+        ]
+        == 1
+    )
 
 
 def test_generation_receipt_requires_identical_baseline_inputs(tmp_path):

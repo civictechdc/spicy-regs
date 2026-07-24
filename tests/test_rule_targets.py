@@ -12,7 +12,7 @@ def _write(path, columns, rows):
     write_parquet_rows(path, columns=columns, rows=rows)
 
 
-def test_rule_target_spine_emits_known_edges_from_every_source(tmp_path):
+def test_rule_target_spine_emits_only_action_specific_edges(tmp_path):
     _write(
         tmp_path / "dockets.parquet",
         ("docket_id", "rin", "modify_date"),
@@ -93,8 +93,6 @@ def test_rule_target_spine_emits_known_edges_from_every_source(tmp_path):
         ("document_rin", None, "2060-AV13"),
         ("fr_cfr_ref", "40-60", "2060-AV12"),
         ("document_fr_doc", "40-60", "2060-AV12"),
-        ("ua_cfr_ref", "40-63", "2060-AV12"),
-        ("ua_cfr_ref", "40-64", "2060-AV13"),
     }
     assert pq.ParquetFile(output).schema_arrow.names == list(COLUMNS)
     assert all(row["method"] == "deterministic" for row in rows)

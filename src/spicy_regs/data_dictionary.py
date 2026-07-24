@@ -4,9 +4,9 @@
 The data dictionary has two layers:
 
 * **Schema (source of truth, in code).** Column names and types come from
-  :data:`spicy_regs.schemas.regulations.RECORD_TYPES` for the three core tables
-  and from :data:`DERIVED_SCHEMAS` below for the four rollup tables. This keeps
-  generation deterministic and offline.
+  :data:`spicy_regs.schemas.regulations.RECORD_TYPES` for core tables and from
+  :data:`DERIVED_SCHEMAS` below for rollups. This keeps generation
+  deterministic and offline.
 * **Descriptions (curated prose).** Human descriptions live in
   ``data_dictionary/descriptions.yaml``, keyed by table and column.
 
@@ -59,6 +59,8 @@ TABLES: tuple[str, ...] = (
     "rule_targets",
     "authority_edges",
     "proceedings",
+    "regulatory_agenda_items",
+    "agenda_item_proceedings",
     "comment_periods",
     "concepts",
     "concept_assignments",
@@ -95,6 +97,8 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
         "rule_targets",
         "authority_edges",
         "proceedings",
+        "regulatory_agenda_items",
+        "agenda_item_proceedings",
         "comment_periods",
         "concepts",
         "concept_assignments",
@@ -297,6 +301,38 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("cfr_target_iris_json", "VARCHAR"),
         ("authority_refs_json", "VARCHAR"),
         ("identity_predecessors_json", "VARCHAR"),
+        ("method", "VARCHAR"),
+        ("actor_id", "VARCHAR"),
+        ("run_id", "VARCHAR"),
+        ("asserted_at", "VARCHAR"),
+        ("supersedes_id", "VARCHAR"),
+    ],
+    "regulatory_agenda_items": [
+        ("agenda_item_id", "VARCHAR"),
+        ("rin", "VARCHAR"),
+        ("scope_status", "VARCHAR"),
+        ("scope_basis", "VARCHAR"),
+        ("linked_proceeding_count", "VARCHAR"),
+        ("observation_count", "VARCHAR"),
+        ("latest_agenda_edition", "VARCHAR"),
+        ("first_seen", "VARCHAR"),
+        ("last_seen", "VARCHAR"),
+        ("method", "VARCHAR"),
+        ("actor_id", "VARCHAR"),
+        ("run_id", "VARCHAR"),
+        ("asserted_at", "VARCHAR"),
+        ("supersedes_id", "VARCHAR"),
+    ],
+    "agenda_item_proceedings": [
+        ("relationship_id", "VARCHAR"),
+        ("agenda_item_id", "VARCHAR"),
+        ("rin", "VARCHAR"),
+        ("proceeding_id", "VARCHAR"),
+        ("relationship_role", "VARCHAR"),
+        ("source", "VARCHAR"),
+        ("evidence_id", "VARCHAR"),
+        ("evidence_uri", "VARCHAR"),
+        ("evidence_date", "VARCHAR"),
         ("method", "VARCHAR"),
         ("actor_id", "VARCHAR"),
         ("run_id", "VARCHAR"),
