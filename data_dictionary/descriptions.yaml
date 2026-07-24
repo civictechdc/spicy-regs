@@ -127,6 +127,43 @@ tables:
       document_type: "Document category counted in this bucket (e.g. `Rule`, `Notice`)."
       document_count: "Number of documents the agency posted of that type in that month."
 
+  rulemaking_lifecycles:
+    summary: >-
+      Legacy proposed-to-final timing rollup over regulations.gov documents.
+      `proceedings` is the first-class identity/stage surface; this table remains
+      published for existing duration and stuck-proposal consumers.
+    columns:
+      kind: "`pair` for a completed proposed-to-final sequence or `stuck` for a proposal with no later final rule."
+      docket_id: "Regulations.gov docket identifier."
+      agency_code: "Agency code from the proposed-rule document."
+      title: "Representative proposed-rule title."
+      proposed_date: "Earliest proposed-rule posted date in the docket."
+      final_date: "Earliest final-rule date at or after the proposal; null for `stuck` rows."
+      days: "Elapsed days from proposal to final rule; null for `stuck` rows."
+
+  fr_docket_links:
+    summary: >-
+      Exploded Federal Register-to-regulations.gov link table: one row per
+      Federal Register document and referenced docket. It is the normalized
+      bridge used by `rule_targets`, proceedings, and comment periods.
+    columns:
+      docket_id: "Referenced regulations.gov docket identifier."
+      document_number: "Federal Register document number."
+      title: "Federal Register document title."
+      abstract: "Federal Register abstract."
+      document_type: "Federal Register category such as `Rule` or `Proposed Rule`."
+      subtype: "Federal Register subtype, when present."
+      publication_date: "Federal Register publication date."
+      effective_on: "Effective date, when stated."
+      comments_close_on: "Federal Register comment deadline, when stated."
+      signing_date: "Signing date for presidential documents."
+      agency_slugs: "Comma-separated Federal Register agency slugs."
+      docket_ids_json: "Original JSON docket-id array retained for compatibility."
+      regulation_id_numbers_json: "JSON array of RINs reported by the Federal Register document."
+      html_url: "Federal Register HTML page."
+      pdf_url: "Federal Register PDF rendition."
+      executive_order_number: "Executive-order number, when applicable."
+
   cfr_sections:
     summary: >-
       One row per Code of Federal Regulations *section* (a GovInfo CFR granule),
@@ -165,6 +202,7 @@ tables:
       congress: "Congress number the bill was introduced in (e.g. `118`)."
       bill_type: "Bill type, lowercased (e.g. `hr`, `s`, `hjres`, `sjres`, `hconres`, `sconres`, `hres`, `sres`)."
       bill_number: "Bill number within its `(congress, bill_type)` (e.g. `1234`)."
+      pl_number: "Enacted Public Law number as `<congress>-<law-number>` (e.g. `117-58`), parsed from the list payload's latest-action text. Direct join key to `authority_edges.pl_number`."
       title: "Bill title as returned by the list endpoint."
       origin_chamber: "Chamber the bill originated in (`House` or `Senate`)."
       latest_action_date: "Date of the most recent action on the bill (ISO 8601 string). Often the useful sort/recency signal."
@@ -221,6 +259,7 @@ tables:
       docket_ids_json: "JSON array of docket identifier strings referenced by the document (e.g. regulations.gov docket numbers). Joins to `dockets`/`documents` via `fr_docket_links`."
       regulation_id_numbers_json: "JSON array of Regulation Identifier Numbers (RINs). The join key to the Unified Agenda. Often `[]`."
       cfr_references_json: "JSON array of CFR citations as `{title, part, chapter, citation_url}` objects. The join key to the CFR."
+      topics_json: "JSON array of Federal Register Thesaurus topics assigned to the document. Seeds and evaluates the `subject` concept scheme."
       html_url: "URL of the document's HTML page on federalregister.gov."
       pdf_url: "URL of the document's PDF rendition."
       body_html_url: "URL of the document's full-text HTML body."
@@ -230,6 +269,149 @@ tables:
       subtype: "FR document subtype, when set. Often null."
       executive_order_number: "Executive order number, for presidential EO documents. Null otherwise."
       modify_date: "Processing/modification date carried from the prior published table; null for rows freshly ingested via the REST API (which does not expose it)."
+
+  rule_targets:
+    summary: >-
+      The deterministic rule-identity spine: one row per docket, normalized CFR
+      target, optional RIN, and evidence source. Corroborating sources remain
+      separate rows. Mapped identifier fields use Rulespec Level-0 conventions;
+      local provenance fields remain outside that claim. All columns are
+      VARCHAR.
+    columns:
+      docket_id: "Subject regulations.gov docket."
+      cfr_ref: "Compact CFR key `<title>-<part>[.<section>]`; null on RIN-only edges."
+      cfr_title: "Decomposed CFR title number."
+      cfr_part: "Decomposed CFR part number."
+      cfr_section: "Decomposed CFR section, usually null for FR part-level metadata."
+      rin: "Regulation Identifier Number associated with the edge, when known."
+      source: "Evidence path: `fr_cfr_ref`, `ua_cfr_ref`, `docket_rin`, `document_rin`, or `document_fr_doc`."
+      evidence_id: "A concrete source row justifying the edge: FR document number, RIN/agenda edition, docket id, or document id."
+      first_seen: "Earliest publication/action timestamp among folded evidence for this logical edge."
+      last_seen: "Latest publication/action timestamp among folded evidence for this logical edge."
+      method: "Derivation method; `deterministic` in v1."
+      actor_id: "Versioned ruleset that produced the assertion."
+      run_id: "Pipeline run identifier."
+      asserted_at: "UTC timestamp when the row was asserted."
+      supersedes_id: "Prior assertion revised by this row; null for deterministic v1 spine rows."
+
+  authority_edges:
+    summary: >-
+      Parsed Unified Agenda statutory-authority citations. Failed parses are
+      deliberately retained with their raw text so parser coverage can improve
+      without hiding evidence. All columns are VARCHAR.
+    columns:
+      rin: "RIN whose agenda entry cited the authority."
+      authority_raw: "Original authority string, always retained."
+      usc_title: "Parsed U.S. Code title, when present."
+      usc_section: "Parsed U.S. Code section with subsection parentheses omitted."
+      pl_number: "Parsed Public Law number `<congress>-<law-number>`; joins to `congress_bills.pl_number`."
+      authority_type: "`usc`, `public_law`, `statute_at_large`, `eo`, or `other`."
+      parse_status: "`ok`, `partial`, or `failed`; failed rows are searchable and never dropped."
+      agenda_edition: "Unified Agenda edition that supplied the citation."
+      method: "Derivation method; `deterministic` in v1."
+      actor_id: "Versioned authority-parser ruleset."
+      run_id: "Pipeline run identifier."
+      asserted_at: "UTC timestamp when the parse assertion was made."
+      supersedes_id: "Prior assertion revised by this row; null for v1 deterministic parses."
+
+  proceedings:
+    summary: >-
+      One row per rulemaking proceeding, normally RIN-bounded and optionally
+      spanning multiple regulations.gov dockets. It is assembled independently
+      from source identity and publication evidence; the legacy duration rollup
+      remains a separate product.
+    columns:
+      proceeding_id: "Stable opaque proceeding id. Primary key."
+      rin: "Associated RIN when available; a strong evidence/join key that is not globally unique proceeding identity."
+      docket_ids_json: "JSON array of associated regulations.gov dockets; may contain multiple ids."
+      title: "Most recent available agenda/docket/publication title."
+      agency_code: "Most frequently observed issuing agency code."
+      current_stage: "Latest evidenced stage: `prerule`, `proposed`, `supplemental`, `final`, `withdrawn`, or `longterm`; null when no stage evidence exists."
+      stage_events_json: "Ordered JSON stage-event history with date, source, evidence id, and Rulespec event kind."
+      fr_document_numbers_json: "JSON array of Federal Register documents published in the proceeding."
+      cfr_refs_json: "JSON array of compact CFR targets from `rule_targets`."
+      authority_refs_json: "JSON array of compact U.S.C., Public Law, or retained raw authority references."
+      identity_predecessors_json: "JSON array of prior-generation proceeding ids whose evidence overlaps this component; records continuity, merges, and splits."
+      method: "Derivation method; `deterministic`."
+      actor_id: "Versioned proceeding-assembly ruleset."
+      run_id: "Pipeline run identifier."
+      asserted_at: "UTC assertion timestamp."
+      supersedes_id: "The same stable proceeding id when this row replaces its prior-generation assertion; null for a newly assigned id."
+
+  comment_periods:
+    summary: >-
+      One row per continuous public-comment interval attached to a proceeding
+      and docket. Overlapping deadline extensions coalesce; a closed gap creates
+      a separate reopening row.
+    columns:
+      comment_period_id: "Stable opaque id based on proceeding, docket, and opening date. Primary key."
+      proceeding_id: "Owning proceeding. Foreign key to `proceedings.proceeding_id`."
+      rin: "Proceeding RIN, when available."
+      docket_id: "Associated regulations.gov docket, when known."
+      open_date: "First day comments were accepted."
+      close_date: "Last day comments were accepted; never earlier than `open_date`."
+      source: "`documents.comment_end_date`, `federal_register.comments_close_on`, or a `+`-joined corroboration."
+      evidence_ids_json: "JSON array of source document ids or FR document numbers."
+      method: "Derivation method; `deterministic`."
+      actor_id: "Versioned comment-period assembly ruleset."
+      run_id: "Pipeline run identifier."
+      asserted_at: "UTC assertion timestamp."
+      supersedes_id: "Prior interval assertion revised by this row, when applicable."
+
+  concepts:
+    summary: >-
+      SKOS-style retrieval concept registry. The v1 `subject` facet is seeded
+      from Federal Register Thesaurus terms; `regulated_entity` starts empty and
+      grows through extraction. Concepts are never hard-deleted or renamed in
+      place.
+    columns:
+      concept_id: "Stable opaque concept id. Primary key."
+      scheme: "Facet: `subject` or `regulated_entity` in v1."
+      pref_label: "Preferred human-readable label."
+      alt_labels_json: "JSON array of synonyms and labels absorbed by merges."
+      definition: "One-sentence scope note."
+      broader_id: "Parent concept id for the subject hierarchy; graph must remain acyclic."
+      status: "`active`, `candidate`, or `deprecated`."
+      replaced_by: "Replacement concept id after a merge; chain is acyclic and resolvable."
+      external_ids_json: "JSON array of FR Thesaurus anchors, CAS numbers, NAICS codes, or `skos:exactMatch` IRIs."
+      method: "`deterministic`, `llm`, `embedding`, or `human`."
+      actor_id: "Model, ruleset, or human actor that last asserted registry state."
+      run_id: "Pipeline run identifier."
+      asserted_at: "UTC assertion timestamp."
+      supersedes_id: "Prior concept/assertion lineage reference, when applicable."
+
+  concept_assignments:
+    summary: >-
+      Append-only tag assertions connecting dockets and FR-backed
+      regulations.gov documents to concepts. Validation disagreements append a
+      lower-confidence superseding row; existing assertions are never updated.
+    columns:
+      assignment_id: "Stable assertion id. Primary key."
+      subject_type: "`docket`, `document`, or future `cfr_section`."
+      subject_id: "Foreign key into the table named by `subject_type`."
+      concept_id: "Assigned concept; deprecated ids resolve through `concepts.replaced_by`."
+      confidence: "Assertion confidence from 0 through 1, stored as VARCHAR."
+      evidence_json: "Grounding spans, source fields, source-text digest, justification, and optional validation result."
+      method: "`llm`, `embedding`, `human`, or deterministic method."
+      actor_id: "Model/version, ruleset, or human actor."
+      run_id: "Resumable generation/validation run identifier."
+      asserted_at: "UTC assertion timestamp."
+      supersedes_id: "Prior assignment revised by this assertion; null for an initial assignment."
+
+  concept_events:
+    summary: >-
+      Append-only audit trail of structural concept changes and the tagging
+      loop's memory. It supports undo/reconstruction without hard deletion.
+    columns:
+      event_id: "Stable event id. Primary key."
+      event_type: "`seed`, `merge`, `split`, `rename`, `deprecate`, or `promote`."
+      payload_json: "Canonical JSON before/after payload with affected ids, labels, scores, and rationale."
+      method: "Method responsible for the event."
+      actor_id: "Model, ruleset, or human actor responsible for the event."
+      run_id: "Pipeline run identifier."
+      asserted_at: "UTC event timestamp."
+      supersedes_id: "Prior event/assertion superseded by this event, when applicable."
+
   sam_entities:
     summary: >-
       One row per registered federal entity, ingested from the SAM.gov Entity

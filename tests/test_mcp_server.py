@@ -24,9 +24,7 @@ VERCEL_COPY_PATH = REPO_ROOT / "mcp-server" / "api" / "index.py"
 
 
 def _load_vercel_copy():
-    spec = importlib.util.spec_from_file_location(
-        "spicy_regs_mcp_vercel_copy", VERCEL_COPY_PATH
-    )
+    spec = importlib.util.spec_from_file_location("spicy_regs_mcp_vercel_copy", VERCEL_COPY_PATH)
     assert spec and spec.loader, f"could not load {VERCEL_COPY_PATH}"
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -46,9 +44,7 @@ def test_jsonify_coerces_non_json_types():
     assert j(date(2024, 1, 2)) == "2024-01-02"
     assert j(datetime(2024, 1, 2, 3, 4, 5)) == "2024-01-02T03:04:05"
     assert j(Decimal("1.50")) == "1.50"
-    assert j(UUID("12345678-1234-5678-1234-567812345678")) == (
-        "12345678-1234-5678-1234-567812345678"
-    )
+    assert j(UUID("12345678-1234-5678-1234-567812345678")) == ("12345678-1234-5678-1234-567812345678")
     assert j(b"\x00\xff") == "00ff"
     assert j([Decimal("1"), date(2024, 1, 1)]) == ["1", "2024-01-01"]
     assert j({"a": Decimal("2"), "b": [b"\xab"]}) == {"a": "2", "b": ["ab"]}
@@ -89,9 +85,37 @@ def test_vercel_copy_in_sync():
     assert vercel.TABLES == mcp_server.TABLES
     assert vercel.INSTRUCTIONS == mcp_server.INSTRUCTIONS
     assert vercel.DEFAULT_R2_BASE_URL == mcp_server.DEFAULT_R2_BASE_URL
+    assert vercel.MATERIALIZED_TABLES == mcp_server.MATERIALIZED_TABLES
     # The catalog-backed comments path must stay identical across the two copies.
     assert vercel.CATALOG_ALIAS == mcp_server.CATALOG_ALIAS
     assert vercel.DEFAULT_CATALOG_NAMESPACE == mcp_server.DEFAULT_CATALOG_NAMESPACE
+
+
+def test_materialized_table_url_fails_closed_without_manifest():
+    assert mcp_server._published_table_url("proceedings", None) is None
+    assert mcp_server._published_table_url("proceedings", {}) is None
+    assert mcp_server._published_table_url("dockets", None) == (f"{mcp_server.R2_BASE_URL}/dockets.parquet")
+
+
+def test_advertised_tables_fail_closed_without_materialized_manifest(monkeypatch):
+    def unavailable(base_url):
+        raise RuntimeError(f"unavailable: {base_url}")
+
+    monkeypatch.setattr(mcp_server, "resolve_materialized_table_urls", unavailable)
+
+    advertised = set(mcp_server._published_table_names())
+    assert advertised
+    assert advertised.isdisjoint(mcp_server.MATERIALIZED_TABLES)
+
+
+def test_advertised_tables_include_complete_materialized_generation(monkeypatch):
+    monkeypatch.setattr(
+        mcp_server,
+        "resolve_materialized_table_urls",
+        lambda base_url: {name: f"{base_url}/{name}" for name in mcp_server.MATERIALIZED_TABLES},
+    )
+
+    assert mcp_server._published_table_names() == mcp_server.TABLES
 
 
 # --- catalog config resolution ----------------------------------------------
@@ -208,10 +232,7 @@ def test_sandbox_survives_temp_spill():
     out-of-memory error — never the confusing permission error.
     """
     con = _sandboxed_connection(memory_limit="20MB")
-    spilling_sql = (
-        "SELECT i, count(*) AS c FROM range(3_000_000) r(i) "
-        "GROUP BY i ORDER BY c, i DESC"
-    )
+    spilling_sql = "SELECT i, count(*) AS c FROM range(3_000_000) r(i) GROUP BY i ORDER BY c, i DESC"
     try:
         con.execute(spilling_sql).fetchall()
     except duckdb.OutOfMemoryException:
@@ -273,9 +294,7 @@ def test_comments_catalog_view_dedups_on_read():
     )
     rows = con.execute("SELECT comment_id, comment FROM comments ORDER BY comment_id").fetchall()
     assert rows == [("c1", "new"), ("c2", "only-null"), ("c3", "unique")]
-    counts = con.execute(
-        "SELECT count(*), count(DISTINCT comment_id) FROM comments"
-    ).fetchone()
+    counts = con.execute("SELECT count(*), count(DISTINCT comment_id) FROM comments").fetchone()
     assert counts is not None
     total, distinct = counts
     assert total == distinct == 3

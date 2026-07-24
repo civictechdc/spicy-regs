@@ -13,6 +13,7 @@ One row per congressional bill, ingested from the Congress.gov v3 REST API (`/bi
 | `congress` | `VARCHAR` | Congress number the bill was introduced in (e.g. `118`). |
 | `bill_type` | `VARCHAR` | Bill type, lowercased (e.g. `hr`, `s`, `hjres`, `sjres`, `hconres`, `sconres`, `hres`, `sres`). |
 | `bill_number` | `VARCHAR` | Bill number within its `(congress, bill_type)` (e.g. `1234`). |
+| `pl_number` | `VARCHAR` | Enacted Public Law number as `<congress>-<law-number>` (e.g. `117-58`), parsed from the list payload's latest-action text. Direct join key to `authority_edges.pl_number`. |
 | `title` | `VARCHAR` | Bill title as returned by the list endpoint. |
 | `origin_chamber` | `VARCHAR` | Chamber the bill originated in (`House` or `Senate`). |
 | `latest_action_date` | `VARCHAR` | Date of the most recent action on the bill (ISO 8601 string). Often the useful sort/recency signal. |

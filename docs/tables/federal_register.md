@@ -22,6 +22,7 @@ One row per Federal Register document, ingested from the federalregister.gov RES
 | `docket_ids_json` | `VARCHAR` | JSON array of docket identifier strings referenced by the document (e.g. regulations.gov docket numbers). Joins to `dockets`/`documents` via `fr_docket_links`. |
 | `regulation_id_numbers_json` | `VARCHAR` | JSON array of Regulation Identifier Numbers (RINs). The join key to the Unified Agenda. Often `[]`. |
 | `cfr_references_json` | `VARCHAR` | JSON array of CFR citations as `{title, part, chapter, citation_url}` objects. The join key to the CFR. |
+| `topics_json` | `VARCHAR` | JSON array of Federal Register Thesaurus topics assigned to the document. Seeds and evaluates the `subject` concept scheme. |
 | `html_url` | `VARCHAR` | URL of the document's HTML page on federalregister.gov. |
 | `pdf_url` | `VARCHAR` | URL of the document's PDF rendition. |
 | `body_html_url` | `VARCHAR` | URL of the document's full-text HTML body. |
