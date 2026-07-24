@@ -1,0 +1,660 @@
+{
+  "clean_repository_gate": {
+    "baseline_worktree_proven": true,
+    "baseline_worktree_required": true,
+    "required": true,
+    "status": "pass"
+  },
+  "created_at": "2026-07-24T06:59:54.992117+00:00",
+  "format_version": 1,
+  "gates": [
+    {
+      "command": [
+        "make",
+        "-C",
+        "/Users/mikewolfd/Work/rulespec",
+        "PYTHON=uv run --with-requirements requirements.txt --with jsonschema --with pyld python",
+        "compile"
+      ],
+      "cwd": "/Users/mikewolfd/Work/rulespec",
+      "exit_code": 0,
+      "finished_at": "2026-07-24T06:59:13.613548+00:00",
+      "log": "/Users/mikewolfd/Work/spicy-regs/docs/evidence/rulespec-stabilization-2026-07-24/paired-receipt-logs/rulespec-compile.log",
+      "log_sha256": "4bf4d62af77889c6f8881d8e9290acb8ef440e244821fe22194d13f1ca3606c5",
+      "name": "rulespec-compile",
+      "started_at": "2026-07-24T06:58:57.965984+00:00",
+      "status": "pass"
+    },
+    {
+      "command": [
+        "make",
+        "-C",
+        "/Users/mikewolfd/Work/rulespec",
+        "PYTHON=uv run --with-requirements requirements.txt --with jsonschema --with pyld python",
+        "test"
+      ],
+      "cwd": "/Users/mikewolfd/Work/rulespec",
+      "exit_code": 0,
+      "finished_at": "2026-07-24T06:59:48.734949+00:00",
+      "log": "/Users/mikewolfd/Work/spicy-regs/docs/evidence/rulespec-stabilization-2026-07-24/paired-receipt-logs/rulespec-test.log",
+      "log_sha256": "8f711110a235d8c25b8336b2df54c83d93ec9920ed5c00da3048d7a716ff63a0",
+      "name": "rulespec-test",
+      "started_at": "2026-07-24T06:59:13.613891+00:00",
+      "status": "pass"
+    },
+    {
+      "command": [
+        "env",
+        "R2_PUBLIC_URL=",
+        "uv",
+        "run",
+        "pytest"
+      ],
+      "cwd": "/private/tmp/spicy-regs-rule-candidate-3a032d2",
+      "exit_code": 0,
+      "finished_at": "2026-07-24T06:59:52.180164+00:00",
+      "log": "/Users/mikewolfd/Work/spicy-regs/docs/evidence/rulespec-stabilization-2026-07-24/paired-receipt-logs/spicy-pytest.log",
+      "log_sha256": "1e5c12702a965731bba8c891990489f19815e5051730df599f462f9accbf8ca9",
+      "name": "spicy-pytest",
+      "started_at": "2026-07-24T06:59:48.735417+00:00",
+      "status": "pass"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "spicy-regs-dict",
+        "check"
+      ],
+      "cwd": "/private/tmp/spicy-regs-rule-candidate-3a032d2",
+      "exit_code": 0,
+      "finished_at": "2026-07-24T06:59:52.315051+00:00",
+      "log": "/Users/mikewolfd/Work/spicy-regs/docs/evidence/rulespec-stabilization-2026-07-24/paired-receipt-logs/spicy-dictionary.log",
+      "log_sha256": "307fedf3b2644a82cb4dc63db7d838c5816a13e99a8f638f4991b84c70d0374e",
+      "name": "spicy-dictionary",
+      "started_at": "2026-07-24T06:59:52.180626+00:00",
+      "status": "pass"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "ruff",
+        "check",
+        "."
+      ],
+      "cwd": "/private/tmp/spicy-regs-rule-candidate-3a032d2",
+      "exit_code": 0,
+      "finished_at": "2026-07-24T06:59:52.386954+00:00",
+      "log": "/Users/mikewolfd/Work/spicy-regs/docs/evidence/rulespec-stabilization-2026-07-24/paired-receipt-logs/spicy-ruff.log",
+      "log_sha256": "d35a8af7c2ebca9cde69bfac8ef0a5a3cc3830ccbd70e2bae9f1e50d59446f20",
+      "name": "spicy-ruff",
+      "started_at": "2026-07-24T06:59:52.315504+00:00",
+      "status": "pass"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "ty",
+        "check",
+        "src",
+        "tests"
+      ],
+      "cwd": "/private/tmp/spicy-regs-rule-candidate-3a032d2",
+      "exit_code": 0,
+      "finished_at": "2026-07-24T06:59:52.588666+00:00",
+      "log": "/Users/mikewolfd/Work/spicy-regs/docs/evidence/rulespec-stabilization-2026-07-24/paired-receipt-logs/spicy-types.log",
+      "log_sha256": "7cc1c309498850094839f1fc7bc9d5eb40efef5186062cf235c53ba97b6987a8",
+      "name": "spicy-types",
+      "started_at": "2026-07-24T06:59:52.387377+00:00",
+      "status": "pass"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "--group",
+        "docs",
+        "mkdocs",
+        "build",
+        "--strict"
+      ],
+      "cwd": "/private/tmp/spicy-regs-rule-candidate-3a032d2",
+      "exit_code": 0,
+      "finished_at": "2026-07-24T06:59:54.786391+00:00",
+      "log": "/Users/mikewolfd/Work/spicy-regs/docs/evidence/rulespec-stabilization-2026-07-24/paired-receipt-logs/spicy-docs.log",
+      "log_sha256": "817709ef4cb653556ede804566f375b16f4a237b0856aef94a0d44fd4f9e3009",
+      "name": "spicy-docs",
+      "started_at": "2026-07-24T06:59:52.589120+00:00",
+      "status": "pass"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "python",
+        "/Users/mikewolfd/Work/rulespec/tools/l0_mapping_audit.py",
+        "/private/tmp/spicy-regs-rule-candidate-3a032d2/conformance/rulespec-l0.yaml"
+      ],
+      "cwd": "/private/tmp/spicy-regs-rule-candidate-3a032d2",
+      "exit_code": 0,
+      "finished_at": "2026-07-24T06:59:54.861534+00:00",
+      "log": "/Users/mikewolfd/Work/spicy-regs/docs/evidence/rulespec-stabilization-2026-07-24/paired-receipt-logs/rulespec-l0.log",
+      "log_sha256": "c2f28c64f5de2ed0d01aa717045aaffc93c5b12afc29e2fc34fff17adf5bc19b",
+      "name": "rulespec-l0",
+      "started_at": "2026-07-24T06:59:54.786837+00:00",
+      "status": "pass"
+    }
+  ],
+  "generation": {
+    "artifacts": {
+      "authority_edges.parquet": {
+        "bytes": 105766,
+        "columns": [
+          "rin",
+          "authority_raw",
+          "usc_title",
+          "usc_section",
+          "pl_number",
+          "authority_type",
+          "parse_status",
+          "agenda_edition",
+          "method",
+          "actor_id",
+          "run_id",
+          "asserted_at",
+          "supersedes_id"
+        ],
+        "rows": 10618,
+        "sha256": "8afb1832cadc4563db1dd2d9a1f7f6947e0355c549358fba52f923fe5d8520dc"
+      },
+      "comment_periods.parquet": {
+        "bytes": 10511183,
+        "columns": [
+          "comment_period_id",
+          "proceeding_ids_json",
+          "rins_json",
+          "docket_ids_json",
+          "open_date",
+          "close_date",
+          "source",
+          "opened_by_artifact_ids_json",
+          "evidence_ids_json",
+          "method",
+          "actor_id",
+          "run_id",
+          "asserted_at",
+          "supersedes_id"
+        ],
+        "rows": 254445,
+        "sha256": "1c43b2457f71194a7e9efe56ec9c7c630a028ef8d8483864b53e99b6a6874ba8"
+      },
+      "concept_assignments.parquet": {
+        "bytes": 7898,
+        "columns": [
+          "assignment_id",
+          "subject_type",
+          "subject_id",
+          "concept_id",
+          "confidence",
+          "evidence_json",
+          "method",
+          "actor_id",
+          "run_id",
+          "asserted_at",
+          "supersedes_id"
+        ],
+        "rows": 24,
+        "sha256": "7b9d122db5b0d6293fe082377fdd5d5a33309948492f21c54789e3d37fe63f77"
+      },
+      "concept_events.parquet": {
+        "bytes": 41343,
+        "columns": [
+          "event_id",
+          "event_type",
+          "payload_json",
+          "method",
+          "actor_id",
+          "run_id",
+          "asserted_at",
+          "supersedes_id"
+        ],
+        "rows": 901,
+        "sha256": "06c4987dd2ec73af084fe0004b16da1d3ea1e8306758f3ea583d611cb26abe99"
+      },
+      "concepts.parquet": {
+        "bytes": 45878,
+        "columns": [
+          "concept_id",
+          "scheme",
+          "pref_label",
+          "alt_labels_json",
+          "definition",
+          "broader_id",
+          "status",
+          "replaced_by",
+          "external_ids_json",
+          "method",
+          "actor_id",
+          "run_id",
+          "asserted_at",
+          "supersedes_id"
+        ],
+        "rows": 901,
+        "sha256": "f338b7c8a1e6aae1f938a50a7b22936085b9e41efd2315c33077a19e903f0ddf"
+      },
+      "proceedings.parquet": {
+        "bytes": 24832498,
+        "columns": [
+          "proceeding_id",
+          "rin",
+          "docket_ids_json",
+          "title",
+          "agency_code",
+          "current_stage",
+          "stage_events_json",
+          "fr_document_numbers_json",
+          "cfr_refs_json",
+          "cfr_target_iris_json",
+          "authority_refs_json",
+          "identity_predecessors_json",
+          "method",
+          "actor_id",
+          "run_id",
+          "asserted_at",
+          "supersedes_id"
+        ],
+        "rows": 312298,
+        "sha256": "42448483c84b3249ebd7fa44c4149d2759ad6f8a2f71b3ea2ec5c120e6337178"
+      },
+      "rule_targets.parquet": {
+        "bytes": 318947,
+        "columns": [
+          "docket_id",
+          "cfr_ref",
+          "cfr_title",
+          "cfr_part",
+          "cfr_section",
+          "rin",
+          "source",
+          "evidence_id",
+          "first_seen",
+          "last_seen",
+          "method",
+          "actor_id",
+          "run_id",
+          "asserted_at",
+          "supersedes_id"
+        ],
+        "rows": 40546,
+        "sha256": "7e9376bd82f6d4a00dd8c08fbdced5aaed610b78611746414d59892b9cd9a1db"
+      }
+    },
+    "baseline": {
+      "artifacts": {
+        "authority_edges.parquet": {
+          "bytes": 105766,
+          "columns": [
+            "rin",
+            "authority_raw",
+            "usc_title",
+            "usc_section",
+            "pl_number",
+            "authority_type",
+            "parse_status",
+            "agenda_edition",
+            "method",
+            "actor_id",
+            "run_id",
+            "asserted_at",
+            "supersedes_id"
+          ],
+          "rows": 10618,
+          "sha256": "1676c4ba6340f93b0804a009b08f7934f391fa4f0ef2f0832e1fc60175343e69"
+        },
+        "comment_periods.parquet": {
+          "bytes": 11956298,
+          "columns": [
+            "comment_period_id",
+            "proceeding_id",
+            "rin",
+            "docket_id",
+            "open_date",
+            "close_date",
+            "source",
+            "evidence_ids_json",
+            "method",
+            "actor_id",
+            "run_id",
+            "asserted_at",
+            "supersedes_id"
+          ],
+          "rows": 283367,
+          "sha256": "7b788fe7db987e466a6760a6f00de5db5085c2190cbd17e6586846a07579acdd"
+        },
+        "concept_assignments.parquet": {
+          "bytes": 7898,
+          "columns": [
+            "assignment_id",
+            "subject_type",
+            "subject_id",
+            "concept_id",
+            "confidence",
+            "evidence_json",
+            "method",
+            "actor_id",
+            "run_id",
+            "asserted_at",
+            "supersedes_id"
+          ],
+          "rows": 24,
+          "sha256": "7b9d122db5b0d6293fe082377fdd5d5a33309948492f21c54789e3d37fe63f77"
+        },
+        "concept_events.parquet": {
+          "bytes": 41343,
+          "columns": [
+            "event_id",
+            "event_type",
+            "payload_json",
+            "method",
+            "actor_id",
+            "run_id",
+            "asserted_at",
+            "supersedes_id"
+          ],
+          "rows": 901,
+          "sha256": "06c4987dd2ec73af084fe0004b16da1d3ea1e8306758f3ea583d611cb26abe99"
+        },
+        "concepts.parquet": {
+          "bytes": 45878,
+          "columns": [
+            "concept_id",
+            "scheme",
+            "pref_label",
+            "alt_labels_json",
+            "definition",
+            "broader_id",
+            "status",
+            "replaced_by",
+            "external_ids_json",
+            "method",
+            "actor_id",
+            "run_id",
+            "asserted_at",
+            "supersedes_id"
+          ],
+          "rows": 901,
+          "sha256": "f338b7c8a1e6aae1f938a50a7b22936085b9e41efd2315c33077a19e903f0ddf"
+        },
+        "proceedings.parquet": {
+          "bytes": 30759115,
+          "columns": [
+            "proceeding_id",
+            "rin",
+            "docket_ids_json",
+            "title",
+            "agency_code",
+            "current_stage",
+            "stage_events_json",
+            "fr_document_numbers_json",
+            "cfr_refs_json",
+            "authority_refs_json",
+            "identity_predecessors_json",
+            "method",
+            "actor_id",
+            "run_id",
+            "asserted_at",
+            "supersedes_id"
+          ],
+          "rows": 341492,
+          "sha256": "86df5f1ce1a1531396156689e441084e799a50004093df5a9c21e4c9bf5ad906"
+        },
+        "rule_targets.parquet": {
+          "bytes": 4040712,
+          "columns": [
+            "docket_id",
+            "cfr_ref",
+            "cfr_title",
+            "cfr_part",
+            "cfr_section",
+            "rin",
+            "source",
+            "evidence_id",
+            "first_seen",
+            "last_seen",
+            "method",
+            "actor_id",
+            "run_id",
+            "asserted_at",
+            "supersedes_id"
+          ],
+          "rows": 335008,
+          "sha256": "93c0139b6559aa3c68765789b1dc5e8e92611faf67466579e3f93a0da49b4c12"
+        }
+      },
+      "failures": {
+        "by_check": {},
+        "examples": [],
+        "total": 0
+      },
+      "inputs_match": true,
+      "manifest": "/Users/mikewolfd/Work/spicy-regs/output/rulespec-stabilization-baseline-final/ontology-dataset-manifest.json",
+      "metrics": {
+        "comment_periods": {
+          "rows": 283367
+        },
+        "proceedings": {
+          "agency_code_values": 280444,
+          "docket_not_in_source": 12215,
+          "invalid_docket_syntax": 84888,
+          "multi_docket_rows": 21007,
+          "rows": 341492,
+          "self_predecessor_edges": 305807
+        },
+        "rule_targets": {
+          "docket_not_in_source": 47222,
+          "invalid_cfr_reference": 12,
+          "invalid_docket_syntax": 247229,
+          "rows": 335008
+        }
+      },
+      "snapshot_id": "snapshot_28b10bf221418c95ca0120adae2d523f"
+    },
+    "failures": {
+      "by_check": {},
+      "examples": [],
+      "total": 0
+    },
+    "inputs": {
+      "previous_snapshot_id": "snapshot_b40ccfbd464a1bb8ee7b6a2d6f2310df",
+      "prior_artifacts": {
+        "concept_assignments.parquet": {
+          "bytes": 7898,
+          "sha256": "7b9d122db5b0d6293fe082377fdd5d5a33309948492f21c54789e3d37fe63f77"
+        },
+        "concept_events.parquet": {
+          "bytes": 41343,
+          "sha256": "06c4987dd2ec73af084fe0004b16da1d3ea1e8306758f3ea583d611cb26abe99"
+        },
+        "concepts.parquet": {
+          "bytes": 45878,
+          "sha256": "f338b7c8a1e6aae1f938a50a7b22936085b9e41efd2315c33077a19e903f0ddf"
+        },
+        "proceedings.parquet": {
+          "bytes": 20636765,
+          "sha256": "c295b17b06d00a4a43221c82440642a3cbe09bba48cd907bad57f45d6ff7cb29"
+        }
+      },
+      "sources": {
+        "dockets.parquet": {
+          "bytes": 14347053,
+          "sha256": "b14cd488b7898391cff448ac4de19f85936072dcb1aa105da32eea88e6fd7938"
+        },
+        "documents.parquet": {
+          "bytes": 54786110,
+          "sha256": "52f085f9ec2ee0c08fe3fb59bcd789bfef34000f87608ea36af9a6adbacfb04d"
+        },
+        "federal_register.parquet": {
+          "bytes": 155603798,
+          "sha256": "ac18315faa8be4a8d3656e758597d672c5d85c23cc6f8fde0ac53c9295b22bf2"
+        },
+        "fr_docket_links.parquet": {
+          "bytes": 82748978,
+          "sha256": "b3409f0ada792a8c9534edcf87c290a8b39e482e4803f08656bfa9de4504fd45"
+        },
+        "unified_agenda.parquet": {
+          "bytes": 1017503,
+          "sha256": "e6862d5d6a5300f10c70eeaf321f1e82e1f5332f71069d07723cc584ee6a85ae"
+        }
+      }
+    },
+    "manifest": "/Users/mikewolfd/Work/spicy-regs/output/rulespec-stabilization-candidate-final/ontology-dataset-manifest.json",
+    "metrics": {
+      "authority_edges": {
+        "parse_status:failed": 903,
+        "parse_status:ok": 6285,
+        "parse_status:partial": 3430,
+        "public_law_identifiers": 756,
+        "rows": 10618,
+        "usc_identifiers": 8578
+      },
+      "comment_periods": {
+        "docket_only_intervals": 1845,
+        "joint_proceeding_intervals": 13,
+        "multi_docket_intervals": 682,
+        "rows": 254445,
+        "unanchored_intervals": 0
+      },
+      "proceedings": {
+        "agency_identified": 280612,
+        "authority_evidence_present": 3811,
+        "citation_target_iris": 36783,
+        "distinct_predecessor_edges": 0,
+        "docket_not_in_source": 0,
+        "invalid_docket_syntax": 0,
+        "multi_docket_rows": 88,
+        "placeholder_authority_claims": 0,
+        "rin_evidence": 38857,
+        "rows": 312298,
+        "self_predecessor_edges": 0,
+        "stage:final": 82508,
+        "stage:longterm": 779,
+        "stage:prerule": 79,
+        "stage:proposed": 13929,
+        "stage:supplemental": 774,
+        "stage:withdrawn": 6391,
+        "unresolved_edition_targets": 36783
+      },
+      "rule_targets": {
+        "citation_targets": 39426,
+        "docket_not_in_source": 0,
+        "invalid_cfr_reference": 0,
+        "invalid_docket_syntax": 0,
+        "rows": 40546,
+        "source:docket_rin": 285,
+        "source:document_fr_doc": 22738,
+        "source:document_rin": 26,
+        "source:fr_cfr_ref": 16467,
+        "source:ua_cfr_ref": 1030
+      },
+      "source_membership": {
+        "cross_posting_links": 3029,
+        "cross_posting_values": 3061,
+        "cross_posting_values_filtered": 32,
+        "dockets": 277318,
+        "documents": 1987880,
+        "federal_register_documents": 1004233
+      }
+    },
+    "snapshot_id": "snapshot_04ebfb14969691c54af2c3cc31a28be4",
+    "status": "pass"
+  },
+  "kind": "spicy-regs-rulespec-paired-corpus-receipt",
+  "materialization_gates": [
+    {
+      "command": [
+        "uv",
+        "run",
+        "materialize-ontology",
+        "--output-dir",
+        "/Users/mikewolfd/Work/spicy-regs/output/rulespec-stabilization-baseline-final",
+        "--no-full-refresh",
+        "--skip-upload"
+      ],
+      "cwd": "/private/tmp/spicy-regs-rule-baseline",
+      "exit_code": 0,
+      "finished_at": "2026-07-24T06:57:15.720978+00:00",
+      "log": "/Users/mikewolfd/Work/spicy-regs/docs/evidence/rulespec-stabilization-2026-07-24/paired-receipt-logs/baseline-materialize.log",
+      "log_sha256": "716172aecff42a55c9f3dd15ff60f9d4893ee3c92c167aecd2201bd5aa035159",
+      "name": "baseline-materialize",
+      "started_at": "2026-07-24T06:55:48.537880+00:00",
+      "status": "pass"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "materialize-ontology",
+        "--output-dir",
+        "/Users/mikewolfd/Work/spicy-regs/output/rulespec-stabilization-candidate-final",
+        "--no-full-refresh",
+        "--skip-upload"
+      ],
+      "cwd": "/private/tmp/spicy-regs-rule-candidate-3a032d2",
+      "exit_code": 0,
+      "finished_at": "2026-07-24T06:58:43.100238+00:00",
+      "log": "/Users/mikewolfd/Work/spicy-regs/docs/evidence/rulespec-stabilization-2026-07-24/paired-receipt-logs/candidate-materialize.log",
+      "log_sha256": "c24aecf521c988519ccb68cb5d65766fd2a76b36d15a6c655a5d065cd50632e9",
+      "name": "candidate-materialize",
+      "started_at": "2026-07-24T06:57:15.722169+00:00",
+      "status": "pass"
+    }
+  ],
+  "repositories": {
+    "baseline_spicy_regs": {
+      "after_gates": {
+        "branch": null,
+        "clean": true,
+        "commit": "f693c69c5961ea362890df084236be11c98bab3e",
+        "path": "/private/tmp/spicy-regs-rule-baseline",
+        "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "branch": null,
+      "clean": true,
+      "commit": "f693c69c5961ea362890df084236be11c98bab3e",
+      "path": "/private/tmp/spicy-regs-rule-baseline",
+      "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "rulespec": {
+      "after_gates": {
+        "branch": "us-regulatory-identifiers",
+        "clean": true,
+        "commit": "d81fb29e5673fd9459723fe36fdde4f16358c19c",
+        "path": "/Users/mikewolfd/Work/rulespec",
+        "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "branch": "us-regulatory-identifiers",
+      "clean": true,
+      "commit": "d81fb29e5673fd9459723fe36fdde4f16358c19c",
+      "path": "/Users/mikewolfd/Work/rulespec",
+      "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "spicy_regs": {
+      "after_gates": {
+        "branch": null,
+        "clean": true,
+        "commit": "3a032d26138c0d99d518e1dbfca20fa1a6e4c0b2",
+        "path": "/private/tmp/spicy-regs-rule-candidate-3a032d2",
+        "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "branch": null,
+      "clean": true,
+      "commit": "3a032d26138c0d99d518e1dbfca20fa1a6e4c0b2",
+      "path": "/private/tmp/spicy-regs-rule-candidate-3a032d2",
+      "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "rulespec_contract_digest": "sha256:ea9b899ba92955b83638ece811d7a4b744dd912f72e19290e32c97508674de1c",
+  "status": "pass"
+}

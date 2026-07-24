@@ -1,0 +1,37 @@
+$ uv run --group docs mkdocs build --strict
+cwd: /private/tmp/spicy-regs-rule-candidate-3a032d2
+exit_code: 0
+
+--- stdout ---
+
+--- stderr ---
+Downloading babel (9.7MiB)
+Downloading mkdocs (3.7MiB)
+Downloading mkdocs-material (8.9MiB)
+ Downloaded mkdocs
+ Downloaded babel
+ Downloaded mkdocs-material
+Installed 19 packages in 158ms
+
+[31m │  ⚠  Warning from the Material for MkDocs team[0m
+[31m │[0m
+[31m │[0m  MkDocs 2.0, the underlying framework of Material for MkDocs,
+[31m │[0m  will introduce backward-incompatible changes, including:
+[31m │[0m
+[31m │  × [0mAll plugins will stop working – the plugin system has been removed
+[31m │  × [0mAll theme overrides will break – the theming system has been rewritten
+[31m │  × [0mNo migration path exists – existing projects cannot be upgraded
+[31m │  × [0mClosed contribution model – community members can't report bugs
+[31m │  × [0mCurrently unlicensed – unsuitable for production use
+[31m │[0m
+[31m │[0m  Our full analysis:
+[31m │[0m
+[31m │[0m  [4mhttps://squidfunk.github.io/mkdocs-material/blog/2026/02/18/mkdocs-2.0/[0m
+[0m
+INFO    -  Cleaning site directory
+INFO    -  Building documentation to directory: /private/tmp/spicy-regs-rule-candidate-3a032d2/site
+INFO    -  The following pages exist in the docs directory, but are not included in the "nav" configuration:
+  - superpowers/specs/2026-07-23-metadata-ontology-layer-design.md
+  - superpowers/specs/2026-07-23-regulatory-ontology-program-overview.md
+INFO    -  Documentation built in 0.35 seconds
+

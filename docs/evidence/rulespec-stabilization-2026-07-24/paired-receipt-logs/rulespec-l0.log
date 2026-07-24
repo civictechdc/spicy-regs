@@ -1,0 +1,10 @@
+$ uv run python /Users/mikewolfd/Work/rulespec/tools/l0_mapping_audit.py /private/tmp/spicy-regs-rule-candidate-3a032d2/conformance/rulespec-l0.yaml
+cwd: /private/tmp/spicy-regs-rule-candidate-3a032d2
+exit_code: 0
+
+--- stdout ---
+[PASS] /private/tmp/spicy-regs-rule-candidate-3a032d2/conformance/rulespec-l0.yaml: 1 block(s), 21 mapping(s), 18 term(s)
+L0 mapping audit: 1/1 passed
+
+--- stderr ---
+

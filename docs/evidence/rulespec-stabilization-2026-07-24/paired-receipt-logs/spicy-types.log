@@ -1,0 +1,9 @@
+$ uv run ty check src tests
+cwd: /private/tmp/spicy-regs-rule-candidate-3a032d2
+exit_code: 0
+
+--- stdout ---
+All checks passed!
+
+--- stderr ---
+

@@ -1,0 +1,66 @@
+$ env R2_PUBLIC_URL= uv run pytest
+cwd: /private/tmp/spicy-regs-rule-candidate-3a032d2
+exit_code: 0
+
+--- stdout ---
+============================= test session starts ==============================
+platform darwin -- Python 3.10.19, pytest-9.0.2, pluggy-1.6.0
+rootdir: /private/tmp/spicy-regs-rule-candidate-3a032d2
+configfile: pyproject.toml
+plugins: anyio-4.12.1
+collected 533 items / 3 deselected / 530 selected
+
+tests/test_authority_edges.py .                                          [  0%]
+tests/test_backfill_derived_text.py .......                              [  1%]
+tests/test_bloom_filter.py ......                                        [  2%]
+tests/test_cfr_sections.py ...............                               [  5%]
+tests/test_congress_bills.py ...........                                 [  7%]
+tests/test_courtlistener.py ......                                       [  8%]
+tests/test_crs_reports.py .........                                      [ 10%]
+tests/test_data_dictionary.py ...........                                [ 12%]
+tests/test_derived_text.py ..............                                [ 15%]
+tests/test_download_r2.py ........                                       [ 16%]
+tests/test_enrich_pdf.py ............                                    [ 18%]
+tests/test_example_pipeline.py .                                         [ 19%]
+tests/test_fcc_ecfs.py .................                                 [ 22%]
+tests/test_fec_committees.py .............                               [ 24%]
+tests/test_federal_register.py .......                                   [ 26%]
+tests/test_fetch_pdf.py .....                                            [ 26%]
+tests/test_gao_reports.py ..........                                     [ 28%]
+tests/test_iceberg.py ....................                               [ 32%]
+tests/test_load.py .........                                             [ 34%]
+tests/test_lobbying_filings.py ........                                  [ 35%]
+tests/test_manifest.py ........                                          [ 37%]
+tests/test_manifest_class.py ......                                      [ 38%]
+tests/test_materialized_pipeline.py ..............                       [ 41%]
+tests/test_mcp_server.py ...........................                     [ 46%]
+tests/test_mirrulations_reader.py ................                       [ 49%]
+tests/test_ontology_citations.py ...............................         [ 55%]
+tests/test_ontology_concepts.py ........................................ [ 62%]
+..                                                                       [ 63%]
+tests/test_ontology_dataset.py ..                                        [ 63%]
+tests/test_ontology_receipt.py ......                                    [ 64%]
+tests/test_parquet_staging_writer.py ...                                 [ 65%]
+tests/test_pdf_text.py ........                                          [ 66%]
+tests/test_pipelines_base.py .....                                       [ 67%]
+tests/test_proceedings.py .......                                        [ 68%]
+tests/test_published.py ...                                              [ 69%]
+tests/test_r2.py ...                                                     [ 70%]
+tests/test_record_types.py .............                                 [ 72%]
+tests/test_records.py ......                                             [ 73%]
+tests/test_regulations_pipeline.py ...............                       [ 76%]
+tests/test_rollup_freshness.py ...                                       [ 76%]
+tests/test_rule_targets.py ...                                           [ 77%]
+tests/test_sam_entities.py .........................................     [ 85%]
+tests/test_sources_base.py ........                                      [ 86%]
+tests/test_staging.py ...                                                [ 87%]
+tests/test_tag_quality.py .                                              [ 87%]
+tests/test_transform.py ...............................................  [ 96%]
+tests/test_transforms.py ....                                            [ 97%]
+tests/test_unified_agenda.py .......                                     [ 98%]
+tests/test_usaspending_recipients.py ........                            [100%]
+
+====================== 530 passed, 3 deselected in 2.75s =======================
+
+--- stderr ---
+

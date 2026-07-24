@@ -1,6 +1,6 @@
 # Rulespec-backed metadata architecture
 
-**Status:** Active backlog
+**Status:** Active backlog; `RULE-007` automated release-candidate gates complete
 **Scope:** Spicy Regs, the sibling Rulespec repository, and their versioned interface
 **Parent reference:** `docs/superpowers/specs/2026-07-23-regulatory-ontology-program-overview.md`
 **Current stabilization review:** `../rulespec/thoughts/reviews/2026-07-24-rulemaking-condition2-adversarial-review.md`
@@ -290,13 +290,13 @@ never part of an unattended validation run.
 
 ### RULE-001 — State the architecture in the parent overview
 
-- [ ] Replace the weak "vocabulary substrate" framing with the architectural
+- [x] Replace the weak "vocabulary substrate" framing with the architectural
       rule above.
-- [ ] State that Spicy Regs is a Rulespec application profile implemented in
+- [x] State that Spicy Regs is a Rulespec application profile implemented in
       Parquet and pipelines.
-- [ ] State that the current regulatory ontology is the first vertical slice,
+- [x] State that the current regulatory ontology is the first vertical slice,
       not the final metadata boundary.
-- [ ] Distinguish fast-changing local semantics from stable shared semantics.
+- [x] Distinguish fast-changing local semantics from stable shared semantics.
 
 **Done when:** A contributor can read the overview and correctly explain which
 repo owns semantic contracts, physical data, model execution, conformance, and
@@ -304,9 +304,9 @@ concept promotion.
 
 ### RULE-002 — Write the Spicy Regs Rulespec application profile
 
-- [ ] Create `docs/rulespec-profile.md`.
-- [ ] Inventory every published table and classify its grain and semantic role.
-- [ ] For each table, record:
+- [x] Create `docs/rulespec-profile.md`.
+- [x] Inventory every published table and classify its grain and semantic role.
+- [x] For each table, record:
   - local key and canonical IRI strategy;
   - Rulespec or composed class;
   - identity scheme and source authority;
@@ -316,7 +316,7 @@ concept promotion.
   - evidence and provenance requirements;
   - current projection and conformance status;
   - deliberate local extensions and unresolved gaps.
-- [ ] Cover at least:
+- [x] Cover at least:
   - regulations.gov dockets, documents, and comments;
   - Federal Register documents and Unified Agenda records;
   - proceedings and comment periods;
@@ -326,7 +326,7 @@ concept promotion.
   - GAO and CRS reports;
   - lobbying filings and FEC committees;
   - SAM entities and USASpending recipients.
-- [ ] Classify every gap as `compose`, `profile`, `Rulespec candidate`, or
+- [x] Classify every gap as `compose`, `profile`, `Rulespec candidate`, or
       `source data unavailable`.
 
 **Done when:** Every current table has a semantic home without flattening
@@ -338,7 +338,7 @@ containers, artifacts, versions, actors, and assertions into one type.
       without representing it as an independent review.
 - [x] Record the review decisions for cross-postings, unknown authority, and
       proceeding-stage names.
-- [ ] Complete the `RULE-007` repair batch while the module remains
+- [x] Complete the `RULE-007` automated repair batch while the module remains
       Experimental.
 - [ ] Obtain a non-originating consumer review of the repaired contract or
       ratification of the simulated review against it.
@@ -354,12 +354,12 @@ Rulespec contract without access to a sibling worktree or private branch.
 
 ### RULE-004 — Define compatibility and change governance
 
-- [ ] Document which Rulespec terms Spicy Regs treats as stable.
-- [ ] Define migration rules for pre-1.0 term, shape, and identifier changes.
-- [ ] Require a compatibility report before Spicy Regs changes its pinned
+- [x] Document which Rulespec terms Spicy Regs treats as stable.
+- [x] Define migration rules for pre-1.0 term, shape, and identifier changes.
+- [x] Require a compatibility report before Spicy Regs changes its pinned
       Rulespec release.
-- [ ] Record maintainership overlap and the independent-review requirement.
-- [ ] Define the evidence required before Spicy Regs proposes a new core term.
+- [x] Record maintainership overlap and the independent-review requirement.
+- [x] Define the evidence required before Spicy Regs proposes a new core term.
 
 **Done when:** A Rulespec change cannot silently alter a published Spicy Regs
 meaning.
@@ -449,31 +449,36 @@ non-originating-consumer gate.
 
 - [x] Add the review's eight graduation workstreams and all finding references
       to the canonical `../rulespec/TODO.md`.
-- [ ] Complete the Rulespec repair batch for graph invariants, producible rule
+- [x] Complete the Rulespec repair batch for graph invariants, producible rule
       targets, complete comment periods, terminal and external legal events,
       identity continuity, the three agenda decisions, and grammar/tooling
       hygiene.
-- [ ] Add Spicy Regs regression and corpus fixtures for every review finding
+- [x] Add Spicy Regs regression and Rulespec conformance fixtures for every
+      review finding
       grounded in this corpus, including the reproduced shape attacks.
-- [ ] Stop creating information-free agency Authority nodes merely to satisfy
+- [x] Stop creating information-free agency Authority nodes merely to satisfy
       `hasAuthority`; absence must mean unknown.
-- [ ] Migrate the six stage enum mappings and enforce agreement with the latest
+- [x] Migrate the six stage enum mappings and enforce agreement with the latest
       stage-family lifecycle event.
-- [ ] Retain and project docket-anchored comment periods instead of dropping
+- [x] Retain and project docket-anchored comment periods instead of dropping
       known intervals when Proceeding identity is unresolved.
-- [ ] Project RIN evidence, directional proceeding continuity, citation-level
-      affected targets, produced editions, and canonical cross-posting links
-      under the repaired contract.
-- [ ] Rerun the full corpus and publish before/after counts for target coverage,
+- [x] Project RIN evidence, directional proceeding continuity, citation-level
+      affected targets, and canonical cross-posting links under the repaired
+      contract; support produced editions while reporting their source-backed
+      absence in this snapshot.
+- [x] Rerun the full corpus and publish before/after counts for target coverage,
       retained comment periods, placeholder authorities, invalid identifiers,
       shape violations, and unresolved evidence.
-- [ ] Prove the baseline and candidate manifests have identical input and prior
+- [x] Prove the baseline and candidate manifests have identical input and prior
       state hashes; keep their outputs in separate directories.
-- [ ] Produce one paired gate receipt binding the Rulespec commit and contract
+- [x] Produce one paired gate receipt binding the Rulespec commit and contract
       digest, Spicy Regs commit, candidate snapshot id, all seven artifact
       hashes, and every Rulespec, Spicy Regs, L0, and corpus-validation result.
-- [ ] Regenerate both repositories' conformance artifacts; update the Rulespec
-      release pin and digest only after the paired gates pass.
+- [x] Regenerate the Spicy Regs conformance artifact against the final paired
+      receipt.
+- [ ] At the release cut, regenerate Rulespec's reference and partner
+      conformance artifacts and replace the candidate digest with the released
+      version plus digest.
 - [ ] Obtain a non-originating consumer review or ratification against the
       repaired artifacts before graduation.
 
@@ -533,15 +538,15 @@ happened to it.
 
 ### RULE-013 — Add corpus-level conformance evidence
 
-- [ ] Extend the L0 self-certification process with a corpus-bound validation
+- [x] Extend the L0 self-certification process with a corpus-bound validation
       receipt.
-- [ ] Bind the receipt to the complete materialized-generation digest.
-- [ ] Validate every projected value, not only mapping examples.
-- [ ] Check identifier syntax, source-of-record membership, domain, range,
+- [x] Bind the receipt to the complete materialized-generation digest.
+- [x] Validate every projected value, not only mapping examples.
+- [x] Check identifier syntax, source-of-record membership, domain, range,
       direction, enum values, referential integrity, and transformation output.
-- [ ] Publish row counts and failure counts by table, term, and identifier
+- [x] Publish row counts and failure counts by table, term, and identifier
       scheme.
-- [ ] Block publication when a claimed mapping has invalid carrier rows.
+- [x] Block publication when a claimed mapping has invalid carrier rows.
 
 **Done when:** A green conformance result proves that the published generation,
 not merely its mapping document, satisfies the declared semantic contract.

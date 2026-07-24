@@ -1,0 +1,9 @@
+$ uv run spicy-regs-dict check
+cwd: /private/tmp/spicy-regs-rule-candidate-3a032d2
+exit_code: 0
+
+--- stdout ---
+✓ Data dictionary check passed (29 tables, source=schema).
+
+--- stderr ---
+

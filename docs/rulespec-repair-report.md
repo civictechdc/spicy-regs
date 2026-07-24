@@ -1,7 +1,7 @@
 # Rulespec rulemaking stabilization report
 
 **Task:** `RULE-007`
-**Status:** Repaired release-candidate rehearsal passed; final clean paired receipt pending
+**Status:** Automated release-candidate gate passed; release and independent review pending
 **Run date:** 2026-07-24
 **Publication:** Local only; no R2 upload, Rulespec release, tag, or package publication
 **Independent review:** Open; the maintainer-operated simulation is not a non-originating-consumer review
@@ -10,10 +10,11 @@
 
 The Experimental Rulespec US rulemaking contract and the Spicy Regs projection
 have been repaired against every graduation precondition in the 2026-07-24
-adversarial review. The paired full-corpus rehearsal passes with zero receipt
-validation failures. The rulemaking architecture remains sound, but the module
-must stay Experimental until a maintainer publishes the repaired Rulespec
-release and a non-originating consumer reviews or ratifies it.
+adversarial review. The [final paired receipt](evidence/rulespec-stabilization-2026-07-24/paired-receipt.json)
+passes with zero carrier failures and every automated gate green. The
+rulemaking architecture remains sound, but the module must stay Experimental
+until a maintainer publishes the repaired Rulespec release and a
+non-originating consumer reviews or ratifies it.
 
 The repaired Rulespec L0 contract digest is
 `sha256:ea9b899ba92955b83638ece811d7a4b744dd912f72e19290e32c97508674de1c`.
@@ -24,9 +25,12 @@ The complete finding-by-finding disposition is in Rulespec
 confirmed findings, F-13's deferred trigger, the three agenda decisions, their
 normative changes, generated enforcement, and executable fixtures.
 
+The receipt SHA-256 is
+`de07c8042c7873c3bb1853ad74566c8e4b60f040160f8357456b531a4ba8219d`.
+
 ## Paired provenance
 
-| Item | Rehearsal value |
+| Item | Final value |
 | --- | --- |
 | Pre-repair Spicy Regs commit | `b3c268c5408ab9b4c1dff97ed63d0bd57ca5c765` |
 | Baseline runner commit | `f693c69c5961ea362890df084236be11c98bab3e` |
@@ -34,10 +38,12 @@ normative changes, generated enforcement, and executable fixtures.
 | Baseline worktree | Clean detached worktree at `/tmp/spicy-regs-rule-baseline` |
 | Starting Rulespec commit | `957662e151c194ac81dd248727e0a550d7f75c55` |
 | Starting Rulespec digest | `sha256:836968b28f3b86283f53c57ae5c9ab8ebd77e96531cd4751476f1a5ee3d296f2` |
+| Repaired Rulespec commit | `d81fb29e5673fd9459723fe36fdde4f16358c19c` |
 | Repaired Rulespec digest | `sha256:ea9b899ba92955b83638ece811d7a4b744dd912f72e19290e32c97508674de1c` |
-| Baseline snapshot | `snapshot_56f2ce22dd4b59f599e684a86413ca63` |
-| Candidate rehearsal snapshot | `snapshot_c0b15c6aee3780c0a40a924f59b591bf` |
-| Candidate implementation commits | To be frozen and recorded by the final clean receipt |
+| Repaired Spicy Regs commit | `3a032d26138c0d99d518e1dbfca20fa1a6e4c0b2` |
+| Baseline snapshot | `snapshot_28b10bf221418c95ca0120adae2d523f` |
+| Candidate snapshot | `snapshot_04ebfb14969691c54af2c3cc31a28be4` |
+| Clean-worktree gate | Pass before and after materialization/gates in all three worktrees |
 
 The baseline performance patch changes lookup complexity only. Targeted
 continuity tests pass at the baseline runner commit, and the report treats its
@@ -69,7 +75,7 @@ heterogeneous Federal Register labels as regulations.gov identifiers and
 connected unrelated dockets through reused RINs. The repaired pipeline requires
 source-of-record membership and evidence-qualified component joins.
 
-| Measure | Pre-repair | Repaired rehearsal | Interpretation |
+| Measure | Pre-repair | Repaired final | Interpretation |
 | --- | ---: | ---: | --- |
 | Rule-target rows | 335,008 | 40,546 | False heterogeneous docket edges removed |
 | Rule-target invalid docket syntax | 247,229 | 0 | Registry grammar enforced |
@@ -117,8 +123,9 @@ invented semantic claims.
 - `hasAuthority` is optional. `agency_code` remains useful metadata but never
   mints a legal Authority placeholder.
 - RIN is repeatable identity evidence, not globally unique Proceeding identity.
-- Proceeding stage uses the six `proceeding-*` event IRIs and must agree with
-  the latest stage-family event.
+- Proceeding stage uses the six source-producible `proceeding-*` event IRIs and
+  must agree with the latest stage-family event. Rulespec also supports an
+  evidenced `proceedingConcluded` state with a termination cause.
 - Compact CFR targets project through `proceedingAffectsCitation`; immutable
   pre/post-action edition links remain absent until resolved.
 - Distinct merge/split identities may use `proceedingSupersedes`; reusing the
@@ -132,16 +139,16 @@ invented semantic claims.
 - `us-regsgov` accepts real underscore and single-segment forms, but lexical
   validity never substitutes for source membership.
 
-## Candidate artifact rehearsal
+## Final candidate artifacts
 
-The rehearsal manifest binds exactly the seven declared ontology outputs:
+The final manifest binds exactly the seven declared ontology outputs:
 
 | Artifact | Rows | SHA-256 |
 | --- | ---: | --- |
-| `rule_targets.parquet` | 40,546 | `10b2de8291fc82a06d6297ead8536691efc241a09834074048e617cb6a1633ac` |
-| `authority_edges.parquet` | 10,618 | `52d8270114312491b59cf72b4054f1771779ca705d3b3f08580c3b14b02ef661` |
-| `proceedings.parquet` | 312,298 | `c657cdf24d1a01d0a70da10b44198bc8b68b00968af89b6e879e9870d760ec20` |
-| `comment_periods.parquet` | 254,445 | `0e68121b7ce9a287f2421cf7d0fc5007b6a3302e62f8fc95da588a9b328d84f2` |
+| `rule_targets.parquet` | 40,546 | `7e9376bd82f6d4a00dd8c08fbdced5aaed610b78611746414d59892b9cd9a1db` |
+| `authority_edges.parquet` | 10,618 | `8afb1832cadc4563db1dd2d9a1f7f6947e0355c549358fba52f923fe5d8520dc` |
+| `proceedings.parquet` | 312,298 | `42448483c84b3249ebd7fa44c4149d2759ad6f8a2f71b3ea2ec5c120e6337178` |
+| `comment_periods.parquet` | 254,445 | `1c43b2457f71194a7e9efe56ec9c7c630a028ef8d8483864b53e99b6a6874ba8` |
 | `concepts.parquet` | 901 | `f338b7c8a1e6aae1f938a50a7b22936085b9e41efd2315c33077a19e903f0ddf` |
 | `concept_assignments.parquet` | 24 | `7b9d122db5b0d6293fe082377fdd5d5a33309948492f21c54789e3d37fe63f77` |
 | `concept_events.parquet` | 901 | `06c4987dd2ec73af084fe0004b16da1d3ea1e8306758f3ea583d611cb26abe99` |
@@ -150,9 +157,19 @@ The receipt verifies manifest identity, exact artifact set, byte counts, hashes,
 row counts, schemas, source/prior hashes, identifier transforms,
 source-of-record membership, domain/range references, stage agreement,
 cross-posting eligibility, comment anchors/dates/evidence, and semantic
-continuity. The clean final receipt will additionally run and hash the baseline
-and candidate builds, Rulespec compile/full test, Spicy Regs full test,
-dictionary check, full lint, and partner L0 audit.
+continuity. It also records and hashes the successful baseline and candidate
+builds plus these release-candidate gates:
+
+- Rulespec compile and full test: 292 fixtures, zero core divergences, and 7/7
+  projector round trips;
+- Spicy Regs: 530 selected tests passed, with three intentionally deselected;
+- data dictionary: 29 tables reconciled with executable schemas;
+- Ruff, ty, and strict MkDocs build;
+- partner L0 audit: 21 mappings and 18 terms passed.
+
+Ontology publication now invokes the row-level validator after building the
+manifest and before its first R2 write. A carrier failure therefore leaves the
+remote generation and latest pointer unchanged.
 
 ## Remaining friction and human gates
 

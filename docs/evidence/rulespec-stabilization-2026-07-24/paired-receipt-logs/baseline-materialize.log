@@ -1,0 +1,27 @@
+$ uv run materialize-ontology --output-dir /Users/mikewolfd/Work/spicy-regs/output/rulespec-stabilization-baseline-final --no-full-refresh --skip-upload
+cwd: /private/tmp/spicy-regs-rule-baseline
+exit_code: 0
+
+--- stdout ---
+
+--- stderr ---
+warning: `VIRTUAL_ENV=/private/tmp/spicy-regs-rule-candidate-3a032d2/.venv` does not match the project environment path `.venv` and will be ignored; use `--active` to target the active environment instead
+2026-07-24 02:55:49.110 | INFO     | spicy_regs.pipelines.materialized:_prime_sources:213 - Using local source snapshot dockets.parquet
+2026-07-24 02:55:49.111 | INFO     | spicy_regs.pipelines.materialized:_prime_sources:213 - Using local source snapshot documents.parquet
+2026-07-24 02:55:49.111 | INFO     | spicy_regs.pipelines.materialized:_prime_sources:213 - Using local source snapshot federal_register.parquet
+2026-07-24 02:55:49.111 | INFO     | spicy_regs.pipelines.materialized:_prime_sources:213 - Using local source snapshot unified_agenda.parquet
+2026-07-24 02:55:49.111 | INFO     | spicy_regs.pipelines.materialized:_prime_sources:213 - Using local source snapshot fr_docket_links.parquet
+2026-07-24 02:55:49.242 | INFO     | spicy_regs.pipelines.materialized:run:159 - Materializing ontology stage rule-targets...
+2026-07-24 02:56:07.255 | INFO     | spicy_regs.transforms.build_rule_targets:build_rule_targets:295 - Rule targets: 335,008 rows across 161,590 dockets
+2026-07-24 02:56:07.315 | INFO     | spicy_regs.pipelines.materialized:run:159 - Materializing ontology stage authority-edges...
+2026-07-24 02:56:07.401 | INFO     | spicy_regs.transforms.build_authority_edges:build_authority_edges:105 - Authority edges: 10,618 rows (903 retained parse failures)
+2026-07-24 02:56:07.402 | INFO     | spicy_regs.pipelines.materialized:run:159 - Materializing ontology stage proceedings...
+2026-07-24 02:56:53.163 | INFO     | spicy_regs.transforms.build_proceedings:build_proceedings:584 - Proceedings: 341,492 rows (21,007 multi-docket)
+2026-07-24 02:56:53.163 | WARNING  | spicy_regs.transforms.build_proceedings:build_proceedings:591 - Proceedings left ambiguous RIN-scoped evidence unattached: authority_reused_rin=1,539, document_without_unique_component=91,515, fr_document_without_component=11,266, fr_document_without_unique_component=10,644, unified_agenda_reused_rin=532
+2026-07-24 02:56:53.749 | INFO     | spicy_regs.pipelines.materialized:run:159 - Materializing ontology stage comment-periods...
+2026-07-24 02:57:15.304 | WARNING  | spicy_regs.transforms.build_comment_periods:build_comment_periods:279 - comment_periods: skipped 7,196 inverted source intervals (documents.comment_end_date=6,806, federal_register.comments_close_on=390); examples: documents.comment_end_date AHRQ-2022-0004-0204: 2010-12-03..2010-01-15; documents.comment_end_date AHRQ_FRDOC_0001-0204: 2010-12-03..2010-01-15; documents.comment_end_date AID-2021-0054-0001: 2021-11-02..2021-07-16; documents.comment_end_date AID-2021-0055-0001: 2021-11-02..2021-08-24; documents.comment_end_date AID-2024-0009-0001: 2025-04-21..2024-10-29
+2026-07-24 02:57:15.304 | WARNING  | spicy_regs.transforms.build_comment_periods:build_comment_periods:286 - comment_periods: skipped 8,205 FR intervals whose reused RIN had no unique docket component
+2026-07-24 02:57:15.304 | WARNING  | spicy_regs.transforms.build_comment_periods:build_comment_periods:291 - comment_periods: skipped 8,965 document intervals whose docket had no unique proceeding component
+2026-07-24 02:57:15.367 | INFO     | spicy_regs.transforms.build_comment_periods:build_comment_periods:296 - Comment periods: 283,367 rows (129,242 reopened intervals beyond the first)
+2026-07-24 02:57:15.633 | INFO     | spicy_regs.pipelines.materialized:run:178 - skip_upload=True — materialized dataset ontology left at /Users/mikewolfd/Work/spicy-regs/output/rulespec-stabilization-baseline-final
+

@@ -1,0 +1,1152 @@
+$ make -C /Users/mikewolfd/Work/rulespec PYTHON=uv run --with-requirements requirements.txt --with jsonschema --with pyld python test
+cwd: /Users/mikewolfd/Work/rulespec
+exit_code: 0
+
+--- stdout ---
+cargo test --manifest-path crates/Cargo.toml --workspace
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 28 tests
+test round_trip_concept_mapping_fixture ... ok
+test round_trip_bridgevalidationresult_with_freshness_fixture ... ok
+test round_trip_ai_lineage_fixture ... ok
+test round_trip_attestation_revoked_fixture ... ok
+test round_trip_bridge_consumer_registration_fixture ... ok
+test round_trip_concept_resolution_result_fixture ... ok
+test round_trip_bridge_validation_result_fixture ... ok
+test round_trip_confidence_record_fixtures ... ok
+test round_trip_authority_fixture ... ok
+test round_trip_attestation_fixture ... ok
+test round_trip_applicability_scope_fixture ... ok
+test round_trip_attestation_with_effective_period_fixture ... ok
+test round_trip_attestation_waiving_finding_fixture ... ok
+test round_trip_attestation_revoked_within_period_fixture ... ok
+test round_trip_effective_period_fixture ... ok
+test round_trip_access_scope_fixtures ... ok
+test round_trip_finding_fixture ... ok
+test round_trip_registry_conflict_fixture ... ok
+test round_trip_sourcefragment_with_freshness_fixture ... ok
+test round_trip_evidencebinding_with_freshness_fixture ... ok
+test round_trip_justification_fixture ... ok
+test round_trip_local_adoption_fixture ... ok
+test round_trip_rulemaking_fixtures ... ok
+test round_trip_evidence_binding_fixtures ... ok
+test round_trip_lifecycle_event_fixture ... ok
+test round_trip_warrant_fixtures ... ok
+test round_trip_source_fragment_fixtures ... ok
+test round_trip_artifact_fixtures ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test extract_returns_empty_overlay_when_no_rkaf_node_present ... ok
+test round_trip_returns_true_on_common_shape ... ok
+test attach_then_extract_partitions_by_type_namespace ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test extract_refuses_non_rulespec_x_rkaf ... ok
+test attach_refuses_to_overwrite_existing_x_rkaf ... ok
+test attach_then_extract_is_identity ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test attach_refuses_existing_non_rulespec_x_rkaf ... ok
+test extract_refuses_missing_rkaf_version ... ok
+test attach_then_extract_is_identity_at_doc_level ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 34 tests
+test bridge::tests::verify_finding_iris_resolve_empty_graph_ok ... ok
+test errors::tests::runtime_error_iri_tag_mapping ... ok
+test bridge::tests::verify_finding_iris_resolve_bvr_findings_dangling_errors ... ok
+test cascade::tests::dangling_effective_period_iri_errors_loudly ... ok
+test bridge::tests::verify_finding_iris_resolve_target_finding_dangling_errors ... ok
+test bridge::tests::verify_finding_iris_resolve_target_finding_resolves_ok ... ok
+test bridge::tests::verify_finding_iris_resolve_bvr_findings_resolves_ok ... ok
+test cascade::tests::as_of_outside_period_excludes_node ... ok
+test cascade::tests::malformed_effective_period_errors_loudly ... ok
+test graph::tests::incoming_finds_inverse_edges ... ok
+test cascade::tests::as_of_semantic_compare_handles_non_z_offsets ... ok
+test cascade::tests::cycle_safe_via_visited_set ... ok
+test concept::tests::multi_bcr_without_evaluation_consumer_propagates_error ... ok
+test graph::tests::incoming_handles_array_valued_predicates ... ok
+test cascade::tests::supersession_fanout_reaches_work_products_not_superseder ... ok
+test graph::tests::multi_typed_node_appears_under_each_type ... ok
+test graph::tests::parses_graph_and_indexes_by_id ... ok
+test graph::tests::single_object_treated_as_one_node_graph ... ok
+test reducer::tests::lattice_ordering ... ok
+test runtime::tests::deep_equal_affected_set_is_order_insensitive ... ok
+test runtime::tests::deep_equal_non_set_arrays_are_order_sensitive ... ok
+test runtime::tests::deep_equal_skips_informational_keys ... ok
+test runtime::tests::malformed_test_case_rejected ... ok
+test runtime::tests::unsupported_contract_rejected ... ok
+test temporal::tests::effective_at_dangling_period_iri_errors_loudly ... ok
+test temporal::tests::effective_at_malformed_revoked_at_errors_loudly ... ok
+test temporal::tests::effective_at_no_constraints_returns_true ... ok
+test temporal::tests::effective_at_period_contains_time ... ok
+test temporal::tests::effective_at_period_excludes_time ... ok
+test temporal::tests::effective_at_revoked_after_time_is_true ... ok
+test temporal::tests::effective_at_revoked_before_time_is_false ... ok
+test temporal::tests::effective_attestations_at_empty_graph_returns_empty ... ok
+test temporal::tests::effective_attestations_at_malformed_propagates ... ok
+test temporal::tests::effective_attestations_at_mix_returns_only_effective ... ok
+
+test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 46 tests
+test bridge_rule_10_positive ... ok
+test bridge_rule_2_positive ... ok
+test bridge_rule_1_negative ... ok
+test bridge_rule_10_negative ... ok
+test bridge_rule_3_negative ... ok
+test bridge_rule_5_safe_automatic_migration_positive ... ok
+test bridge_rule_6_negative ... ok
+test bridge_rule_1_positive ... ok
+test bridge_rule_4_negative ... ok
+test bridge_rule_2_negative ... ok
+test bridge_rule_5_positive ... ok
+test bridge_rule_5_negative ... ok
+test bridge_rule_3_positive ... ok
+test bridge_rule_4_positive ... ok
+test bridge_rule_6_positive ... ok
+test bridge_rule_7_terminating_chain_positive ... ok
+test bridge_rule_7_negative ... ok
+test bridge_rule_8_attestation_revoked ... ok
+test bridge_rule_8_attestation_out_of_period ... ok
+test bridge_rule_8_positive ... ok
+test bridge_rule_8_negative ... ok
+test bridge_rule_8_targeted_finding ... ok
+test bridge_rule_9_positive ... ok
+test concept_resolution_unresolved ... ok
+test bridge_rule_9_negative ... ok
+test bridge_rule_8_target_finding_dangling_negative ... ok
+test pit_unsupported_anchor_error ... ok
+test concept_resolution_resolved ... ok
+test concept_resolution_informational_severity ... ok
+test cascade_closure_supersession_fanout ... ok
+test point_in_time_exception_honored ... ok
+test concept_resolution_publication_blocking ... ok
+test concept_resolution_mapping_conflict ... ok
+test concept_resolution_authority_critical ... ok
+test cascade_as_of_excludes_expired ... ok
+test reducer_applicability_gate ... ok
+test reducer_capability_cap_narrows ... ok
+test reducer_freshness_fresh_passes ... ok
+test reducer_stale_with_honored_pit ... ok
+test reducer_freshness_malformed_negative ... ok
+test usage_eligibility_reducer_baseline_workspace ... ok
+test reducer_freshness_stale_narrows ... ok
+test usage_eligibility_reducer_stale_narrows ... ok
+test usage_eligibility_reducer_local_broadens_in_scope ... ok
+test cascade_all_edge_predicates ... ok
+test all_behavior_fixtures_pass ... ok
+
+test result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test tests::warrant_minimal_passes ... ok
+test tests::graph_envelope_aggregates_errors ... ok
+test tests::warrant_missing_kind_fails ... ok
+test tests::unknown_type_passes ... ok
+test tests::malformed_comment_period_date_fails ... ok
+test tests::reversed_comment_period_fails ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+
+running 3 tests
+test positive_fixtures_cover_every_embedded_schema_type ... ok
+test every_positive_fixture_validates ... ok
+test negative_fixtures_load_and_classify ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test cli_passes_positive_fixture ... ok
+test cli_json_mode_emits_structured_report ... ok
+test cli_fails_negative_fixture_with_diagnostic ... ok
+test cli_json_mode_emits_error_array_on_failure ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test rkaf-validate/src/lib.rs - (line 3) - compile ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+cargo build --manifest-path crates/Cargo.toml -p rkaf-validate-cli
+rkaf-validate: reference-corpora/us-rulemaking/v0.2/data/epa-oil-and-gas-climate-review.jsonld PASS
+uv run --with-requirements requirements.txt --with jsonschema --with pyld python tools/ci_validate.py reference-corpora/us-rulemaking/v0.2/data/*.jsonld
+Rulespec CI validation gate
+============================================================
+
+[1/3] Environment check
+  pyshacl 0.40.0 OK
+  shapes:  shapes/rkaf-shapes-accessscope.ttl
+  shapes:  shapes/rkaf-shapes-conceptregistry.ttl
+  shapes:  shapes/rkaf-shapes-confidence.ttl
+  shapes:  shapes/rkaf-shapes-core.ttl
+  shapes:  shapes/rkaf-shapes-pattern-c.ttl
+  shapes:  shapes/rkaf-shapes-studio-promotions.ttl
+  shapes:  shapes/rkaf-shapes-warrant.ttl
+  shapes:  compiled/shacl/core/access-scope.ttl
+  shapes:  compiled/shacl/core/ai-lineage.ttl
+  shapes:  compiled/shacl/core/applicability-scope.ttl
+  shapes:  compiled/shacl/core/artifact.ttl
+  shapes:  compiled/shacl/core/assertion.ttl
+  shapes:  compiled/shacl/core/attestation.ttl
+  shapes:  compiled/shacl/core/authority.ttl
+  shapes:  compiled/shacl/core/bridge-consumer-registration.ttl
+  shapes:  compiled/shacl/core/bridge-issue-attestation-contract.ttl
+  shapes:  compiled/shacl/core/bridge-validation-result.ttl
+  shapes:  compiled/shacl/core/concept-mapping.ttl
+  shapes:  compiled/shacl/core/concept-resolution-result.ttl
+  shapes:  compiled/shacl/core/concept.ttl
+  shapes:  compiled/shacl/core/confidence-record.ttl
+  shapes:  compiled/shacl/core/consumer-effective-declaration.ttl
+  shapes:  compiled/shacl/core/effective-period.ttl
+  shapes:  compiled/shacl/core/evaluation-anchor.ttl
+  shapes:  compiled/shacl/core/evidence-binding.ttl
+  shapes:  compiled/shacl/core/finding.ttl
+  shapes:  compiled/shacl/core/generated-work-product.ttl
+  shapes:  compiled/shacl/core/justification.ttl
+  shapes:  compiled/shacl/core/lifecycle-event.ttl
+  shapes:  compiled/shacl/core/local-adoption.ttl
+  shapes:  compiled/shacl/core/mapping-state.ttl
+  shapes:  compiled/shacl/core/point-in-time-exception.ttl
+  shapes:  compiled/shacl/core/registry-conflict.ttl
+  shapes:  compiled/shacl/core/retention-policy.ttl
+  shapes:  compiled/shacl/core/revalidation-event.ttl
+  shapes:  compiled/shacl/core/rulemaking.ttl
+  shapes:  compiled/shacl/core/source-fragment.ttl
+  shapes:  compiled/shacl/core/trust-and-safety.ttl
+  shapes:  compiled/shacl/core/usage-eligibility.ttl
+  shapes:  compiled/shacl/core/warrant.ttl
+  shapes:  compiled/shacl/core/workspace.ttl
+
+[2/3] Per-fixture validation
+  [PASS] epa-oil-and-gas-climate-review: 0 violations, 135 triples
+
+[3/3] Summary
+  Shapes:     41 files
+  Fixtures:   1
+  Triples:    135
+  Violations: 0
+  Result:     PASS
+uv run --with-requirements requirements.txt --with jsonschema --with pyld python tools/ci_validate.py
+Rulespec CI validation gate
+============================================================
+
+[1/3] Environment check
+  pyshacl 0.40.0 OK
+  shapes:  shapes/rkaf-shapes-accessscope.ttl
+  shapes:  shapes/rkaf-shapes-conceptregistry.ttl
+  shapes:  shapes/rkaf-shapes-confidence.ttl
+  shapes:  shapes/rkaf-shapes-core.ttl
+  shapes:  shapes/rkaf-shapes-pattern-c.ttl
+  shapes:  shapes/rkaf-shapes-studio-promotions.ttl
+  shapes:  shapes/rkaf-shapes-warrant.ttl
+  shapes:  compiled/shacl/core/access-scope.ttl
+  shapes:  compiled/shacl/core/ai-lineage.ttl
+  shapes:  compiled/shacl/core/applicability-scope.ttl
+  shapes:  compiled/shacl/core/artifact.ttl
+  shapes:  compiled/shacl/core/assertion.ttl
+  shapes:  compiled/shacl/core/attestation.ttl
+  shapes:  compiled/shacl/core/authority.ttl
+  shapes:  compiled/shacl/core/bridge-consumer-registration.ttl
+  shapes:  compiled/shacl/core/bridge-issue-attestation-contract.ttl
+  shapes:  compiled/shacl/core/bridge-validation-result.ttl
+  shapes:  compiled/shacl/core/concept-mapping.ttl
+  shapes:  compiled/shacl/core/concept-resolution-result.ttl
+  shapes:  compiled/shacl/core/concept.ttl
+  shapes:  compiled/shacl/core/confidence-record.ttl
+  shapes:  compiled/shacl/core/consumer-effective-declaration.ttl
+  shapes:  compiled/shacl/core/effective-period.ttl
+  shapes:  compiled/shacl/core/evaluation-anchor.ttl
+  shapes:  compiled/shacl/core/evidence-binding.ttl
+  shapes:  compiled/shacl/core/finding.ttl
+  shapes:  compiled/shacl/core/generated-work-product.ttl
+  shapes:  compiled/shacl/core/justification.ttl
+  shapes:  compiled/shacl/core/lifecycle-event.ttl
+  shapes:  compiled/shacl/core/local-adoption.ttl
+  shapes:  compiled/shacl/core/mapping-state.ttl
+  shapes:  compiled/shacl/core/point-in-time-exception.ttl
+  shapes:  compiled/shacl/core/registry-conflict.ttl
+  shapes:  compiled/shacl/core/retention-policy.ttl
+  shapes:  compiled/shacl/core/revalidation-event.ttl
+  shapes:  compiled/shacl/core/rulemaking.ttl
+  shapes:  compiled/shacl/core/source-fragment.ttl
+  shapes:  compiled/shacl/core/trust-and-safety.ttl
+  shapes:  compiled/shacl/core/usage-eligibility.ttl
+  shapes:  compiled/shacl/core/warrant.ttl
+  shapes:  compiled/shacl/core/workspace.ttl
+
+[2/3] Per-fixture validation
+  [PASS] accessscope-organizationVisible-positive: 0 violations, 2 triples
+  [PASS] accessscope-public-positive: 0 violations, 2 triples
+  [PASS] ailineage-positive: 0 violations, 9 triples
+  [PASS] applicabilityscope-positive: 0 violations, 5 triples
+  [PASS] artifact-cid-positive: 0 violations, 3 triples
+  [PASS] artifact-cross-posting-positive: 0 violations, 12 triples
+  [PASS] artifact-doi-positive: 0 violations, 3 triples
+  [PASS] artifact-eli-positive: 0 violations, 3 triples
+  [PASS] artifact-us-cfr-positive: 0 violations, 5 triples
+  [PASS] artifact-us-eo-positive: 0 violations, 5 triples
+  [PASS] artifact-us-frdoc-positive: 0 violations, 9 triples
+  [PASS] artifact-us-pl-positive: 0 violations, 5 triples
+  [PASS] artifact-us-regsgov-positive: 0 violations, 5 triples
+  [PASS] artifact-us-usc-positive: 0 violations, 5 triples
+  [PASS] attestation-positive: 0 violations, 7 triples
+  [PASS] attestation-revoked-positive: 0 violations, 9 triples
+  [PASS] attestation-revoked-within-period-positive: 0 violations, 13 triples
+  [PASS] attestation-waiving-finding-positive: 0 violations, 16 triples
+  [PASS] attestation-with-effective-period-positive: 0 violations, 12 triples
+  [PASS] authority-positive: 0 violations, 4 triples
+  [PASS] bridgeconsumerregistration-positive: 0 violations, 14 triples
+  [PASS] bridgeissueattestationcontract-positive: 0 violations, 7 triples
+  [PASS] bridgevalidationresult-positive: 0 violations, 10 triples
+  [PASS] bridgevalidationresult-with-freshness-positive: 0 violations, 10 triples
+  [PASS] commentperiod-docket-only-positive: 0 violations, 9 triples
+  [PASS] commentperiod-positive: 0 violations, 19 triples
+  [PASS] concept-registered-positive: 0 violations, 5 triples
+  [PASS] conceptmapping-positive: 0 violations, 5 triples
+  [PASS] conceptresolutionresult-positive: 0 violations, 6 triples
+  [PASS] confidencerecord-calibrated-positive: 0 violations, 7 triples
+  [PASS] confidencerecord-uncalibrated-positive: 0 violations, 6 triples
+  [PASS] consumereffectivedeclaration-positive: 0 violations, 6 triples
+  [PASS] docket-us-regsgov-positive: 0 violations, 3 triples
+  [PASS] edges/access-scope-with-dpv-composition-positive: 0 violations, 11 triples
+  [PASS] effectiveperiod-positive: 0 violations, 2 triples
+  [PASS] evaluationanchor-positive: 0 violations, 2 triples
+  [PASS] evidencebinding-no-evidence-reason-positive: 0 violations, 6 triples
+  [PASS] evidencebinding-positive: 0 violations, 14 triples
+  [PASS] evidencebinding-with-freshness-positive: 0 violations, 5 triples
+  [PASS] finding-positive: 0 violations, 14 triples
+  [PASS] generatedworkproduct-positive: 0 violations, 3 triples
+  [PASS] justification-positive: 0 violations, 4 triples
+  [PASS] lifecycleevent-partial-vacatur-positive: 0 violations, 12 triples
+  [PASS] lifecycleevent-positive: 0 violations, 7 triples
+  [PASS] lifecycleevent-proceeding-stages-positive: 0 violations, 39 triples
+  [PASS] localadoption-positive: 0 violations, 9 triples
+  [PASS] localconcept-positive: 0 violations, 5 triples
+  [PASS] mappingapplicabilitycontext-positive: 0 violations, 3 triples
+  [PASS] mappingstate-positive: 0 violations, 1 triples
+  [PASS] modelcard-minimal-positive: 0 violations, 46 triples
+  [PASS] pointintimeexception-positive: 0 violations, 4 triples
+  [PASS] proceeding-concluded-positive: 0 violations, 10 triples
+  [PASS] proceeding-continuity-positive: 0 violations, 7 triples
+  [PASS] proceeding-evidence-identifier-positive: 0 violations, 6 triples
+  [PASS] proceeding-official-registry-positive: 0 violations, 8 triples
+  [PASS] proceeding-unknown-authority-positive: 0 violations, 4 triples
+  [PASS] proceeding-us-rin-positive: 0 violations, 29 triples
+  [PASS] registryconflict-positive: 0 violations, 7 triples
+  [PASS] retentionpolicy-positive: 0 violations, 4 triples
+  [PASS] revalidationevent-positive: 0 violations, 11 triples
+  [PASS] sourcefragment-aknt-eid-positive: 0 violations, 9 triples
+  [PASS] sourcefragment-oa-textquote-positive: 0 violations, 9 triples
+  [PASS] sourcefragment-oa-xpath-positive: 0 violations, 9 triples
+  [PASS] sourcefragment-uslm-section-positive: 0 violations, 9 triples
+  [PASS] sourcefragment-with-freshness-positive: 0 violations, 6 triples
+  [PASS] warrant-cross-family-transition-positive: 0 violations, 7 triples
+  [PASS] warrant-legal-positive: 0 violations, 4 triples
+  [PASS] warrant-scientific-positive: 0 violations, 3 triples
+  [PASS] workspace-positive: 0 violations, 4 triples
+
+[3/3] Summary
+  Shapes:     41 files
+  Fixtures:   69
+  Triples:    574
+  Violations: 0
+  Result:     PASS
+uv run --with-requirements requirements.txt --with jsonschema --with pyld python tools/validate_negatives.py
+loaded 2272 triples across 41 shape files
+  [FAIL-AS-EXPECTED] fixtures/accessscope-leak-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/ailineage-missing-approver-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/confidencerecord-score-theater-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/evidencebinding-missing-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/modelcard-governance-rejection-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/a-i-lineage-missing-human-approver-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/a-i-lineage-missing-input-context-hash-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/a-i-lineage-missing-model-id-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/a-i-lineage-missing-model-version-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/a-i-lineage-missing-prompt-template-ref-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/a-i-lineage-missing-temperature-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/access-scope-missing-access-scope-kind-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/applicability-scope-missing-applies-in-jurisdiction-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/artifact-missing-artifact-identifier-scheme-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/artifact-missing-has-artifact-identifier-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/artifact-regulatory-identifier-missing-scheme-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/artifact-regulatory-scheme-missing-identifier-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/artifact-us-cfr-malformed-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/artifact-us-eo-malformed-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/artifact-us-frdoc-malformed-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/artifact-us-pl-malformed-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/artifact-us-regsgov-malformed-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/artifact-us-usc-malformed-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/assertion-human-asserted-with-ai-lineage-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/assertion-missing-assertion-origin-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/attestation-missing-attestation-scope-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/attestation-missing-attested-at-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/attestation-missing-attestor-kind-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/attestation-missing-attestor-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/attestation-missing-decision-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/attestation-missing-targets-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/authority-missing-authority-kind-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/bridge-consumer-registration-missing-bridge-contract-version-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/bridge-consumer-registration-missing-consumer-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/bridge-consumer-registration-missing-registered-at-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/bridge-consumer-registration-missing-supported-authority-kinds-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/bridge-consumer-registration-missing-supported-automatic-migrations-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/bridge-consumer-registration-missing-supported-evaluation-anchors-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/bridge-consumer-registration-missing-supports-registry-version-range-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/bridge-issue-attestation-contract-missing-attested-issue-kinds-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/bridge-issue-attestation-contract-missing-consumer-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/bridge-issue-attestation-contract-missing-contract-version-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/bridge-validation-result-missing-bridge-contract-version-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/bridge-validation-result-missing-consumer-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/bridge-validation-result-missing-effective-usage-eligibility-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/bridge-validation-result-missing-effective-usage-eligibility-rationale-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/bridge-validation-result-missing-packet-id-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/bridge-validation-result-missing-result-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/bridge-validation-result-missing-validated-at-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/bridge-validation-result-rejected-no-remediation-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/comment-period-end-before-start-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/comment-period-malformed-date-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/comment-period-missing-comment-period-end-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/comment-period-missing-comment-period-for-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/comment-period-missing-comment-period-start-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/comment-period-missing-provenance-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/concept-mapping-missing-mapping-relation-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/concept-mapping-missing-source-concept-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/concept-mapping-missing-target-concept-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/concept-resolution-result-missing-input-concept-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/concept-resolution-result-missing-resolution-status-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/concept-resolution-result-missing-resolved-at-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/confidence-record-calibrated-without-corpus-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/confidence-record-missing-calibration-status-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/confidence-record-missing-confidence-basis-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/confidence-record-missing-confidence-method-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/confidence-record-missing-generated-by-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/consumer-effective-declaration-missing-consumer-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/consumer-effective-declaration-missing-declared-at-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/consumer-effective-declaration-missing-declared-effective-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/consumer-effective-declaration-missing-for-assertion-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/docket-missing-docket-identifier-scheme-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/docket-missing-has-docket-identifier-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/docket-us-regsgov-malformed-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/effective-period-missing-effective-period-start-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/evidence-binding-missing-binds-assertion-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/finding-missing-detected-at-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/finding-missing-detected-by-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/finding-missing-finding-kind-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/finding-missing-subject-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/generated-work-product-missing-justified-by-assertion-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/justification-missing-has-warrant-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/justification-no-warrant-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/lifecycle-event-missing-applies-to-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/lifecycle-event-missing-effective-date-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/lifecycle-event-missing-emitted-by-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/lifecycle-event-missing-lifecycle-event-kind-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/lifecycleevent-external-legal-no-proceeding-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/local-adoption-missing-adopted-at-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/local-adoption-missing-adoption-authority-kind-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/local-adoption-missing-adoption-scope-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/local-adoption-missing-adoption-status-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/local-adoption-missing-authorized-by-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/local-adoption-missing-organization-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/local-adoption-missing-target-assertion-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/local-adoption-missing-usage-eligibility-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/local-adoption-statutory-authority-kind-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/local-concept-missing-concept-scope-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/local-concept-missing-concept-status-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/local-concept-missing-defined-in-scope-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/local-concept-missing-pref-label-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/mapping-applicability-context-missing-application-domain-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/point-in-time-exception-missing-evaluation-anchor-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/proceeding-concluded-missing-cause-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/proceeding-latest-stage-mismatch-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/proceeding-missing-has-proceeding-identifier-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/proceeding-missing-proceeding-identifier-scheme-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/proceeding-multiple-stages-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/proceeding-official-registry-missing-registry-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/proceeding-regsgov-identity-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/proceeding-stage-event-docket-target-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/proceeding-stage-on-docket-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/proceeding-us-rin-malformed-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/registered-concept-missing-concept-scope-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/registered-concept-missing-concept-status-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/registered-concept-missing-managed-by-registry-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/registered-concept-missing-pref-label-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/registry-conflict-missing-conflicting-entries-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/registry-conflict-missing-detected-at-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/registry-conflict-missing-severity-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/registry-conflict-single-entry-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/retention-policy-missing-retention-duration-days-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/retention-policy-missing-retention-post-expiry-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/retention-policy-missing-retention-trigger-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/revalidation-closure-event-missing-bridge-contract-version-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/revalidation-closure-event-missing-closed-at-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/revalidation-closure-event-missing-closes-revalidation-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/revalidation-closure-event-missing-closure-decision-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/revalidation-event-missing-bridge-contract-version-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/revalidation-event-missing-opened-at-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/revalidation-event-missing-revalidation-for-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/revalidation-event-missing-triggered-by-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/rulemaking-reference-class-confusion-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/source-fragment-missing-binds-artifact-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/source-fragment-missing-has-selector-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/source-fragment-missing-selector-kind-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/warrant-family-kind-mismatch-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/warrant-missing-warrant-family-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/warrant-missing-warrant-kind-negative.jsonld
+  [FAIL-AS-EXPECTED] fixtures/negatives/workspace-missing-workspace-id-negative.jsonld
+cargo build --manifest-path crates/Cargo.toml -p projector-harness
+uv run --with-requirements requirements.txt --with jsonschema --with pyld python tools/vocab_audit.py
+vocab audit — fixtures required: 61 present: 73 | CUE primitives: 34 covered: 34
+
+EXTRA fixtures: 12 (not in required list; informational; pass `--list-extras` to enumerate)
+uv run --with-requirements requirements.txt --with jsonschema --with pyld python -m unittest tools.test_constraints_compile tools.test_l0_mapping_audit -v
+uv run --with-requirements requirements.txt --with jsonschema --with pyld python tools/l0_mapping_audit.py
+L0 mapping audit: 0/0 passed
+uv run --with-requirements requirements.txt --with jsonschema --with pyld python tools/l0_l3_coverage_audit.py
+L0-L3 coverage audit
+  normal fixtures: 292
+  schema classes: 35
+  L0 vocabulary fixtures: 61/61
+  L0 CUE primitive terms: 34/34
+  L1 JSON-LD parse: 292/292
+  L2 positive type coverage: 35/35
+  L2 negative type coverage: 35/35
+  L2 required-field negatives: 106/106
+  L3 edge type coverage: 35/35
+uv run --with-requirements requirements.txt --with jsonschema --with pyld python tools/rename_audit.py
+Rulespec rename audit — root: /Users/mikewolfd/Work/rulespec
+Total findings: 0
+  Filename matches: 0
+  iri-w3id: 0
+  urn-pkaf: 0
+  prefix-pkaf: 0
+  brand-PKAF: 0
+  brand-pkaf: 0
+CLEAN
+uv run --with-requirements requirements.txt --with jsonschema --with pyld python tools/l4_coverage_audit.py
+L4 coverage audit
+  behavior fixtures: 45
+  contracts: 5/5
+  bridge rules: 10/10 plus safeAutomaticMigration
+  reducer branches: 6/6
+  PIT branches: 2/2
+  concept outcomes/severities: 3/3 + 4/4
+  cascade predicates: 17/17
+uv run --with-requirements requirements.txt --with jsonschema --with pyld python tools/constraints_parity.py
+Running 57 fixture×constraint pairs across targets
+======================================================================
+CORE PARITY (release gate — all targets MUST agree)
+----------------------------------------------------------------------
+  [OK] artifact                            expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   artifact-eli-positive.jsonld
+  [OK] artifact                            expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   artifact-doi-positive.jsonld
+  [OK] artifact                            expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   artifact-cid-positive.jsonld
+  [OK] artifact                            expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   artifact-us-cfr-positive.jsonld
+  [OK] artifact                            expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   artifact-us-usc-positive.jsonld
+  [OK] artifact                            expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   artifact-us-frdoc-positive.jsonld
+  [OK] artifact                            expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   artifact-us-regsgov-positive.jsonld
+  [OK] artifact                            expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   artifact-us-pl-positive.jsonld
+  [OK] artifact                            expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   artifact-us-eo-positive.jsonld
+  [OK] artifact                            expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   artifact-regulatory-identifier-missing-scheme-negative.jsonld
+  [OK] artifact                            expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   artifact-regulatory-scheme-missing-identifier-negative.jsonld
+  [OK] artifact                            expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   artifact-us-cfr-malformed-negative.jsonld
+  [OK] artifact                            expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   artifact-us-usc-malformed-negative.jsonld
+  [OK] artifact                            expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   artifact-us-frdoc-malformed-negative.jsonld
+  [OK] artifact                            expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   artifact-us-regsgov-malformed-negative.jsonld
+  [OK] artifact                            expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   artifact-us-pl-malformed-negative.jsonld
+  [OK] artifact                            expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   artifact-us-eo-malformed-negative.jsonld
+  [OK] rulemaking                          expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   docket-us-regsgov-positive.jsonld
+  [OK] rulemaking                          expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   docket-missing-has-docket-identifier-negative.jsonld
+  [OK] rulemaking                          expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   docket-missing-docket-identifier-scheme-negative.jsonld
+  [OK] rulemaking                          expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   docket-us-regsgov-malformed-negative.jsonld
+  [OK] rulemaking                          expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   proceeding-us-rin-positive.jsonld
+  [OK] rulemaking                          expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   proceeding-missing-has-proceeding-identifier-negative.jsonld
+  [OK] rulemaking                          expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   proceeding-missing-proceeding-identifier-scheme-negative.jsonld
+  [OK] rulemaking                          expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   proceeding-multi-docket-edge.jsonld
+  [OK] rulemaking                          expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   proceeding-unknown-authority-positive.jsonld
+  [OK] rulemaking                          expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   proceeding-us-rin-malformed-negative.jsonld
+  [OK] rulemaking                          expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   commentperiod-positive.jsonld
+  [OK] rulemaking                          expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   comment-period-missing-comment-period-for-negative.jsonld
+  [OK] rulemaking                          expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   comment-period-missing-comment-period-start-negative.jsonld
+  [OK] rulemaking                          expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   comment-period-missing-comment-period-end-negative.jsonld
+  [OK] rulemaking                          expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   comment-period-missing-provenance-negative.jsonld
+  [OK] rulemaking                          expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   comment-period-malformed-date-negative.jsonld
+  [OK] rulemaking                          expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   comment-period-end-before-start-negative.jsonld
+  [OK] warrant                             expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   warrant-legal-positive.jsonld
+  [OK] warrant                             expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   warrant-scientific-positive.jsonld
+  [OK] confidence-record                   expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   confidencerecord-uncalibrated-positive.jsonld
+  [OK] confidence-record                   expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   confidencerecord-calibrated-positive.jsonld
+  [OK] confidence-record                   expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   confidencerecord-score-theater-negative.jsonld
+  [OK] access-scope                        expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   accessscope-public-positive.jsonld
+  [OK] access-scope                        expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   accessscope-organizationVisible-positive.jsonld
+  [OK] access-scope                        expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   accessscope-leak-negative.jsonld
+  [OK] ai-lineage                          expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   ailineage-positive.jsonld
+  [OK] ai-lineage                          expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   ailineage-missing-approver-negative.jsonld
+  [OK] retention-policy                    expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   retentionpolicy-positive.jsonld
+  [OK] workspace                           expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   workspace-positive.jsonld
+  [OK] evidence-binding                    expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   evidencebinding-positive.jsonld
+  [OK] evidence-binding                    expected=PASS json-schema=PASS shacl=PASS rust-struct=OK   ts-struct=OK   evidencebinding-no-evidence-reason-positive.jsonld
+  [OK] evidence-binding                    expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   evidencebinding-missing-negative.jsonld
+  [FAIL] conditional-silent-pass             expected=PASS json-schema=FAIL shacl=PASS rust-struct=OK   ts-struct=OK   conditional-silent-pass-positive.jsonld (sh-divergence — expected for adversarial)
+  [OK] conditional-silent-pass             expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   conditional-silent-pass-negative.jsonld
+  [OK] enum-drift                          expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   enum-drift-negative.jsonld
+  [OK] cross-property-coupling             expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   cross-property-coupling-negative.jsonld
+  [FAIL] nested-noevidencereason             expected=PASS json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   nested-noevidencereason-positive.jsonld
+  [OK] warrant-family-confusion            expected=FAIL json-schema=FAIL shacl=PASS rust-struct=OK   ts-struct=OK   warrant-family-confusion-negative.jsonld (sh-divergence — expected for adversarial)
+  [OK] consent-vs-warrant                  expected=FAIL json-schema=FAIL shacl=PASS rust-struct=OK   ts-struct=OK   consent-vs-warrant-negative.jsonld (sh-divergence — expected for adversarial)
+  [OK] confidence-score-without-method     expected=FAIL json-schema=FAIL shacl=FAIL rust-struct=OK   ts-struct=OK   confidence-score-without-method-negative.jsonld
+======================================================================
+CORE divergences (release blockers): 0
+ADVERSARIAL findings (documentation): 2
+uv run --with-requirements requirements.txt --with jsonschema --with pyld python tools/projector_parity.py
+  [OK] json-schema/round-trip round-trip-empty-overlay.jsonld
+  [OK] json-schema/round-trip round-trip-snap-redetermination.jsonld
+  [OK] json-schema/round-trip round-trip-warrant-chain.jsonld
+  [OK] json-ld/round-trip round-trip-attach-overlay-on-native.jsonld
+  [OK] json-ld/round-trip round-trip-snap-redetermination.jsonld
+  [OK] openapi/round-trip round-trip-minimal.yaml
+  [OK] openapi/round-trip round-trip-source-authority-api.yaml
+
+7/7 round-trip fixtures passed
+uv run --with-requirements requirements.txt --with jsonschema --with pyld python tools/version_sync.py --check
+truth: VERSION = '0.2.0-pre.7'
+
+All call sites in sync.
+uv run --with-requirements requirements.txt --with jsonschema --with pyld python tools/codegen_drift_audit.py
+OK: codegen lock-step (crates/rkaf-core/src/generated, no drift)
+cargo build --manifest-path crates/Cargo.toml --workspace
+cargo build --manifest-path crates/Cargo.toml -p rkaf-runtime-cli --release
+uv run --with-requirements requirements.txt --with jsonschema --with pyld python tools/conformance_report.py
+fixture                                                 exp        L1     L2     L3     L4    
+-----------------------------------------------------------------------------------------------
+accessscope-leak-negative.jsonld                        negative   pass   fail   fail   not-tested
+accessscope-organizationVisible-positive.jsonld         positive   pass   pass   pass   not-tested
+accessscope-public-positive.jsonld                      positive   pass   pass   pass   not-tested
+ailineage-missing-approver-negative.jsonld              negative   pass   fail   fail   not-tested
+ailineage-positive.jsonld                               positive   pass   pass   pass   not-tested
+applicabilityscope-positive.jsonld                      positive   pass   pass   pass   not-tested
+artifact-cid-positive.jsonld                            positive   pass   pass   pass   not-tested
+artifact-cross-posting-positive.jsonld                  positive   pass   pass   pass   not-tested
+artifact-doi-positive.jsonld                            positive   pass   pass   pass   not-tested
+artifact-eli-positive.jsonld                            positive   pass   pass   pass   not-tested
+artifact-us-cfr-positive.jsonld                         positive   pass   pass   pass   not-tested
+artifact-us-eo-positive.jsonld                          positive   pass   pass   pass   not-tested
+artifact-us-frdoc-positive.jsonld                       positive   pass   pass   pass   not-tested
+artifact-us-pl-positive.jsonld                          positive   pass   pass   pass   not-tested
+artifact-us-regsgov-positive.jsonld                     positive   pass   pass   pass   not-tested
+artifact-us-usc-positive.jsonld                         positive   pass   pass   pass   not-tested
+attestation-positive.jsonld                             positive   pass   pass   pass   not-tested
+attestation-revoked-positive.jsonld                     positive   pass   pass   pass   not-tested
+attestation-revoked-within-period-positive.jsonld       positive   pass   pass   pass   not-tested
+attestation-waiving-finding-positive.jsonld             positive   pass   pass   pass   not-tested
+attestation-with-effective-period-positive.jsonld       positive   pass   pass   pass   not-tested
+authority-positive.jsonld                               positive   pass   pass   pass   not-tested
+behavior/bridge-rule-1-legal-with-authority-positive.jsonld behavior   pass   pass   pass   pass  
+behavior/bridge-rule-1-legal-without-authority-negative.jsonld behavior   pass   pass   pass   pass  
+behavior/bridge-rule-10-gwp-missing-justification-negative.jsonld behavior   pass   pass   pass   pass  
+behavior/bridge-rule-10-gwp-with-terminating-justification-positive.jsonld behavior   pass   pass   pass   pass  
+behavior/bridge-rule-2-declared-broadens-without-adoption-negative.jsonld behavior   pass   pass   pass   pass  
+behavior/bridge-rule-2-declared-equals-reducer-positive.jsonld behavior   pass   pass   pass   pass  
+behavior/bridge-rule-3-chain-terminus-kind-matches-positive.jsonld behavior   pass   pass   pass   pass  
+behavior/bridge-rule-3-chain-terminus-kind-mismatch-negative.jsonld behavior   pass   pass   pass   pass  
+behavior/bridge-rule-4-supported-anchor-positive.jsonld behavior   pass   pass   fail   pass  
+behavior/bridge-rule-4-unsupported-anchor-negative.jsonld behavior   pass   pass   fail   pass  
+behavior/bridge-rule-5-safe-automatic-migration-positive.jsonld behavior   pass   pass   pass   pass  
+behavior/bridge-rule-5-stale-not-transitioned-negative.jsonld behavior   pass   pass   pass   pass  
+behavior/bridge-rule-5-stale-transition-set-positive.jsonld behavior   pass   pass   pass   pass  
+behavior/bridge-rule-6-concept-in-authority-negative.jsonld behavior   pass   pass   pass   pass  
+behavior/bridge-rule-6-no-concept-in-authority-positive.jsonld behavior   pass   pass   pass   pass  
+behavior/bridge-rule-7-justification-orphan.jsonld      behavior   pass   pass   pass   pass  
+behavior/bridge-rule-7-terminating-chain-positive.jsonld behavior   pass   pass   pass   pass  
+behavior/bridge-rule-8-attestation-out-of-period-negative.jsonld behavior   pass   pass   pass   pass  
+behavior/bridge-rule-8-attestation-revoked-negative.jsonld behavior   pass   pass   pass   pass  
+behavior/bridge-rule-8-issue-with-attestation-positive.jsonld behavior   pass   pass   pass   pass  
+behavior/bridge-rule-8-issue-without-attestation-negative.jsonld behavior   pass   pass   pass   pass  
+behavior/bridge-rule-8-target-finding-dangling-negative.jsonld behavior   pass   pass   pass   pass  
+behavior/bridge-rule-8-targeted-finding-positive.jsonld behavior   pass   pass   pass   pass  
+behavior/bridge-rule-9-version-in-range-positive.jsonld behavior   pass   pass   fail   pass  
+behavior/bridge-rule-9-version-out-of-range-negative.jsonld behavior   pass   pass   fail   pass  
+behavior/cascade-closure-all-edge-predicates.jsonld     behavior   pass   pass   fail   pass  
+behavior/cascade-closure-as-of-excludes-expired.jsonld  behavior   pass   pass   pass   pass  
+behavior/cascade-closure-supersession-fanout.jsonld     behavior   pass   pass   pass   pass  
+behavior/concept-resolution-authority-critical.jsonld   behavior   pass   pass   fail   pass  
+behavior/concept-resolution-informational-severity.jsonld behavior   pass   pass   pass   pass  
+behavior/concept-resolution-mapping-conflict.jsonld     behavior   pass   pass   pass   pass  
+behavior/concept-resolution-publication-blocking.jsonld behavior   pass   pass   fail   pass  
+behavior/concept-resolution-resolved-positive.jsonld    behavior   pass   pass   pass   pass  
+behavior/concept-resolution-unresolved-positive.jsonld  behavior   pass   pass   pass   pass  
+behavior/point-in-time-exception-honored.jsonld         behavior   pass   pass   fail   pass  
+behavior/point-in-time-exception-unsupported-anchor.jsonld behavior   pass   pass   fail   pass  
+behavior/usage-eligibility-reducer-applicability-gate.jsonld behavior   pass   pass   pass   pass  
+behavior/usage-eligibility-reducer-baseline-workspace-positive.jsonld behavior   pass   pass   pass   pass  
+behavior/usage-eligibility-reducer-capability-cap-narrows.jsonld behavior   pass   pass   fail   pass  
+behavior/usage-eligibility-reducer-freshness-fresh-passes.jsonld behavior   pass   pass   fail   pass  
+behavior/usage-eligibility-reducer-freshness-malformed-negative.jsonld behavior   pass   pass   fail   pass  
+behavior/usage-eligibility-reducer-freshness-stale-narrows.jsonld behavior   pass   pass   fail   pass  
+behavior/usage-eligibility-reducer-local-broadens-in-scope.jsonld behavior   pass   pass   pass   pass  
+behavior/usage-eligibility-reducer-stale-narrows.jsonld behavior   pass   pass   pass   pass  
+behavior/usage-eligibility-reducer-stale-with-honored-pit.jsonld behavior   pass   pass   fail   pass  
+bridgeconsumerregistration-positive.jsonld              positive   pass   pass   pass   not-tested
+bridgeissueattestationcontract-positive.jsonld          positive   pass   pass   pass   not-tested
+bridgevalidationresult-positive.jsonld                  positive   pass   pass   pass   not-tested
+bridgevalidationresult-with-freshness-positive.jsonld   positive   pass   pass   pass   not-tested
+commentperiod-docket-only-positive.jsonld               positive   pass   pass   pass   not-tested
+commentperiod-positive.jsonld                           positive   pass   pass   pass   not-tested
+concept-registered-positive.jsonld                      positive   pass   pass   pass   not-tested
+conceptmapping-positive.jsonld                          positive   pass   pass   pass   not-tested
+conceptresolutionresult-positive.jsonld                 positive   pass   pass   pass   not-tested
+confidencerecord-calibrated-positive.jsonld             positive   pass   pass   pass   not-tested
+confidencerecord-score-theater-negative.jsonld          negative   pass   fail   fail   not-tested
+confidencerecord-uncalibrated-positive.jsonld           positive   pass   pass   pass   not-tested
+consumereffectivedeclaration-positive.jsonld            positive   pass   pass   pass   not-tested
+docket-us-regsgov-positive.jsonld                       positive   pass   pass   pass   not-tested
+edges/a-i-lineage-temperature-zero-edge.jsonld          edge       pass   pass   pass   not-tested
+edges/access-scope-expired-embargo-edge.jsonld          edge       pass   pass   pass   not-tested
+edges/access-scope-with-dpv-composition-positive.jsonld positive   pass   pass   pass   not-tested
+edges/applicability-scope-universal-edge.jsonld         edge       pass   fail   fail   not-tested
+edges/artifact-partner-defined-edge.jsonld              edge       pass   pass   pass   not-tested
+edges/assertion-imported-origin-edge.jsonld             edge       pass   pass   pass   not-tested
+edges/attestation-multi-target-edge.jsonld              edge       pass   fail   fail   not-tested
+edges/bridge-consumer-registration-singletons-edge.jsonld edge       pass   pass   pass   not-tested
+edges/bridge-issue-attestation-contract-single-kind-edge.jsonld edge       pass   pass   pass   not-tested
+edges/bridge-validation-result-mixed-warning-edge.jsonld edge       pass   pass   pass   not-tested
+edges/comment-period-reopened-edge.jsonld               edge       pass   pass   fail   not-tested
+edges/concept-mapping-skos-broader-edge.jsonld          edge       pass   pass   pass   not-tested
+edges/concept-resolution-result-unresolved-edge.jsonld  edge       pass   pass   pass   not-tested
+edges/confidence-record-boundary-one-edge.jsonld        edge       pass   pass   pass   not-tested
+edges/confidence-record-boundary-zero-edge.jsonld       edge       pass   pass   pass   not-tested
+edges/consolidates-multi-predecessor-edge.jsonld        edge       pass   pass   pass   not-tested
+edges/consumer-effective-declaration-workspace-edge.jsonld edge       pass   pass   pass   not-tested
+edges/docket-partner-defined-edge.jsonld                edge       pass   pass   pass   not-tested
+edges/effective-period-with-sunset-edge.jsonld          edge       pass   pass   pass   not-tested
+edges/effective-period-zero-duration-edge.jsonld        edge       pass   pass   pass   not-tested
+edges/evidence-binding-multi-fragment-edge.jsonld       edge       pass   pass   pass   not-tested
+edges/finding-minimal-edge.jsonld                       edge       pass   pass   pass   not-tested
+edges/generated-work-product-proposed-eligibility-edge.jsonld edge       pass   pass   pass   not-tested
+edges/justification-multi-evidence-edge.jsonld          edge       pass   pass   pass   not-tested
+edges/lifecycle-event-cascade-trigger-edge.jsonld       edge       pass   pass   pass   not-tested
+edges/local-adoption-with-applicability-edge.jsonld     edge       pass   pass   pass   not-tested
+edges/local-concept-deprecated-edge.jsonld              edge       pass   pass   pass   not-tested
+edges/mapping-applicability-context-array-domain-edge.jsonld edge       pass   pass   pass   not-tested
+edges/multi-typed-authority-warrant-edge.jsonld         edge       pass   pass   pass   not-tested
+edges/point-in-time-exception-retains-work-product-edge.jsonld edge       pass   pass   pass   not-tested
+edges/proceeding-multi-docket-edge.jsonld               edge       pass   pass   pass   not-tested
+edges/registered-concept-promoted-edge.jsonld           edge       pass   pass   pass   not-tested
+edges/registry-conflict-authority-critical-edge.jsonld  edge       pass   pass   pass   not-tested
+edges/retention-policy-zero-duration-edge.jsonld        edge       pass   pass   pass   not-tested
+edges/revalidation-closure-event-retained-pit-edge.jsonld edge       pass   pass   pass   not-tested
+edges/revalidation-event-current-time-edge.jsonld       edge       pass   pass   pass   not-tested
+edges/source-fragment-mixed-selector-edge.jsonld        edge       pass   fail   fail   not-tested
+edges/warrant-self-predecessor-edge.jsonld              edge       pass   pass   pass   not-tested
+edges/workspace-empty-trust-list-edge.jsonld            edge       pass   pass   pass   not-tested
+effectiveperiod-positive.jsonld                         positive   pass   pass   pass   not-tested
+evaluationanchor-positive.jsonld                        positive   pass   pass   pass   not-tested
+evidencebinding-missing-negative.jsonld                 negative   pass   fail   fail   not-tested
+evidencebinding-no-evidence-reason-positive.jsonld      positive   pass   pass   pass   not-tested
+evidencebinding-positive.jsonld                         positive   pass   pass   pass   not-tested
+evidencebinding-with-freshness-positive.jsonld          positive   pass   pass   pass   not-tested
+finding-positive.jsonld                                 positive   pass   pass   pass   not-tested
+generatedworkproduct-positive.jsonld                    positive   pass   pass   pass   not-tested
+justification-positive.jsonld                           positive   pass   pass   pass   not-tested
+lifecycleevent-partial-vacatur-positive.jsonld          positive   pass   pass   pass   not-tested
+lifecycleevent-positive.jsonld                          positive   pass   pass   pass   not-tested
+lifecycleevent-proceeding-stages-positive.jsonld        positive   pass   pass   pass   not-tested
+localadoption-positive.jsonld                           positive   pass   pass   pass   not-tested
+localconcept-positive.jsonld                            positive   pass   pass   pass   not-tested
+mappingapplicabilitycontext-positive.jsonld             positive   pass   pass   pass   not-tested
+mappingstate-positive.jsonld                            positive   pass   pass   pass   not-tested
+modelcard-governance-rejection-negative.jsonld          negative   pass   fail   fail   not-tested
+modelcard-minimal-positive.jsonld                       positive   pass   pass   pass   not-tested
+negatives/a-i-lineage-missing-human-approver-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/a-i-lineage-missing-input-context-hash-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/a-i-lineage-missing-model-id-negative.jsonld  negative   pass   fail   fail   not-tested
+negatives/a-i-lineage-missing-model-version-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/a-i-lineage-missing-prompt-template-ref-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/a-i-lineage-missing-temperature-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/access-scope-missing-access-scope-kind-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/applicability-scope-missing-applies-in-jurisdiction-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/artifact-missing-artifact-identifier-scheme-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/artifact-missing-has-artifact-identifier-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/artifact-regulatory-identifier-missing-scheme-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/artifact-regulatory-scheme-missing-identifier-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/artifact-us-cfr-malformed-negative.jsonld     negative   pass   fail   fail   not-tested
+negatives/artifact-us-eo-malformed-negative.jsonld      negative   pass   fail   fail   not-tested
+negatives/artifact-us-frdoc-malformed-negative.jsonld   negative   pass   fail   fail   not-tested
+negatives/artifact-us-pl-malformed-negative.jsonld      negative   pass   fail   fail   not-tested
+negatives/artifact-us-regsgov-malformed-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/artifact-us-usc-malformed-negative.jsonld     negative   pass   fail   fail   not-tested
+negatives/assertion-human-asserted-with-ai-lineage-negative.jsonld negative   pass   pass   fail   not-tested
+negatives/assertion-missing-assertion-origin-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/attestation-missing-attestation-scope-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/attestation-missing-attested-at-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/attestation-missing-attestor-kind-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/attestation-missing-attestor-negative.jsonld  negative   pass   fail   fail   not-tested
+negatives/attestation-missing-decision-negative.jsonld  negative   pass   fail   fail   not-tested
+negatives/attestation-missing-targets-negative.jsonld   negative   pass   fail   fail   not-tested
+negatives/authority-missing-authority-kind-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/bridge-consumer-registration-missing-bridge-contract-version-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/bridge-consumer-registration-missing-consumer-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/bridge-consumer-registration-missing-registered-at-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/bridge-consumer-registration-missing-supported-authority-kinds-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/bridge-consumer-registration-missing-supported-automatic-migrations-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/bridge-consumer-registration-missing-supported-evaluation-anchors-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/bridge-consumer-registration-missing-supports-registry-version-range-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/bridge-issue-attestation-contract-missing-attested-issue-kinds-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/bridge-issue-attestation-contract-missing-consumer-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/bridge-issue-attestation-contract-missing-contract-version-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/bridge-validation-result-missing-bridge-contract-version-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/bridge-validation-result-missing-consumer-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/bridge-validation-result-missing-effective-usage-eligibility-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/bridge-validation-result-missing-effective-usage-eligibility-rationale-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/bridge-validation-result-missing-packet-id-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/bridge-validation-result-missing-result-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/bridge-validation-result-missing-validated-at-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/bridge-validation-result-rejected-no-remediation-negative.jsonld negative   pass   pass   fail   not-tested
+negatives/comment-period-end-before-start-negative.jsonld negative   pass   pass   fail   not-tested
+negatives/comment-period-malformed-date-negative.jsonld negative   pass   pass   fail   not-tested
+negatives/comment-period-missing-comment-period-end-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/comment-period-missing-comment-period-for-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/comment-period-missing-comment-period-start-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/comment-period-missing-provenance-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/concept-mapping-missing-mapping-relation-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/concept-mapping-missing-source-concept-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/concept-mapping-missing-target-concept-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/concept-resolution-result-missing-input-concept-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/concept-resolution-result-missing-resolution-status-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/concept-resolution-result-missing-resolved-at-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/confidence-record-calibrated-without-corpus-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/confidence-record-missing-calibration-status-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/confidence-record-missing-confidence-basis-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/confidence-record-missing-confidence-method-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/confidence-record-missing-generated-by-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/consumer-effective-declaration-missing-consumer-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/consumer-effective-declaration-missing-declared-at-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/consumer-effective-declaration-missing-declared-effective-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/consumer-effective-declaration-missing-for-assertion-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/docket-missing-docket-identifier-scheme-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/docket-missing-has-docket-identifier-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/docket-us-regsgov-malformed-negative.jsonld   negative   pass   fail   fail   not-tested
+negatives/effective-period-missing-effective-period-start-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/evidence-binding-missing-binds-assertion-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/finding-missing-detected-at-negative.jsonld   negative   pass   fail   fail   not-tested
+negatives/finding-missing-detected-by-negative.jsonld   negative   pass   fail   fail   not-tested
+negatives/finding-missing-finding-kind-negative.jsonld  negative   pass   fail   fail   not-tested
+negatives/finding-missing-subject-negative.jsonld       negative   pass   fail   fail   not-tested
+negatives/generated-work-product-missing-justified-by-assertion-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/justification-missing-has-warrant-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/justification-no-warrant-negative.jsonld      negative   pass   fail   fail   not-tested
+negatives/lifecycle-event-missing-applies-to-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/lifecycle-event-missing-effective-date-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/lifecycle-event-missing-emitted-by-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/lifecycle-event-missing-lifecycle-event-kind-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/lifecycleevent-external-legal-no-proceeding-negative.jsonld negative   pass   pass   fail   not-tested
+negatives/local-adoption-missing-adopted-at-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/local-adoption-missing-adoption-authority-kind-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/local-adoption-missing-adoption-scope-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/local-adoption-missing-adoption-status-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/local-adoption-missing-authorized-by-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/local-adoption-missing-organization-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/local-adoption-missing-target-assertion-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/local-adoption-missing-usage-eligibility-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/local-adoption-statutory-authority-kind-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/local-concept-missing-concept-scope-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/local-concept-missing-concept-status-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/local-concept-missing-defined-in-scope-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/local-concept-missing-pref-label-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/mapping-applicability-context-missing-application-domain-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/point-in-time-exception-missing-evaluation-anchor-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/proceeding-concluded-missing-cause-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/proceeding-latest-stage-mismatch-negative.jsonld negative   pass   pass   fail   not-tested
+negatives/proceeding-missing-has-proceeding-identifier-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/proceeding-missing-proceeding-identifier-scheme-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/proceeding-multiple-stages-negative.jsonld    negative   pass   fail   fail   not-tested
+negatives/proceeding-official-registry-missing-registry-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/proceeding-regsgov-identity-negative.jsonld   negative   pass   pass   fail   not-tested
+negatives/proceeding-stage-event-docket-target-negative.jsonld negative   pass   pass   fail   not-tested
+negatives/proceeding-stage-on-docket-negative.jsonld    negative   pass   pass   fail   not-tested
+negatives/proceeding-us-rin-malformed-negative.jsonld   negative   pass   fail   fail   not-tested
+negatives/registered-concept-missing-concept-scope-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/registered-concept-missing-concept-status-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/registered-concept-missing-managed-by-registry-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/registered-concept-missing-pref-label-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/registry-conflict-missing-conflicting-entries-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/registry-conflict-missing-detected-at-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/registry-conflict-missing-severity-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/registry-conflict-single-entry-negative.jsonld negative   pass   pass   fail   not-tested
+negatives/retention-policy-missing-retention-duration-days-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/retention-policy-missing-retention-post-expiry-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/retention-policy-missing-retention-trigger-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/revalidation-closure-event-missing-bridge-contract-version-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/revalidation-closure-event-missing-closed-at-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/revalidation-closure-event-missing-closes-revalidation-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/revalidation-closure-event-missing-closure-decision-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/revalidation-event-missing-bridge-contract-version-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/revalidation-event-missing-opened-at-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/revalidation-event-missing-revalidation-for-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/revalidation-event-missing-triggered-by-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/rulemaking-reference-class-confusion-negative.jsonld negative   pass   pass   fail   not-tested
+negatives/source-fragment-missing-binds-artifact-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/source-fragment-missing-has-selector-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/source-fragment-missing-selector-kind-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/warrant-family-kind-mismatch-negative.jsonld  negative   pass   pass   fail   not-tested
+negatives/warrant-missing-warrant-family-negative.jsonld negative   pass   fail   fail   not-tested
+negatives/warrant-missing-warrant-kind-negative.jsonld  negative   pass   fail   fail   not-tested
+negatives/workspace-missing-workspace-id-negative.jsonld negative   pass   fail   fail   not-tested
+pointintimeexception-positive.jsonld                    positive   pass   pass   pass   not-tested
+proceeding-concluded-positive.jsonld                    positive   pass   pass   pass   not-tested
+proceeding-continuity-positive.jsonld                   positive   pass   pass   pass   not-tested
+proceeding-evidence-identifier-positive.jsonld          positive   pass   pass   pass   not-tested
+proceeding-official-registry-positive.jsonld            positive   pass   pass   pass   not-tested
+proceeding-unknown-authority-positive.jsonld            positive   pass   pass   pass   not-tested
+proceeding-us-rin-positive.jsonld                       positive   pass   pass   pass   not-tested
+registryconflict-positive.jsonld                        positive   pass   pass   pass   not-tested
+retentionpolicy-positive.jsonld                         positive   pass   pass   pass   not-tested
+revalidationevent-positive.jsonld                       positive   pass   pass   pass   not-tested
+sourcefragment-aknt-eid-positive.jsonld                 positive   pass   pass   pass   not-tested
+sourcefragment-oa-textquote-positive.jsonld             positive   pass   pass   pass   not-tested
+sourcefragment-oa-xpath-positive.jsonld                 positive   pass   pass   pass   not-tested
+sourcefragment-uslm-section-positive.jsonld             positive   pass   pass   pass   not-tested
+sourcefragment-with-freshness-positive.jsonld           positive   pass   pass   pass   not-tested
+warrant-cross-family-transition-positive.jsonld         positive   pass   pass   pass   not-tested
+warrant-legal-positive.jsonld                           positive   pass   pass   pass   not-tested
+warrant-scientific-positive.jsonld                      positive   pass   pass   pass   not-tested
+workspace-positive.jsonld                               positive   pass   pass   pass   not-tested
+
+Total: 292 fixtures, 0 divergences
+
+--- stderr ---
+   Compiling rkaf-core v0.2.0-pre.7 (/Users/mikewolfd/Work/rulespec/crates/rkaf-core)
+   Compiling rkaf-validate v0.2.0-pre.7 (/Users/mikewolfd/Work/rulespec/crates/rkaf-validate)
+   Compiling rkaf-runtime v0.2.0-pre.7 (/Users/mikewolfd/Work/rulespec/crates/rkaf-runtime)
+   Compiling rkaf-validate-cli v0.2.0-pre.7 (/Users/mikewolfd/Work/rulespec/crates/rkaf-validate-cli)
+   Compiling rkaf-runtime-cli v0.2.0-pre.7 (/Users/mikewolfd/Work/rulespec/crates/rkaf-runtime-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.54s
+     Running unittests src/main.rs (crates/target/debug/deps/projector_harness-ec4999349dd56711)
+     Running unittests src/lib.rs (crates/target/debug/deps/rkaf_core-7bb0e80ba8bf472b)
+     Running tests/fixture_round_trip.rs (crates/target/debug/deps/fixture_round_trip-958f4d1195289779)
+     Running unittests src/lib.rs (crates/target/debug/deps/rkaf_projector_core-b100210c83489f42)
+     Running unittests src/lib.rs (crates/target/debug/deps/rkaf_projector_json_ld-a6527954456834f4)
+     Running tests/round_trip.rs (crates/target/debug/deps/round_trip-a795971ec905780c)
+     Running unittests src/lib.rs (crates/target/debug/deps/rkaf_projector_json_schema-f0f0520ed5a4bb2b)
+     Running tests/round_trip.rs (crates/target/debug/deps/round_trip-5d65ed6bafa7bd66)
+     Running unittests src/lib.rs (crates/target/debug/deps/rkaf_projector_openapi-7dc92d863f4a8a50)
+     Running tests/round_trip.rs (crates/target/debug/deps/round_trip-31e36a74a889b4c9)
+     Running unittests src/lib.rs (crates/target/debug/deps/rkaf_runtime-d2ea32138c5564e3)
+     Running tests/behavior_fixtures.rs (crates/target/debug/deps/behavior_fixtures-ecb960e83543d3f1)
+     Running unittests src/main.rs (crates/target/debug/deps/rkaf_behavior_validate-8495908824b8b5e8)
+     Running unittests src/lib.rs (crates/target/debug/deps/rkaf_validate-edc485bfc19d72e2)
+     Running tests/fixture_validation.rs (crates/target/debug/deps/fixture_validation-2da7ff0c041bcb64)
+     Running unittests src/main.rs (crates/target/debug/deps/rkaf_validate-0202a6ac8e60d2b8)
+     Running tests/cli_smoke.rs (crates/target/debug/deps/cli_smoke-2611ac4b78991834)
+   Doc-tests rkaf_core
+   Doc-tests rkaf_projector_core
+   Doc-tests rkaf_projector_json_ld
+   Doc-tests rkaf_projector_json_schema
+   Doc-tests rkaf_projector_openapi
+   Doc-tests rkaf_runtime
+   Doc-tests rkaf_validate
+   Compiling rkaf-core v0.2.0-pre.7 (/Users/mikewolfd/Work/rulespec/crates/rkaf-core)
+   Compiling rkaf-validate v0.2.0-pre.7 (/Users/mikewolfd/Work/rulespec/crates/rkaf-validate)
+   Compiling rkaf-validate-cli v0.2.0-pre.7 (/Users/mikewolfd/Work/rulespec/crates/rkaf-validate-cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.77s
+Failed to convert Literal lexical form to value. Datatype=http://www.w3.org/2001/XMLSchema#date, Converter=<function parse_xsd_date at 0x101faf370>
+Traceback (most recent call last):
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/rdflib/term.py", line 2262, in _castLexicalToPython
+    return conv_func(lexical)  # type: ignore[arg-type]
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/rdflib/xsd_datetime.py", line 587, in parse_xsd_date
+    return parse_date(date_string if not minus else ("-" + date_string))
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/isodate/isodates.py", line 190, in parse_date
+    return date(
+ValueError: month must be in 1..12
+Failed to convert Literal lexical form to value. Datatype=http://www.w3.org/2001/XMLSchema#date, Converter=<function parse_xsd_date at 0x101faf370>
+Traceback (most recent call last):
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/rdflib/term.py", line 2262, in _castLexicalToPython
+    return conv_func(lexical)  # type: ignore[arg-type]
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/rdflib/xsd_datetime.py", line 587, in parse_xsd_date
+    return parse_date(date_string if not minus else ("-" + date_string))
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/isodate/isodates.py", line 190, in parse_date
+    return date(
+ValueError: month must be in 1..12
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.06s
+test_optional_nonempty_list_is_absent_or_nonempty (tools.test_constraints_compile.ConstraintCompilerTests) ... ok
+test_patterns_dates_and_order_project_from_aliased_shape (tools.test_constraints_compile.ConstraintCompilerTests) ... ok
+test_reference_ranges_project_to_shacl_classes (tools.test_constraints_compile.ConstraintCompilerTests) ... ok
+test_artifact_identifier_accepts_declared_scheme (tools.test_l0_mapping_audit.L0MappingAuditTests) ... ok
+test_enum_target_must_belong_to_mapped_term (tools.test_l0_mapping_audit.L0MappingAuditTests) ... ok
+test_inverse_relation_declares_domain_and_range (tools.test_l0_mapping_audit.L0MappingAuditTests) ... ok
+test_mapping_version_must_match_current_contract (tools.test_l0_mapping_audit.L0MappingAuditTests) ... ok
+test_multiple_mapping_blocks_are_composed (tools.test_l0_mapping_audit.L0MappingAuditTests) ... ok
+test_partner_cannot_mix_levels_or_claim_adoption_depth (tools.test_l0_mapping_audit.L0MappingAuditTests) ... ok
+test_partner_terms_used_must_match_mapping (tools.test_l0_mapping_audit.L0MappingAuditTests) ... ok
+test_same_column_may_project_distinct_predicates (tools.test_l0_mapping_audit.L0MappingAuditTests) ... ok
+test_source_membership_declares_evidence_qualified_projection (tools.test_l0_mapping_audit.L0MappingAuditTests) ... ok
+test_transform_sample_must_execute_exactly (tools.test_l0_mapping_audit.L0MappingAuditTests) ... ok
+test_unknown_term_and_compact_term_fail (tools.test_l0_mapping_audit.L0MappingAuditTests) ... ok
+test_valid_mapping_checks_domain_kind_enum_and_identifier_sample (tools.test_l0_mapping_audit.L0MappingAuditTests) ... ok
+test_valid_partner_self_certification_passes (tools.test_l0_mapping_audit.L0MappingAuditTests) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 0.028s
+
+OK
+Failed to convert Literal lexical form to value. Datatype=http://www.w3.org/2001/XMLSchema#dateTime, Converter=<function parse_datetime at 0x1032c8040>
+Traceback (most recent call last):
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/isodate/isodatetime.py", line 25, in parse_datetime
+    datestring, timestring = datetimestring.split("T")
+ValueError: not enough values to unpack (expected 2, got 1)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/rdflib/term.py", line 2262, in _castLexicalToPython
+    return conv_func(lexical)  # type: ignore[arg-type]
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/isodate/isodatetime.py", line 27, in parse_datetime
+    raise ISO8601Error(
+isodate.isoerror.ISO8601Error: ISO 8601 time designator 'T' missing. Unable to parse datetime string 'not-a-date'
+Failed to convert Literal lexical form to value. Datatype=http://www.w3.org/2001/XMLSchema#date, Converter=<function parse_xsd_date at 0x1032cb520>
+Traceback (most recent call last):
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/rdflib/term.py", line 2262, in _castLexicalToPython
+    return conv_func(lexical)  # type: ignore[arg-type]
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/rdflib/xsd_datetime.py", line 587, in parse_xsd_date
+    return parse_date(date_string if not minus else ("-" + date_string))
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/isodate/isodates.py", line 190, in parse_date
+    return date(
+ValueError: month must be in 1..12
+Failed to convert Literal lexical form to value. Datatype=http://www.w3.org/2001/XMLSchema#date, Converter=<function parse_xsd_date at 0x1032cb520>
+Traceback (most recent call last):
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/rdflib/term.py", line 2262, in _castLexicalToPython
+    return conv_func(lexical)  # type: ignore[arg-type]
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/rdflib/xsd_datetime.py", line 587, in parse_xsd_date
+    return parse_date(date_string if not minus else ("-" + date_string))
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/isodate/isodates.py", line 190, in parse_date
+    return date(
+ValueError: month must be in 1..12
+   Compiling rkaf-core v0.2.0-pre.7 (/Users/mikewolfd/Work/rulespec/crates/rkaf-core)
+   Compiling rkaf-validate v0.2.0-pre.7 (/Users/mikewolfd/Work/rulespec/crates/rkaf-validate)
+   Compiling rkaf-runtime v0.2.0-pre.7 (/Users/mikewolfd/Work/rulespec/crates/rkaf-runtime)
+   Compiling rkaf-validate-cli v0.2.0-pre.7 (/Users/mikewolfd/Work/rulespec/crates/rkaf-validate-cli)
+   Compiling rkaf-runtime-cli v0.2.0-pre.7 (/Users/mikewolfd/Work/rulespec/crates/rkaf-runtime-cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.66s
+   Compiling rkaf-core v0.2.0-pre.7 (/Users/mikewolfd/Work/rulespec/crates/rkaf-core)
+   Compiling rkaf-runtime v0.2.0-pre.7 (/Users/mikewolfd/Work/rulespec/crates/rkaf-runtime)
+   Compiling rkaf-runtime-cli v0.2.0-pre.7 (/Users/mikewolfd/Work/rulespec/crates/rkaf-runtime-cli)
+    Finished `release` profile [optimized] target(s) in 1.73s
+Failed to convert Literal lexical form to value. Datatype=http://www.w3.org/2001/XMLSchema#dateTime, Converter=<function parse_datetime at 0x10b408700>
+Traceback (most recent call last):
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/isodate/isodatetime.py", line 25, in parse_datetime
+    datestring, timestring = datetimestring.split("T")
+ValueError: not enough values to unpack (expected 2, got 1)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/rdflib/term.py", line 2262, in _castLexicalToPython
+    return conv_func(lexical)  # type: ignore[arg-type]
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/isodate/isodatetime.py", line 27, in parse_datetime
+    raise ISO8601Error(
+isodate.isoerror.ISO8601Error: ISO 8601 time designator 'T' missing. Unable to parse datetime string 'not-a-date'
+Failed to convert Literal lexical form to value. Datatype=http://www.w3.org/2001/XMLSchema#date, Converter=<function parse_xsd_date at 0x10b40bbe0>
+Traceback (most recent call last):
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/rdflib/term.py", line 2262, in _castLexicalToPython
+    return conv_func(lexical)  # type: ignore[arg-type]
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/rdflib/xsd_datetime.py", line 587, in parse_xsd_date
+    return parse_date(date_string if not minus else ("-" + date_string))
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/isodate/isodates.py", line 190, in parse_date
+    return date(
+ValueError: month must be in 1..12
+Failed to convert Literal lexical form to value. Datatype=http://www.w3.org/2001/XMLSchema#date, Converter=<function parse_xsd_date at 0x10b40bbe0>
+Traceback (most recent call last):
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/rdflib/term.py", line 2262, in _castLexicalToPython
+    return conv_func(lexical)  # type: ignore[arg-type]
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/rdflib/xsd_datetime.py", line 587, in parse_xsd_date
+    return parse_date(date_string if not minus else ("-" + date_string))
+  File "/Users/mikewolfd/.cache/uv/archive-v0/_bFJMx2tdtoGVbQJ/lib/python3.10/site-packages/isodate/isodates.py", line 190, in parse_date
+    return date(
+ValueError: month must be in 1..12
+

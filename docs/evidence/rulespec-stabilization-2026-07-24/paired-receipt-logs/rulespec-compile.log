@@ -1,0 +1,11 @@
+$ make -C /Users/mikewolfd/Work/rulespec PYTHON=uv run --with-requirements requirements.txt --with jsonschema --with pyld python compile
+cwd: /Users/mikewolfd/Work/rulespec
+exit_code: 0
+
+--- stdout ---
+tools/compile_all.sh
+[OK] all pins current at sha256:ea9b899ba92955b83638ece811d7a4b744dd912f72e19290e32c97508674de1c
+
+--- stderr ---
+Installed 22 packages in 22ms
+
