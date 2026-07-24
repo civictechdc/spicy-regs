@@ -126,8 +126,12 @@ keeps the normative contract digest in `rulespec_version` and records the
 released semantic version and canonical GitHub release page in
 `rulespec_release` and `rulespec_release_url`. A real upload fails before source
 retrieval unless the L0 claim passes, both release fields agree, and the release
-page is reachable. `--skip-upload` deliberately bypasses this operational gate
-so an unreleased candidate can still be built and reviewed locally.
+page is reachable. The preflight also downloads the immutable tag archive under
+strict size limits, recomputes Rulespec's canonical digest from
+`constraints/core/*.cue`, the JSON-LD context, and the L0 range registry, and
+requires it to equal `rulespec_version`. `--skip-upload` deliberately bypasses
+this operational gate so an unreleased candidate can still be built and
+reviewed locally.
 
 ## Compatibility and change governance
 

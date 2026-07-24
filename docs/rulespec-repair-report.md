@@ -177,6 +177,11 @@ its matching, reachable canonical GitHub release URL. Those fields are
 intentionally null in this candidate. Local `--skip-upload` materialization
 remains available for review.
 
+Once those fields are populated, the preflight retrieves the immutable tag
+archive with bounded compressed and contract-file sizes, recomputes the
+canonical L0 digest from the tagged CUE constraints, context, and range
+registry, and rejects any release/digest mismatch.
+
 ## Remaining friction and human gates
 
 The following are explicit unknowns or external gates, not skipped work:

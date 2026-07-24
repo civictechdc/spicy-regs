@@ -347,8 +347,9 @@ containers, artifacts, versions, actors, and assertions into one type.
 - [ ] Replace the content-digest-only dependency with a released version plus
       its immutable digest.
 - [x] Make production ontology publication fail closed until the declaration
-      names a matching, reachable canonical release URL; retain `--skip-upload`
-      for candidate review.
+      names a matching, reachable canonical release URL and its tag archive
+      recomputes to the declared contract digest; retain `--skip-upload` for
+      candidate review.
 - [ ] File the Spicy Regs partner self-certification in the Rulespec repository.
 - [ ] Regenerate Rulespec's stale reference self-certification.
 

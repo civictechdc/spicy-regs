@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from shutil import copy2
 from typing import Annotated, ClassVar
 
-import httpx
-import yaml
 from cyclopts import App, Parameter
 
 from spicy_regs.ontology.common import RunContext
+from spicy_regs.ontology.rulespec_release import require_released_rulespec
 from spicy_regs.pipelines.materialized import DatasetStage, MaterializedDatasetPipeline
 from spicy_regs.transforms import (
     build_authority_edges,
@@ -22,63 +20,6 @@ from spicy_regs.transforms import (
     build_proceedings,
     build_rule_targets,
 )
-
-_RULESPEC_CONTRACT_DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
-_RULESPEC_RELEASE_VERSION = re.compile(
-    r"^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?(?:\+[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$"
-)
-_RULESPEC_RELEASE_URL_PREFIX = "https://github.com/Formspec-Labs/rulespec/releases/tag/v"
-
-
-def _require_released_rulespec(path: Path, *, verify_reachable: bool = True) -> None:
-    """Fail unless an L0 declaration pins a reachable Rulespec release."""
-    try:
-        declaration = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError) as exc:
-        raise RuntimeError(f"Cannot publish ontology dataset; invalid Rulespec declaration at {path}: {exc}") from exc
-
-    if not isinstance(declaration, dict):
-        raise RuntimeError(f"Cannot publish ontology dataset; Rulespec declaration at {path} is not a mapping")
-
-    digest = declaration.get("rulespec_version")
-    if not isinstance(digest, str) or not _RULESPEC_CONTRACT_DIGEST.fullmatch(digest):
-        raise RuntimeError(
-            f"Cannot publish ontology dataset; Rulespec declaration at {path} "
-            "does not contain an immutable sha256 contract digest"
-        )
-    results = declaration.get("results")
-    if (
-        declaration.get("declared_levels") != ["L0"]
-        or not isinstance(results, dict)
-        or results.get("L0") != "pass"
-    ):
-        raise RuntimeError(
-            f"Cannot publish ontology dataset; Rulespec declaration at {path} does not contain a passing L0 claim"
-        )
-
-    version = declaration.get("rulespec_release")
-    release_url = declaration.get("rulespec_release_url")
-    if not isinstance(version, str) or not _RULESPEC_RELEASE_VERSION.fullmatch(version):
-        raise RuntimeError(
-            f"Cannot publish ontology dataset; Rulespec declaration at {path} "
-            "does not pin a released semantic version"
-        )
-
-    expected_url = f"{_RULESPEC_RELEASE_URL_PREFIX}{version}"
-    if not isinstance(release_url, str) or release_url != expected_url:
-        raise RuntimeError(
-            f"Cannot publish ontology dataset; Rulespec release URL must be {expected_url!r}, got {release_url!r}"
-        )
-
-    if not verify_reachable:
-        return
-    try:
-        response = httpx.head(release_url, follow_redirects=True, timeout=20)
-        response.raise_for_status()
-    except httpx.HTTPError as exc:
-        raise RuntimeError(
-            f"Cannot publish ontology dataset; pinned Rulespec release is not reachable at {release_url}"
-        ) from exc
 
 
 class OntologyDatasetPipeline(MaterializedDatasetPipeline):
@@ -124,7 +65,7 @@ class OntologyDatasetPipeline(MaterializedDatasetPipeline):
         """Require both R2 credentials and a real Rulespec release before upload."""
         super()._validate_publication_environment()
         if not self.skip_upload:
-            _require_released_rulespec(self.rulespec_declaration)
+            require_released_rulespec(self.rulespec_declaration)
 
     def source_column_requirements(self) -> dict[str, tuple[str, ...]]:
         federal_register = [
