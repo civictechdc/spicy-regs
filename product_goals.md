@@ -144,6 +144,20 @@ rule → challenge → outcome. **Current access:** official Supreme Court PDFs.
 **Remaining access:** CourtListener/RECAP API. **Remaining extension:**
 broader opinions plus a rule↔case crosswalk.
 
+### Information Collection Requests (PRA/ICR pipeline)
+The prospective twin of legacy rescue: before a survey, form, or program
+report is changed or killed, an ICR moves through OMB with its own comment
+window. This is where measurement itself gets defended — and commenting is
+open to anyone, including organizations restricted to education.
+dataindex.us (Ross/Dick; GPL code, CC BY-SA content) already aggregates
+ICRs, surveys open for comment, and dataset-loss signals — consume and
+join rather than rebuild, and treat their loss signals as standing
+triggers for the legacy-rescue snapshots below. Joins by agency and OMB
+control number; reginfo.gov is the shared source system with the OIRA
+entry above.
+**Access:** dataindex.us; reginfo.gov ICR records for provenance.
+**Candidate views:** `icr_actions`, `dataset_status`.
+
 ### CBO cost estimates
 The fiscal facts cited in every legislative fight; joins to
 `congress_bills`.
