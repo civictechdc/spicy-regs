@@ -1,0 +1,51 @@
+# Graph-engine bake-off — captured results (2026-07-24)
+# duckdb 1.4.4 (project) | duckpgq community ext | kuzu 0.11.3 (isolated venv)
+# generation: output/mixed-real-data-all-profile-openai-v1
+
+==================== REAL CORPUS: DuckDB SQL vs DuckPGQ ====================
+seed CFR='5-890'  seed RIN='1545-BQ55'
+
+Q_A  everything touching a CFR unit
+  plain SQL :   6 rows total (4 RIN hits)  0.410 ms
+  DuckPGQ   :   4 RIN hits                0.496 ms
+  RIN-hit parity: True
+
+Q_B  variable-length reachability (uncited-but-related RINs) — recursive CTE
+     (DuckPGQ variable-length: see probe_duckpgq_varlen.py — it crashes)
+  1 co-target hop(s): recursiveCTE= 0 RINs (0.587 ms)
+  2 co-target hop(s): recursiveCTE= 3 RINs (0.843 ms)
+  3 co-target hop(s): recursiveCTE= 3 RINs (0.953 ms)
+
+==================== DuckPGQ path-pattern probe (fresh conn per case) ====================
+duckpgq path-pattern probe (seed RIN='0938-AV15')
+
+  OK    fixed 2-hop  (a)-[T]->(Cfr)<-[T]-(b): 4 rows
+  FAIL  var-length   (a)-[T]->{1,6}(b)  DIRECTED: InternalException: InternalException("INTERNAL Error: Attempted to access index 22 within
+  FAIL  var-length   (a)-[T]-{2,6}(b)   UNDIRECTED: ConstraintException: ConstraintException('Constraint Error: Non-existent/non-unique vertice
+
+==================== REAL CORPUS: Kuzu ====================
+Kuzu 0.11.3
+schema + COPY load (5 tables): 79.1 ms
+
+Q_A everything touching CFR 5-890: 4 RIN hits  0.870 ms
+
+Q_B variable-length reachability (native Kuzu *hops):
+  depth 1 (*2..2):  3 RINs  0.736 ms  -> ['0938-AV15', '1210-AC17', '1545-BQ55']
+  depth 2 (*2..4):  3 RINs  0.755 ms  -> ['0938-AV15', '1210-AC17', '1545-BQ55']
+  depth 3 (*2..6):  3 RINs  1.040 ms  -> ['0938-AV15', '1210-AC17', '1545-BQ55']
+
+==================== SCALING: DuckDB recursive CTE ====================
+DuckDB recursive-CTE reachability (seed R0, up to 3 co-target hops)
+ scale   load_ms  query_ms(med)  RINs_reached
+    1k       1.6           1.50            22
+   10k       4.0           2.14            22
+  100k      22.4           6.11            22
+    1M      27.5           9.61            22
+
+==================== SCALING: Kuzu native variable-length ====================
+Kuzu 0.11.3 native *variable-length reachability (seed R0, 3 co-target hops)
+ scale   load_ms  query_ms(med)  RINs_reached
+    1k      36.7           1.29            22
+   10k      28.5           1.71            22
+  100k      65.0           2.26            22
+    1M     221.1           2.06            22

@@ -1,0 +1,5 @@
+graph/
+scale/
+kuzu_db/
+ks_*/
+*.parquet
