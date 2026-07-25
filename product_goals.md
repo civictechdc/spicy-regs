@@ -24,6 +24,24 @@ roadmap to spec, the entry points there.
 3. **Feasibility** — official API beats scraping; scraping beats FOIA.
 4. **Joinability** — links to existing views by agency, docket, RIN, entity, or geography.
 
+## Current priority read (July 2026)
+
+One contributor's ordering argument, per the invitation above. Five items
+clear a higher bar than the rest — the driving use case fails without them,
+or the window to act is closing, or they multiply everything else:
+
+1. **Legacy dataset rescue** — irreversible once the portals go dark; days
+   of work; snapshot first, model never-mind-when.
+2. **Geo crosswalks + district demographics** — the join layer that
+   unlocks localization for every other table; clean Census API.
+3. **Medicaid waivers and SPAs** — the highest-value gap, and the
+   `proceedings`/`comment_periods` model already fits waiver actions.
+4. **State legislation** — hard external deadline: sessions open in January.
+5. **Public inspection desk** — a near-free extension of the FR pipeline.
+
+Everything else on this roadmap sharpens the commons; these five make it
+viable for its driving use case.
+
 ---
 
 ## Tier 1 — high value, feasible now
@@ -85,6 +103,25 @@ All-agency IG reports, already aggregated at Oversight.gov. Complements
 `gao_reports`.
 **Access:** Oversight.gov API. **Candidate view:** `oig_reports`.
 
+### Apportionments and impoundment
+OMB is now required to publish account-level apportionments, and GAO issues
+Impoundment Control Act decisions. Funds being slow-walked or withheld are
+invisible in every other source on this page — a quietly starved account is
+upstream of every service cut — and nobody publishes apportionment diffs as
+structured data.
+**Access:** apportionment-public.max.gov files, diffed over time; GAO
+legal-decisions scrape. **Candidate views:** `apportionments`,
+`impoundment_decisions`. Joins by agency, account, CFDA.
+
+### Agency web change monitoring
+Guidance is not only issued — it is quietly edited. A monitored inventory
+of high-value pages (guidance indexes, eligibility manuals, data portals)
+with content diffs extends change detection from documents to the web
+itself, and gives the legacy-rescue work below a standing sensor instead of
+a one-time snapshot. EDGI's website-monitoring practice is the precedent.
+**Access:** targeted crawling + content hashing. **Candidate view:**
+`web_changes`.
+
 ---
 
 ## Tier 2 — high value, moderate effort
@@ -99,10 +136,13 @@ a static `geo_crosswalks` table (ZIP↔district, county↔district). The
 crosswalks alone would unlock localization for every other table.
 
 ### Court opinions and litigation linkage
-Linking `court_dockets` to opinions would let APA challenges read as a
-thread: rule → challenge → outcome.
-**Access:** CourtListener/RECAP API. **Candidate extension:**
-`court_opinions`, rule↔case crosswalk.
+The local candidate now ingests official Supreme Court PDF opinion packages as
+`court_opinions`, which supplies real judicial text for document processing.
+It does not yet connect the broader `court_dockets` corpus to authored opinions
+or to challenged rules. That linkage would let APA challenges read as a thread:
+rule → challenge → outcome. **Current access:** official Supreme Court PDFs.
+**Remaining access:** CourtListener/RECAP API. **Remaining extension:**
+broader opinions plus a rule↔case crosswalk.
 
 ### CBO cost estimates
 The fiscal facts cited in every legislative fight; joins to
@@ -111,15 +151,58 @@ The fiscal facts cited in every legislative fight; joins to
 
 ### CMS provider and facility data
 Care Compare and Payroll-Based Journal staffing data — facility-level
-quality, geocodable to districts.
+quality, geocodable to districts. Ownership files add the roll-up chains
+behind facility operators, joining the entity graph.
 **Access:** data.cms.gov bulk. **Candidate views:** `cms_facilities`,
-`cms_staffing`.
+`cms_staffing`, `cms_ownership`.
 
 ### State AG multistate actions
 Multistate suits and comment letters — a growing share of how federal
 policy is contested.
 **Access:** press-release scraping, perhaps the ~15 most active offices.
 **Candidate view:** `ag_actions`.
+
+### State-side waiver notices
+Before an 1115 or 1915 action reaches Medicaid.gov, the state must run its
+own public comment period on the state Medicaid agency's site — the
+earliest possible waiver signal, and a participation window open even to
+organizations restricted to education. Fifty fragile pages, but the top
+10–15 states would cover most of the caseload.
+**Access:** per-state scraping. **Candidate view:** `state_waiver_notices`.
+
+### Federal workforce and vacancies
+Agency hollowing-out is service degradation announced nowhere: OPM FedScope
+headcounts by agency and component as a time series, plus PLUM Act
+appointee and vacancy data (acting-vs-confirmed also matters to
+litigation).
+**Access:** OPM FedScope cubes; plum.opm.gov. **Candidate views:**
+`agency_headcount`, `appointee_vacancies`.
+
+### Single audits
+Grantee audit findings from the Federal Audit Clearinghouse — early warning
+for both genuine grantee distress and pretexts for defunding.
+**Access:** api.fac.gov (official API). **Candidate view:** `single_audits`.
+
+### CRS reports
+Free expert analysis — the policy shop a two-person organization doesn't
+have. Modest uniqueness, high joinability to `congress_bills` and
+hearings. EveryCRSReport.com already publishes a bulk machine-readable
+index plus full text (public domain), including pre-2018 reports the
+official portal lacks, and preserves report versions — consume that feed
+rather than scraping the official site, which stays as provenance anchor
+and freshness cross-check.
+**Access:** everycrsreport.com bulk CSV + files; crsreports.congress.gov
+for verification. **Candidate view:** `crs_reports`.
+
+### Legislator and committee reference
+Rosters, committee assignments, and stable IDs — the join layer that makes
+"route this to the chair" computable. Complements `state_legislators`
+(Tier 1, via Open States) with federal rosters and committee assignments
+at both levels. Public facts only; who-knows-whom belongs to consumers,
+never here.
+**Access:** unitedstates/congress-legislators and openstates/people, both
+openly licensed. **Candidate views:** `legislators`,
+`committee_assignments`.
 
 ---
 
@@ -137,7 +220,21 @@ policy is contested.
 - **Cross-corpus entity graph** — resolving organizations across
   `comments`, `lobbying_filings`, `sam_entities`, and
   `usaspending_recipients` into one spine: who is active on this issue, in
-  what roles.
+  what roles. Nonprofit filings (ProPublica's 990 API) and campaign finance
+  (OpenFEC) join here as external spines — consume, don't re-ingest.
+- **HCBS waitlist series** (`hcbs_waitlists`) — the most-cited advocacy
+  number in the aging/disability field, published nowhere as a maintained
+  series. Realistic production is attested contribution through downstream
+  curation gateways (KFF's annual survey, state agency pages, verified
+  field observations), with methodology and attribution carried per row.
+- **SSA operational metrics** (`ssa_service_metrics`) — field-office
+  closures, wait times, disability backlogs; service collapse as a time
+  series.
+- **FACA advisory committees** (`faca_committees`) — charters, membership,
+  meeting cadence; purges and disbandments are cheap-to-detect leading
+  indicators. GSA publishes exports.
+- **State lobbying registrations** (`state_lobbying`) — fifty fragmented
+  disclosure regimes nobody aggregates; pilot a few states.
 
 ---
 
@@ -279,7 +376,14 @@ faithfully, not gatekeeping.
    exposes its deadline as a first-class, queryable field. The locally
    implemented `proceedings`/`comment_periods` materialized dataset delivers
    most of this once its first production generation is published.
+   Expirations belong in the same frame: waiver end dates, demonstration
+   sunsets, and effective dates make the calendar forward-looking — "what's
+   scheduled to happen," not just "what happened."
 5. **Provenance on every row.** Source URL and retrieval date, always — the
    dataset should be citable in testimony without apology.
 6. **MCP parity.** Every new view lands in `list_sources`/`describe_table`
    the day it ships; assistants are a primary consumer, not an afterthought.
+7. **Aggregation safety.** Public record does not mean safe to publish in
+   every shape. Commenter PII and membership-revealing aggregations get no
+   convenient query paths — the commons makes the government legible, not
+   the citizens who participated.
