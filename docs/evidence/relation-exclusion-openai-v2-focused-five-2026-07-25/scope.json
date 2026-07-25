@@ -1,0 +1,15 @@
+{
+  "case_ids": [
+    "relx-v2-973cdad68a5c36f0",
+    "relx-v2-67a08387711d35c7",
+    "relx-v2-71395ccd8ec8d8d0",
+    "relx-v2-7c90b40744e9f83d",
+    "relx-v2-18e15c9465ef5a82"
+  ],
+  "experiment_status": "focused-diagnostic-v2-provisional",
+  "oracle_status": "provisional-machine-assisted",
+  "publication_eligible": false,
+  "purpose": "Focused diagnostic rerun of only the five previously disputed v1 source-target cases",
+  "source_corpus_content_id": "ad39e0c2a96cd5c89b9727163e9494882cf476046c84953ab772513a84bcff36",
+  "warning": "This run is intentionally exposed-case diagnosis, not a sealed fair-v2 benchmark."
+}

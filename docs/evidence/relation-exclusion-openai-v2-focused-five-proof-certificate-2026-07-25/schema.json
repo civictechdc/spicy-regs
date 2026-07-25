@@ -1,0 +1,1283 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "cases": {
+      "additionalProperties": false,
+      "properties": {
+        "relx-v2-18e15c9465ef5a82": {
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "attribution": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "claimant_text": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "status": {
+                        "enum": [
+                          "attributed_actor",
+                          "source_voice",
+                          "unclear"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "claimant_text"
+                    ],
+                    "type": "object"
+                  },
+                  "conditionality": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "condition_text": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "status": {
+                        "enum": [
+                          "explicit",
+                          "not_explicit",
+                          "unclear"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "condition_text"
+                    ],
+                    "type": "object"
+                  },
+                  "evidence_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "evidence_start": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "evidence_text": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "intended_effective_scope": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "end": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "raw_text": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "reference": {
+                        "enum": [
+                          "document_time",
+                          "evaluation_time",
+                          "explicit_time",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "relation_to_reference": {
+                        "enum": [
+                          "after",
+                          "atemporal",
+                          "before",
+                          "includes",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "start": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "relation_to_reference",
+                      "reference",
+                      "start",
+                      "end",
+                      "raw_text"
+                    ],
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  },
+                  "kind": {
+                    "enum": [
+                      "relation_assertion",
+                      "relation_change_event"
+                    ],
+                    "type": "string"
+                  },
+                  "operation": {
+                    "enum": [
+                      "adopt",
+                      "remove",
+                      "supersede",
+                      "suspend",
+                      null
+                    ],
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "polarity": {
+                    "enum": [
+                      "affirmed",
+                      "denied",
+                      null
+                    ],
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "rationale": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "stage": {
+                    "enum": [
+                      "decided",
+                      "effective",
+                      "proposed",
+                      "unclear",
+                      "withdrawn",
+                      null
+                    ],
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "temporal_scope": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "end": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "raw_text": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "reference": {
+                        "enum": [
+                          "document_time",
+                          "evaluation_time",
+                          "explicit_time",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "relation_to_reference": {
+                        "enum": [
+                          "after",
+                          "atemporal",
+                          "before",
+                          "includes",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "start": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "relation_to_reference",
+                      "reference",
+                      "start",
+                      "end",
+                      "raw_text"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "polarity",
+                  "operation",
+                  "stage",
+                  "temporal_scope",
+                  "intended_effective_scope",
+                  "attribution",
+                  "conditionality",
+                  "evidence_text",
+                  "evidence_start",
+                  "evidence_end",
+                  "rationale"
+                ],
+                "type": "object"
+              },
+              "maxItems": 4,
+              "type": "array"
+            },
+            "no_answer_rationale": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "items",
+            "no_answer_rationale"
+          ],
+          "type": "object"
+        },
+        "relx-v2-67a08387711d35c7": {
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "attribution": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "claimant_text": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "status": {
+                        "enum": [
+                          "attributed_actor",
+                          "source_voice",
+                          "unclear"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "claimant_text"
+                    ],
+                    "type": "object"
+                  },
+                  "conditionality": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "condition_text": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "status": {
+                        "enum": [
+                          "explicit",
+                          "not_explicit",
+                          "unclear"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "condition_text"
+                    ],
+                    "type": "object"
+                  },
+                  "evidence_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "evidence_start": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "evidence_text": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "intended_effective_scope": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "end": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "raw_text": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "reference": {
+                        "enum": [
+                          "document_time",
+                          "evaluation_time",
+                          "explicit_time",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "relation_to_reference": {
+                        "enum": [
+                          "after",
+                          "atemporal",
+                          "before",
+                          "includes",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "start": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "relation_to_reference",
+                      "reference",
+                      "start",
+                      "end",
+                      "raw_text"
+                    ],
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  },
+                  "kind": {
+                    "enum": [
+                      "relation_assertion",
+                      "relation_change_event"
+                    ],
+                    "type": "string"
+                  },
+                  "operation": {
+                    "enum": [
+                      "adopt",
+                      "remove",
+                      "supersede",
+                      "suspend",
+                      null
+                    ],
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "polarity": {
+                    "enum": [
+                      "affirmed",
+                      "denied",
+                      null
+                    ],
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "rationale": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "stage": {
+                    "enum": [
+                      "decided",
+                      "effective",
+                      "proposed",
+                      "unclear",
+                      "withdrawn",
+                      null
+                    ],
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "temporal_scope": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "end": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "raw_text": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "reference": {
+                        "enum": [
+                          "document_time",
+                          "evaluation_time",
+                          "explicit_time",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "relation_to_reference": {
+                        "enum": [
+                          "after",
+                          "atemporal",
+                          "before",
+                          "includes",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "start": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "relation_to_reference",
+                      "reference",
+                      "start",
+                      "end",
+                      "raw_text"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "polarity",
+                  "operation",
+                  "stage",
+                  "temporal_scope",
+                  "intended_effective_scope",
+                  "attribution",
+                  "conditionality",
+                  "evidence_text",
+                  "evidence_start",
+                  "evidence_end",
+                  "rationale"
+                ],
+                "type": "object"
+              },
+              "maxItems": 4,
+              "type": "array"
+            },
+            "no_answer_rationale": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "items",
+            "no_answer_rationale"
+          ],
+          "type": "object"
+        },
+        "relx-v2-71395ccd8ec8d8d0": {
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "attribution": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "claimant_text": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "status": {
+                        "enum": [
+                          "attributed_actor",
+                          "source_voice",
+                          "unclear"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "claimant_text"
+                    ],
+                    "type": "object"
+                  },
+                  "conditionality": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "condition_text": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "status": {
+                        "enum": [
+                          "explicit",
+                          "not_explicit",
+                          "unclear"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "condition_text"
+                    ],
+                    "type": "object"
+                  },
+                  "evidence_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "evidence_start": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "evidence_text": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "intended_effective_scope": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "end": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "raw_text": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "reference": {
+                        "enum": [
+                          "document_time",
+                          "evaluation_time",
+                          "explicit_time",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "relation_to_reference": {
+                        "enum": [
+                          "after",
+                          "atemporal",
+                          "before",
+                          "includes",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "start": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "relation_to_reference",
+                      "reference",
+                      "start",
+                      "end",
+                      "raw_text"
+                    ],
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  },
+                  "kind": {
+                    "enum": [
+                      "relation_assertion",
+                      "relation_change_event"
+                    ],
+                    "type": "string"
+                  },
+                  "operation": {
+                    "enum": [
+                      "adopt",
+                      "remove",
+                      "supersede",
+                      "suspend",
+                      null
+                    ],
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "polarity": {
+                    "enum": [
+                      "affirmed",
+                      "denied",
+                      null
+                    ],
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "rationale": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "stage": {
+                    "enum": [
+                      "decided",
+                      "effective",
+                      "proposed",
+                      "unclear",
+                      "withdrawn",
+                      null
+                    ],
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "temporal_scope": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "end": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "raw_text": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "reference": {
+                        "enum": [
+                          "document_time",
+                          "evaluation_time",
+                          "explicit_time",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "relation_to_reference": {
+                        "enum": [
+                          "after",
+                          "atemporal",
+                          "before",
+                          "includes",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "start": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "relation_to_reference",
+                      "reference",
+                      "start",
+                      "end",
+                      "raw_text"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "polarity",
+                  "operation",
+                  "stage",
+                  "temporal_scope",
+                  "intended_effective_scope",
+                  "attribution",
+                  "conditionality",
+                  "evidence_text",
+                  "evidence_start",
+                  "evidence_end",
+                  "rationale"
+                ],
+                "type": "object"
+              },
+              "maxItems": 4,
+              "type": "array"
+            },
+            "no_answer_rationale": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "items",
+            "no_answer_rationale"
+          ],
+          "type": "object"
+        },
+        "relx-v2-7c90b40744e9f83d": {
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "attribution": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "claimant_text": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "status": {
+                        "enum": [
+                          "attributed_actor",
+                          "source_voice",
+                          "unclear"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "claimant_text"
+                    ],
+                    "type": "object"
+                  },
+                  "conditionality": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "condition_text": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "status": {
+                        "enum": [
+                          "explicit",
+                          "not_explicit",
+                          "unclear"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "condition_text"
+                    ],
+                    "type": "object"
+                  },
+                  "evidence_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "evidence_start": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "evidence_text": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "intended_effective_scope": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "end": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "raw_text": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "reference": {
+                        "enum": [
+                          "document_time",
+                          "evaluation_time",
+                          "explicit_time",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "relation_to_reference": {
+                        "enum": [
+                          "after",
+                          "atemporal",
+                          "before",
+                          "includes",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "start": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "relation_to_reference",
+                      "reference",
+                      "start",
+                      "end",
+                      "raw_text"
+                    ],
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  },
+                  "kind": {
+                    "enum": [
+                      "relation_assertion",
+                      "relation_change_event"
+                    ],
+                    "type": "string"
+                  },
+                  "operation": {
+                    "enum": [
+                      "adopt",
+                      "remove",
+                      "supersede",
+                      "suspend",
+                      null
+                    ],
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "polarity": {
+                    "enum": [
+                      "affirmed",
+                      "denied",
+                      null
+                    ],
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "rationale": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "stage": {
+                    "enum": [
+                      "decided",
+                      "effective",
+                      "proposed",
+                      "unclear",
+                      "withdrawn",
+                      null
+                    ],
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "temporal_scope": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "end": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "raw_text": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "reference": {
+                        "enum": [
+                          "document_time",
+                          "evaluation_time",
+                          "explicit_time",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "relation_to_reference": {
+                        "enum": [
+                          "after",
+                          "atemporal",
+                          "before",
+                          "includes",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "start": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "relation_to_reference",
+                      "reference",
+                      "start",
+                      "end",
+                      "raw_text"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "polarity",
+                  "operation",
+                  "stage",
+                  "temporal_scope",
+                  "intended_effective_scope",
+                  "attribution",
+                  "conditionality",
+                  "evidence_text",
+                  "evidence_start",
+                  "evidence_end",
+                  "rationale"
+                ],
+                "type": "object"
+              },
+              "maxItems": 4,
+              "type": "array"
+            },
+            "no_answer_rationale": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "items",
+            "no_answer_rationale"
+          ],
+          "type": "object"
+        },
+        "relx-v2-973cdad68a5c36f0": {
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "attribution": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "claimant_text": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "status": {
+                        "enum": [
+                          "attributed_actor",
+                          "source_voice",
+                          "unclear"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "claimant_text"
+                    ],
+                    "type": "object"
+                  },
+                  "conditionality": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "condition_text": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "status": {
+                        "enum": [
+                          "explicit",
+                          "not_explicit",
+                          "unclear"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "condition_text"
+                    ],
+                    "type": "object"
+                  },
+                  "evidence_end": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "evidence_start": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "evidence_text": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "intended_effective_scope": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "end": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "raw_text": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "reference": {
+                        "enum": [
+                          "document_time",
+                          "evaluation_time",
+                          "explicit_time",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "relation_to_reference": {
+                        "enum": [
+                          "after",
+                          "atemporal",
+                          "before",
+                          "includes",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "start": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "relation_to_reference",
+                      "reference",
+                      "start",
+                      "end",
+                      "raw_text"
+                    ],
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  },
+                  "kind": {
+                    "enum": [
+                      "relation_assertion",
+                      "relation_change_event"
+                    ],
+                    "type": "string"
+                  },
+                  "operation": {
+                    "enum": [
+                      "adopt",
+                      "remove",
+                      "supersede",
+                      "suspend",
+                      null
+                    ],
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "polarity": {
+                    "enum": [
+                      "affirmed",
+                      "denied",
+                      null
+                    ],
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "rationale": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "stage": {
+                    "enum": [
+                      "decided",
+                      "effective",
+                      "proposed",
+                      "unclear",
+                      "withdrawn",
+                      null
+                    ],
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "temporal_scope": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "end": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "raw_text": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "reference": {
+                        "enum": [
+                          "document_time",
+                          "evaluation_time",
+                          "explicit_time",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "relation_to_reference": {
+                        "enum": [
+                          "after",
+                          "atemporal",
+                          "before",
+                          "includes",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "start": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "relation_to_reference",
+                      "reference",
+                      "start",
+                      "end",
+                      "raw_text"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "polarity",
+                  "operation",
+                  "stage",
+                  "temporal_scope",
+                  "intended_effective_scope",
+                  "attribution",
+                  "conditionality",
+                  "evidence_text",
+                  "evidence_start",
+                  "evidence_end",
+                  "rationale"
+                ],
+                "type": "object"
+              },
+              "maxItems": 4,
+              "type": "array"
+            },
+            "no_answer_rationale": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "items",
+            "no_answer_rationale"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "relx-v2-973cdad68a5c36f0",
+        "relx-v2-67a08387711d35c7",
+        "relx-v2-71395ccd8ec8d8d0",
+        "relx-v2-7c90b40744e9f83d",
+        "relx-v2-18e15c9465ef5a82"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "cases"
+  ],
+  "type": "object"
+}

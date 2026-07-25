@@ -1,0 +1,265 @@
+{
+  "cases": [
+    {
+      "candidates": [],
+      "case_id": "relx-v2-18e15c9465ef5a82",
+      "no_answer_rationale": "The excerpt proposes temporarily suspending a duty on specified bench grinders but does not explicitly state that the duty applies to imports.",
+      "raw_candidate_count": 0,
+      "rejections": []
+    },
+    {
+      "candidates": [
+        {
+          "attribution": {
+            "claimant_text": null,
+            "status": "source_voice"
+          },
+          "candidate_id": "relation_candidate_v2_f8c7a662f4d2c7f766a2ac1d",
+          "conditionality": {
+            "condition_text": null,
+            "status": "not_explicit"
+          },
+          "current_at_evaluation": "unknown",
+          "evidence_alignment": "provided-offsets",
+          "evidence_end": 390,
+          "evidence_start": 180,
+          "evidence_text": "The standards of this section do not apply where mining is done on a flat or gently rolling terrain with an occasional steep slope through which the mining proceeds and leaves a plain or predominantly flat area",
+          "intended_effective_scope": null,
+          "kind": "relation_assertion",
+          "operation": null,
+          "polarity": "denied",
+          "rationale": "The section expressly states that its standards do not apply to mining on flat or gently rolling terrain under the stated conditions.",
+          "stage": null,
+          "target_relation": {
+            "object": {
+              "id": "urn:spicy-regs:entity:mining-flat-gently-rolling-terrain-stated-conditions",
+              "label": "mining on flat or gently rolling terrain meeting the stated conditions"
+            },
+            "predicate": {
+              "id": "urn:spicy-regs:predicate:applies-to",
+              "label": "apply to"
+            },
+            "subject": {
+              "id": "urn:spicy-regs:entity:30-cfr-716-2-performance-standards",
+              "label": "performance standards in section 716.2"
+            }
+          },
+          "temporal_scope": {
+            "end": null,
+            "raw_text": null,
+            "reference": "unknown",
+            "relation_to_reference": "atemporal",
+            "start": null
+          }
+        }
+      ],
+      "case_id": "relx-v2-67a08387711d35c7",
+      "no_answer_rationale": null,
+      "raw_candidate_count": 1,
+      "rejections": []
+    },
+    {
+      "candidates": [
+        {
+          "attribution": {
+            "claimant_text": "the FCC",
+            "status": "attributed_actor"
+          },
+          "candidate_id": "relation_candidate_v2_9fb67e231bd580eb23d08531",
+          "conditionality": {
+            "condition_text": null,
+            "status": "not_explicit"
+          },
+          "current_at_evaluation": "unknown",
+          "evidence_alignment": "provided-offsets",
+          "evidence_end": 126,
+          "evidence_start": 33,
+          "evidence_text": "the FCC would think that our local ABC station does not provide a service to our communities.",
+          "intended_effective_scope": null,
+          "kind": "relation_assertion",
+          "operation": null,
+          "polarity": "denied",
+          "rationale": "The speaker attributes to the FCC the view that the local ABC station does not provide a service to the communities.",
+          "stage": null,
+          "target_relation": {
+            "object": {
+              "id": "urn:spicy-regs:entity:community-service",
+              "label": "a service to the community"
+            },
+            "predicate": {
+              "id": "urn:spicy-regs:predicate:provides",
+              "label": "provides"
+            },
+            "subject": {
+              "id": "urn:spicy-regs:entity:local-abc-station",
+              "label": "local ABC station"
+            }
+          },
+          "temporal_scope": {
+            "end": null,
+            "raw_text": null,
+            "reference": "unknown",
+            "relation_to_reference": "atemporal",
+            "start": null
+          }
+        }
+      ],
+      "case_id": "relx-v2-71395ccd8ec8d8d0",
+      "no_answer_rationale": null,
+      "raw_candidate_count": 1,
+      "rejections": []
+    },
+    {
+      "candidates": [
+        {
+          "attribution": {
+            "claimant_text": null,
+            "status": "source_voice"
+          },
+          "candidate_id": "relation_candidate_v2_b37cd9b2963a7542841bfda6",
+          "conditionality": {
+            "condition_text": null,
+            "status": "not_explicit"
+          },
+          "current_at_evaluation": "unknown",
+          "evidence_alignment": "provided-offsets",
+          "evidence_end": 297,
+          "evidence_start": 180,
+          "evidence_text": "29 CFR 38.40 contains affirmative outreach requirements for recipients of financial assistance under Title I of WIOA.",
+          "intended_effective_scope": null,
+          "kind": "relation_assertion",
+          "operation": null,
+          "polarity": "affirmed",
+          "rationale": "The excerpt explicitly states that 29 CFR 38.40 contains affirmative outreach requirements.",
+          "stage": null,
+          "target_relation": {
+            "object": {
+              "id": "urn:spicy-regs:entity:affirmative-outreach-requirements",
+              "label": "affirmative outreach requirements"
+            },
+            "predicate": {
+              "id": "urn:spicy-regs:predicate:contains",
+              "label": "contains"
+            },
+            "subject": {
+              "id": "urn:spicy-regs:entity:29-cfr-38-40",
+              "label": "29 CFR 38.40"
+            }
+          },
+          "temporal_scope": {
+            "end": null,
+            "raw_text": null,
+            "reference": "unknown",
+            "relation_to_reference": "atemporal",
+            "start": null
+          }
+        },
+        {
+          "attribution": {
+            "claimant_text": "The Department",
+            "status": "attributed_actor"
+          },
+          "candidate_id": "relation_candidate_v2_6c42cbfc85cd417ef71b40de",
+          "conditionality": {
+            "condition_text": null,
+            "status": "not_explicit"
+          },
+          "current_at_evaluation": null,
+          "evidence_alignment": "provided-offsets",
+          "evidence_end": 470,
+          "evidence_start": 180,
+          "evidence_text": "29 CFR 38.40 contains affirmative outreach requirements for recipients of financial assistance under Title I of WIOA. Section 188 of WIOA does not authorize the Department to require affirmative outreach. The Department is therefore proposing to remove this requirement from the regulations",
+          "intended_effective_scope": {
+            "end": null,
+            "raw_text": null,
+            "reference": "unknown",
+            "relation_to_reference": "unknown",
+            "start": null
+          },
+          "kind": "relation_change_event",
+          "operation": "remove",
+          "polarity": null,
+          "rationale": "The Department explicitly proposes removing the requirement identified in context as the affirmative outreach requirement contained in 29 CFR 38.40.",
+          "stage": "proposed",
+          "target_relation": {
+            "object": {
+              "id": "urn:spicy-regs:entity:affirmative-outreach-requirements",
+              "label": "affirmative outreach requirements"
+            },
+            "predicate": {
+              "id": "urn:spicy-regs:predicate:contains",
+              "label": "contains"
+            },
+            "subject": {
+              "id": "urn:spicy-regs:entity:29-cfr-38-40",
+              "label": "29 CFR 38.40"
+            }
+          },
+          "temporal_scope": {
+            "end": null,
+            "raw_text": null,
+            "reference": "unknown",
+            "relation_to_reference": "unknown",
+            "start": null
+          }
+        }
+      ],
+      "case_id": "relx-v2-7c90b40744e9f83d",
+      "no_answer_rationale": null,
+      "raw_candidate_count": 2,
+      "rejections": []
+    },
+    {
+      "candidates": [
+        {
+          "attribution": {
+            "claimant_text": "the emergency amendment",
+            "status": "attributed_actor"
+          },
+          "candidate_id": "relation_candidate_v2_2c457071d60532c9b1b1126f",
+          "conditionality": {
+            "condition_text": null,
+            "status": "not_explicit"
+          },
+          "current_at_evaluation": "unknown",
+          "evidence_alignment": "provided-offsets",
+          "evidence_end": 234,
+          "evidence_start": 63,
+          "evidence_text": "any logical or physical resources\r\nthat are internal or external to an aircraft and contribute to its\r\nairworthiness are excluded from the scope of the emergency amendment",
+          "intended_effective_scope": null,
+          "kind": "relation_assertion",
+          "operation": null,
+          "polarity": "denied",
+          "rationale": "The excerpt explicitly excludes the specified aircraft resources from the emergency amendment's scope, denying that the amendment applies to them.",
+          "stage": null,
+          "target_relation": {
+            "object": {
+              "id": "urn:spicy-regs:entity:aircraft-resources-contributing-to-airworthiness",
+              "label": "internal or external aircraft resources contributing to airworthiness"
+            },
+            "predicate": {
+              "id": "urn:spicy-regs:predicate:applies-to",
+              "label": "applies to"
+            },
+            "subject": {
+              "id": "urn:spicy-regs:entity:emergency-amendment",
+              "label": "emergency amendment"
+            }
+          },
+          "temporal_scope": {
+            "end": null,
+            "raw_text": null,
+            "reference": "unknown",
+            "relation_to_reference": "atemporal",
+            "start": null
+          }
+        }
+      ],
+      "case_id": "relx-v2-973cdad68a5c36f0",
+      "no_answer_rationale": null,
+      "raw_candidate_count": 1,
+      "rejections": []
+    }
+  ],
+  "format_version": 2
+}

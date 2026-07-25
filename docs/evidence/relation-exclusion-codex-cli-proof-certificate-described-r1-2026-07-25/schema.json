@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Candidate assertions for every supplied case; this is extraction, not approval or comparison.",
+  "properties": {
+    "cases": {
+      "description": "Exactly one result object for each input case, with no omitted or duplicate case IDs.",
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "assertions": {
+            "description": "Assertions about this case's exact target relation only. Use an empty array when no verbatim span entails it.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "evidence_end": {
+                  "description": "Zero-based exclusive character offset of evidence_text in document_excerpt.",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "evidence_start": {
+                  "description": "Zero-based inclusive character offset of evidence_text in document_excerpt.",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "evidence_text": {
+                  "description": "Exact verbatim substring that entails the complete target relation and polarity; include coordinated alternatives needed by the rule.",
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "modality": {
+                  "description": "Status of the proposition itself: operative now, proposed, past-only, attributed to a named speaker, governed by an express condition, or unknown.",
+                  "enum": [
+                    "attributed",
+                    "conditional",
+                    "current",
+                    "historical",
+                    "proposed",
+                    "unknown"
+                  ],
+                  "type": "string"
+                },
+                "object_iri": {
+                  "description": "Copy this case's supplied target object IRI exactly; the evidence must reach its full stated scope.",
+                  "enum": [
+                    "urn:spicy-regs:action:department-require-affirmative-outreach",
+                    "urn:spicy-regs:entity:affirmative-outreach-requirements",
+                    "urn:spicy-regs:entity:aircraft-resources-contributing-to-airworthiness",
+                    "urn:spicy-regs:entity:community-service",
+                    "urn:spicy-regs:entity:imports",
+                    "urn:spicy-regs:entity:incarcerated-individuals",
+                    "urn:spicy-regs:entity:maximum-relief-under-plan",
+                    "urn:spicy-regs:entity:mining-flat-gently-rolling-terrain-stated-conditions",
+                    "urn:spicy-regs:entity:section-401a-despite-arrangement",
+                    "urn:spicy-regs:entity:unchanged-regulatory-language",
+                    "urn:spicy-regs:value:indefinitely"
+                  ],
+                  "type": "string"
+                },
+                "polarity": {
+                  "description": "Whether the excerpt explicitly supports or explicitly rejects the exact target proposition. Absence and proposed change are not denied.",
+                  "enum": [
+                    "affirmed",
+                    "denied"
+                  ],
+                  "type": "string"
+                },
+                "predicate_iri": {
+                  "description": "Copy this case's supplied target predicate IRI exactly; the evidence must express this relation.",
+                  "enum": [
+                    "urn:spicy-regs:predicate:applies-to",
+                    "urn:spicy-regs:predicate:authorizes",
+                    "urn:spicy-regs:predicate:contains",
+                    "urn:spicy-regs:predicate:is-retained-for",
+                    "urn:spicy-regs:predicate:provides",
+                    "urn:spicy-regs:predicate:qualify-for",
+                    "urn:spicy-regs:predicate:remains-in-effect",
+                    "urn:spicy-regs:predicate:satisfies"
+                  ],
+                  "type": "string"
+                },
+                "rationale": {
+                  "description": "Brief support certificate naming the textual subject, relation, object, polarity cue, and material status cue.",
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "subject_iri": {
+                  "description": "Copy this case's supplied target subject IRI exactly; never use another case's IRI.",
+                  "enum": [
+                    "urn:spicy-regs:entity:29-cfr-38-40",
+                    "urn:spicy-regs:entity:30-cfr-716-2-performance-standards",
+                    "urn:spicy-regs:entity:assessment-rate",
+                    "urn:spicy-regs:entity:brown-and-taylor",
+                    "urn:spicy-regs:entity:duty-on-specified-8-inch-bench-grinders",
+                    "urn:spicy-regs:entity:emergency-amendment",
+                    "urn:spicy-regs:entity:local-abc-station",
+                    "urn:spicy-regs:entity:medicaid-program",
+                    "urn:spicy-regs:entity:prior-preamble-explanation-unchanged-language",
+                    "urn:spicy-regs:entity:profit-sharing-plan-with-cash-deferred-arrangement",
+                    "urn:spicy-regs:entity:wioa-section-188"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "subject_iri",
+                "predicate_iri",
+                "object_iri",
+                "polarity",
+                "modality",
+                "evidence_text",
+                "evidence_start",
+                "evidence_end",
+                "rationale"
+              ],
+              "type": "object"
+            },
+            "maxItems": 3,
+            "type": "array"
+          },
+          "case_id": {
+            "description": "Copy one input case_id exactly; use each case_id once.",
+            "enum": [
+              "explicit_denial_gao_airworthiness",
+              "explicit_denial_cfr_mining_terrain",
+              "explicit_denial_scotus_maximum_relief",
+              "explicit_denial_wioa_authority",
+              "affirmed_control_cfr_plan_satisfaction",
+              "affirmed_control_assessment_rate",
+              "affirmed_control_fcc_community_service",
+              "affirmed_control_retained_preamble",
+              "temporal_control_wioa_current_and_proposed",
+              "temporal_control_bill_proposed_suspension",
+              "unrelated_control_lobbying_filing",
+              "unrelated_control_gao_wrong_pairing_note"
+            ],
+            "type": "string"
+          },
+          "no_answer_rationale": {
+            "description": "When assertions is empty, briefly name the missing proof obligation; otherwise null.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "case_id",
+          "assertions",
+          "no_answer_rationale"
+        ],
+        "type": "object"
+      },
+      "maxItems": 12,
+      "minItems": 12,
+      "type": "array"
+    }
+  },
+  "required": [
+    "cases"
+  ],
+  "type": "object"
+}

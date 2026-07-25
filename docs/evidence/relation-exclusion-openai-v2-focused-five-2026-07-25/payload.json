@@ -1,0 +1,162 @@
+{
+  "cases": [
+    {
+      "case_id": "relx-v2-973cdad68a5c36f0",
+      "source": {
+        "artifact_id": "gao-26-107693",
+        "artifact_time": {
+          "kind": "unknown",
+          "value": null
+        },
+        "artifact_version_id": "urn:spicy-regs:evaluation-artifact:8010da8d7410c0dd1c820fe89d5abf7845985580874f86bc60bb6c11e9b11616",
+        "document_excerpt": "Asked Questions for\r\nthe emergency amendment, which noted that any logical or physical resources\r\nthat are internal or external to an aircraft and contribute to its\r\nairworthiness are excluded from the scope of the emergency amendment.\r\nAdditionally, according to the aviation stakeholders we interviewed, the FAA\r\nReauthorization Act of 2024\u2019s provision that grants FAA exclusive authority to\r\nregulate the cybersecurity of civil aircraft helped to provide some clarity.</p>\r\n\r\n<p class=\"MsoBodyText\">As previously mentioned, FAA has clearly defined its role\r\nand responsibilities for the cybersecurity of avionics and the ground systems\r\nit operates in the NAS. ",
+        "excerpt_sha256": "8010da8d7410c0dd1c820fe89d5abf7845985580874f86bc60bb6c11e9b11616",
+        "primary_source_url": "https://files.gao.gov/reports/GAO-26-107693/index.html",
+        "source_field": "gao_reports.full_text",
+        "source_type": "GAO report",
+        "untrusted_metadata": ""
+      },
+      "target_relation": {
+        "object": {
+          "id": "urn:spicy-regs:entity:aircraft-resources-contributing-to-airworthiness",
+          "label": "internal or external aircraft resources contributing to airworthiness"
+        },
+        "predicate": {
+          "id": "urn:spicy-regs:predicate:applies-to",
+          "label": "applies to"
+        },
+        "subject": {
+          "id": "urn:spicy-regs:entity:emergency-amendment",
+          "label": "emergency amendment"
+        }
+      }
+    },
+    {
+      "case_id": "relx-v2-67a08387711d35c7",
+      "source": {
+        "artifact_id": "30 CFR 716.2",
+        "artifact_time": {
+          "kind": "unknown",
+          "value": null
+        },
+        "artifact_version_id": "urn:spicy-regs:evaluation-artifact:1b8c6b40ed4954ce6b9e7e73c9f5af6df341606b7dd17ceeb31270a6cecb1be3",
+        "document_excerpt": "e regulatory authority after consideration of soils, climate, the method of operation, geology, and other regional characteristics, shall meet the following performance standards. The standards of this section do not apply where mining is done on a flat or gently rolling terrain with an occasional steep slope through which the mining proceeds and leaves a plain or predominantly flat area; or where the mining is governed by \u00a7\u2009716.3.</P>\n        <P>(a) Spoil, waste materials or debris, including that from clearing and grubbing, and abandoned or disabled equipment, shall not be placed or allowed to remain on the downslope.</P>\n        <P>(b) The h",
+        "excerpt_sha256": "1b8c6b40ed4954ce6b9e7e73c9f5af6df341606b7dd17ceeb31270a6cecb1be3",
+        "primary_source_url": "https://www.govinfo.gov/content/pkg/CFR-2025-title30-vol3/xml/CFR-2025-title30-vol3-sec716-2.xml",
+        "source_field": "cfr_sections.xml_text",
+        "source_type": "CFR section",
+        "untrusted_metadata": ""
+      },
+      "target_relation": {
+        "object": {
+          "id": "urn:spicy-regs:entity:mining-flat-gently-rolling-terrain-stated-conditions",
+          "label": "mining on flat or gently rolling terrain meeting the stated conditions"
+        },
+        "predicate": {
+          "id": "urn:spicy-regs:predicate:applies-to",
+          "label": "apply to"
+        },
+        "subject": {
+          "id": "urn:spicy-regs:entity:30-cfr-716-2-performance-standards",
+          "label": "performance standards in section 716.2"
+        }
+      }
+    },
+    {
+      "case_id": "relx-v2-71395ccd8ec8d8d0",
+      "source": {
+        "artifact_id": "26109961075",
+        "artifact_time": {
+          "kind": "unknown",
+          "value": null
+        },
+        "artifact_version_id": "urn:spicy-regs:evaluation-artifact:903f0c19cb6bebf778f2bd167a3bbfca6286d4d6d6f3a108f1a52ea61aef0050",
+        "document_excerpt": "It\u2019s beyond my understanding why the FCC would think that our local ABC station does not provide a service to our communities. The only thing that makes sense is that this is yet another attempt to eliminate constitutional rights to free speech. It\u2019s imperative that the local ABC station in Fresno continue to broadcast. Important public safety information and world events are broadcasted by this station and locals have a right to choose which outlets we want to watch and listen to. ",
+        "excerpt_sha256": "903f0c19cb6bebf778f2bd167a3bbfca6286d4d6d6f3a108f1a52ea61aef0050",
+        "primary_source_url": "https://www.fcc.gov/ecfs/filing/26109961075",
+        "source_field": "fcc_filings.text_data",
+        "source_type": "FCC filing",
+        "untrusted_metadata": ""
+      },
+      "target_relation": {
+        "object": {
+          "id": "urn:spicy-regs:entity:community-service",
+          "label": "a service to the community"
+        },
+        "predicate": {
+          "id": "urn:spicy-regs:predicate:provides",
+          "label": "provides"
+        },
+        "subject": {
+          "id": "urn:spicy-regs:entity:local-abc-station",
+          "label": "local ABC station"
+        }
+      }
+    },
+    {
+      "case_id": "relx-v2-7c90b40744e9f83d",
+      "source": {
+        "artifact_id": "1291-AA47",
+        "artifact_time": {
+          "kind": "unknown",
+          "value": null
+        },
+        "artifact_version_id": "urn:spicy-regs:evaluation-artifact:13cdb3e26034f78804308d3a54799fbec504dc4e67219b8ece6f8a95714f6e7c",
+        "document_excerpt": "ulations. The regulations at 29 CFR Part 38 implement the nondiscrimination and equal opportunity provisions of section 188 of the Workforce Innovation and Opportunity Act (WIOA). 29 CFR 38.40 contains affirmative outreach requirements for recipients of financial assistance under Title I of WIOA. Section 188 of WIOA does not authorize the Department to require affirmative outreach. The Department is therefore proposing to remove this requirement from the regulations in accordance with Executive Order 14219, Ensuring Lawful Governance and Implementing the President&rsquo;s &lsquo;Department of Government Efficiency&rsquo; Deregulatory Initiative (February 19",
+        "excerpt_sha256": "13cdb3e26034f78804308d3a54799fbec504dc4e67219b8ece6f8a95714f6e7c",
+        "primary_source_url": "https://www.reginfo.gov/public/do/eAgendaViewRule?pubId=202510&RIN=1291-AA47",
+        "source_field": "unified_agenda.abstract",
+        "source_type": "Unified Agenda item",
+        "untrusted_metadata": ""
+      },
+      "target_relation": {
+        "object": {
+          "id": "urn:spicy-regs:entity:affirmative-outreach-requirements",
+          "label": "affirmative outreach requirements"
+        },
+        "predicate": {
+          "id": "urn:spicy-regs:predicate:contains",
+          "label": "contains"
+        },
+        "subject": {
+          "id": "urn:spicy-regs:entity:29-cfr-38-40",
+          "label": "29 CFR 38.40"
+        }
+      }
+    },
+    {
+      "case_id": "relx-v2-18e15c9465ef5a82",
+      "source": {
+        "artifact_id": "109-s-2977",
+        "artifact_time": {
+          "kind": "unknown",
+          "value": null
+        },
+        "artifact_version_id": "urn:spicy-regs:evaluation-artifact:1458581b387b2440345c00a10f8add3a0c5ed093f22ef5838202147514a68901",
+        "document_excerpt": "ional Bills 109th Congress]\n[From the U.S. Government Publishing Office]\n[S. 2977 Introduced in Senate (IS)]\n\n\n109th CONGRESS\n  2d Session\n                                S. 2977\n\nTo suspend temporarily the duty on 8-inch bench grinders for grinding, \n polishing or otherwise finishing metal or cement, valued under $3,025 \n                                 each.\n\n\n_______________________________________________________________________\n\n\n                   IN THE SENATE OF THE UNITED STATES\n\n                              May 23, 2006\n\n  Mr. Isakson introduced the following bill; which was read twice and \n                  referred to the Committee on Finance\n\n_",
+        "excerpt_sha256": "1458581b387b2440345c00a10f8add3a0c5ed093f22ef5838202147514a68901",
+        "primary_source_url": "https://www.govinfo.gov/content/pkg/BILLS-109s2977is/html/BILLS-109s2977is.htm",
+        "source_field": "congress_bills.full_text",
+        "source_type": "introduced congressional bill",
+        "untrusted_metadata": ""
+      },
+      "target_relation": {
+        "object": {
+          "id": "urn:spicy-regs:entity:imports",
+          "label": "imports"
+        },
+        "predicate": {
+          "id": "urn:spicy-regs:predicate:applies-to",
+          "label": "applies to"
+        },
+        "subject": {
+          "id": "urn:spicy-regs:entity:duty-on-specified-8-inch-bench-grinders",
+          "label": "the duty on specified 8-inch bench grinders"
+        }
+      }
+    }
+  ],
+  "evaluation_time": "2026-07-24T20:00:00Z",
+  "format_version": 2,
+  "task": "target_relation_assertion_and_change_event_extraction"
+}

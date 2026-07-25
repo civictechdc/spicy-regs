@@ -1,0 +1,30 @@
+{
+  "full_request_sha256": "c5579646f2a5efdf79ca9550dc60d37bc465980135bc2dd0ebbe14c18bca6781",
+  "historical_reconstruction": true,
+  "provider_payload_sha256": "8b9ac741ebc3a0292d9a3bf33e5142e387f41c04f45787e018035462bb1edd89",
+  "receipt": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 27901.307,
+        "input_tokens": 3225,
+        "output_tokens": 2642,
+        "request_id": "ad571c6d-8de5-49f0-b353-f8c63386bf0c",
+        "response_id": "resp_086cf2af8c966a9e016a641b51276881a1b422192cc831075d",
+        "status": "completed",
+        "total_tokens": 5867
+      }
+    ],
+    "duration_ms": 27901.368,
+    "max_output_tokens": 6500,
+    "prompt_sha256": "8b9ac741ebc3a0292d9a3bf33e5142e387f41c04f45787e018035462bb1edd89",
+    "prompt_token_estimate": 3019,
+    "reasoning_effort": "medium",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "priority",
+    "retry_count": 0,
+    "status": "completed",
+    "store": false
+  }
+}

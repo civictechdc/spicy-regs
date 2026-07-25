@@ -1,0 +1,164 @@
+{
+  "cases": {
+    "relx-v2-18e15c9465ef5a82": {
+      "items": [],
+      "no_answer_rationale": "The excerpt proposes temporarily suspending a duty on specified bench grinders but does not explicitly state that the duty applies to imports."
+    },
+    "relx-v2-67a08387711d35c7": {
+      "items": [
+        {
+          "attribution": {
+            "claimant_text": null,
+            "status": "source_voice"
+          },
+          "conditionality": {
+            "condition_text": null,
+            "status": "not_explicit"
+          },
+          "evidence_end": 390,
+          "evidence_start": 180,
+          "evidence_text": "The standards of this section do not apply where mining is done on a flat or gently rolling terrain with an occasional steep slope through which the mining proceeds and leaves a plain or predominantly flat area",
+          "intended_effective_scope": null,
+          "kind": "relation_assertion",
+          "operation": null,
+          "polarity": "denied",
+          "rationale": "The section expressly states that its standards do not apply to mining on flat or gently rolling terrain under the stated conditions.",
+          "stage": null,
+          "temporal_scope": {
+            "end": null,
+            "raw_text": null,
+            "reference": "unknown",
+            "relation_to_reference": "atemporal",
+            "start": null
+          }
+        }
+      ],
+      "no_answer_rationale": null
+    },
+    "relx-v2-71395ccd8ec8d8d0": {
+      "items": [
+        {
+          "attribution": {
+            "claimant_text": "the FCC",
+            "status": "attributed_actor"
+          },
+          "conditionality": {
+            "condition_text": null,
+            "status": "not_explicit"
+          },
+          "evidence_end": 126,
+          "evidence_start": 33,
+          "evidence_text": "the FCC would think that our local ABC station does not provide a service to our communities.",
+          "intended_effective_scope": null,
+          "kind": "relation_assertion",
+          "operation": null,
+          "polarity": "denied",
+          "rationale": "The speaker attributes to the FCC the view that the local ABC station does not provide a service to the communities.",
+          "stage": null,
+          "temporal_scope": {
+            "end": null,
+            "raw_text": null,
+            "reference": "unknown",
+            "relation_to_reference": "atemporal",
+            "start": null
+          }
+        }
+      ],
+      "no_answer_rationale": null
+    },
+    "relx-v2-7c90b40744e9f83d": {
+      "items": [
+        {
+          "attribution": {
+            "claimant_text": null,
+            "status": "source_voice"
+          },
+          "conditionality": {
+            "condition_text": null,
+            "status": "not_explicit"
+          },
+          "evidence_end": 297,
+          "evidence_start": 180,
+          "evidence_text": "29 CFR 38.40 contains affirmative outreach requirements for recipients of financial assistance under Title I of WIOA.",
+          "intended_effective_scope": null,
+          "kind": "relation_assertion",
+          "operation": null,
+          "polarity": "affirmed",
+          "rationale": "The excerpt explicitly states that 29 CFR 38.40 contains affirmative outreach requirements.",
+          "stage": null,
+          "temporal_scope": {
+            "end": null,
+            "raw_text": null,
+            "reference": "unknown",
+            "relation_to_reference": "atemporal",
+            "start": null
+          }
+        },
+        {
+          "attribution": {
+            "claimant_text": "The Department",
+            "status": "attributed_actor"
+          },
+          "conditionality": {
+            "condition_text": null,
+            "status": "not_explicit"
+          },
+          "evidence_end": 470,
+          "evidence_start": 180,
+          "evidence_text": "29 CFR 38.40 contains affirmative outreach requirements for recipients of financial assistance under Title I of WIOA. Section 188 of WIOA does not authorize the Department to require affirmative outreach. The Department is therefore proposing to remove this requirement from the regulations",
+          "intended_effective_scope": {
+            "end": null,
+            "raw_text": null,
+            "reference": "unknown",
+            "relation_to_reference": "unknown",
+            "start": null
+          },
+          "kind": "relation_change_event",
+          "operation": "remove",
+          "polarity": null,
+          "rationale": "The Department explicitly proposes removing the requirement identified in context as the affirmative outreach requirement contained in 29 CFR 38.40.",
+          "stage": "proposed",
+          "temporal_scope": {
+            "end": null,
+            "raw_text": null,
+            "reference": "unknown",
+            "relation_to_reference": "unknown",
+            "start": null
+          }
+        }
+      ],
+      "no_answer_rationale": null
+    },
+    "relx-v2-973cdad68a5c36f0": {
+      "items": [
+        {
+          "attribution": {
+            "claimant_text": "the emergency amendment",
+            "status": "attributed_actor"
+          },
+          "conditionality": {
+            "condition_text": null,
+            "status": "not_explicit"
+          },
+          "evidence_end": 234,
+          "evidence_start": 63,
+          "evidence_text": "any logical or physical resources\r\nthat are internal or external to an aircraft and contribute to its\r\nairworthiness are excluded from the scope of the emergency amendment",
+          "intended_effective_scope": null,
+          "kind": "relation_assertion",
+          "operation": null,
+          "polarity": "denied",
+          "rationale": "The excerpt explicitly excludes the specified aircraft resources from the emergency amendment's scope, denying that the amendment applies to them.",
+          "stage": null,
+          "temporal_scope": {
+            "end": null,
+            "raw_text": null,
+            "reference": "unknown",
+            "relation_to_reference": "atemporal",
+            "start": null
+          }
+        }
+      ],
+      "no_answer_rationale": null
+    }
+  }
+}

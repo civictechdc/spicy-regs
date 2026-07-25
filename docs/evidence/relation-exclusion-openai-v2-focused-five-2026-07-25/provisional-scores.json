@@ -1,0 +1,228 @@
+{
+  "allowed_match_count": 0,
+  "cases": [
+    {
+      "allowed_outputs": 0,
+      "case_id": "relx-v2-18e15c9465ef5a82",
+      "false_positives": 0,
+      "matched_allowed_outputs": 0,
+      "matched_outputs": 0,
+      "matched_required_outputs": 0,
+      "matches": [],
+      "missing_required": 0,
+      "predicted_outputs": 0,
+      "required_outputs": 0,
+      "role": "unsupported_target_control",
+      "scoring_status": "included"
+    },
+    {
+      "allowed_outputs": 0,
+      "case_id": "relx-v2-67a08387711d35c7",
+      "false_positives": 0,
+      "matched_allowed_outputs": 0,
+      "matched_outputs": 1,
+      "matched_required_outputs": 1,
+      "matches": [
+        {
+          "candidate_id": "relation_candidate_v2_f8c7a662f4d2c7f766a2ac1d",
+          "dimension_matches": {
+            "attribution": true,
+            "conditionality": true,
+            "temporal_reference": false,
+            "temporal_relation": false
+          },
+          "evidence_grade": "unadjudicated_enclosing",
+          "expected_candidate_id": "urn:spicy-regs:evaluation:v2:cfr-mining-terrain:denied",
+          "requirement": "required"
+        }
+      ],
+      "missing_required": 0,
+      "predicted_outputs": 1,
+      "required_outputs": 1,
+      "role": "direct_denial",
+      "scoring_status": "included"
+    },
+    {
+      "allowed_outputs": 1,
+      "case_id": "relx-v2-71395ccd8ec8d8d0",
+      "false_positives": 1,
+      "matched_allowed_outputs": 0,
+      "matched_outputs": 0,
+      "matched_required_outputs": 0,
+      "matches": [],
+      "missing_required": 1,
+      "predicted_outputs": 1,
+      "required_outputs": 1,
+      "role": "mixed_attribution_control",
+      "scoring_status": "included"
+    },
+    {
+      "allowed_outputs": 0,
+      "case_id": "relx-v2-7c90b40744e9f83d",
+      "false_positives": 0,
+      "matched_allowed_outputs": 0,
+      "matched_outputs": 2,
+      "matched_required_outputs": 2,
+      "matches": [
+        {
+          "candidate_id": "relation_candidate_v2_b37cd9b2963a7542841bfda6",
+          "dimension_matches": {
+            "attribution": true,
+            "conditionality": true,
+            "temporal_reference": false,
+            "temporal_relation": false
+          },
+          "evidence_grade": "preferred_exact",
+          "expected_candidate_id": "urn:spicy-regs:evaluation:v2:wioa-containment:affirmed",
+          "requirement": "required"
+        },
+        {
+          "candidate_id": "relation_candidate_v2_6c42cbfc85cd417ef71b40de",
+          "dimension_matches": {
+            "attribution": false,
+            "attribution_claimant": false,
+            "conditionality": true,
+            "intended_effective_reference": false,
+            "intended_effective_relation": false,
+            "temporal_raw_text": false,
+            "temporal_reference": false,
+            "temporal_relation": false
+          },
+          "evidence_grade": "preferred_exact",
+          "expected_candidate_id": "urn:spicy-regs:evaluation:v2:wioa-containment:proposed-removal",
+          "requirement": "required"
+        }
+      ],
+      "missing_required": 0,
+      "predicted_outputs": 2,
+      "required_outputs": 2,
+      "role": "assertion_plus_change_event_control",
+      "scoring_status": "included"
+    },
+    {
+      "allowed_outputs": 0,
+      "case_id": "relx-v2-973cdad68a5c36f0",
+      "false_positives": 0,
+      "matched_allowed_outputs": 0,
+      "matched_outputs": 1,
+      "matched_required_outputs": 1,
+      "matches": [
+        {
+          "candidate_id": "relation_candidate_v2_2c457071d60532c9b1b1126f",
+          "dimension_matches": {
+            "attribution": true,
+            "attribution_claimant": true,
+            "conditionality": true,
+            "temporal_reference": false,
+            "temporal_relation": false
+          },
+          "evidence_grade": "unadjudicated",
+          "expected_candidate_id": "urn:spicy-regs:evaluation:v2:gao-airworthiness:denied",
+          "requirement": "required"
+        }
+      ],
+      "missing_required": 0,
+      "predicted_outputs": 1,
+      "required_outputs": 1,
+      "role": "direct_denial",
+      "scoring_status": "included"
+    }
+  ],
+  "core_semantics": {
+    "f1": 0.8,
+    "false_negatives": 1,
+    "false_positives": 1,
+    "precision": 0.8,
+    "recall": 0.8,
+    "true_positives": 4
+  },
+  "dimensions": {
+    "attribution": {
+      "accuracy": 0.75,
+      "correct": 3,
+      "total": 4
+    },
+    "attribution_claimant": {
+      "accuracy": 0.5,
+      "correct": 1,
+      "total": 2
+    },
+    "condition_text": {
+      "accuracy": 1.0,
+      "correct": 0,
+      "total": 0
+    },
+    "conditionality": {
+      "accuracy": 1.0,
+      "correct": 4,
+      "total": 4
+    },
+    "intended_effective_bounds": {
+      "accuracy": 1.0,
+      "correct": 0,
+      "total": 0
+    },
+    "intended_effective_raw_text": {
+      "accuracy": 1.0,
+      "correct": 0,
+      "total": 0
+    },
+    "intended_effective_reference": {
+      "accuracy": 0.0,
+      "correct": 0,
+      "total": 1
+    },
+    "intended_effective_relation": {
+      "accuracy": 0.0,
+      "correct": 0,
+      "total": 1
+    },
+    "temporal_bounds": {
+      "accuracy": 1.0,
+      "correct": 0,
+      "total": 0
+    },
+    "temporal_raw_text": {
+      "accuracy": 0.0,
+      "correct": 0,
+      "total": 1
+    },
+    "temporal_reference": {
+      "accuracy": 0.0,
+      "correct": 0,
+      "total": 4
+    },
+    "temporal_relation": {
+      "accuracy": 0.0,
+      "correct": 0,
+      "total": 4
+    }
+  },
+  "evidence": {
+    "preferred_exact": 2,
+    "unadjudicated": 1,
+    "unadjudicated_enclosing": 1,
+    "unmatched": 1
+  },
+  "evidence_entailment": {
+    "accepted_sufficient": 2,
+    "unadjudicated": 2,
+    "unmatched": 1
+  },
+  "evidence_entailment_rate": 0.4,
+  "exact_grounding_rate": 1.0,
+  "exactly_grounded_candidate_count": 5,
+  "excluded_case_count": 0,
+  "excluded_case_ids": [],
+  "excluded_raw_candidate_count": 0,
+  "false_current_discrepancies": 0,
+  "format_version": 2,
+  "offset_repair_rate": 0.0,
+  "oracle_status": "provisional-machine-assisted",
+  "provided_offset_exact_rate": 1.0,
+  "publication_eligible": false,
+  "raw_candidate_count": 5,
+  "rejected_candidate_count": 0,
+  "unrelated_false_target_candidates": 0,
+  "unsupported_false_target_candidates": 0
+}

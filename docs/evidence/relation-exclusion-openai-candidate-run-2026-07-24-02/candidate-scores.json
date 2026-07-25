@@ -1,0 +1,135 @@
+{
+  "case_count": 12,
+  "cases": [
+    {
+      "case_id": "affirmed_control_assessment_rate",
+      "exact_candidate_matches": 1,
+      "gold_target_candidates": 1,
+      "polarity_modality_matches": 1,
+      "predicted_target_candidates": 1,
+      "role": "affirmed_control",
+      "target_presence_correct": true
+    },
+    {
+      "case_id": "affirmed_control_cfr_plan_satisfaction",
+      "exact_candidate_matches": 1,
+      "gold_target_candidates": 1,
+      "polarity_modality_matches": 1,
+      "predicted_target_candidates": 1,
+      "role": "affirmed_control",
+      "target_presence_correct": true
+    },
+    {
+      "case_id": "affirmed_control_fcc_community_service",
+      "exact_candidate_matches": 0,
+      "gold_target_candidates": 1,
+      "polarity_modality_matches": 0,
+      "predicted_target_candidates": 1,
+      "role": "affirmed_control",
+      "target_presence_correct": true
+    },
+    {
+      "case_id": "affirmed_control_retained_preamble",
+      "exact_candidate_matches": 1,
+      "gold_target_candidates": 1,
+      "polarity_modality_matches": 1,
+      "predicted_target_candidates": 1,
+      "role": "affirmed_control",
+      "target_presence_correct": true
+    },
+    {
+      "case_id": "explicit_denial_cfr_mining_terrain",
+      "exact_candidate_matches": 0,
+      "gold_target_candidates": 1,
+      "polarity_modality_matches": 1,
+      "predicted_target_candidates": 1,
+      "role": "direct_denial",
+      "target_presence_correct": true
+    },
+    {
+      "case_id": "explicit_denial_gao_airworthiness",
+      "exact_candidate_matches": 0,
+      "gold_target_candidates": 1,
+      "polarity_modality_matches": 0,
+      "predicted_target_candidates": 1,
+      "role": "direct_denial",
+      "target_presence_correct": true
+    },
+    {
+      "case_id": "explicit_denial_scotus_maximum_relief",
+      "exact_candidate_matches": 1,
+      "gold_target_candidates": 1,
+      "polarity_modality_matches": 1,
+      "predicted_target_candidates": 1,
+      "role": "direct_denial",
+      "target_presence_correct": true
+    },
+    {
+      "case_id": "explicit_denial_wioa_authority",
+      "exact_candidate_matches": 1,
+      "gold_target_candidates": 1,
+      "polarity_modality_matches": 1,
+      "predicted_target_candidates": 1,
+      "role": "direct_denial",
+      "target_presence_correct": true
+    },
+    {
+      "case_id": "temporal_control_bill_proposed_suspension",
+      "exact_candidate_matches": 0,
+      "gold_target_candidates": 1,
+      "polarity_modality_matches": 0,
+      "predicted_target_candidates": 0,
+      "role": "temporal_control",
+      "target_presence_correct": false
+    },
+    {
+      "case_id": "temporal_control_wioa_current_and_proposed",
+      "exact_candidate_matches": 1,
+      "gold_target_candidates": 2,
+      "polarity_modality_matches": 1,
+      "predicted_target_candidates": 1,
+      "role": "temporal_control",
+      "target_presence_correct": true
+    },
+    {
+      "case_id": "unrelated_control_gao_wrong_pairing_note",
+      "exact_candidate_matches": 0,
+      "gold_target_candidates": 0,
+      "polarity_modality_matches": 0,
+      "predicted_target_candidates": 0,
+      "role": "unrelated_control",
+      "target_presence_correct": true
+    },
+    {
+      "case_id": "unrelated_control_lobbying_filing",
+      "exact_candidate_matches": 0,
+      "gold_target_candidates": 0,
+      "polarity_modality_matches": 0,
+      "predicted_target_candidates": 0,
+      "role": "unrelated_control",
+      "target_presence_correct": true
+    }
+  ],
+  "exact_assertion": {
+    "f1": 0.6,
+    "false_negatives": 5,
+    "false_positives": 3,
+    "precision": 0.666667,
+    "recall": 0.545455,
+    "true_positives": 6
+  },
+  "exact_grounding_rate": 1.0,
+  "exactly_grounded_candidate_count": 9,
+  "polarity_modality": {
+    "f1": 0.7,
+    "false_negatives": 4,
+    "false_positives": 2,
+    "precision": 0.777778,
+    "recall": 0.636364,
+    "true_positives": 7
+  },
+  "raw_candidate_count": 9,
+  "rejected_candidate_count": 0,
+  "target_presence_accuracy": 0.916667,
+  "unrelated_false_target_candidates": 0
+}

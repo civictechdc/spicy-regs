@@ -1,0 +1,172 @@
+{
+  "cases": [
+    {
+      "assertions": [
+        {
+          "evidence_end": 235,
+          "evidence_start": 21,
+          "evidence_text": "the emergency amendment, which noted that any logical or physical resources\r\nthat are internal or external to an aircraft and contribute to its\r\nairworthiness are excluded from the scope of the emergency amendment.",
+          "modality": "attributed",
+          "object_iri": "urn:spicy-regs:entity:aircraft-resources-contributing-to-airworthiness",
+          "polarity": "denied",
+          "predicate_iri": "urn:spicy-regs:predicate:applies-to",
+          "rationale": "The excerpt attributes a statement expressly excluding the identified aircraft resources from the amendment's scope.",
+          "subject_iri": "urn:spicy-regs:entity:emergency-amendment"
+        }
+      ],
+      "case_id": "explicit_denial_gao_airworthiness",
+      "no_answer_rationale": null
+    },
+    {
+      "assertions": [
+        {
+          "evidence_end": 435,
+          "evidence_start": 180,
+          "evidence_text": "The standards of this section do not apply where mining is done on a flat or gently rolling terrain with an occasional steep slope through which the mining proceeds and leaves a plain or predominantly flat area; or where the mining is governed by § 716.3.",
+          "modality": "current",
+          "object_iri": "urn:spicy-regs:entity:mining-flat-gently-rolling-terrain-stated-conditions",
+          "polarity": "denied",
+          "predicate_iri": "urn:spicy-regs:predicate:applies-to",
+          "rationale": "The provision expressly states that the standards do not apply under the specified terrain conditions.",
+          "subject_iri": "urn:spicy-regs:entity:30-cfr-716-2-performance-standards"
+        }
+      ],
+      "case_id": "explicit_denial_cfr_mining_terrain",
+      "no_answer_rationale": null
+    },
+    {
+      "assertions": [
+        {
+          "evidence_end": 244,
+          "evidence_start": 113,
+          "evidence_text": "Respondents Myra Brown and Alexander \nTaylor are two borrowers who do not qualify for the maximum relief \navailable under the Plan.",
+          "modality": "current",
+          "object_iri": "urn:spicy-regs:entity:maximum-relief-under-plan",
+          "polarity": "denied",
+          "predicate_iri": "urn:spicy-regs:predicate:qualify-for",
+          "rationale": "The excerpt expressly says Brown and Taylor do not qualify for the maximum relief.",
+          "subject_iri": "urn:spicy-regs:entity:brown-and-taylor"
+        }
+      ],
+      "case_id": "explicit_denial_scotus_maximum_relief",
+      "no_answer_rationale": null
+    },
+    {
+      "assertions": [
+        {
+          "evidence_end": 384,
+          "evidence_start": 298,
+          "evidence_text": "Section 188 of WIOA does not authorize the Department to require affirmative outreach.",
+          "modality": "current",
+          "object_iri": "urn:spicy-regs:action:department-require-affirmative-outreach",
+          "polarity": "denied",
+          "predicate_iri": "urn:spicy-regs:predicate:authorizes",
+          "rationale": "The sentence explicitly denies that Section 188 provides the specified authorization.",
+          "subject_iri": "urn:spicy-regs:entity:wioa-section-188"
+        }
+      ],
+      "case_id": "explicit_denial_wioa_authority",
+      "no_answer_rationale": null
+    },
+    {
+      "assertions": [
+        {
+          "evidence_end": 303,
+          "evidence_start": 89,
+          "evidence_text": "A profit-sharing, stock bonus, pre-ERISA money purchase pension, or rural cooperative plan does not fail to satisfy the requirements of section 401(a) merely because the plan includes a cash or deferred arrangement.",
+          "modality": "current",
+          "object_iri": "urn:spicy-regs:entity:section-401a-despite-arrangement",
+          "polarity": "affirmed",
+          "predicate_iri": "urn:spicy-regs:predicate:satisfies",
+          "rationale": "The phrase “does not fail to satisfy” expressly affirms satisfaction despite inclusion of the arrangement.",
+          "subject_iri": "urn:spicy-regs:entity:profit-sharing-plan-with-cash-deferred-arrangement"
+        }
+      ],
+      "case_id": "affirmed_control_cfr_plan_satisfaction",
+      "no_answer_rationale": null
+    },
+    {
+      "assertions": [
+        {
+          "evidence_end": 257,
+          "evidence_start": 160,
+          "evidence_text": "The assessment rate will remain in effect indefinitely unless modified, suspended, or terminated.",
+          "modality": "current",
+          "object_iri": "urn:spicy-regs:value:indefinitely",
+          "polarity": "affirmed",
+          "predicate_iri": "urn:spicy-regs:predicate:remains-in-effect",
+          "rationale": "The excerpt states the assessment rate's operative duration, subject to specified later changes.",
+          "subject_iri": "urn:spicy-regs:entity:assessment-rate"
+        }
+      ],
+      "case_id": "affirmed_control_assessment_rate",
+      "no_answer_rationale": null
+    },
+    {
+      "assertions": [
+        {
+          "evidence_end": 126,
+          "evidence_start": 0,
+          "evidence_text": "It’s beyond my understanding why the FCC would think that our local ABC station does not provide a service to our communities.",
+          "modality": "current",
+          "object_iri": "urn:spicy-regs:entity:community-service",
+          "polarity": "affirmed",
+          "predicate_iri": "urn:spicy-regs:predicate:provides",
+          "rationale": "The rhetorical construction rejects the supposed FCC view that the station does not provide community service, conveying the filer's contrary affirmation.",
+          "subject_iri": "urn:spicy-regs:entity:local-abc-station"
+        }
+      ],
+      "case_id": "affirmed_control_fcc_community_service",
+      "no_answer_rationale": null
+    },
+    {
+      "assertions": [
+        {
+          "evidence_end": 259,
+          "evidence_start": 20,
+          "evidence_text": "Where language of previous \nregulations remains unchanged, the \npreamble explanation and interpretation \nof that language published with all prior \nfinal rules are also retained, unless \nspecifically modified in the preamble to \nthis rule.",
+          "modality": "conditional",
+          "object_iri": "urn:spicy-regs:entity:unchanged-regulatory-language",
+          "polarity": "affirmed",
+          "predicate_iri": "urn:spicy-regs:predicate:is-retained-for",
+          "rationale": "The retention is expressly conditioned on the regulatory language remaining unchanged and not being specifically modified.",
+          "subject_iri": "urn:spicy-regs:entity:prior-preamble-explanation-unchanged-language"
+        }
+      ],
+      "case_id": "affirmed_control_retained_preamble",
+      "no_answer_rationale": null
+    },
+    {
+      "assertions": [
+        {
+          "evidence_end": 297,
+          "evidence_start": 180,
+          "evidence_text": "29 CFR 38.40 contains affirmative outreach requirements for recipients of financial assistance under Title I of WIOA.",
+          "modality": "current",
+          "object_iri": "urn:spicy-regs:entity:affirmative-outreach-requirements",
+          "polarity": "affirmed",
+          "predicate_iri": "urn:spicy-regs:predicate:contains",
+          "rationale": "The excerpt explicitly states that 29 CFR 38.40 contains affirmative outreach requirements.",
+          "subject_iri": "urn:spicy-regs:entity:29-cfr-38-40"
+        }
+      ],
+      "case_id": "temporal_control_wioa_current_and_proposed",
+      "no_answer_rationale": null
+    },
+    {
+      "assertions": [],
+      "case_id": "temporal_control_bill_proposed_suspension",
+      "no_answer_rationale": "The excerpt proposes suspending a duty on specified bench grinders but does not explicitly state that the duty applies to imports."
+    },
+    {
+      "assertions": [],
+      "case_id": "unrelated_control_lobbying_filing",
+      "no_answer_rationale": "The excerpt discusses defense appropriations and contains no statement about the Medicaid program applying to incarcerated individuals."
+    },
+    {
+      "assertions": [],
+      "case_id": "unrelated_control_gao_wrong_pairing_note",
+      "no_answer_rationale": "The excerpt concerns an aviation cybersecurity amendment and contains no statement about the Medicaid program applying to incarcerated individuals."
+    }
+  ]
+}

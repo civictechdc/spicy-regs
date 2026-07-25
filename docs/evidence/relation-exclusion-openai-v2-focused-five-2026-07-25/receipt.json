@@ -1,0 +1,329 @@
+{
+  "artifact_sha256": {
+    "instructions.txt": "2a4e6f73399bc8a02c142e08e844ca1bfa3f5e531c043ed0badbdea83448f2ee",
+    "normalized-candidates.json": "6c1ff6f5b0cb72982a1e2e45d224c5778b30f1c586644ec6f4c2efe992a57bc0",
+    "payload.json": "e3aa88d321d97f1e1fe6ce0005f69b5437c4629002adc7a75ddf1240f991d21a",
+    "provisional-scores.json": "37d0caf23c12eebf7ba36b99ea78f25fb1f1db1e3b23b5c42f04aea33188cd78",
+    "request.json": "459697e3254fc71645e7dbe61826984441741c4e993b282e2772d98a3e154ef4",
+    "response.json": "decdb543930a9b53b6f33b2b5f02bebee80bd77eaac3ee639388867c928724cf",
+    "schema.json": "a388d70ad3483a9374ce7c0574fba97bc021b821284ff51869b723c89ffd3926",
+    "scope.json": "5c9798538455d321bdd1bce03fb6196fcb68dff0e65480d71048388764450802"
+  },
+  "experiment_status": "focused-diagnostic-v2-provisional",
+  "format_version": 1,
+  "generated_at": "2026-07-25T15:16:16Z",
+  "limitations": [
+    "The five cases were selected after observing prior failures.",
+    "The oracle is provisional-machine-assisted and not human-adjudicated.",
+    "This single run cannot estimate variance or rank providers."
+  ],
+  "methodology": {
+    "benchmark_eligible": false,
+    "contract": "relation-exclusion-v2",
+    "evidence_scoring": "accepted-span-and-entailment-options",
+    "oracle_status": "provisional-machine-assisted",
+    "prompt_profile": "v2-orthogonal-change-event-v1",
+    "schema": "lean-strict-v2",
+    "target_ids_attached_deterministically": true
+  },
+  "model": {
+    "model": "gpt-5.6-sol",
+    "model_id": "openai:gpt-5.6-sol",
+    "provider": "openai-responses-api",
+    "reasoning_effort": "medium",
+    "service_tier": "priority",
+    "store": false
+  },
+  "provider_call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 38595.697,
+        "input_tokens": 4434,
+        "output_tokens": 4109,
+        "request_id": "6cdf786a-af72-4449-8882-11d9c197209b",
+        "response_id": "resp_0693567bb12b55a3016a64d31b940081a28326ab22f73ee4c8",
+        "status": "completed",
+        "total_tokens": 8543
+      }
+    ],
+    "duration_ms": 38595.747,
+    "input_tokens": 4434,
+    "max_output_tokens": 16000,
+    "max_retries": 3,
+    "output_tokens": 4109,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "4bf0c4c8ba9d4e2c96aa7c9088eaf76f6a68648b30e06e95696ff658428a3a12",
+    "prompt_token_estimate": 2283,
+    "reasoning_effort": "medium",
+    "request_sha256": "e2ef774c6d74df1e0e81b1bc45b3e6de73875af39e8e3bba5bfa6b40cc85d1ae",
+    "requested_service_tier": "priority",
+    "response_id": "resp_0693567bb12b55a3016a64d31b940081a28326ab22f73ee4c8",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "priority",
+    "retry_count": 0,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 300.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 8543
+  },
+  "provisional_scores": {
+    "allowed_match_count": 0,
+    "cases": [
+      {
+        "allowed_outputs": 0,
+        "case_id": "relx-v2-18e15c9465ef5a82",
+        "false_positives": 0,
+        "matched_allowed_outputs": 0,
+        "matched_outputs": 0,
+        "matched_required_outputs": 0,
+        "matches": [],
+        "missing_required": 0,
+        "predicted_outputs": 0,
+        "required_outputs": 0,
+        "role": "unsupported_target_control",
+        "scoring_status": "included"
+      },
+      {
+        "allowed_outputs": 0,
+        "case_id": "relx-v2-67a08387711d35c7",
+        "false_positives": 0,
+        "matched_allowed_outputs": 0,
+        "matched_outputs": 1,
+        "matched_required_outputs": 1,
+        "matches": [
+          {
+            "candidate_id": "relation_candidate_v2_f8c7a662f4d2c7f766a2ac1d",
+            "dimension_matches": {
+              "attribution": true,
+              "conditionality": true,
+              "temporal_reference": false,
+              "temporal_relation": false
+            },
+            "evidence_grade": "unadjudicated_enclosing",
+            "expected_candidate_id": "urn:spicy-regs:evaluation:v2:cfr-mining-terrain:denied",
+            "requirement": "required"
+          }
+        ],
+        "missing_required": 0,
+        "predicted_outputs": 1,
+        "required_outputs": 1,
+        "role": "direct_denial",
+        "scoring_status": "included"
+      },
+      {
+        "allowed_outputs": 1,
+        "case_id": "relx-v2-71395ccd8ec8d8d0",
+        "false_positives": 1,
+        "matched_allowed_outputs": 0,
+        "matched_outputs": 0,
+        "matched_required_outputs": 0,
+        "matches": [],
+        "missing_required": 1,
+        "predicted_outputs": 1,
+        "required_outputs": 1,
+        "role": "mixed_attribution_control",
+        "scoring_status": "included"
+      },
+      {
+        "allowed_outputs": 0,
+        "case_id": "relx-v2-7c90b40744e9f83d",
+        "false_positives": 0,
+        "matched_allowed_outputs": 0,
+        "matched_outputs": 2,
+        "matched_required_outputs": 2,
+        "matches": [
+          {
+            "candidate_id": "relation_candidate_v2_b37cd9b2963a7542841bfda6",
+            "dimension_matches": {
+              "attribution": true,
+              "conditionality": true,
+              "temporal_reference": false,
+              "temporal_relation": false
+            },
+            "evidence_grade": "preferred_exact",
+            "expected_candidate_id": "urn:spicy-regs:evaluation:v2:wioa-containment:affirmed",
+            "requirement": "required"
+          },
+          {
+            "candidate_id": "relation_candidate_v2_6c42cbfc85cd417ef71b40de",
+            "dimension_matches": {
+              "attribution": false,
+              "attribution_claimant": false,
+              "conditionality": true,
+              "intended_effective_reference": false,
+              "intended_effective_relation": false,
+              "temporal_raw_text": false,
+              "temporal_reference": false,
+              "temporal_relation": false
+            },
+            "evidence_grade": "preferred_exact",
+            "expected_candidate_id": "urn:spicy-regs:evaluation:v2:wioa-containment:proposed-removal",
+            "requirement": "required"
+          }
+        ],
+        "missing_required": 0,
+        "predicted_outputs": 2,
+        "required_outputs": 2,
+        "role": "assertion_plus_change_event_control",
+        "scoring_status": "included"
+      },
+      {
+        "allowed_outputs": 0,
+        "case_id": "relx-v2-973cdad68a5c36f0",
+        "false_positives": 0,
+        "matched_allowed_outputs": 0,
+        "matched_outputs": 1,
+        "matched_required_outputs": 1,
+        "matches": [
+          {
+            "candidate_id": "relation_candidate_v2_2c457071d60532c9b1b1126f",
+            "dimension_matches": {
+              "attribution": true,
+              "attribution_claimant": true,
+              "conditionality": true,
+              "temporal_reference": false,
+              "temporal_relation": false
+            },
+            "evidence_grade": "unadjudicated",
+            "expected_candidate_id": "urn:spicy-regs:evaluation:v2:gao-airworthiness:denied",
+            "requirement": "required"
+          }
+        ],
+        "missing_required": 0,
+        "predicted_outputs": 1,
+        "required_outputs": 1,
+        "role": "direct_denial",
+        "scoring_status": "included"
+      }
+    ],
+    "core_semantics": {
+      "f1": 0.8,
+      "false_negatives": 1,
+      "false_positives": 1,
+      "precision": 0.8,
+      "recall": 0.8,
+      "true_positives": 4
+    },
+    "dimensions": {
+      "attribution": {
+        "accuracy": 0.75,
+        "correct": 3,
+        "total": 4
+      },
+      "attribution_claimant": {
+        "accuracy": 0.5,
+        "correct": 1,
+        "total": 2
+      },
+      "condition_text": {
+        "accuracy": 1.0,
+        "correct": 0,
+        "total": 0
+      },
+      "conditionality": {
+        "accuracy": 1.0,
+        "correct": 4,
+        "total": 4
+      },
+      "intended_effective_bounds": {
+        "accuracy": 1.0,
+        "correct": 0,
+        "total": 0
+      },
+      "intended_effective_raw_text": {
+        "accuracy": 1.0,
+        "correct": 0,
+        "total": 0
+      },
+      "intended_effective_reference": {
+        "accuracy": 0.0,
+        "correct": 0,
+        "total": 1
+      },
+      "intended_effective_relation": {
+        "accuracy": 0.0,
+        "correct": 0,
+        "total": 1
+      },
+      "temporal_bounds": {
+        "accuracy": 1.0,
+        "correct": 0,
+        "total": 0
+      },
+      "temporal_raw_text": {
+        "accuracy": 0.0,
+        "correct": 0,
+        "total": 1
+      },
+      "temporal_reference": {
+        "accuracy": 0.0,
+        "correct": 0,
+        "total": 4
+      },
+      "temporal_relation": {
+        "accuracy": 0.0,
+        "correct": 0,
+        "total": 4
+      }
+    },
+    "evidence": {
+      "preferred_exact": 2,
+      "unadjudicated": 1,
+      "unadjudicated_enclosing": 1,
+      "unmatched": 1
+    },
+    "evidence_entailment": {
+      "accepted_sufficient": 2,
+      "unadjudicated": 2,
+      "unmatched": 1
+    },
+    "evidence_entailment_rate": 0.4,
+    "exact_grounding_rate": 1.0,
+    "exactly_grounded_candidate_count": 5,
+    "excluded_case_count": 0,
+    "excluded_case_ids": [],
+    "excluded_raw_candidate_count": 0,
+    "false_current_discrepancies": 0,
+    "format_version": 2,
+    "offset_repair_rate": 0.0,
+    "oracle_status": "provisional-machine-assisted",
+    "provided_offset_exact_rate": 1.0,
+    "publication_eligible": false,
+    "raw_candidate_count": 5,
+    "rejected_candidate_count": 0,
+    "unrelated_false_target_candidates": 0,
+    "unsupported_false_target_candidates": 0
+  },
+  "publication_eligible": false,
+  "request": {
+    "instructions_sha256": "0e9e8f24be94cb2bb6a9753917ac6a0ddc2823c2430814b89559c10235ed324d",
+    "oracle_keys_in_payload": [],
+    "payload_sha256": "4bf0c4c8ba9d4e2c96aa7c9088eaf76f6a68648b30e06e95696ff658428a3a12",
+    "request_sha256": "bc4ea23c6c0da0a861756bbcd622650194150adc9678780dec34f7fa080c91f8",
+    "schema_sha256": "a71eaecc62baad64077dc46cfa549d6cf98f9505dd8d04cd049ae6feabf5f302"
+  },
+  "scope": {
+    "case_count": 5,
+    "case_ids": [
+      "relx-v2-973cdad68a5c36f0",
+      "relx-v2-67a08387711d35c7",
+      "relx-v2-71395ccd8ec8d8d0",
+      "relx-v2-7c90b40744e9f83d",
+      "relx-v2-18e15c9465ef5a82"
+    ],
+    "source_corpus_content_id": "ad39e0c2a96cd5c89b9727163e9494882cf476046c84953ab772513a84bcff36",
+    "source_corpus_file_sha256": "eb944481112d2fbc96d48aed1e64389fd1103988d12e7bb5429bdfc2084a5a27",
+    "source_corpus_path": "/Users/mikewolfd/Work/spicy-regs/tests/fixtures/relation_exclusion_explicit_denial_v2_corpus.json"
+  },
+  "security": {
+    "secret_match_count": 0,
+    "secret_match_files": []
+  },
+  "status": "completed"
+}

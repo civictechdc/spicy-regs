@@ -1,0 +1,277 @@
+{
+  "artifact_sha256": {
+    "candidate-scores.json": "eb072b5a289efa977c2fc49907a9f9646b1832f59105b9e65e149effe6152c61",
+    "comparison-results.json": "e5ac0ef6f599697652f94c349ee8acb9b3bdd35221f861206609e694b708fae4",
+    "instructions.txt": "67b6baead4cb27b09195bec487059fd1950add7312ff2e632e233ceeaecf6672",
+    "normalized-candidates.json": "e6ecb7842d2b4546e3b3694149dbfd123b39bdb8dc183d88426f0021b6a0aad9",
+    "payload.json": "905ef2476db6d6955160eb7f57c964fa691fa2b21d3fad6a367f441a241dc351",
+    "request.json": "d95d74900bf8b63931f41cf8dc51c342843b0d869c7f4ad087d71cfedfc4a7ae",
+    "response.json": "dc417ea4f5e1589c4648c7dae6d2da4afd3688c7a89e53b8f7494e54fe69cc94",
+    "schema.json": "df9cc1e025e3d48fab5e0bef7f37ba4a890c7bb45375cb52f22995a0a0d3a7d9"
+  },
+  "candidate_scores": {
+    "case_count": 12,
+    "cases": [
+      {
+        "case_id": "affirmed_control_assessment_rate",
+        "exact_candidate_matches": 1,
+        "gold_target_candidates": 1,
+        "polarity_modality_matches": 1,
+        "predicted_target_candidates": 1,
+        "role": "affirmed_control",
+        "target_presence_correct": true
+      },
+      {
+        "case_id": "affirmed_control_cfr_plan_satisfaction",
+        "exact_candidate_matches": 1,
+        "gold_target_candidates": 1,
+        "polarity_modality_matches": 1,
+        "predicted_target_candidates": 1,
+        "role": "affirmed_control",
+        "target_presence_correct": true
+      },
+      {
+        "case_id": "affirmed_control_fcc_community_service",
+        "exact_candidate_matches": 0,
+        "gold_target_candidates": 1,
+        "polarity_modality_matches": 0,
+        "predicted_target_candidates": 1,
+        "role": "affirmed_control",
+        "target_presence_correct": true
+      },
+      {
+        "case_id": "affirmed_control_retained_preamble",
+        "exact_candidate_matches": 1,
+        "gold_target_candidates": 1,
+        "polarity_modality_matches": 1,
+        "predicted_target_candidates": 1,
+        "role": "affirmed_control",
+        "target_presence_correct": true
+      },
+      {
+        "case_id": "explicit_denial_cfr_mining_terrain",
+        "exact_candidate_matches": 0,
+        "gold_target_candidates": 1,
+        "polarity_modality_matches": 1,
+        "predicted_target_candidates": 1,
+        "role": "direct_denial",
+        "target_presence_correct": true
+      },
+      {
+        "case_id": "explicit_denial_gao_airworthiness",
+        "exact_candidate_matches": 1,
+        "gold_target_candidates": 1,
+        "polarity_modality_matches": 1,
+        "predicted_target_candidates": 1,
+        "role": "direct_denial",
+        "target_presence_correct": true
+      },
+      {
+        "case_id": "explicit_denial_scotus_maximum_relief",
+        "exact_candidate_matches": 1,
+        "gold_target_candidates": 1,
+        "polarity_modality_matches": 1,
+        "predicted_target_candidates": 1,
+        "role": "direct_denial",
+        "target_presence_correct": true
+      },
+      {
+        "case_id": "explicit_denial_wioa_authority",
+        "exact_candidate_matches": 1,
+        "gold_target_candidates": 1,
+        "polarity_modality_matches": 1,
+        "predicted_target_candidates": 1,
+        "role": "direct_denial",
+        "target_presence_correct": true
+      },
+      {
+        "case_id": "temporal_control_bill_proposed_suspension",
+        "exact_candidate_matches": 0,
+        "gold_target_candidates": 1,
+        "polarity_modality_matches": 0,
+        "predicted_target_candidates": 0,
+        "role": "temporal_control",
+        "target_presence_correct": false
+      },
+      {
+        "case_id": "temporal_control_wioa_current_and_proposed",
+        "exact_candidate_matches": 1,
+        "gold_target_candidates": 2,
+        "polarity_modality_matches": 1,
+        "predicted_target_candidates": 1,
+        "role": "temporal_control",
+        "target_presence_correct": true
+      },
+      {
+        "case_id": "unrelated_control_gao_wrong_pairing_note",
+        "exact_candidate_matches": 0,
+        "gold_target_candidates": 0,
+        "polarity_modality_matches": 0,
+        "predicted_target_candidates": 0,
+        "role": "unrelated_control",
+        "target_presence_correct": true
+      },
+      {
+        "case_id": "unrelated_control_lobbying_filing",
+        "exact_candidate_matches": 0,
+        "gold_target_candidates": 0,
+        "polarity_modality_matches": 0,
+        "predicted_target_candidates": 0,
+        "role": "unrelated_control",
+        "target_presence_correct": true
+      }
+    ],
+    "exact_assertion": {
+      "f1": 0.7,
+      "false_negatives": 4,
+      "false_positives": 2,
+      "precision": 0.777778,
+      "recall": 0.636364,
+      "true_positives": 7
+    },
+    "exact_grounding_rate": 1.0,
+    "exactly_grounded_candidate_count": 9,
+    "polarity_modality": {
+      "f1": 0.8,
+      "false_negatives": 3,
+      "false_positives": 1,
+      "precision": 0.888889,
+      "recall": 0.727273,
+      "true_positives": 8
+    },
+    "raw_candidate_count": 9,
+    "rejected_candidate_count": 0,
+    "target_presence_accuracy": 0.916667,
+    "unrelated_false_target_candidates": 0
+  },
+  "comparison_contract_version": "resolver-proof-record-v1",
+  "comparisons": {
+    "case_count": 12,
+    "detected_direct_denials": 3,
+    "false_control_findings": 0,
+    "matching_outcome_count": 10,
+    "omission_analysis": "disabled",
+    "outcome_accuracy": 0.833333
+  },
+  "dataset": {
+    "case_count": 12,
+    "content_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+    "file_sha256": "2cf0a55675eeb205b844d27eca617713bc4f3f18f6917b47b1f6a7b57dbc281c",
+    "omission_analysis": "disabled",
+    "oracle": "human-adjudicated",
+    "path": "/Users/mikewolfd/Work/spicy-regs/tests/fixtures/relation_exclusion_explicit_denial_v1.json"
+  },
+  "experiment_status": "diagnostic-v1",
+  "failures": [
+    "candidate extraction does not exactly match the oracle",
+    "deterministic comparison outcomes differ from the oracle",
+    "not all explicit denials emitted findings"
+  ],
+  "format_version": 2,
+  "generated_at": "2026-07-25T13:52:34Z",
+  "model": {
+    "model": "gpt-5.6-sol",
+    "model_id": "codex-cli:gpt-5.6-sol",
+    "reasoning_effort": "medium",
+    "service_tier": "unavailable",
+    "store": false
+  },
+  "provider_call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 155940.392,
+        "input_tokens": 10871,
+        "output_tokens": 6831,
+        "response_id": "codex-thread:019f998a-3291-79f0-afe8-d6a3761bbc43",
+        "status": "completed",
+        "total_tokens": 17702
+      }
+    ],
+    "cli_version": "codex-cli 0.145.0",
+    "command_sha256": "97e5953cd37d0887470af2396549ea8f14695aa238028750dafe66437091dc03",
+    "disabled_features": [
+      "apps",
+      "auth_elicitation",
+      "browser_use",
+      "browser_use_external",
+      "browser_use_full_cdp_access",
+      "code_mode_host",
+      "computer_use",
+      "fast_mode",
+      "goals",
+      "guardian_approval",
+      "hooks",
+      "image_generation",
+      "in_app_browser",
+      "memories",
+      "mentions_v2",
+      "multi_agent",
+      "plugin_sharing",
+      "plugins",
+      "remote_compaction_v2",
+      "remote_plugin",
+      "shell_snapshot",
+      "shell_tool",
+      "skill_search",
+      "tool_call_mcp_elicitation",
+      "tool_suggest",
+      "unified_exec",
+      "workspace_dependencies"
+    ],
+    "duration_ms": 155940.392,
+    "event_count": 4,
+    "event_stream_sha256": "821bc84846c8d4c49bb30a38098e5ca67c635d58f5afd7b15d1f4aecbc9d4e3f",
+    "event_types": [
+      "item.completed",
+      "thread.started",
+      "turn.completed",
+      "turn.started"
+    ],
+    "exit_code": 0,
+    "forbidden_item_types": [],
+    "input_tokens": 10871,
+    "max_output_tokens": 12000,
+    "max_output_tokens_enforced": false,
+    "max_retries": 0,
+    "output_tokens": 6831,
+    "prompt_sha256": "cf33eabdeae79137183d0f5c049bd61eebfd813875cfcb01698039e3cfb02c31",
+    "provider": "codex-cli",
+    "reasoning_effort": "medium",
+    "request_sha256": "080e7b4dcd0c84129e2a6221a7b85f97379499597bb75820af481a4431d87e3e",
+    "response_id": "codex-thread:019f998a-3291-79f0-afe8-d6a3761bbc43",
+    "response_model": "gpt-5.6-sol",
+    "retry_count": 0,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "session_persistence": "ephemeral",
+    "status": "completed",
+    "stderr_sha256": "1aa26269eb1cc57f86b235a03cda53c004edb5b1e9fc99d4da4f00843293d721",
+    "store": false,
+    "terminal_error_event_types": [],
+    "thread_id": "019f998a-3291-79f0-afe8-d6a3761bbc43",
+    "timeout_seconds": 360.0,
+    "tools_enabled": false,
+    "total_tokens": 17702,
+    "transport": "codex-cli",
+    "unknown_event_types": []
+  },
+  "publication_eligible": false,
+  "request": {
+    "instruction_profile": "proof-certificate-v1",
+    "instructions_sha256": "d436d7b459e9414bfd610e81231e424fb66c5a64d11319912f59036da6b5c5b8",
+    "max_output_tokens": 12000,
+    "oracle_keys_in_payload": [],
+    "payload_sha256": "cf33eabdeae79137183d0f5c049bd61eebfd813875cfcb01698039e3cfb02c31",
+    "request_sha256": "080e7b4dcd0c84129e2a6221a7b85f97379499597bb75820af481a4431d87e3e",
+    "schema_profile": "described-v1",
+    "schema_sha256": "d435a7e539f152d0c58a879daee9bb2e28cd5125ba424968f377eceb9f266d7a"
+  },
+  "run_id": "relation-exclusion-codex-thread:019f998a-3291-79f0-afe8-d6a3761bbc43",
+  "security": {
+    "secret_match_count": 0,
+    "secret_match_files": []
+  },
+  "status": "fail"
+}

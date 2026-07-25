@@ -1,0 +1,339 @@
+{
+  "artifact_sha256": {
+    "instructions.txt": "dcaf0c6ca205ae5e05fedbf613f5b215670d50130eb789840d3be2d056d03db8",
+    "normalized-candidates.json": "5f00a535fb73323bc9408b7c1f7fba5351ad10b24d3c455eecac676d9b42997d",
+    "payload.json": "e3aa88d321d97f1e1fe6ce0005f69b5437c4629002adc7a75ddf1240f991d21a",
+    "provisional-scores.json": "7763d4e0567358f9f16064bbc664aac1a1e2ccb8073ff5ce7a522895ca7390f0",
+    "request.json": "d82374b797e4647e6812d0e3b72271cf1fe2a32b140b1900dfe4092a9ee15a28",
+    "response.json": "43de0e5b5ae75b83c20f8ae66c5058a2a45d6de7b168ac3ab2e2e8a3fa1a5d2d",
+    "schema.json": "a388d70ad3483a9374ce7c0574fba97bc021b821284ff51869b723c89ffd3926",
+    "scope.json": "a4d8d2c4c16020a7035feff9ef171ef5bed9d5ce29fdc6b313c833ee68d11781"
+  },
+  "experiment_status": "focused-diagnostic-v2-provisional",
+  "format_version": 1,
+  "generated_at": "2026-07-25T15:18:37Z",
+  "limitations": [
+    "The five cases and prompt refinements were selected after observing prior failures.",
+    "The oracle is provisional-machine-assisted and not human-adjudicated.",
+    "This single run cannot estimate variance or rank providers."
+  ],
+  "methodology": {
+    "benchmark_eligible": false,
+    "contract": "relation-exclusion-v2",
+    "evidence_scoring": "accepted-span-and-entailment-options",
+    "oracle_status": "provisional-machine-assisted",
+    "prompt_profile": "proof-certificate-v2-focused-diagnostic-v1",
+    "schema": "lean-strict-v2",
+    "target_ids_attached_deterministically": true
+  },
+  "model": {
+    "model": "gpt-5.6-sol",
+    "model_id": "openai:gpt-5.6-sol",
+    "provider": "openai-responses-api",
+    "reasoning_effort": "medium",
+    "service_tier": "priority",
+    "store": false
+  },
+  "provider_call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 49067.045,
+        "input_tokens": 4789,
+        "output_tokens": 4773,
+        "request_id": "0ae0f5ce-0c7e-4ee3-88f2-2afb918f4efd",
+        "response_id": "resp_0c73df8d33ef6d0d016a64d39c9d74819d95789e163a0a5df9",
+        "status": "completed",
+        "total_tokens": 9562
+      }
+    ],
+    "duration_ms": 49067.297,
+    "input_tokens": 4789,
+    "max_output_tokens": 16000,
+    "max_retries": 3,
+    "output_tokens": 4773,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "4bf0c4c8ba9d4e2c96aa7c9088eaf76f6a68648b30e06e95696ff658428a3a12",
+    "prompt_token_estimate": 2635,
+    "reasoning_effort": "medium",
+    "request_sha256": "7bda894500258e4ad7eeb5541b7a71118d4db7a2fb122eae76a834955fd2eddc",
+    "requested_service_tier": "priority",
+    "response_id": "resp_0c73df8d33ef6d0d016a64d39c9d74819d95789e163a0a5df9",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "priority",
+    "retry_count": 0,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 300.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 9562
+  },
+  "provisional_scores": {
+    "allowed_match_count": 0,
+    "cases": [
+      {
+        "allowed_outputs": 0,
+        "case_id": "relx-v2-18e15c9465ef5a82",
+        "false_positives": 0,
+        "matched_allowed_outputs": 0,
+        "matched_outputs": 0,
+        "matched_required_outputs": 0,
+        "matches": [],
+        "missing_required": 0,
+        "predicted_outputs": 0,
+        "required_outputs": 0,
+        "role": "unsupported_target_control",
+        "scoring_status": "included"
+      },
+      {
+        "allowed_outputs": 0,
+        "case_id": "relx-v2-67a08387711d35c7",
+        "false_positives": 0,
+        "matched_allowed_outputs": 0,
+        "matched_outputs": 1,
+        "matched_required_outputs": 1,
+        "matches": [
+          {
+            "candidate_id": "relation_candidate_v2_00e5ad9585b4cd7277f3fd7c",
+            "dimension_matches": {
+              "attribution": true,
+              "condition_text": false,
+              "conditionality": false,
+              "temporal_reference": true,
+              "temporal_relation": true
+            },
+            "evidence_grade": "preferred_exact",
+            "expected_candidate_id": "urn:spicy-regs:evaluation:v2:cfr-mining-terrain:denied",
+            "requirement": "required"
+          }
+        ],
+        "missing_required": 0,
+        "predicted_outputs": 1,
+        "required_outputs": 1,
+        "role": "direct_denial",
+        "scoring_status": "included"
+      },
+      {
+        "allowed_outputs": 1,
+        "case_id": "relx-v2-71395ccd8ec8d8d0",
+        "false_positives": 1,
+        "matched_allowed_outputs": 0,
+        "matched_outputs": 1,
+        "matched_required_outputs": 1,
+        "matches": [
+          {
+            "candidate_id": "relation_candidate_v2_cbece307855d89df378dc334",
+            "dimension_matches": {
+              "attribution": true,
+              "conditionality": true,
+              "temporal_reference": true,
+              "temporal_relation": true
+            },
+            "evidence_grade": "preferred_exact",
+            "expected_candidate_id": "urn:spicy-regs:evaluation:v2:fcc-community-service:affirmed",
+            "requirement": "required"
+          }
+        ],
+        "missing_required": 0,
+        "predicted_outputs": 2,
+        "required_outputs": 1,
+        "role": "mixed_attribution_control",
+        "scoring_status": "included"
+      },
+      {
+        "allowed_outputs": 0,
+        "case_id": "relx-v2-7c90b40744e9f83d",
+        "false_positives": 0,
+        "matched_allowed_outputs": 0,
+        "matched_outputs": 2,
+        "matched_required_outputs": 2,
+        "matches": [
+          {
+            "candidate_id": "relation_candidate_v2_2581967abdc23ee33b419252",
+            "dimension_matches": {
+              "attribution": true,
+              "conditionality": true,
+              "temporal_reference": true,
+              "temporal_relation": true
+            },
+            "evidence_grade": "preferred_exact",
+            "expected_candidate_id": "urn:spicy-regs:evaluation:v2:wioa-containment:affirmed",
+            "requirement": "required"
+          },
+          {
+            "candidate_id": "relation_candidate_v2_5a310db8c684b4f973306ac3",
+            "dimension_matches": {
+              "attribution": true,
+              "conditionality": true,
+              "intended_effective_reference": true,
+              "intended_effective_relation": true,
+              "temporal_raw_text": false,
+              "temporal_reference": true,
+              "temporal_relation": true
+            },
+            "evidence_grade": "preferred_exact",
+            "expected_candidate_id": "urn:spicy-regs:evaluation:v2:wioa-containment:proposed-removal",
+            "requirement": "required"
+          }
+        ],
+        "missing_required": 0,
+        "predicted_outputs": 2,
+        "required_outputs": 2,
+        "role": "assertion_plus_change_event_control",
+        "scoring_status": "included"
+      },
+      {
+        "allowed_outputs": 0,
+        "case_id": "relx-v2-973cdad68a5c36f0",
+        "false_positives": 0,
+        "matched_allowed_outputs": 0,
+        "matched_outputs": 1,
+        "matched_required_outputs": 1,
+        "matches": [
+          {
+            "candidate_id": "relation_candidate_v2_d6f1efefeed27cf8c054bd00",
+            "dimension_matches": {
+              "attribution": false,
+              "attribution_claimant": false,
+              "conditionality": true,
+              "temporal_reference": true,
+              "temporal_relation": true
+            },
+            "evidence_grade": "preferred_exact",
+            "expected_candidate_id": "urn:spicy-regs:evaluation:v2:gao-airworthiness:denied",
+            "requirement": "required"
+          }
+        ],
+        "missing_required": 0,
+        "predicted_outputs": 1,
+        "required_outputs": 1,
+        "role": "direct_denial",
+        "scoring_status": "included"
+      }
+    ],
+    "core_semantics": {
+      "f1": 0.909091,
+      "false_negatives": 0,
+      "false_positives": 1,
+      "precision": 0.833333,
+      "recall": 1.0,
+      "true_positives": 5
+    },
+    "dimensions": {
+      "attribution": {
+        "accuracy": 0.8,
+        "correct": 4,
+        "total": 5
+      },
+      "attribution_claimant": {
+        "accuracy": 0.0,
+        "correct": 0,
+        "total": 1
+      },
+      "condition_text": {
+        "accuracy": 0.0,
+        "correct": 0,
+        "total": 1
+      },
+      "conditionality": {
+        "accuracy": 0.8,
+        "correct": 4,
+        "total": 5
+      },
+      "intended_effective_bounds": {
+        "accuracy": 1.0,
+        "correct": 0,
+        "total": 0
+      },
+      "intended_effective_raw_text": {
+        "accuracy": 1.0,
+        "correct": 0,
+        "total": 0
+      },
+      "intended_effective_reference": {
+        "accuracy": 1.0,
+        "correct": 1,
+        "total": 1
+      },
+      "intended_effective_relation": {
+        "accuracy": 1.0,
+        "correct": 1,
+        "total": 1
+      },
+      "temporal_bounds": {
+        "accuracy": 1.0,
+        "correct": 0,
+        "total": 0
+      },
+      "temporal_raw_text": {
+        "accuracy": 0.0,
+        "correct": 0,
+        "total": 1
+      },
+      "temporal_reference": {
+        "accuracy": 1.0,
+        "correct": 5,
+        "total": 5
+      },
+      "temporal_relation": {
+        "accuracy": 1.0,
+        "correct": 5,
+        "total": 5
+      }
+    },
+    "evidence": {
+      "preferred_exact": 5,
+      "unmatched": 1
+    },
+    "evidence_entailment": {
+      "accepted_sufficient": 5,
+      "unmatched": 1
+    },
+    "evidence_entailment_rate": 0.833333,
+    "exact_grounding_rate": 1.0,
+    "exactly_grounded_candidate_count": 6,
+    "excluded_case_count": 0,
+    "excluded_case_ids": [],
+    "excluded_raw_candidate_count": 0,
+    "false_current_discrepancies": 0,
+    "format_version": 2,
+    "offset_repair_rate": 0.0,
+    "oracle_status": "provisional-machine-assisted",
+    "provided_offset_exact_rate": 1.0,
+    "publication_eligible": false,
+    "raw_candidate_count": 6,
+    "rejected_candidate_count": 0,
+    "unrelated_false_target_candidates": 0,
+    "unsupported_false_target_candidates": 0
+  },
+  "publication_eligible": false,
+  "request": {
+    "instructions_sha256": "8c3df39866dbbc947d9211c0c8a913b3f9b7b05314a6033d9fefafe50d05c5d7",
+    "oracle_keys_in_payload": [],
+    "payload_sha256": "4bf0c4c8ba9d4e2c96aa7c9088eaf76f6a68648b30e06e95696ff658428a3a12",
+    "request_sha256": "aa3de24b63b480936a58223864069f24ac00097af4a7661e532b38823652a906",
+    "schema_sha256": "a71eaecc62baad64077dc46cfa549d6cf98f9505dd8d04cd049ae6feabf5f302"
+  },
+  "scope": {
+    "case_count": 5,
+    "case_ids": [
+      "relx-v2-973cdad68a5c36f0",
+      "relx-v2-67a08387711d35c7",
+      "relx-v2-71395ccd8ec8d8d0",
+      "relx-v2-7c90b40744e9f83d",
+      "relx-v2-18e15c9465ef5a82"
+    ],
+    "source_corpus_content_id": "ad39e0c2a96cd5c89b9727163e9494882cf476046c84953ab772513a84bcff36",
+    "source_corpus_file_sha256": "eb944481112d2fbc96d48aed1e64389fd1103988d12e7bb5429bdfc2084a5a27",
+    "source_corpus_path": "/Users/mikewolfd/Work/spicy-regs/tests/fixtures/relation_exclusion_explicit_denial_v2_corpus.json"
+  },
+  "security": {
+    "secret_match_count": 0,
+    "secret_match_files": []
+  },
+  "status": "completed"
+}

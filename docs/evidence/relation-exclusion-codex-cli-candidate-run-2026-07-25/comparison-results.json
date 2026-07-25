@@ -1,0 +1,2543 @@
+{
+  "case_count": 12,
+  "cases": [
+    {
+      "case_id": "affirmed_control_assessment_rate",
+      "considered_observation_ids": [],
+      "expected_outcome": "satisfied",
+      "finding": null,
+      "observed_outcome": "unknown",
+      "outcome_matches": false,
+      "proof_ids": [
+        "urn:spicy-regs:resolver-proof:0a82fbb7df85f120cbea542fca1c9383aa7b55c1d1051c2009069ff9033d1e3c",
+        "urn:spicy-regs:resolver-proof:0ccdb5540be6fe8f5df42b903d9b54380f1d8c0c53bd94a14b84928662e989d3",
+        "urn:spicy-regs:resolver-proof:3327a66c0d6414ec3e889572be166d264f8f491cb85418d43183a9be42899795",
+        "urn:spicy-regs:resolver-proof:790024675e602d45376b9c9977de84ff53d48836a70240de89f28e45e21cd6fe",
+        "urn:spicy-regs:resolver-proof:ed697a124bea13be4fd7aabbbd7b311c42e2fcd30d48626ae297e184cdbc74ed"
+      ],
+      "proof_records": [
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_assessment_rate:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "73e725b8ba3fa3dbc96d535eb2298817140ddd87a66092c9eddbd056d4957d06"
+            },
+            {
+              "name": "binding:urn:spicy-regs:evaluation:affirmed_control_assessment_rate:evidence:baseline",
+              "sha256": "0c0bf939a1f565e0a31b5b23b80f53da8fad7d7d3c355333b88c6ace1d55ff68"
+            },
+            {
+              "name": "source:urn:spicy-regs:evaluation:affirmed_control_assessment_rate:evidence:baseline",
+              "sha256": "82ba4c9c8f1a9d3d458d2f5bfe6616d291c7c1d9bac205d742847f52d7977054"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_assessment_rate:assertion:baseline",
+            "urn:spicy-regs:evaluation:affirmed_control_assessment_rate:artifact:baseline"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:exact-source-evidence",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:0a82fbb7df85f120cbea542fca1c9383aa7b55c1d1051c2009069ff9033d1e3c",
+          "proof_type": "evidence_binding",
+          "rationale": "Every bound span aligns exactly to the locked artifact version.",
+          "record_digest": "0a82fbb7df85f120cbea542fca1c9383aa7b55c1d1051c2009069ff9033d1e3c",
+          "resolver_id": "urn:spicy-regs:resolver:bound-evidence",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_assessment_rate:evidence:baseline"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_assessment_rate:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "73e725b8ba3fa3dbc96d535eb2298817140ddd87a66092c9eddbd056d4957d06"
+            },
+            {
+              "name": "warrant_set",
+              "sha256": "e987ada4b76e5767991b7d5c6f28dea717c354a5c70ae5117532da2152096691"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_assessment_rate:assertion:baseline",
+            "urn:spicy-regs:evaluation:affirmed_control_assessment_rate:warrant:human-oracle"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:eligible-baseline",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:0ccdb5540be6fe8f5df42b903d9b54380f1d8c0c53bd94a14b84928662e989d3",
+          "proof_type": "baseline_warrant",
+          "rationale": "A registered warrant authorizes this comparison baseline.",
+          "record_digest": "0ccdb5540be6fe8f5df42b903d9b54380f1d8c0c53bd94a14b84928662e989d3",
+          "resolver_id": "urn:spicy-regs:resolver:baseline-warrant",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_assessment_rate:warrant-proof",
+            "urn:spicy-regs:evaluation:affirmed_control_assessment_rate:warrant:human-oracle"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_assessment_rate:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "relation_key",
+              "sha256": "277f2263c1e2147dfbc3d244acd75ce130b44c2c559db7a97b16c316e9192aa1"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:entity:assessment-rate",
+            "urn:spicy-regs:predicate:remains-in-effect",
+            "urn:spicy-regs:value:indefinitely"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:canonical-relation",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:3327a66c0d6414ec3e889572be166d264f8f491cb85418d43183a9be42899795",
+          "proof_type": "predicate_catalog",
+          "rationale": "The predicate direction and both entities resolve in the catalog.",
+          "record_digest": "3327a66c0d6414ec3e889572be166d264f8f491cb85418d43183a9be42899795",
+          "resolver_id": "urn:spicy-regs:resolver:predicate-catalog",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_assessment_rate:predicate-catalog-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_assessment_rate:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "73e725b8ba3fa3dbc96d535eb2298817140ddd87a66092c9eddbd056d4957d06"
+            },
+            {
+              "name": "attestation:urn:spicy-regs:evaluation:affirmed_control_assessment_rate:attestation:baseline",
+              "sha256": "511098ea1ae7b54d047138153e38bb1a69c80df7bbb6a343d77cb439ade0ff2f"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_assessment_rate:assertion:baseline",
+            "urn:spicy-regs:evaluation:affirmed_control_assessment_rate:consumer-scope"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:accepted-current",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:790024675e602d45376b9c9977de84ff53d48836a70240de89f28e45e21cd6fe",
+          "proof_type": "assertion_attestation",
+          "rationale": "The assertion is accepted in this consumer scope.",
+          "record_digest": "790024675e602d45376b9c9977de84ff53d48836a70240de89f28e45e21cd6fe",
+          "resolver_id": "urn:spicy-regs:resolver:assertion-state",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_assessment_rate:attestation:baseline"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_assessment_rate:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "artifact_pair",
+              "sha256": "1e4697a0bf21ac9f1ea7d805b5a583c5d35dba5228ad55a330680b6fcc573701"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_assessment_rate:artifact:baseline",
+            "urn:spicy-regs:evaluation:affirmed_control_assessment_rate:artifact:observed",
+            "urn:spicy-regs:evaluation:affirmed_control_assessment_rate:pairing"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:comparable-artifacts",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:ed697a124bea13be4fd7aabbbd7b311c42e2fcd30d48626ae297e184cdbc74ed",
+          "proof_type": "artifact_pairing",
+          "rationale": "An approved pairing binds the exact artifact versions.",
+          "record_digest": "ed697a124bea13be4fd7aabbbd7b311c42e2fcd30d48626ae297e184cdbc74ed",
+          "resolver_id": "urn:spicy-regs:resolver:artifact-pairing",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_assessment_rate:pairing",
+            "urn:spicy-regs:evaluation:affirmed_control_assessment_rate:pairing-proof"
+          ]
+        }
+      ],
+      "rationale": "No comparable accepted observation resolves the relation.",
+      "role": "affirmed_control"
+    },
+    {
+      "case_id": "affirmed_control_cfr_plan_satisfaction",
+      "considered_observation_ids": [
+        "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:assertion:relation_candidate_f36f1238ebc019fc537534bf"
+      ],
+      "expected_outcome": "satisfied",
+      "finding": null,
+      "observed_outcome": "satisfied",
+      "outcome_matches": true,
+      "proof_ids": [
+        "urn:spicy-regs:resolver-proof:17ebd0a23f804bdd492cc6c4690283f0f9280ae80012db90be35da944cfecb97",
+        "urn:spicy-regs:resolver-proof:40008fe45b501bf50ac49115597cc5b5ee6a92bebbf8afba314c0b287fca55c6",
+        "urn:spicy-regs:resolver-proof:4526a104e19047b4da554834841d4cfe3188578627c1b3cbb2c122da84906d6e",
+        "urn:spicy-regs:resolver-proof:8847c64a00807cfb380d79d9a1bbc1779b0f9c365e0cfae1cca196b1ed3c1a2e",
+        "urn:spicy-regs:resolver-proof:8d7b14179d0ac50bfc86548a518f3a45ac68e607453012f84ce49a434cb71b2f",
+        "urn:spicy-regs:resolver-proof:9856a0fcad52414980e889cf3b5c89c8482649e3b1d8b876244e75d55acd0999",
+        "urn:spicy-regs:resolver-proof:c5da72b3d114af1d0f2ad95c1701b3562807c9ccd306753517cffd7390c9caea",
+        "urn:spicy-regs:resolver-proof:d294741ae310e39ac5c2470af5a5988f6f8cf96d691d38b4ac31944a571bea95",
+        "urn:spicy-regs:resolver-proof:de9d9ea7179e4f60fa9e3793b6680060fffd1688d1847a818365a11809e0d6b7"
+      ],
+      "proof_records": [
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "da00a56414ddf1e11f4733282105375679a526f2f93b89b4d83f63a65f0dfaaf"
+            },
+            {
+              "name": "binding:urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:evidence:relation_candidate_f36f1238ebc019fc537534bf",
+              "sha256": "b39164652431057a3f3772f36e38b120a649ac3e7f14bf4de94b781b4689d3e7"
+            },
+            {
+              "name": "source:urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:evidence:relation_candidate_f36f1238ebc019fc537534bf",
+              "sha256": "1d80f6cd306e042b3cd6e18e87a507715f1a5278ebb5d22b27ad624415fa0da2"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:assertion:relation_candidate_f36f1238ebc019fc537534bf",
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:artifact:observed"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:exact-source-evidence",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:17ebd0a23f804bdd492cc6c4690283f0f9280ae80012db90be35da944cfecb97",
+          "proof_type": "evidence_binding",
+          "rationale": "Every bound span aligns exactly to the locked artifact version.",
+          "record_digest": "17ebd0a23f804bdd492cc6c4690283f0f9280ae80012db90be35da944cfecb97",
+          "resolver_id": "urn:spicy-regs:resolver:bound-evidence",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:evidence:relation_candidate_f36f1238ebc019fc537534bf"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "artifact_pair",
+              "sha256": "9fa797a72ec393896ea39c2c0e9e8295dad66038813b97c22f7edd1ff1cea5c7"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:artifact:baseline",
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:artifact:observed",
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:pairing"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:comparable-artifacts",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:40008fe45b501bf50ac49115597cc5b5ee6a92bebbf8afba314c0b287fca55c6",
+          "proof_type": "artifact_pairing",
+          "rationale": "An approved pairing binds the exact artifact versions.",
+          "record_digest": "40008fe45b501bf50ac49115597cc5b5ee6a92bebbf8afba314c0b287fca55c6",
+          "resolver_id": "urn:spicy-regs:resolver:artifact-pairing",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:pairing",
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:pairing-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "68aed1c7a2dccac906b3d91b3fcad55ce90feea2823dfac882e79178c521ab07"
+            },
+            {
+              "name": "warrant_set",
+              "sha256": "bd6a8538b8235615dd5ac247c76805fbe8e5a21e578e544ad8c3ca80b466ecd9"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:assertion:baseline",
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:warrant:human-oracle"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:eligible-baseline",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:4526a104e19047b4da554834841d4cfe3188578627c1b3cbb2c122da84906d6e",
+          "proof_type": "baseline_warrant",
+          "rationale": "A registered warrant authorizes this comparison baseline.",
+          "record_digest": "4526a104e19047b4da554834841d4cfe3188578627c1b3cbb2c122da84906d6e",
+          "resolver_id": "urn:spicy-regs:resolver:baseline-warrant",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:warrant-proof",
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:warrant:human-oracle"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "68aed1c7a2dccac906b3d91b3fcad55ce90feea2823dfac882e79178c521ab07"
+            },
+            {
+              "name": "binding:urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:evidence:baseline",
+              "sha256": "70fca25e3e0a795a8670000c48fc8b2dd40d93506f62cc36fd7d45ec1a3d3d98"
+            },
+            {
+              "name": "source:urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:evidence:baseline",
+              "sha256": "10342ce90b19334ce9842fac492d801bbc9ba5a0f8604716e79e4cafac97bcb1"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:assertion:baseline",
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:artifact:baseline"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:exact-source-evidence",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:8847c64a00807cfb380d79d9a1bbc1779b0f9c365e0cfae1cca196b1ed3c1a2e",
+          "proof_type": "evidence_binding",
+          "rationale": "Every bound span aligns exactly to the locked artifact version.",
+          "record_digest": "8847c64a00807cfb380d79d9a1bbc1779b0f9c365e0cfae1cca196b1ed3c1a2e",
+          "resolver_id": "urn:spicy-regs:resolver:bound-evidence",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:evidence:baseline"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "expected_relation_key",
+              "sha256": "182d884965a26ccabb3254df9fbad33a9c952d754edec2bbc51907095005f2c9"
+            },
+            {
+              "name": "observed_relation_key",
+              "sha256": "182d884965a26ccabb3254df9fbad33a9c952d754edec2bbc51907095005f2c9"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:entity:profit-sharing-plan-with-cash-deferred-arrangement",
+            "urn:spicy-regs:predicate:satisfies",
+            "urn:spicy-regs:entity:section-401a-despite-arrangement"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:canonical-relation",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:8d7b14179d0ac50bfc86548a518f3a45ac68e607453012f84ce49a434cb71b2f",
+          "proof_type": "predicate_catalog",
+          "rationale": "The canonical relation keys are identical.",
+          "record_digest": "8d7b14179d0ac50bfc86548a518f3a45ac68e607453012f84ce49a434cb71b2f",
+          "resolver_id": "urn:spicy-regs:resolver:predicate-catalog",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:predicate-catalog-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "expected_assertion",
+              "sha256": "68aed1c7a2dccac906b3d91b3fcad55ce90feea2823dfac882e79178c521ab07"
+            },
+            {
+              "name": "observed_assertion",
+              "sha256": "da00a56414ddf1e11f4733282105375679a526f2f93b89b4d83f63a65f0dfaaf"
+            },
+            {
+              "name": "scope_relation",
+              "sha256": "b0f1a1bee231ee66116fac36827eecf0e5b316922d4b6e7298e73d8e671f1401"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:assertion:baseline",
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:assertion:relation_candidate_f36f1238ebc019fc537534bf",
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:scope:baseline",
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:scope:observed-1-current"
+          ],
+          "outcome": "equivalent",
+          "policy_id": "urn:spicy-regs:policy:scope-comparison",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:9856a0fcad52414980e889cf3b5c89c8482649e3b1d8b876244e75d55acd0999",
+          "proof_type": "scope_declaration",
+          "rationale": "The evaluation profile declares the temporal and applicability relationship.",
+          "record_digest": "9856a0fcad52414980e889cf3b5c89c8482649e3b1d8b876244e75d55acd0999",
+          "resolver_id": "urn:spicy-regs:resolver:declared-scope",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:scope-proof:1-equivalent"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "da00a56414ddf1e11f4733282105375679a526f2f93b89b4d83f63a65f0dfaaf"
+            },
+            {
+              "name": "attestation:urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:attestation:relation_candidate_f36f1238ebc019fc537534bf",
+              "sha256": "22e6e8c94e6873eda1af9719ae8bd2945a7331d40153b80fdbb7ff5dcc308a5d"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:assertion:relation_candidate_f36f1238ebc019fc537534bf",
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:consumer-scope"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:accepted-current",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:c5da72b3d114af1d0f2ad95c1701b3562807c9ccd306753517cffd7390c9caea",
+          "proof_type": "assertion_attestation",
+          "rationale": "The assertion is accepted in this consumer scope.",
+          "record_digest": "c5da72b3d114af1d0f2ad95c1701b3562807c9ccd306753517cffd7390c9caea",
+          "resolver_id": "urn:spicy-regs:resolver:assertion-state",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:attestation:relation_candidate_f36f1238ebc019fc537534bf"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "relation_key",
+              "sha256": "182d884965a26ccabb3254df9fbad33a9c952d754edec2bbc51907095005f2c9"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:entity:profit-sharing-plan-with-cash-deferred-arrangement",
+            "urn:spicy-regs:predicate:satisfies",
+            "urn:spicy-regs:entity:section-401a-despite-arrangement"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:canonical-relation",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:d294741ae310e39ac5c2470af5a5988f6f8cf96d691d38b4ac31944a571bea95",
+          "proof_type": "predicate_catalog",
+          "rationale": "The predicate direction and both entities resolve in the catalog.",
+          "record_digest": "d294741ae310e39ac5c2470af5a5988f6f8cf96d691d38b4ac31944a571bea95",
+          "resolver_id": "urn:spicy-regs:resolver:predicate-catalog",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:predicate-catalog-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "68aed1c7a2dccac906b3d91b3fcad55ce90feea2823dfac882e79178c521ab07"
+            },
+            {
+              "name": "attestation:urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:attestation:baseline",
+              "sha256": "3c91fa4ddcc3a5df741d4553e3bf902fcb06d39abaeaae601d110ec83f0e4f8c"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:assertion:baseline",
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:consumer-scope"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:accepted-current",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:de9d9ea7179e4f60fa9e3793b6680060fffd1688d1847a818365a11809e0d6b7",
+          "proof_type": "assertion_attestation",
+          "rationale": "The assertion is accepted in this consumer scope.",
+          "record_digest": "de9d9ea7179e4f60fa9e3793b6680060fffd1688d1847a818365a11809e0d6b7",
+          "resolver_id": "urn:spicy-regs:resolver:assertion-state",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_cfr_plan_satisfaction:attestation:baseline"
+          ]
+        }
+      ],
+      "rationale": "Accepted source evidence affirms the baseline relation.",
+      "role": "affirmed_control"
+    },
+    {
+      "case_id": "affirmed_control_fcc_community_service",
+      "considered_observation_ids": [],
+      "expected_outcome": "satisfied",
+      "finding": null,
+      "observed_outcome": "unknown",
+      "outcome_matches": false,
+      "proof_ids": [
+        "urn:spicy-regs:resolver-proof:0526adf552f409e19c0a22cbe390e609145acd869e3304c7b3c2226d275f0823",
+        "urn:spicy-regs:resolver-proof:59a2ca81fc137d5a5b058f3f0ecbace0e379cc423684e8bf779026fa870fac7d",
+        "urn:spicy-regs:resolver-proof:75055fb149a1441aff442d6d89eb873f890d566619c92478bfb73eabf8817e66",
+        "urn:spicy-regs:resolver-proof:e7c78f44047ef19e9bb784b2c5b8d1202d2f6897fc83c70462cfdf365da0c680",
+        "urn:spicy-regs:resolver-proof:fe91b702c273c8975fbd8194093a394dcdd77f6d204c7022fea2b2212f198f0f"
+      ],
+      "proof_records": [
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "7cdf61f427fd67a434401893c390acdefad6692cac4edb01c7f39cc1a710dc0f"
+            },
+            {
+              "name": "binding:urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:evidence:baseline",
+              "sha256": "91a760de989009a645bbdba15b41e7e4c177a8e7de44f60edee3b507ba0c2d63"
+            },
+            {
+              "name": "source:urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:evidence:baseline",
+              "sha256": "76e251452efe1e94702c8f23022b4d565cf14c4116642a74491eff2dc92baa9e"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:assertion:baseline",
+            "urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:artifact:baseline"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:exact-source-evidence",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:0526adf552f409e19c0a22cbe390e609145acd869e3304c7b3c2226d275f0823",
+          "proof_type": "evidence_binding",
+          "rationale": "Every bound span aligns exactly to the locked artifact version.",
+          "record_digest": "0526adf552f409e19c0a22cbe390e609145acd869e3304c7b3c2226d275f0823",
+          "resolver_id": "urn:spicy-regs:resolver:bound-evidence",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:evidence:baseline"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "relation_key",
+              "sha256": "4ad8cbdcca75995b7658aef32d154255b68d934abe2290338366a04dca5e26ca"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:entity:local-abc-station",
+            "urn:spicy-regs:predicate:provides",
+            "urn:spicy-regs:entity:community-service"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:canonical-relation",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:59a2ca81fc137d5a5b058f3f0ecbace0e379cc423684e8bf779026fa870fac7d",
+          "proof_type": "predicate_catalog",
+          "rationale": "The predicate direction and both entities resolve in the catalog.",
+          "record_digest": "59a2ca81fc137d5a5b058f3f0ecbace0e379cc423684e8bf779026fa870fac7d",
+          "resolver_id": "urn:spicy-regs:resolver:predicate-catalog",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:predicate-catalog-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "artifact_pair",
+              "sha256": "7d44dee6737322dfd64aefa25c2089c28d3595830a757fddccbaa84cf15b3176"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:artifact:baseline",
+            "urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:artifact:observed",
+            "urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:pairing"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:comparable-artifacts",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:75055fb149a1441aff442d6d89eb873f890d566619c92478bfb73eabf8817e66",
+          "proof_type": "artifact_pairing",
+          "rationale": "An approved pairing binds the exact artifact versions.",
+          "record_digest": "75055fb149a1441aff442d6d89eb873f890d566619c92478bfb73eabf8817e66",
+          "resolver_id": "urn:spicy-regs:resolver:artifact-pairing",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:pairing",
+            "urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:pairing-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "7cdf61f427fd67a434401893c390acdefad6692cac4edb01c7f39cc1a710dc0f"
+            },
+            {
+              "name": "attestation:urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:attestation:baseline",
+              "sha256": "e60f334b5c851b5e2e0ada7d0df348eb3d37636f013ba4f81349d077dd88e00a"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:assertion:baseline",
+            "urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:consumer-scope"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:accepted-current",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:e7c78f44047ef19e9bb784b2c5b8d1202d2f6897fc83c70462cfdf365da0c680",
+          "proof_type": "assertion_attestation",
+          "rationale": "The assertion is accepted in this consumer scope.",
+          "record_digest": "e7c78f44047ef19e9bb784b2c5b8d1202d2f6897fc83c70462cfdf365da0c680",
+          "resolver_id": "urn:spicy-regs:resolver:assertion-state",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:attestation:baseline"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "7cdf61f427fd67a434401893c390acdefad6692cac4edb01c7f39cc1a710dc0f"
+            },
+            {
+              "name": "warrant_set",
+              "sha256": "978ff8a4fe4e7a037dc439fcbadaf0c9c42d34bb5b969d17b9dcea37dbeb0abb"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:assertion:baseline",
+            "urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:warrant:human-oracle"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:eligible-baseline",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:fe91b702c273c8975fbd8194093a394dcdd77f6d204c7022fea2b2212f198f0f",
+          "proof_type": "baseline_warrant",
+          "rationale": "A registered warrant authorizes this comparison baseline.",
+          "record_digest": "fe91b702c273c8975fbd8194093a394dcdd77f6d204c7022fea2b2212f198f0f",
+          "resolver_id": "urn:spicy-regs:resolver:baseline-warrant",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:warrant-proof",
+            "urn:spicy-regs:evaluation:affirmed_control_fcc_community_service:warrant:human-oracle"
+          ]
+        }
+      ],
+      "rationale": "No comparable accepted observation resolves the relation.",
+      "role": "affirmed_control"
+    },
+    {
+      "case_id": "affirmed_control_retained_preamble",
+      "considered_observation_ids": [],
+      "expected_outcome": "satisfied",
+      "finding": null,
+      "observed_outcome": "unknown",
+      "outcome_matches": false,
+      "proof_ids": [
+        "urn:spicy-regs:resolver-proof:3237b11aa159e44424ce72763213484b6e1d3fb9946faf16e7e3358b4b47caec",
+        "urn:spicy-regs:resolver-proof:3ac51c46af2ad061ab95d177bacdd9f3292e784606a9eec1412b64aece2372d1",
+        "urn:spicy-regs:resolver-proof:795e13835b70dbeecd8345ad8513dda805a2ab74a4596c24a2008b636a289a3d",
+        "urn:spicy-regs:resolver-proof:9a6d0fbbd31a18091380d7adc4820568e650e29ea6011af47f7070dd1dc54785",
+        "urn:spicy-regs:resolver-proof:ed17534d9b2e0ef1bc79aa11bbdee99c71f15eac20050264e7e8a308b21731f9"
+      ],
+      "proof_records": [
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_retained_preamble:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "bf989b5745d7ed0c0c7e5b2c7c2305859c41d591bd12ea82a623487f3c0fde1d"
+            },
+            {
+              "name": "attestation:urn:spicy-regs:evaluation:affirmed_control_retained_preamble:attestation:baseline",
+              "sha256": "cdcc0f96ae53905736c603a7349501a20a607b8e43c1fbc5d8a8de1a5ae9cfed"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_retained_preamble:assertion:baseline",
+            "urn:spicy-regs:evaluation:affirmed_control_retained_preamble:consumer-scope"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:accepted-current",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:3237b11aa159e44424ce72763213484b6e1d3fb9946faf16e7e3358b4b47caec",
+          "proof_type": "assertion_attestation",
+          "rationale": "The assertion is accepted in this consumer scope.",
+          "record_digest": "3237b11aa159e44424ce72763213484b6e1d3fb9946faf16e7e3358b4b47caec",
+          "resolver_id": "urn:spicy-regs:resolver:assertion-state",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_retained_preamble:attestation:baseline"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_retained_preamble:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "artifact_pair",
+              "sha256": "6a8b781c3601c6e005248e00473afa34c48fde22e4f1074a831c8552de12adf4"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_retained_preamble:artifact:baseline",
+            "urn:spicy-regs:evaluation:affirmed_control_retained_preamble:artifact:observed",
+            "urn:spicy-regs:evaluation:affirmed_control_retained_preamble:pairing"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:comparable-artifacts",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:3ac51c46af2ad061ab95d177bacdd9f3292e784606a9eec1412b64aece2372d1",
+          "proof_type": "artifact_pairing",
+          "rationale": "An approved pairing binds the exact artifact versions.",
+          "record_digest": "3ac51c46af2ad061ab95d177bacdd9f3292e784606a9eec1412b64aece2372d1",
+          "resolver_id": "urn:spicy-regs:resolver:artifact-pairing",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_retained_preamble:pairing",
+            "urn:spicy-regs:evaluation:affirmed_control_retained_preamble:pairing-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_retained_preamble:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "bf989b5745d7ed0c0c7e5b2c7c2305859c41d591bd12ea82a623487f3c0fde1d"
+            },
+            {
+              "name": "binding:urn:spicy-regs:evaluation:affirmed_control_retained_preamble:evidence:baseline",
+              "sha256": "d8149d864b586b9d0a27eee2f82debbd12a046501efc697cb8e61790d514a1b1"
+            },
+            {
+              "name": "source:urn:spicy-regs:evaluation:affirmed_control_retained_preamble:evidence:baseline",
+              "sha256": "5647c67a6a4565a85b0692b083ff996892421c5fd5b47b49d9d51b91ee525d27"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_retained_preamble:assertion:baseline",
+            "urn:spicy-regs:evaluation:affirmed_control_retained_preamble:artifact:baseline"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:exact-source-evidence",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:795e13835b70dbeecd8345ad8513dda805a2ab74a4596c24a2008b636a289a3d",
+          "proof_type": "evidence_binding",
+          "rationale": "Every bound span aligns exactly to the locked artifact version.",
+          "record_digest": "795e13835b70dbeecd8345ad8513dda805a2ab74a4596c24a2008b636a289a3d",
+          "resolver_id": "urn:spicy-regs:resolver:bound-evidence",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_retained_preamble:evidence:baseline"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_retained_preamble:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "bf989b5745d7ed0c0c7e5b2c7c2305859c41d591bd12ea82a623487f3c0fde1d"
+            },
+            {
+              "name": "warrant_set",
+              "sha256": "89f6ad945c4b5aa4521e411fc5dac7eee35f442ca616fbc16a8fe3b05c99d9dc"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_retained_preamble:assertion:baseline",
+            "urn:spicy-regs:evaluation:affirmed_control_retained_preamble:warrant:human-oracle"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:eligible-baseline",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:9a6d0fbbd31a18091380d7adc4820568e650e29ea6011af47f7070dd1dc54785",
+          "proof_type": "baseline_warrant",
+          "rationale": "A registered warrant authorizes this comparison baseline.",
+          "record_digest": "9a6d0fbbd31a18091380d7adc4820568e650e29ea6011af47f7070dd1dc54785",
+          "resolver_id": "urn:spicy-regs:resolver:baseline-warrant",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_retained_preamble:warrant-proof",
+            "urn:spicy-regs:evaluation:affirmed_control_retained_preamble:warrant:human-oracle"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:affirmed_control_retained_preamble:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "relation_key",
+              "sha256": "350de262e0c06ac17f2f325e54bebaacf7a82868221d43087bc856d3f5b0d9e3"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:entity:prior-preamble-explanation-unchanged-language",
+            "urn:spicy-regs:predicate:is-retained-for",
+            "urn:spicy-regs:entity:unchanged-regulatory-language"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:canonical-relation",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:ed17534d9b2e0ef1bc79aa11bbdee99c71f15eac20050264e7e8a308b21731f9",
+          "proof_type": "predicate_catalog",
+          "rationale": "The predicate direction and both entities resolve in the catalog.",
+          "record_digest": "ed17534d9b2e0ef1bc79aa11bbdee99c71f15eac20050264e7e8a308b21731f9",
+          "resolver_id": "urn:spicy-regs:resolver:predicate-catalog",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:affirmed_control_retained_preamble:predicate-catalog-proof"
+          ]
+        }
+      ],
+      "rationale": "No comparable accepted observation resolves the relation.",
+      "role": "affirmed_control"
+    },
+    {
+      "case_id": "explicit_denial_cfr_mining_terrain",
+      "considered_observation_ids": [],
+      "expected_outcome": "discrepancy",
+      "finding": null,
+      "observed_outcome": "unknown",
+      "outcome_matches": false,
+      "proof_ids": [
+        "urn:spicy-regs:resolver-proof:377fe54b0cf414c8930992841d40a2932aa280458e3003d40fdde491ab8a10ec",
+        "urn:spicy-regs:resolver-proof:5f1a2889d0a02cd0e4093dd626e0e4ebde8860b401515c764808183079d364ca",
+        "urn:spicy-regs:resolver-proof:c35d6d7cc04a1344515359016ae2ddfda2cf7caec637cfe09156b82185eabbc8",
+        "urn:spicy-regs:resolver-proof:d69afdbbc31df0452ac6c39015a4672c038fbc68f787964663cbb8cb7dd3bf6e",
+        "urn:spicy-regs:resolver-proof:fec43588471453f5cd95e9d15275bc29f083e0a799468ea2069b4ac2ce8faa40"
+      ],
+      "proof_records": [
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "666222757c3f1df4d1ac949db766568a1cbba929dd40e75e61a08f6631c9cb9b"
+            },
+            {
+              "name": "warrant_set",
+              "sha256": "2c24d1e894f72b45714edad0df03e4664d67e5794d197aec697ffd16059d6c0b"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:assertion:baseline",
+            "urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:warrant:human-oracle"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:eligible-baseline",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:377fe54b0cf414c8930992841d40a2932aa280458e3003d40fdde491ab8a10ec",
+          "proof_type": "baseline_warrant",
+          "rationale": "A registered warrant authorizes this comparison baseline.",
+          "record_digest": "377fe54b0cf414c8930992841d40a2932aa280458e3003d40fdde491ab8a10ec",
+          "resolver_id": "urn:spicy-regs:resolver:baseline-warrant",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:warrant-proof",
+            "urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:warrant:human-oracle"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "relation_key",
+              "sha256": "a2425e78074133e7e3c4478db78c57c52d3ddc120db04b9827f68c3e0f828d9c"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:entity:30-cfr-716-2-performance-standards",
+            "urn:spicy-regs:predicate:applies-to",
+            "urn:spicy-regs:entity:mining-flat-gently-rolling-terrain-stated-conditions"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:canonical-relation",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:5f1a2889d0a02cd0e4093dd626e0e4ebde8860b401515c764808183079d364ca",
+          "proof_type": "predicate_catalog",
+          "rationale": "The predicate direction and both entities resolve in the catalog.",
+          "record_digest": "5f1a2889d0a02cd0e4093dd626e0e4ebde8860b401515c764808183079d364ca",
+          "resolver_id": "urn:spicy-regs:resolver:predicate-catalog",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:predicate-catalog-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "666222757c3f1df4d1ac949db766568a1cbba929dd40e75e61a08f6631c9cb9b"
+            },
+            {
+              "name": "binding:urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:evidence:baseline",
+              "sha256": "18b60de9a281634c109a0b6b82aa33f989443f3b980795d86d0b83011e95616e"
+            },
+            {
+              "name": "source:urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:evidence:baseline",
+              "sha256": "58d3b05f524e710daa9368f715e005cdcb745ba3a0b54fc068d702b5e5e6e1c7"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:assertion:baseline",
+            "urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:artifact:baseline"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:exact-source-evidence",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:c35d6d7cc04a1344515359016ae2ddfda2cf7caec637cfe09156b82185eabbc8",
+          "proof_type": "evidence_binding",
+          "rationale": "Every bound span aligns exactly to the locked artifact version.",
+          "record_digest": "c35d6d7cc04a1344515359016ae2ddfda2cf7caec637cfe09156b82185eabbc8",
+          "resolver_id": "urn:spicy-regs:resolver:bound-evidence",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:evidence:baseline"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "artifact_pair",
+              "sha256": "d9a200168b206a6dbe4fb3c4908068f0c928753ce57663347f5254fef7c47833"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:artifact:baseline",
+            "urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:artifact:observed",
+            "urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:pairing"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:comparable-artifacts",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:d69afdbbc31df0452ac6c39015a4672c038fbc68f787964663cbb8cb7dd3bf6e",
+          "proof_type": "artifact_pairing",
+          "rationale": "An approved pairing binds the exact artifact versions.",
+          "record_digest": "d69afdbbc31df0452ac6c39015a4672c038fbc68f787964663cbb8cb7dd3bf6e",
+          "resolver_id": "urn:spicy-regs:resolver:artifact-pairing",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:pairing",
+            "urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:pairing-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "666222757c3f1df4d1ac949db766568a1cbba929dd40e75e61a08f6631c9cb9b"
+            },
+            {
+              "name": "attestation:urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:attestation:baseline",
+              "sha256": "3069589231cd9e9d6bf495078e354121d94aecbb1842e30f62ee1d6ade2b6a18"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:assertion:baseline",
+            "urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:consumer-scope"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:accepted-current",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:fec43588471453f5cd95e9d15275bc29f083e0a799468ea2069b4ac2ce8faa40",
+          "proof_type": "assertion_attestation",
+          "rationale": "The assertion is accepted in this consumer scope.",
+          "record_digest": "fec43588471453f5cd95e9d15275bc29f083e0a799468ea2069b4ac2ce8faa40",
+          "resolver_id": "urn:spicy-regs:resolver:assertion-state",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_cfr_mining_terrain:attestation:baseline"
+          ]
+        }
+      ],
+      "rationale": "No comparable accepted observation resolves the relation.",
+      "role": "direct_denial"
+    },
+    {
+      "case_id": "explicit_denial_gao_airworthiness",
+      "considered_observation_ids": [],
+      "expected_outcome": "discrepancy",
+      "finding": null,
+      "observed_outcome": "unknown",
+      "outcome_matches": false,
+      "proof_ids": [
+        "urn:spicy-regs:resolver-proof:ba44ed0f167b47496a0eddf3fbbcff183a443b272020e77fe4eec6ddd59ed41f",
+        "urn:spicy-regs:resolver-proof:cd734e831ed88d14c2e42583870022ae4611b36df9b81ed7d65febe247985ddf",
+        "urn:spicy-regs:resolver-proof:d5d3e2484f2ce09b55c1dd282ce3f61b0852699369e64104f95cba7b8dedb30a",
+        "urn:spicy-regs:resolver-proof:e9db99dede9d1457ca45ecc74ed6d026f71eac72180e38f7c530ee5116add7fb",
+        "urn:spicy-regs:resolver-proof:f31828fe0fe0d675b10bdffc82a8e49b82a578c19cfa882480318a19681c9474"
+      ],
+      "proof_records": [
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "artifact_pair",
+              "sha256": "6707577feebe8cd4f9180123639601d560adf367e8c368153e137fa0555e15a2"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:artifact:baseline",
+            "urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:artifact:observed",
+            "urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:pairing"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:comparable-artifacts",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:ba44ed0f167b47496a0eddf3fbbcff183a443b272020e77fe4eec6ddd59ed41f",
+          "proof_type": "artifact_pairing",
+          "rationale": "An approved pairing binds the exact artifact versions.",
+          "record_digest": "ba44ed0f167b47496a0eddf3fbbcff183a443b272020e77fe4eec6ddd59ed41f",
+          "resolver_id": "urn:spicy-regs:resolver:artifact-pairing",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:pairing",
+            "urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:pairing-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "1007bb945b84310430ad923e2a5f1045dec5e56636bc69bcb88cf3950c58ad2d"
+            },
+            {
+              "name": "attestation:urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:attestation:baseline",
+              "sha256": "5cebcd95e88a3cd5c3165a34a714ea8a647306542e512ed894a1175f34d2628b"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:assertion:baseline",
+            "urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:consumer-scope"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:accepted-current",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:cd734e831ed88d14c2e42583870022ae4611b36df9b81ed7d65febe247985ddf",
+          "proof_type": "assertion_attestation",
+          "rationale": "The assertion is accepted in this consumer scope.",
+          "record_digest": "cd734e831ed88d14c2e42583870022ae4611b36df9b81ed7d65febe247985ddf",
+          "resolver_id": "urn:spicy-regs:resolver:assertion-state",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:attestation:baseline"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "1007bb945b84310430ad923e2a5f1045dec5e56636bc69bcb88cf3950c58ad2d"
+            },
+            {
+              "name": "binding:urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:evidence:baseline",
+              "sha256": "ddf346cd7ed3b06abc882724526cb3d3326b34e3ee9028800cd219616290a766"
+            },
+            {
+              "name": "source:urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:evidence:baseline",
+              "sha256": "9d7a4e3f84bb3fd9afe8cfca7859703799de2f54713807559151141bc0cc744e"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:assertion:baseline",
+            "urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:artifact:baseline"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:exact-source-evidence",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:d5d3e2484f2ce09b55c1dd282ce3f61b0852699369e64104f95cba7b8dedb30a",
+          "proof_type": "evidence_binding",
+          "rationale": "Every bound span aligns exactly to the locked artifact version.",
+          "record_digest": "d5d3e2484f2ce09b55c1dd282ce3f61b0852699369e64104f95cba7b8dedb30a",
+          "resolver_id": "urn:spicy-regs:resolver:bound-evidence",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:evidence:baseline"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "1007bb945b84310430ad923e2a5f1045dec5e56636bc69bcb88cf3950c58ad2d"
+            },
+            {
+              "name": "warrant_set",
+              "sha256": "664f4c29e98304c89c3f7f9689cc724be86426620bc01eeff7d32299e3c375fa"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:assertion:baseline",
+            "urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:warrant:human-oracle"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:eligible-baseline",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:e9db99dede9d1457ca45ecc74ed6d026f71eac72180e38f7c530ee5116add7fb",
+          "proof_type": "baseline_warrant",
+          "rationale": "A registered warrant authorizes this comparison baseline.",
+          "record_digest": "e9db99dede9d1457ca45ecc74ed6d026f71eac72180e38f7c530ee5116add7fb",
+          "resolver_id": "urn:spicy-regs:resolver:baseline-warrant",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:warrant-proof",
+            "urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:warrant:human-oracle"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "relation_key",
+              "sha256": "a793c6b761feb34d777abf2fe68e22d46f7079c59c61687e3b860f85e9225392"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:entity:emergency-amendment",
+            "urn:spicy-regs:predicate:applies-to",
+            "urn:spicy-regs:entity:aircraft-resources-contributing-to-airworthiness"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:canonical-relation",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:f31828fe0fe0d675b10bdffc82a8e49b82a578c19cfa882480318a19681c9474",
+          "proof_type": "predicate_catalog",
+          "rationale": "The predicate direction and both entities resolve in the catalog.",
+          "record_digest": "f31828fe0fe0d675b10bdffc82a8e49b82a578c19cfa882480318a19681c9474",
+          "resolver_id": "urn:spicy-regs:resolver:predicate-catalog",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_gao_airworthiness:predicate-catalog-proof"
+          ]
+        }
+      ],
+      "rationale": "No comparable accepted observation resolves the relation.",
+      "role": "direct_denial"
+    },
+    {
+      "case_id": "explicit_denial_scotus_maximum_relief",
+      "considered_observation_ids": [],
+      "expected_outcome": "discrepancy",
+      "finding": null,
+      "observed_outcome": "unknown",
+      "outcome_matches": false,
+      "proof_ids": [
+        "urn:spicy-regs:resolver-proof:4e3fd84d06d9a04a50e8d0e5e3a21e993c1b5965ee72943384c23a0ed5b41458",
+        "urn:spicy-regs:resolver-proof:75a09cdf928d73b705115639be4e60ae34219853349e12983b902566327131c6",
+        "urn:spicy-regs:resolver-proof:9bd2716ebdde1d042ec6d84b6916d97ebaefa742afa623b2a98fc2b2e869ecce",
+        "urn:spicy-regs:resolver-proof:b31d3c65fb9bc345a4238e685e2114c532e453a5341d7dea371cd5ba3361e98c",
+        "urn:spicy-regs:resolver-proof:eec3dd73dba96c0fbe046d27e5cefc87b4c109c6521ddb89b53a1ba09728fb4f"
+      ],
+      "proof_records": [
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "e9c6000cae5ddc3ec76eccb275e19a6c60aa907ec81f0448f11eaaecabbe1291"
+            },
+            {
+              "name": "warrant_set",
+              "sha256": "bca9055be90613ac541b05c5b565f927fd76ac16260a3974bed4e131cc3a3131"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:assertion:baseline",
+            "urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:warrant:human-oracle"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:eligible-baseline",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:4e3fd84d06d9a04a50e8d0e5e3a21e993c1b5965ee72943384c23a0ed5b41458",
+          "proof_type": "baseline_warrant",
+          "rationale": "A registered warrant authorizes this comparison baseline.",
+          "record_digest": "4e3fd84d06d9a04a50e8d0e5e3a21e993c1b5965ee72943384c23a0ed5b41458",
+          "resolver_id": "urn:spicy-regs:resolver:baseline-warrant",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:warrant-proof",
+            "urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:warrant:human-oracle"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "artifact_pair",
+              "sha256": "61fe38a292f49a7c816fcd4fa831882c47d2e8ac4ce0a74c1bfa16d6a13231eb"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:artifact:baseline",
+            "urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:artifact:observed",
+            "urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:pairing"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:comparable-artifacts",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:75a09cdf928d73b705115639be4e60ae34219853349e12983b902566327131c6",
+          "proof_type": "artifact_pairing",
+          "rationale": "An approved pairing binds the exact artifact versions.",
+          "record_digest": "75a09cdf928d73b705115639be4e60ae34219853349e12983b902566327131c6",
+          "resolver_id": "urn:spicy-regs:resolver:artifact-pairing",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:pairing",
+            "urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:pairing-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "e9c6000cae5ddc3ec76eccb275e19a6c60aa907ec81f0448f11eaaecabbe1291"
+            },
+            {
+              "name": "binding:urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:evidence:baseline",
+              "sha256": "544d27d6db0dc2291af912cd29c1b58c7d5846b256de079fd1dfa930cc91e359"
+            },
+            {
+              "name": "source:urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:evidence:baseline",
+              "sha256": "7bd6b6f921d5e1b03299e4f77e38bd4bebdd57436f1a87998a254057f9e2d751"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:assertion:baseline",
+            "urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:artifact:baseline"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:exact-source-evidence",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:9bd2716ebdde1d042ec6d84b6916d97ebaefa742afa623b2a98fc2b2e869ecce",
+          "proof_type": "evidence_binding",
+          "rationale": "Every bound span aligns exactly to the locked artifact version.",
+          "record_digest": "9bd2716ebdde1d042ec6d84b6916d97ebaefa742afa623b2a98fc2b2e869ecce",
+          "resolver_id": "urn:spicy-regs:resolver:bound-evidence",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:evidence:baseline"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "relation_key",
+              "sha256": "9ca77bc519f49018d3c45d15f94a91ea3f80301a2988388ef67c3e384cbad8f4"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:entity:brown-and-taylor",
+            "urn:spicy-regs:predicate:qualify-for",
+            "urn:spicy-regs:entity:maximum-relief-under-plan"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:canonical-relation",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:b31d3c65fb9bc345a4238e685e2114c532e453a5341d7dea371cd5ba3361e98c",
+          "proof_type": "predicate_catalog",
+          "rationale": "The predicate direction and both entities resolve in the catalog.",
+          "record_digest": "b31d3c65fb9bc345a4238e685e2114c532e453a5341d7dea371cd5ba3361e98c",
+          "resolver_id": "urn:spicy-regs:resolver:predicate-catalog",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:predicate-catalog-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "e9c6000cae5ddc3ec76eccb275e19a6c60aa907ec81f0448f11eaaecabbe1291"
+            },
+            {
+              "name": "attestation:urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:attestation:baseline",
+              "sha256": "39287a72edc1f0ac3ccb6df9b5316e4ecdc235e43e429ad6f7221bf81eef7635"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:assertion:baseline",
+            "urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:consumer-scope"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:accepted-current",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:eec3dd73dba96c0fbe046d27e5cefc87b4c109c6521ddb89b53a1ba09728fb4f",
+          "proof_type": "assertion_attestation",
+          "rationale": "The assertion is accepted in this consumer scope.",
+          "record_digest": "eec3dd73dba96c0fbe046d27e5cefc87b4c109c6521ddb89b53a1ba09728fb4f",
+          "resolver_id": "urn:spicy-regs:resolver:assertion-state",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_scotus_maximum_relief:attestation:baseline"
+          ]
+        }
+      ],
+      "rationale": "No comparable accepted observation resolves the relation.",
+      "role": "direct_denial"
+    },
+    {
+      "case_id": "explicit_denial_wioa_authority",
+      "considered_observation_ids": [
+        "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:assertion:relation_candidate_7a944c63ec1d94e8de86f48a"
+      ],
+      "expected_outcome": "discrepancy",
+      "finding": {
+        "affected_object_iri": "urn:spicy-regs:action:department-require-affirmative-outreach",
+        "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:comparison",
+        "detected_at": "2026-07-24T20:00:00+00:00",
+        "detected_by": "urn:spicy-regs:detector:explicit-denial-v1",
+        "detector_version": "explicit-denial-v1",
+        "expected_assertion_id": "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:assertion:baseline",
+        "finding_fingerprint": "relation-finding-fingerprint_cc27f35a6a1405fb24121f98",
+        "finding_id": "relation-finding_5a4ce77c9df109e209dffd94",
+        "kind": "affirmed_denied_discrepancy",
+        "observed_assertion_ids": [
+          "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:assertion:relation_candidate_7a944c63ec1d94e8de86f48a"
+        ],
+        "proof_ids": [
+          "urn:spicy-regs:resolver-proof:3f16f57b8f0c16d67a61ccb561d4f2e87172d1e530e20d17b741e6a64d7f78bc",
+          "urn:spicy-regs:resolver-proof:47ed1d4c440d60a30596a607d311ab72f4e2ae45a25a96947401aa8cc2d9c5c1",
+          "urn:spicy-regs:resolver-proof:7a306c3a10df8b61394878b2f8512a884c418068c59a0ea01ebf611ea95c79d9",
+          "urn:spicy-regs:resolver-proof:800bd9c288e67b8cdb6a86e9378b3314d87096794ebd95ae9ef9b2982bf1d98e",
+          "urn:spicy-regs:resolver-proof:df3307d7ea2d2a11e14d68cf56c77ff777b099d028a9e4c7d58bf09fbc4eade4",
+          "urn:spicy-regs:resolver-proof:f0d3936635d1db12adadce3c00cf4fef28fb580191a131360904d7980a5e2667",
+          "urn:spicy-regs:resolver-proof:f944c8ea7554a97629367155cc3f168139d0f33c91aa5b2f113f5d3a6fa27821",
+          "urn:spicy-regs:resolver-proof:fe7ab9f1ec71b77af653b6f2710d1861dd0288c19957132863ae1e9d8fed3c2a",
+          "urn:spicy-regs:resolver-proof:fee17b07a3fa30fe7b08fb40c7e6c858cd36045be968559199ba719bedabb613"
+        ],
+        "rationale": "Comparable accepted source evidence explicitly denies the affirmed baseline relation. No actor intent is inferred."
+      },
+      "observed_outcome": "discrepancy",
+      "outcome_matches": true,
+      "proof_ids": [
+        "urn:spicy-regs:resolver-proof:3f16f57b8f0c16d67a61ccb561d4f2e87172d1e530e20d17b741e6a64d7f78bc",
+        "urn:spicy-regs:resolver-proof:47ed1d4c440d60a30596a607d311ab72f4e2ae45a25a96947401aa8cc2d9c5c1",
+        "urn:spicy-regs:resolver-proof:7a306c3a10df8b61394878b2f8512a884c418068c59a0ea01ebf611ea95c79d9",
+        "urn:spicy-regs:resolver-proof:800bd9c288e67b8cdb6a86e9378b3314d87096794ebd95ae9ef9b2982bf1d98e",
+        "urn:spicy-regs:resolver-proof:df3307d7ea2d2a11e14d68cf56c77ff777b099d028a9e4c7d58bf09fbc4eade4",
+        "urn:spicy-regs:resolver-proof:f0d3936635d1db12adadce3c00cf4fef28fb580191a131360904d7980a5e2667",
+        "urn:spicy-regs:resolver-proof:f944c8ea7554a97629367155cc3f168139d0f33c91aa5b2f113f5d3a6fa27821",
+        "urn:spicy-regs:resolver-proof:fe7ab9f1ec71b77af653b6f2710d1861dd0288c19957132863ae1e9d8fed3c2a",
+        "urn:spicy-regs:resolver-proof:fee17b07a3fa30fe7b08fb40c7e6c858cd36045be968559199ba719bedabb613"
+      ],
+      "proof_records": [
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "expected_assertion",
+              "sha256": "dd780284218cc44fa4fbbfacf1cecf7d6f97c28bb9c1a930e453802081a89480"
+            },
+            {
+              "name": "observed_assertion",
+              "sha256": "5862cd94cfa5cf77750e980268bfd57dc563b0f1761495dbc0dda87a88721138"
+            },
+            {
+              "name": "scope_relation",
+              "sha256": "a7663e07ca77b0c6bbc3e16a5cf10eda2a5e1b644de29dfdd2a6f63485739667"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:assertion:baseline",
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:assertion:relation_candidate_7a944c63ec1d94e8de86f48a",
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:scope:baseline",
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:scope:observed-1-current"
+          ],
+          "outcome": "equivalent",
+          "policy_id": "urn:spicy-regs:policy:scope-comparison",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:3f16f57b8f0c16d67a61ccb561d4f2e87172d1e530e20d17b741e6a64d7f78bc",
+          "proof_type": "scope_declaration",
+          "rationale": "The evaluation profile declares the temporal and applicability relationship.",
+          "record_digest": "3f16f57b8f0c16d67a61ccb561d4f2e87172d1e530e20d17b741e6a64d7f78bc",
+          "resolver_id": "urn:spicy-regs:resolver:declared-scope",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:scope-proof:1-equivalent"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "5862cd94cfa5cf77750e980268bfd57dc563b0f1761495dbc0dda87a88721138"
+            },
+            {
+              "name": "attestation:urn:spicy-regs:evaluation:explicit_denial_wioa_authority:attestation:relation_candidate_7a944c63ec1d94e8de86f48a",
+              "sha256": "db4acb6805d5353cf99644ad667097fc9a2f4cda74a6a5e6923c3857c9109c39"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:assertion:relation_candidate_7a944c63ec1d94e8de86f48a",
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:consumer-scope"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:accepted-current",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:47ed1d4c440d60a30596a607d311ab72f4e2ae45a25a96947401aa8cc2d9c5c1",
+          "proof_type": "assertion_attestation",
+          "rationale": "The assertion is accepted in this consumer scope.",
+          "record_digest": "47ed1d4c440d60a30596a607d311ab72f4e2ae45a25a96947401aa8cc2d9c5c1",
+          "resolver_id": "urn:spicy-regs:resolver:assertion-state",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:attestation:relation_candidate_7a944c63ec1d94e8de86f48a"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "dd780284218cc44fa4fbbfacf1cecf7d6f97c28bb9c1a930e453802081a89480"
+            },
+            {
+              "name": "binding:urn:spicy-regs:evaluation:explicit_denial_wioa_authority:evidence:baseline",
+              "sha256": "3af05945961dc2679a0b52995f5b737f72a0cee8ce0816b9ad93121d13c9f1c8"
+            },
+            {
+              "name": "source:urn:spicy-regs:evaluation:explicit_denial_wioa_authority:evidence:baseline",
+              "sha256": "fcdfb6a11aaabf3867efde25614b86d947d3245e9ff73339b7ad74a063e3dad5"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:assertion:baseline",
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:artifact:baseline"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:exact-source-evidence",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:7a306c3a10df8b61394878b2f8512a884c418068c59a0ea01ebf611ea95c79d9",
+          "proof_type": "evidence_binding",
+          "rationale": "Every bound span aligns exactly to the locked artifact version.",
+          "record_digest": "7a306c3a10df8b61394878b2f8512a884c418068c59a0ea01ebf611ea95c79d9",
+          "resolver_id": "urn:spicy-regs:resolver:bound-evidence",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:evidence:baseline"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "dd780284218cc44fa4fbbfacf1cecf7d6f97c28bb9c1a930e453802081a89480"
+            },
+            {
+              "name": "warrant_set",
+              "sha256": "3b115d68244f516d7e788d5f13ac33cd50dbb670701dd71fcd2a60eeeeeac318"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:assertion:baseline",
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:warrant:human-oracle"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:eligible-baseline",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:800bd9c288e67b8cdb6a86e9378b3314d87096794ebd95ae9ef9b2982bf1d98e",
+          "proof_type": "baseline_warrant",
+          "rationale": "A registered warrant authorizes this comparison baseline.",
+          "record_digest": "800bd9c288e67b8cdb6a86e9378b3314d87096794ebd95ae9ef9b2982bf1d98e",
+          "resolver_id": "urn:spicy-regs:resolver:baseline-warrant",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:warrant-proof",
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:warrant:human-oracle"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "5862cd94cfa5cf77750e980268bfd57dc563b0f1761495dbc0dda87a88721138"
+            },
+            {
+              "name": "binding:urn:spicy-regs:evaluation:explicit_denial_wioa_authority:evidence:relation_candidate_7a944c63ec1d94e8de86f48a",
+              "sha256": "d4f3af4434ab21d6dfc67e64f1291779c43681e5456779cefa70b9abb56bf4fe"
+            },
+            {
+              "name": "source:urn:spicy-regs:evaluation:explicit_denial_wioa_authority:evidence:relation_candidate_7a944c63ec1d94e8de86f48a",
+              "sha256": "13cdb3e26034f78804308d3a54799fbec504dc4e67219b8ece6f8a95714f6e7c"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:assertion:relation_candidate_7a944c63ec1d94e8de86f48a",
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:artifact:observed"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:exact-source-evidence",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:df3307d7ea2d2a11e14d68cf56c77ff777b099d028a9e4c7d58bf09fbc4eade4",
+          "proof_type": "evidence_binding",
+          "rationale": "Every bound span aligns exactly to the locked artifact version.",
+          "record_digest": "df3307d7ea2d2a11e14d68cf56c77ff777b099d028a9e4c7d58bf09fbc4eade4",
+          "resolver_id": "urn:spicy-regs:resolver:bound-evidence",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:evidence:relation_candidate_7a944c63ec1d94e8de86f48a"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "relation_key",
+              "sha256": "eb62a68dcbffeebf39d7c5c45c3d06473554f842ff594b5e4d6aa03f8f85a51c"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:entity:wioa-section-188",
+            "urn:spicy-regs:predicate:authorizes",
+            "urn:spicy-regs:action:department-require-affirmative-outreach"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:canonical-relation",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:f0d3936635d1db12adadce3c00cf4fef28fb580191a131360904d7980a5e2667",
+          "proof_type": "predicate_catalog",
+          "rationale": "The predicate direction and both entities resolve in the catalog.",
+          "record_digest": "f0d3936635d1db12adadce3c00cf4fef28fb580191a131360904d7980a5e2667",
+          "resolver_id": "urn:spicy-regs:resolver:predicate-catalog",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:predicate-catalog-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "artifact_pair",
+              "sha256": "cc49a92463846b1a476e274d9fc6d0d2685506b0b163ce40777614f822b57c10"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:artifact:baseline",
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:artifact:observed",
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:pairing"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:comparable-artifacts",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:f944c8ea7554a97629367155cc3f168139d0f33c91aa5b2f113f5d3a6fa27821",
+          "proof_type": "artifact_pairing",
+          "rationale": "An approved pairing binds the exact artifact versions.",
+          "record_digest": "f944c8ea7554a97629367155cc3f168139d0f33c91aa5b2f113f5d3a6fa27821",
+          "resolver_id": "urn:spicy-regs:resolver:artifact-pairing",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:pairing",
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:pairing-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "expected_relation_key",
+              "sha256": "eb62a68dcbffeebf39d7c5c45c3d06473554f842ff594b5e4d6aa03f8f85a51c"
+            },
+            {
+              "name": "observed_relation_key",
+              "sha256": "eb62a68dcbffeebf39d7c5c45c3d06473554f842ff594b5e4d6aa03f8f85a51c"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:entity:wioa-section-188",
+            "urn:spicy-regs:predicate:authorizes",
+            "urn:spicy-regs:action:department-require-affirmative-outreach"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:canonical-relation",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:fe7ab9f1ec71b77af653b6f2710d1861dd0288c19957132863ae1e9d8fed3c2a",
+          "proof_type": "predicate_catalog",
+          "rationale": "The canonical relation keys are identical.",
+          "record_digest": "fe7ab9f1ec71b77af653b6f2710d1861dd0288c19957132863ae1e9d8fed3c2a",
+          "resolver_id": "urn:spicy-regs:resolver:predicate-catalog",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:predicate-catalog-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "dd780284218cc44fa4fbbfacf1cecf7d6f97c28bb9c1a930e453802081a89480"
+            },
+            {
+              "name": "attestation:urn:spicy-regs:evaluation:explicit_denial_wioa_authority:attestation:baseline",
+              "sha256": "1c3a0c5f8bb35cba8170cd942b89b5a04e5cb7cdaa51116f4edbab50a3752813"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:assertion:baseline",
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:consumer-scope"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:accepted-current",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:fee17b07a3fa30fe7b08fb40c7e6c858cd36045be968559199ba719bedabb613",
+          "proof_type": "assertion_attestation",
+          "rationale": "The assertion is accepted in this consumer scope.",
+          "record_digest": "fee17b07a3fa30fe7b08fb40c7e6c858cd36045be968559199ba719bedabb613",
+          "resolver_id": "urn:spicy-regs:resolver:assertion-state",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:explicit_denial_wioa_authority:attestation:baseline"
+          ]
+        }
+      ],
+      "rationale": "Accepted source evidence denies the affirmed baseline within a comparable scope.",
+      "role": "direct_denial"
+    },
+    {
+      "case_id": "temporal_control_bill_proposed_suspension",
+      "considered_observation_ids": [],
+      "expected_outcome": "unknown",
+      "finding": null,
+      "observed_outcome": "unknown",
+      "outcome_matches": true,
+      "proof_ids": [
+        "urn:spicy-regs:resolver-proof:0d092ac6a13fb88ecbd36ab3f0045645863d2831dacbf753e1cd7e9e3f1346ab",
+        "urn:spicy-regs:resolver-proof:3185f1ca180f9125754bdaf4c273aff804786709306e2ccf3f23e37265c6608b",
+        "urn:spicy-regs:resolver-proof:392bc814dd83dfdd2ed54b7ee27fa1a85be5801e6da65f112b4b11698fcb2688",
+        "urn:spicy-regs:resolver-proof:87d1cb6ea2b1b5764565bd0655d92ab487ebc1084cdba4dc775bd1072d19b989",
+        "urn:spicy-regs:resolver-proof:b2de277053751829b75e06a4107818979ab56e9c03456a6bafef69213fc4a001"
+      ],
+      "proof_records": [
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "relation_key",
+              "sha256": "6b54a1695c9e838bb54049a664c291715958f085beb150ce50e62cc49f65244c"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:entity:duty-on-specified-8-inch-bench-grinders",
+            "urn:spicy-regs:predicate:applies-to",
+            "urn:spicy-regs:entity:imports"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:canonical-relation",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:0d092ac6a13fb88ecbd36ab3f0045645863d2831dacbf753e1cd7e9e3f1346ab",
+          "proof_type": "predicate_catalog",
+          "rationale": "The predicate direction and both entities resolve in the catalog.",
+          "record_digest": "0d092ac6a13fb88ecbd36ab3f0045645863d2831dacbf753e1cd7e9e3f1346ab",
+          "resolver_id": "urn:spicy-regs:resolver:predicate-catalog",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:predicate-catalog-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "a219e18e68ac6609ddf28a8237dd197d9a5c42d22423e39f078a975995951f1e"
+            },
+            {
+              "name": "attestation:urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:attestation:baseline",
+              "sha256": "d007d7227d1259f3cc45d09caeb53c81d51f7e31f4b2ec89eeaed1b9fc3c6c23"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:assertion:baseline",
+            "urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:consumer-scope"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:accepted-current",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:3185f1ca180f9125754bdaf4c273aff804786709306e2ccf3f23e37265c6608b",
+          "proof_type": "assertion_attestation",
+          "rationale": "The assertion is accepted in this consumer scope.",
+          "record_digest": "3185f1ca180f9125754bdaf4c273aff804786709306e2ccf3f23e37265c6608b",
+          "resolver_id": "urn:spicy-regs:resolver:assertion-state",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:attestation:baseline"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "a219e18e68ac6609ddf28a8237dd197d9a5c42d22423e39f078a975995951f1e"
+            },
+            {
+              "name": "binding:urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:evidence:baseline",
+              "sha256": "a188398b4ace71fbed540631245a8f4fdd990fcb65782624bfec92d471b3bab7"
+            },
+            {
+              "name": "source:urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:evidence:baseline",
+              "sha256": "4ffebf386828d51a43a50c360fc31d329dc21620fb3339208c8253cdb4f9d921"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:assertion:baseline",
+            "urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:artifact:baseline"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:exact-source-evidence",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:392bc814dd83dfdd2ed54b7ee27fa1a85be5801e6da65f112b4b11698fcb2688",
+          "proof_type": "evidence_binding",
+          "rationale": "Every bound span aligns exactly to the locked artifact version.",
+          "record_digest": "392bc814dd83dfdd2ed54b7ee27fa1a85be5801e6da65f112b4b11698fcb2688",
+          "resolver_id": "urn:spicy-regs:resolver:bound-evidence",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:evidence:baseline"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "artifact_pair",
+              "sha256": "d0aa3fbae7f0fd7a2cc4e541467dce98ad3f50061d0924efa7833be67748c98a"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:artifact:baseline",
+            "urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:artifact:observed",
+            "urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:pairing"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:comparable-artifacts",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:87d1cb6ea2b1b5764565bd0655d92ab487ebc1084cdba4dc775bd1072d19b989",
+          "proof_type": "artifact_pairing",
+          "rationale": "An approved pairing binds the exact artifact versions.",
+          "record_digest": "87d1cb6ea2b1b5764565bd0655d92ab487ebc1084cdba4dc775bd1072d19b989",
+          "resolver_id": "urn:spicy-regs:resolver:artifact-pairing",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:pairing",
+            "urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:pairing-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "a219e18e68ac6609ddf28a8237dd197d9a5c42d22423e39f078a975995951f1e"
+            },
+            {
+              "name": "warrant_set",
+              "sha256": "1be747f90f5e0e71c5ae3b1d9b8e56645662a1798c54518261c2906e4ebd8a3a"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:assertion:baseline",
+            "urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:warrant:human-oracle"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:eligible-baseline",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:b2de277053751829b75e06a4107818979ab56e9c03456a6bafef69213fc4a001",
+          "proof_type": "baseline_warrant",
+          "rationale": "A registered warrant authorizes this comparison baseline.",
+          "record_digest": "b2de277053751829b75e06a4107818979ab56e9c03456a6bafef69213fc4a001",
+          "resolver_id": "urn:spicy-regs:resolver:baseline-warrant",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:warrant-proof",
+            "urn:spicy-regs:evaluation:temporal_control_bill_proposed_suspension:warrant:human-oracle"
+          ]
+        }
+      ],
+      "rationale": "No comparable accepted observation resolves the relation.",
+      "role": "temporal_control"
+    },
+    {
+      "case_id": "temporal_control_wioa_current_and_proposed",
+      "considered_observation_ids": [
+        "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:assertion:relation_candidate_3f84f822ddc995b3fc5762c4"
+      ],
+      "expected_outcome": "satisfied",
+      "finding": null,
+      "observed_outcome": "satisfied",
+      "outcome_matches": true,
+      "proof_ids": [
+        "urn:spicy-regs:resolver-proof:18a5f486e8cb20917ba0ff9a97b5a65a0566761184bf05cbb74060198ecea434",
+        "urn:spicy-regs:resolver-proof:1b87d490419bd4838221a327f900b990fe6032eeb1de2eebf8150930f80264cb",
+        "urn:spicy-regs:resolver-proof:2d7616b743071c4c14db8f4d141425203869fbd583dfcb3d26cc0d92fda5cc45",
+        "urn:spicy-regs:resolver-proof:459172128e3b35c1b65826d5c3605ae38884f9cf3d1af7319a7a0c45df2d3110",
+        "urn:spicy-regs:resolver-proof:62c6dda6a1805c225b71af26b8f040b86afd175b55fcafb289d8c2c257cb5849",
+        "urn:spicy-regs:resolver-proof:b4aa3aad4c4ba2faba740532e6642210c9b8c512e4ce95a5c1848c9b53d546af",
+        "urn:spicy-regs:resolver-proof:c1707be3b45e4c34c9407546c9641ae9c4dad04527fc6d976d2e8bb34dda9d0f",
+        "urn:spicy-regs:resolver-proof:f5b84b6ff5ca39fa5126585da7f8f0825d8f2d18d2a9c2cd15e7fe1f124d96a4",
+        "urn:spicy-regs:resolver-proof:fe25550656b7b033da4c58e9c37a507dc0b3fcd2ce062104cb219ebe52440849"
+      ],
+      "proof_records": [
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "expected_relation_key",
+              "sha256": "7d3614e068dc686f89efa57dbd7f7f626490d1004635e73b61ee91043cb02b9d"
+            },
+            {
+              "name": "observed_relation_key",
+              "sha256": "7d3614e068dc686f89efa57dbd7f7f626490d1004635e73b61ee91043cb02b9d"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:entity:29-cfr-38-40",
+            "urn:spicy-regs:predicate:contains",
+            "urn:spicy-regs:entity:affirmative-outreach-requirements"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:canonical-relation",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:18a5f486e8cb20917ba0ff9a97b5a65a0566761184bf05cbb74060198ecea434",
+          "proof_type": "predicate_catalog",
+          "rationale": "The canonical relation keys are identical.",
+          "record_digest": "18a5f486e8cb20917ba0ff9a97b5a65a0566761184bf05cbb74060198ecea434",
+          "resolver_id": "urn:spicy-regs:resolver:predicate-catalog",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:predicate-catalog-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "artifact_pair",
+              "sha256": "60d7ca5046c114884753db2515d91c913a27fe965bf278a1ce414ea5abae9cc1"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:artifact:baseline",
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:artifact:observed",
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:pairing"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:comparable-artifacts",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:1b87d490419bd4838221a327f900b990fe6032eeb1de2eebf8150930f80264cb",
+          "proof_type": "artifact_pairing",
+          "rationale": "An approved pairing binds the exact artifact versions.",
+          "record_digest": "1b87d490419bd4838221a327f900b990fe6032eeb1de2eebf8150930f80264cb",
+          "resolver_id": "urn:spicy-regs:resolver:artifact-pairing",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:pairing",
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:pairing-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "relation_key",
+              "sha256": "7d3614e068dc686f89efa57dbd7f7f626490d1004635e73b61ee91043cb02b9d"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:entity:29-cfr-38-40",
+            "urn:spicy-regs:predicate:contains",
+            "urn:spicy-regs:entity:affirmative-outreach-requirements"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:canonical-relation",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:2d7616b743071c4c14db8f4d141425203869fbd583dfcb3d26cc0d92fda5cc45",
+          "proof_type": "predicate_catalog",
+          "rationale": "The predicate direction and both entities resolve in the catalog.",
+          "record_digest": "2d7616b743071c4c14db8f4d141425203869fbd583dfcb3d26cc0d92fda5cc45",
+          "resolver_id": "urn:spicy-regs:resolver:predicate-catalog",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:predicate-catalog-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "140ef387b13f141f20f30c2886b3f67624b89ce2d9e00f430be0b3b8a9fcbf9b"
+            },
+            {
+              "name": "attestation:urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:attestation:relation_candidate_3f84f822ddc995b3fc5762c4",
+              "sha256": "1b7e90a94692374d9f097e359b013944189b0cfad210826b193dd5a97cd16566"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:assertion:relation_candidate_3f84f822ddc995b3fc5762c4",
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:consumer-scope"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:accepted-current",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:459172128e3b35c1b65826d5c3605ae38884f9cf3d1af7319a7a0c45df2d3110",
+          "proof_type": "assertion_attestation",
+          "rationale": "The assertion is accepted in this consumer scope.",
+          "record_digest": "459172128e3b35c1b65826d5c3605ae38884f9cf3d1af7319a7a0c45df2d3110",
+          "resolver_id": "urn:spicy-regs:resolver:assertion-state",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:attestation:relation_candidate_3f84f822ddc995b3fc5762c4"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "140ef387b13f141f20f30c2886b3f67624b89ce2d9e00f430be0b3b8a9fcbf9b"
+            },
+            {
+              "name": "binding:urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:evidence:relation_candidate_3f84f822ddc995b3fc5762c4",
+              "sha256": "024b83c1f3747e4f840e9aeef9b9cb6de4da4ddc6e136a7b280739ced1631096"
+            },
+            {
+              "name": "source:urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:evidence:relation_candidate_3f84f822ddc995b3fc5762c4",
+              "sha256": "13cdb3e26034f78804308d3a54799fbec504dc4e67219b8ece6f8a95714f6e7c"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:assertion:relation_candidate_3f84f822ddc995b3fc5762c4",
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:artifact:observed"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:exact-source-evidence",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:62c6dda6a1805c225b71af26b8f040b86afd175b55fcafb289d8c2c257cb5849",
+          "proof_type": "evidence_binding",
+          "rationale": "Every bound span aligns exactly to the locked artifact version.",
+          "record_digest": "62c6dda6a1805c225b71af26b8f040b86afd175b55fcafb289d8c2c257cb5849",
+          "resolver_id": "urn:spicy-regs:resolver:bound-evidence",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:evidence:relation_candidate_3f84f822ddc995b3fc5762c4"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "expected_assertion",
+              "sha256": "d5d4183bdb26c795b0584876e12f3f382a110c5b1683886078a97f6782a8eb02"
+            },
+            {
+              "name": "observed_assertion",
+              "sha256": "140ef387b13f141f20f30c2886b3f67624b89ce2d9e00f430be0b3b8a9fcbf9b"
+            },
+            {
+              "name": "scope_relation",
+              "sha256": "a97af497b321bd4f7b2f9b7f15213e751a5237b540be93bae644c4f5389f5c24"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:assertion:baseline",
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:assertion:relation_candidate_3f84f822ddc995b3fc5762c4",
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:scope:baseline",
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:scope:observed-1-current"
+          ],
+          "outcome": "equivalent",
+          "policy_id": "urn:spicy-regs:policy:scope-comparison",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:b4aa3aad4c4ba2faba740532e6642210c9b8c512e4ce95a5c1848c9b53d546af",
+          "proof_type": "scope_declaration",
+          "rationale": "The evaluation profile declares the temporal and applicability relationship.",
+          "record_digest": "b4aa3aad4c4ba2faba740532e6642210c9b8c512e4ce95a5c1848c9b53d546af",
+          "resolver_id": "urn:spicy-regs:resolver:declared-scope",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:scope-proof:1-equivalent"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "d5d4183bdb26c795b0584876e12f3f382a110c5b1683886078a97f6782a8eb02"
+            },
+            {
+              "name": "binding:urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:evidence:baseline",
+              "sha256": "f96f2da2e1a5e2153964c5afa1e5f79fa7e3ec37bca4be9166f6f515f2f2511d"
+            },
+            {
+              "name": "source:urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:evidence:baseline",
+              "sha256": "622d83e34ad608db6f9d67053f6124ce66e6b101f38bad75a2a37b32f0acdf51"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:assertion:baseline",
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:artifact:baseline"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:exact-source-evidence",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:c1707be3b45e4c34c9407546c9641ae9c4dad04527fc6d976d2e8bb34dda9d0f",
+          "proof_type": "evidence_binding",
+          "rationale": "Every bound span aligns exactly to the locked artifact version.",
+          "record_digest": "c1707be3b45e4c34c9407546c9641ae9c4dad04527fc6d976d2e8bb34dda9d0f",
+          "resolver_id": "urn:spicy-regs:resolver:bound-evidence",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:evidence:baseline"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "d5d4183bdb26c795b0584876e12f3f382a110c5b1683886078a97f6782a8eb02"
+            },
+            {
+              "name": "attestation:urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:attestation:baseline",
+              "sha256": "1d235693a10ca192f6446ecc4df59c99f678699b97107a74814fbe151f0e3d83"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:assertion:baseline",
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:consumer-scope"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:accepted-current",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:f5b84b6ff5ca39fa5126585da7f8f0825d8f2d18d2a9c2cd15e7fe1f124d96a4",
+          "proof_type": "assertion_attestation",
+          "rationale": "The assertion is accepted in this consumer scope.",
+          "record_digest": "f5b84b6ff5ca39fa5126585da7f8f0825d8f2d18d2a9c2cd15e7fe1f124d96a4",
+          "resolver_id": "urn:spicy-regs:resolver:assertion-state",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:attestation:baseline"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "d5d4183bdb26c795b0584876e12f3f382a110c5b1683886078a97f6782a8eb02"
+            },
+            {
+              "name": "warrant_set",
+              "sha256": "6b0c6674ae1159ca0ed4ea85e7254cd841136b41855caff0ce309b5e644e52cd"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:assertion:baseline",
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:warrant:human-oracle"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:eligible-baseline",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:fe25550656b7b033da4c58e9c37a507dc0b3fcd2ce062104cb219ebe52440849",
+          "proof_type": "baseline_warrant",
+          "rationale": "A registered warrant authorizes this comparison baseline.",
+          "record_digest": "fe25550656b7b033da4c58e9c37a507dc0b3fcd2ce062104cb219ebe52440849",
+          "resolver_id": "urn:spicy-regs:resolver:baseline-warrant",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:warrant-proof",
+            "urn:spicy-regs:evaluation:temporal_control_wioa_current_and_proposed:warrant:human-oracle"
+          ]
+        }
+      ],
+      "rationale": "Accepted source evidence affirms the baseline relation.",
+      "role": "temporal_control"
+    },
+    {
+      "case_id": "unrelated_control_gao_wrong_pairing_note",
+      "considered_observation_ids": [],
+      "expected_outcome": "not_comparable",
+      "finding": null,
+      "observed_outcome": "not_comparable",
+      "outcome_matches": true,
+      "proof_ids": [
+        "urn:spicy-regs:resolver-proof:0286e0931d2d21c450b0b34a7739e5d22a2c61ba55c5f3722d6e7ce9736224ab",
+        "urn:spicy-regs:resolver-proof:2e18aaaa8b3ad083e7a36adc3fa4cf1bb07a16432a3c91fe6d67d99883949d19",
+        "urn:spicy-regs:resolver-proof:ce5c81e39aec85ed31728299ce23191bd12e3dabd05cee4b6cbd2fb8662f5afc",
+        "urn:spicy-regs:resolver-proof:f36059ec72eac6132f3f633a13a13c17627d7994506323b2b9459893a020e519",
+        "urn:spicy-regs:resolver-proof:f41f2a045912124005a19e1e86948c9dc307577fbfffbc47893fac021c06604d"
+      ],
+      "proof_records": [
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "9501442e0aee4a1e6b5dbcf8e68558a6884df7e7603df4f5099ad63c1af80c8f"
+            },
+            {
+              "name": "warrant_set",
+              "sha256": "d3aaa0af5797254bed41027c07abe16bf9cc30df70383340da20ab6a3798bea7"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:assertion:baseline",
+            "urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:warrant:human-oracle"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:eligible-baseline",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:0286e0931d2d21c450b0b34a7739e5d22a2c61ba55c5f3722d6e7ce9736224ab",
+          "proof_type": "baseline_warrant",
+          "rationale": "A registered warrant authorizes this comparison baseline.",
+          "record_digest": "0286e0931d2d21c450b0b34a7739e5d22a2c61ba55c5f3722d6e7ce9736224ab",
+          "resolver_id": "urn:spicy-regs:resolver:baseline-warrant",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:warrant-proof",
+            "urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:warrant:human-oracle"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "9501442e0aee4a1e6b5dbcf8e68558a6884df7e7603df4f5099ad63c1af80c8f"
+            },
+            {
+              "name": "binding:urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:evidence:baseline",
+              "sha256": "70b09f8fa7b2982e3f29d30bbc71a87615457457e2a59cd04ed84e9aa97c8b2f"
+            },
+            {
+              "name": "source:urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:evidence:baseline",
+              "sha256": "77a8cef2c7d7e359c2fe9c1afea4b327ff39a580c71431412b69e3e58461df1c"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:assertion:baseline",
+            "urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:artifact:baseline"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:exact-source-evidence",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:2e18aaaa8b3ad083e7a36adc3fa4cf1bb07a16432a3c91fe6d67d99883949d19",
+          "proof_type": "evidence_binding",
+          "rationale": "Every bound span aligns exactly to the locked artifact version.",
+          "record_digest": "2e18aaaa8b3ad083e7a36adc3fa4cf1bb07a16432a3c91fe6d67d99883949d19",
+          "resolver_id": "urn:spicy-regs:resolver:bound-evidence",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:evidence:baseline"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "artifact_pair",
+              "sha256": "37a75f99b0764dfac1bf679ac46668350a5818bac6caeb494b9e20ada92266a3"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:artifact:baseline",
+            "urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:artifact:observed",
+            "urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:pairing"
+          ],
+          "outcome": "fail",
+          "policy_id": "urn:spicy-regs:policy:comparable-artifacts",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:ce5c81e39aec85ed31728299ce23191bd12e3dabd05cee4b6cbd2fb8662f5afc",
+          "proof_type": "artifact_pairing",
+          "rationale": "No approved pairing binds these artifact versions.",
+          "record_digest": "ce5c81e39aec85ed31728299ce23191bd12e3dabd05cee4b6cbd2fb8662f5afc",
+          "resolver_id": "urn:spicy-regs:resolver:artifact-pairing",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": []
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "relation_key",
+              "sha256": "59aaee1ea49b81b3a70a399fb955ef063883ecd868bcf8b450eaf793a47b81f9"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:entity:medicaid-program",
+            "urn:spicy-regs:predicate:applies-to",
+            "urn:spicy-regs:entity:incarcerated-individuals"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:canonical-relation",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:f36059ec72eac6132f3f633a13a13c17627d7994506323b2b9459893a020e519",
+          "proof_type": "predicate_catalog",
+          "rationale": "The predicate direction and both entities resolve in the catalog.",
+          "record_digest": "f36059ec72eac6132f3f633a13a13c17627d7994506323b2b9459893a020e519",
+          "resolver_id": "urn:spicy-regs:resolver:predicate-catalog",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:predicate-catalog-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "9501442e0aee4a1e6b5dbcf8e68558a6884df7e7603df4f5099ad63c1af80c8f"
+            },
+            {
+              "name": "attestation:urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:attestation:baseline",
+              "sha256": "ba7320f29b006b550b3b260a1818ab8ace31d6ab0a3f951378e7a7885f4f10bd"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:assertion:baseline",
+            "urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:consumer-scope"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:accepted-current",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:f41f2a045912124005a19e1e86948c9dc307577fbfffbc47893fac021c06604d",
+          "proof_type": "assertion_attestation",
+          "rationale": "The assertion is accepted in this consumer scope.",
+          "record_digest": "f41f2a045912124005a19e1e86948c9dc307577fbfffbc47893fac021c06604d",
+          "resolver_id": "urn:spicy-regs:resolver:assertion-state",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:unrelated_control_gao_wrong_pairing_note:attestation:baseline"
+          ]
+        }
+      ],
+      "rationale": "The baseline and observed artifacts are not source-backed peers.",
+      "role": "unrelated_control"
+    },
+    {
+      "case_id": "unrelated_control_lobbying_filing",
+      "considered_observation_ids": [],
+      "expected_outcome": "unknown",
+      "finding": null,
+      "observed_outcome": "unknown",
+      "outcome_matches": true,
+      "proof_ids": [
+        "urn:spicy-regs:resolver-proof:00a42b52bce79ca99ec2fac2ef3141656747c256a47f92137d1862b17ea77338",
+        "urn:spicy-regs:resolver-proof:2a7ab45c29cbaf441f283c66317c62b24bbca4d86b09f380193f10932ca2e21e",
+        "urn:spicy-regs:resolver-proof:74bb4f007c533c4b2931cbb188dc494741d91db84819354317e2478f2ff8a261",
+        "urn:spicy-regs:resolver-proof:b48e5b785d0ac222859e3410d82eb280e75288ff5f7f01dbf157356bf7eaa23a",
+        "urn:spicy-regs:resolver-proof:cd0bf0374bf7202c34a39b8ccf17e6ad81b4da130dc1f014a5e5ee0cac021ec9"
+      ],
+      "proof_records": [
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "4c62f1c1dd3897f088db037b415a3bd28945d585f886edd42bf85adeb2c1c128"
+            },
+            {
+              "name": "warrant_set",
+              "sha256": "f11aaa6ab6f175b2bd75251f8e3dd44094b82786617d4f1b8713ab487000326a"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:assertion:baseline",
+            "urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:warrant:human-oracle"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:eligible-baseline",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:00a42b52bce79ca99ec2fac2ef3141656747c256a47f92137d1862b17ea77338",
+          "proof_type": "baseline_warrant",
+          "rationale": "A registered warrant authorizes this comparison baseline.",
+          "record_digest": "00a42b52bce79ca99ec2fac2ef3141656747c256a47f92137d1862b17ea77338",
+          "resolver_id": "urn:spicy-regs:resolver:baseline-warrant",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:warrant-proof",
+            "urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:warrant:human-oracle"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "4c62f1c1dd3897f088db037b415a3bd28945d585f886edd42bf85adeb2c1c128"
+            },
+            {
+              "name": "attestation:urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:attestation:baseline",
+              "sha256": "01e2fd1a4aee5a2f27daae8e9e23fb3587f6146a23a6ab778acac5e0b5946d91"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:assertion:baseline",
+            "urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:consumer-scope"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:accepted-current",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:2a7ab45c29cbaf441f283c66317c62b24bbca4d86b09f380193f10932ca2e21e",
+          "proof_type": "assertion_attestation",
+          "rationale": "The assertion is accepted in this consumer scope.",
+          "record_digest": "2a7ab45c29cbaf441f283c66317c62b24bbca4d86b09f380193f10932ca2e21e",
+          "resolver_id": "urn:spicy-regs:resolver:assertion-state",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:attestation:baseline"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "assertion",
+              "sha256": "4c62f1c1dd3897f088db037b415a3bd28945d585f886edd42bf85adeb2c1c128"
+            },
+            {
+              "name": "binding:urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:evidence:baseline",
+              "sha256": "25c4032851dd833237e2a137ae7fa5d9540441739e17ec1d3ef929a254057469"
+            },
+            {
+              "name": "source:urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:evidence:baseline",
+              "sha256": "77a8cef2c7d7e359c2fe9c1afea4b327ff39a580c71431412b69e3e58461df1c"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:assertion:baseline",
+            "urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:artifact:baseline"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:exact-source-evidence",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:74bb4f007c533c4b2931cbb188dc494741d91db84819354317e2478f2ff8a261",
+          "proof_type": "evidence_binding",
+          "rationale": "Every bound span aligns exactly to the locked artifact version.",
+          "record_digest": "74bb4f007c533c4b2931cbb188dc494741d91db84819354317e2478f2ff8a261",
+          "resolver_id": "urn:spicy-regs:resolver:bound-evidence",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:evidence:baseline"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "artifact_pair",
+              "sha256": "1c5dbbd238b8ee2d81cbea29691a35875c3e412979641045c60f668faa752e40"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:artifact:baseline",
+            "urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:artifact:observed",
+            "urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:pairing"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:comparable-artifacts",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:b48e5b785d0ac222859e3410d82eb280e75288ff5f7f01dbf157356bf7eaa23a",
+          "proof_type": "artifact_pairing",
+          "rationale": "An approved pairing binds the exact artifact versions.",
+          "record_digest": "b48e5b785d0ac222859e3410d82eb280e75288ff5f7f01dbf157356bf7eaa23a",
+          "resolver_id": "urn:spicy-regs:resolver:artifact-pairing",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:pairing",
+            "urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:pairing-proof"
+          ]
+        },
+        {
+          "comparison_id": "urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:comparison",
+          "evaluated_at": "2026-07-24T20:00:00+00:00",
+          "input_digests": [
+            {
+              "name": "relation_key",
+              "sha256": "59aaee1ea49b81b3a70a399fb955ef063883ecd868bcf8b450eaf793a47b81f9"
+            }
+          ],
+          "input_ids": [
+            "urn:spicy-regs:entity:medicaid-program",
+            "urn:spicy-regs:predicate:applies-to",
+            "urn:spicy-regs:entity:incarcerated-individuals"
+          ],
+          "outcome": "pass",
+          "policy_id": "urn:spicy-regs:policy:canonical-relation",
+          "policy_version": "relation-comparison-v1",
+          "proof_id": "urn:spicy-regs:resolver-proof:cd0bf0374bf7202c34a39b8ccf17e6ad81b4da130dc1f014a5e5ee0cac021ec9",
+          "proof_type": "predicate_catalog",
+          "rationale": "The predicate direction and both entities resolve in the catalog.",
+          "record_digest": "cd0bf0374bf7202c34a39b8ccf17e6ad81b4da130dc1f014a5e5ee0cac021ec9",
+          "resolver_id": "urn:spicy-regs:resolver:predicate-catalog",
+          "resolver_version": "relation-comparison-v1",
+          "snapshot_id": "42e5f8ef1e403a2a98849e172e8db639b197db5fe68ceab2064f7ecaf375f6de",
+          "supporting_record_ids": [
+            "urn:spicy-regs:evaluation:unrelated_control_lobbying_filing:predicate-catalog-proof"
+          ]
+        }
+      ],
+      "rationale": "No comparable accepted observation resolves the relation.",
+      "role": "unrelated_control"
+    }
+  ],
+  "detected_direct_denials": 1,
+  "false_control_findings": 0,
+  "matching_outcome_count": 6,
+  "omission_analysis": "disabled",
+  "outcome_accuracy": 0.5
+}
