@@ -6,6 +6,21 @@ per-release copy lives in [`CHANGELOG.md`](https://github.com/civictechdc/spicy-
 at the repository root and on the
 [GitHub Releases](https://github.com/civictechdc/spicy-regs/releases) page.
 
+## Unreleased local candidate
+
+This candidate is not published, released, or deployed.
+
+- RINs identify durable regulatory agenda items; evidence-qualified
+  relationships connect those items to independently identified Proceedings.
+- Two new ontology outputs carry agenda items and their Proceeding
+  relationships.
+- Official Supreme Court PDF opinion packages add a seventeenth ontology
+  subject profile without inferring authored-opinion boundaries from PDF layout.
+- The source-aware document segmentation, dense and sparse retrieval, hybrid
+  fusion, cross-encoder reranking, and scoped OpenAI tagging pipeline completed
+  its bounded comparison-ready milestone. Broader production certification,
+  oMLX evaluation, and extended reranker sweeps remain deferred.
+
 ## 2026-07-22
 
 This cycle expanded the dataset from a regulations.gov + Federal Register mirror

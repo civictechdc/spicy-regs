@@ -39,8 +39,10 @@ nav:
   - Changelog: changelog.md
   - Querying with Python: querying-python.md
   - Ontology and Rulespec L0: ontology.md
+  - Document segmentation research: ontology-segmentation-research.md
   - Rulespec application profile: rulespec-profile.md
   - RIN ontology corpus report: rin-ontology-revision-report.md
+  - Mixed real-data corpus report: mixed-real-data-corpus-report.md
   - Rulemaking stabilization report: rulespec-repair-report.md
   - Initial full-corpus ontology report: ontology-friction-report.md
   - Tables:
@@ -72,6 +74,7 @@ nav:
       - gao_reports: tables/gao_reports.md
       - crs_reports: tables/crs_reports.md
       - court_dockets: tables/court_dockets.md
+      - court_opinions: tables/court_opinions.md
       - usaspending_recipients: tables/usaspending_recipients.md
       - fcc_proceedings: tables/fcc_proceedings.md
       - fcc_filings: tables/fcc_filings.md

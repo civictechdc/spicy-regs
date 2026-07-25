@@ -1,0 +1,170 @@
+{
+  "artifacts": {
+    "cfr_sections.parquet": {
+      "bytes": 1584517,
+      "rows": 40000,
+      "sha256": "eafd3c82a133608ec55c31fabab7c494e73d934669509db67f78901f687506e9"
+    },
+    "comments.parquet": {
+      "bytes": 6853738,
+      "rows": 50000,
+      "sha256": "1645e2bf39f410d3a3f05b5a48eeba0323f8451d00dc65bd5ae7a62db8c181ef"
+    },
+    "comments_index.parquet": {
+      "bytes": 251291,
+      "rows": 30000,
+      "sha256": "31b02297deeb1856b7bbabffbc444575fe385bd3b27cbd20f451633bf4a5a517"
+    },
+    "congress_bills.parquet": {
+      "bytes": 2688916,
+      "rows": 40000,
+      "sha256": "6eebbbe6697cb2548e5b9bb3c764fab85cd86389a711270b34cbfbef7db55453"
+    },
+    "court_dockets.parquet": {
+      "bytes": 1515529,
+      "rows": 7623,
+      "sha256": "12962666c939048529a0e3c6e6c21d66f00b36ca03c34aaada05a4a41350b70f"
+    },
+    "crs_reports.parquet": {
+      "bytes": 516877,
+      "rows": 13978,
+      "sha256": "50e645b173009c2dc7bfea5e05fdbc9aea152f0b11e8ab112af3fa557bacc73c"
+    },
+    "dockets.parquet": {
+      "bytes": 2466074,
+      "rows": 50847,
+      "sha256": "22a1f2e2adfbfb31ac071a9f7727f3d0d13c5b46461d066b38858c1b4f125664"
+    },
+    "documents.parquet": {
+      "bytes": 3880262,
+      "rows": 102078,
+      "sha256": "a6fdb08e49bfa9b0479516735c8b0302331b85f60d08a64f290509702e38ad87"
+    },
+    "fcc_filings.parquet": {
+      "bytes": 1636309,
+      "rows": 18786,
+      "sha256": "c05035c42f467984092c4974f9895bf9ae242c1875efaab3cf41c27ce9ef6496"
+    },
+    "fcc_proceedings.parquet": {
+      "bytes": 867192,
+      "rows": 21054,
+      "sha256": "db831225dd869affa15ef94c11e6bbec77cea4be00f817506f30a359ea64532c"
+    },
+    "fec_committees.parquet": {
+      "bytes": 1124335,
+      "rows": 30000,
+      "sha256": "22d025f39207d0854609fa6485b82b26a850e46f4af415b1b88566e59b6d65a2"
+    },
+    "federal_register.parquet": {
+      "bytes": 16481412,
+      "rows": 80000,
+      "sha256": "6f00be8bf7db27aa7d2720b3d43a3414d2c3ce65016dfe3576c3ea07b09bf115"
+    },
+    "fr_docket_links.parquet": {
+      "bytes": 16381662,
+      "rows": 80000,
+      "sha256": "ef2f363939970d642960e712b6dff6ce26e2223d4bd9be1f88d4d6802b18075b"
+    },
+    "gao_reports.parquet": {
+      "bytes": 65976,
+      "rows": 47,
+      "sha256": "b0389ce6831ba24e8ed2600099f3439ee4a42ac533dac04f403ec3ce2fb23d70"
+    },
+    "lobbying_filings.parquet": {
+      "bytes": 7140252,
+      "rows": 40000,
+      "sha256": "a6312c5bddd2d649a3aeae443dee12c7338cc5092ac65f552d844db7e46bfd71"
+    },
+    "openai-eval-inputs/dockets.parquet": {
+      "bytes": 6825,
+      "rows": 24,
+      "sha256": "1f96f0f4d8e5c3ba4b0d0677d6bed55fd53a7cfa8c90ec3d1396118a03f90ed8"
+    },
+    "openai-eval-inputs/documents.parquet": {
+      "bytes": 8119,
+      "rows": 24,
+      "sha256": "db75661fc84e4476c5f27ed273c0a6a5f14d26a2d5412b5c672966c6b8d7a598"
+    },
+    "openai-eval-inputs/federal_register.parquet": {
+      "bytes": 22273,
+      "rows": 24,
+      "sha256": "08c2088a7eb4f3cd96e48bd0cc526af3cea5fd3397e2645c46576de48d8896d1"
+    },
+    "openai-eval-inputs/fr_docket_links.parquet": {
+      "bytes": 5916,
+      "rows": 1,
+      "sha256": "fa8ad683f90cc8974e98e00c26950cc2f0afc0fd3492df0c75774e5b6c434e74"
+    },
+    "openai-eval-inputs/unified_agenda.parquet": {
+      "bytes": 14712,
+      "rows": 18,
+      "sha256": "487654cfb789e9fec9957779621fc00af78da72d11d5ec8c835abea888935108"
+    },
+    "record_membership.parquet": {
+      "bytes": 10225674,
+      "rows": 708367,
+      "sha256": "dd71bdb3aed38b80e40faaa20a2b625dca405be18f143f0b8f418a0f9c094b61"
+    },
+    "records.parquet": {
+      "bytes": 60143205,
+      "rows": 708367,
+      "sha256": "1268093f44947a97b1ecd84a8722a9365413102b374db7076ef8d95a6fcdf7e1"
+    },
+    "relationship_expectations.parquet": {
+      "bytes": 11165271,
+      "rows": 309210,
+      "sha256": "85bf0d9273e243b7d4aeda296fba57fcd7178bd53685d35911082e05c27f1660"
+    },
+    "sam_entities.parquet": {
+      "bytes": 2228794,
+      "rows": 50000,
+      "sha256": "59482c704a8170ddeb90cfffbf26cbf80d4c7a8878bfb68fdea39cb3966e70b3"
+    },
+    "unified_agenda.parquet": {
+      "bytes": 1133019,
+      "rows": 3954,
+      "sha256": "af9f79f69c54bd80aa6a9b600c72b00ff3471d5aeda3604857d683c1775a190f"
+    },
+    "usaspending_recipients.parquet": {
+      "bytes": 2400313,
+      "rows": 50000,
+      "sha256": "5fb8803d83c897f4c3d70c0c103e57a9930b2e29fa894dcc163277bc4f1499ce"
+    }
+  },
+  "dangling_endpoint_count": 0,
+  "dataset_id": "mixed_snapshot_c9c7dbdf2ddf6d2527d810d5",
+  "expectation_rows": 309210,
+  "failures": [],
+  "format_version": 2,
+  "label_counts": {
+    "no_declared_relation": 152952,
+    "related": 151258,
+    "unknown": 5000
+  },
+  "openai_eval_input_rows": {
+    "dockets": 24,
+    "documents": 24,
+    "federal_register": 24,
+    "fr_docket_links": 1,
+    "unified_agenda": 18
+  },
+  "positive_negative_pair_overlap": 0,
+  "record_rows": 708367,
+  "related_counts_by_kind": {
+    "comment_in_docket": 49287,
+    "comment_index_describes_docket": 5866,
+    "docket_reports_agenda_item": 113,
+    "document_in_docket": 18023,
+    "fcc_filing_in_proceeding": 18899,
+    "federal_register_links_docket": 59,
+    "regulations_document_has_federal_register_format": 12,
+    "same_cfr_package": 39777,
+    "same_lobbying_client": 16734,
+    "same_registered_entity": 2488
+  },
+  "sample_rows": 708367,
+  "selection_seed": "mixed-real-data-v1",
+  "source_rows_available": 6168517,
+  "source_table_count": 18,
+  "status": "pass"
+}

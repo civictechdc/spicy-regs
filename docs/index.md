@@ -94,6 +94,7 @@ materialized generation.
 | --- | --- | --- |
 | [`usaspending_recipients`](tables/usaspending_recipients.md) | one row per federal-award recipient | `recipient_id` |
 | [`court_dockets`](tables/court_dockets.md) | one row per federal-court docket | `cl_docket_id` |
+| [`court_opinions`](tables/court_opinions.md) | one row per official Supreme Court opinion package | `opinion_id` |
 | [`gao_reports`](tables/gao_reports.md) | one row per GAO report | `report_id` |
 | [`crs_reports`](tables/crs_reports.md) | one row per CRS report | `report_id` |
 
@@ -134,8 +135,31 @@ The complementary sources join through normalized identity tables:
 
 The compact identifiers, provenance mapping, and Rulespec Level-0 posture are
 documented in [Ontology and Rulespec L0](ontology.md). The
+[document segmentation research](ontology-segmentation-research.md) defines the
+source-aware chunking policy for LLM tagging and retrieval. The
 [RIN ontology revision report](rin-ontology-revision-report.md) records the
-current local agenda-item/Proceeding corpus result.
+current local agenda-item/Proceeding corpus result. The
+[mixed real-data corpus report](mixed-real-data-corpus-report.md) remains the
+pre-segmentation, 18-source OpenAI baseline.
+
+### Current design and evidence map
+
+- The [production segmentation goal](superpowers/specs/2026-07-24-production-document-segmentation-agent-goal.md)
+  is the completed comparison-ready ledger. Its bounded model receipts and
+  repository gates pass; broader production certification remains deferred.
+- The [segment carrier decision](superpowers/specs/2026-07-24-document-segmentation-carrier-decision.md)
+  and [package-fit decision](superpowers/specs/2026-07-24-document-ai-package-fit-decision.md)
+  define the current implementation boundary.
+- The [RIN revision goal](superpowers/specs/2026-07-24-rin-ontology-revision-agent-goal.md)
+  and [RIN corpus report](rin-ontology-revision-report.md) define the current
+  local rulemaking candidate. Rulespec remains Experimental and unpublished.
+- The initial Rulespec feedback (`RULESPEC_FEEDBACK_ITERATION_1.md` at the
+  repository root), [initial corpus report](ontology-friction-report.md), and
+  [stabilization report](rulespec-repair-report.md) are historical evidence
+  pinned to earlier contracts.
+- The [edge-coverage findings](corpus-edge-coverage-findings-2026-07-24.md)
+  track open Spicy Regs extraction work discovered during the historical graph
+  spike.
 
 > Coverage notes: `sam_entities` is a partial sample (~5K of ~765K — the SAM API
 > caps pagination; full coverage needs chunked ingestion), `lobbying_filings`

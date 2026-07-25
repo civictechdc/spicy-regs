@@ -583,11 +583,27 @@ settings are:
 
 | Variable | Default | Effect |
 | --- | --- | --- |
-| `SPICY_REGS_ONTOLOGY_MODEL` | `gpt-5.6-luna` | Structured-output tagging and validation model. |
+| `SPICY_REGS_ONTOLOGY_MODEL` | `gpt-5.6-sol` | Structured-output tagging and validation model. |
+| `SPICY_REGS_ONTOLOGY_REASONING_EFFORT` | `medium` | Responses API reasoning effort. |
+| `OPENAI_ONTOLOGY_SERVICE_TIER` | `auto` | Requested Responses API service tier; the request and actual response tiers are retained in provider evidence. |
+| `OPENAI_ONTOLOGY_TIMEOUT_SECONDS` | `120` | Per-attempt client timeout. |
+| `OPENAI_ONTOLOGY_MAX_RETRIES` | `3` | Application-owned retries after the first attempt; SDK retries remain disabled so every physical call is visible. |
+| `OPENAI_ONTOLOGY_RETRY_BASE_SECONDS` | `1` | Base delay for exponential retry backoff. |
 | `ONTOLOGY_GENERATION_LIMIT` | `500` | Maximum new/changed subjects tagged in one assignment run. |
 | `ONTOLOGY_VALIDATION_PERCENT` | `10` | Stable hash-selected percentage of current LLM assertions re-checked. |
 | `ONTOLOGY_DISCOVERY_LIMIT` | `0` | Optional extra candidate-only discovery in the concepts pass; disabled normally to avoid duplicate model calls. |
 | `ONTOLOGY_RUN_ID` | generated | Stable run/checkpoint id to reuse when resuming the same local batch. |
+
+Tagging and validation use strict structured output with respective 8,192- and
+4,096-token output ceilings. Comparison artifacts bind these ceilings and the
+secret-free provider configuration into run identity; provider metadata
+records each physical attempt, retry, requested service tier, and actual
+response tier. Evidence offsets are verified deterministically. A wrong
+provider offset may be repaired only when the quoted evidence has exactly one
+verbatim occurrence in the named field; ambiguous, normalized, fuzzy, or
+non-verbatim matches are rejected. The evidence span records its alignment
+method, and tagging receipts reconcile returned, accepted, rejected, and
+repaired item counts.
 
 `concept_merge_review.jsonl` is the current human-review queue for high-usage,
 below-auto-threshold merge candidates. Tag drift is measurable without an API

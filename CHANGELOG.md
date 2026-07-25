@@ -5,6 +5,33 @@ All notable changes to the Spicy Regs data pipeline are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Entries link to the pull request that introduced the change.
 
+## Unreleased — local ontology and document-AI candidate
+
+This work exists only in the local candidate. It has not been published,
+released, or deployed.
+
+### Added
+
+- A RIN now identifies a durable regulatory agenda item. New
+  `regulatory_agenda_items` and `agenda_item_proceedings` outputs keep agenda
+  observations and independently identified Proceedings distinct.
+- Official Supreme Court PDF opinion packages provide a seventeenth ontology
+  subject profile and real long-form judicial documents. Each package remains
+  one artifact until source-backed structure can separate authored opinions
+  reliably.
+- Source-aware elements, bounded segments, document-only acceptance scope,
+  resumable provider calls, dense and sparse retrieval experiments, hybrid
+  fusion, cross-encoder reranking, and scoped OpenAI tagging complete the
+  bounded document-AI comparison.
+
+### Deferred beyond the comparison-ready milestone
+
+- Broader production certification, migration, a larger legal gold set,
+  operational hardening, and independent review.
+- oMLX evaluation and extended reranker candidate-depth sweeps, which were
+  intentionally excluded from this milestone.
+- A released Rulespec rulemaking contract and non-originating consumer review.
+
 ## [2026.07.22]
 
 The headline of this cycle: the pipeline went from mirroring regulations.gov and
