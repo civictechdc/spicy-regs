@@ -121,6 +121,67 @@ def test_materialized_publication_commits_pointer_last(tmp_path, monkeypatch) ->
     assert len(snapshot_prefixes) == 1
 
 
+def test_internal_artifact_is_generation_bound_but_not_public(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    def build(output_dir: Path, context: RunContext) -> None:
+        del context
+        _write_parquet(output_dir / "public.parquet", ["public"])
+        _write_parquet(output_dir / "internal.parquet", ["internal"])
+
+    class InternalDataset(MaterializedDatasetPipeline):
+        name = "internal-dataset"
+        dataset_name = "internal"
+        published_outputs = ("public.parquet",)
+        internal_outputs = ("internal.parquet",)
+
+        def stages(self):
+            return (
+                DatasetStage(
+                    "build",
+                    (),
+                    ("public.parquet", "internal.parquet"),
+                    build,
+                ),
+            )
+
+    uploads: list[str] = []
+    monkeypatch.setenv("R2_ACCESS_KEY_ID", "test-key")
+    monkeypatch.setenv("R2_SECRET_ACCESS_KEY", "test-secret")
+    monkeypatch.setenv("R2_ENDPOINT", "https://test.r2.example")
+    monkeypatch.setattr(
+        r2,
+        "upload_file",
+        lambda path, remote_key=None, allow_shrink=False: (
+            uploads.append(str(remote_key or path.name))
+        ),
+    )
+
+    InternalDataset(
+        output_dir=tmp_path,
+        skip_upload=False,
+        run_id="internal-test",
+        asserted_at="2026-07-24T12:00:00Z",
+    ).run()
+
+    manifest = json.loads(
+        (tmp_path / "internal-dataset-manifest.json").read_text()
+    )
+    assert InternalDataset.published_outputs == ("public.parquet",)
+    assert set(InternalDataset.generation_outputs()) == {
+        "public.parquet",
+        "internal.parquet",
+    }
+    assert manifest["artifacts"]["public.parquet"]["visibility"] == (
+        "public"
+    )
+    assert manifest["artifacts"]["internal.parquet"]["visibility"] == (
+        "internal"
+    )
+    assert any(key.endswith("/internal.parquet") for key in uploads)
+
+
 def test_materialized_publication_validates_before_first_upload(
     tmp_path,
     monkeypatch,

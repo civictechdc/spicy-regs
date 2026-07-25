@@ -26,7 +26,7 @@ import polars as pl
 from tqdm import tqdm
 
 try:
-    from sentence_transformers import SentenceTransformer  # ty: ignore[unresolved-import]
+    from sentence_transformers import SentenceTransformer
 except ImportError:
     print("Please install sentence-transformers: pip install sentence-transformers torch")
     exit(1)
@@ -260,7 +260,7 @@ Examples:
     model = SentenceTransformer(model_name, device=args.device)
 
     # Get embedding dimensions
-    dims = model.get_sentence_embedding_dimension()
+    dims = model.get_embedding_dimension()
     print(f"Embedding dimensions: {dims}")
 
     # Process

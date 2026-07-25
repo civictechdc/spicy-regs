@@ -7,10 +7,22 @@ import json
 from pathlib import Path
 
 import pyarrow.parquet as pq
+import pytest
 
 from spicy_regs.data_dictionary import expected_schemas
-from spicy_regs.ontology.common import write_parquet_rows
+from spicy_regs.ontology.common import RunContext, write_parquet_rows
+from spicy_regs.ontology.concepts import (
+    make_assignment,
+    seed_concept,
+)
+from spicy_regs.ontology.ledger import (
+    SEGMENT_LEDGER_COLUMNS,
+    segment_result_row,
+    write_segment_ledger,
+)
+from spicy_regs.ontology.llm import TagProposal
 from spicy_regs.ontology.receipt import validate_generation
+from spicy_regs.ontology.subjects import iter_artifacts, segment_artifact
 from spicy_regs.pipelines.ontology_dataset import OntologyDatasetPipeline
 
 SCHEMAS = expected_schemas()
@@ -37,7 +49,11 @@ def _source_record(path: Path) -> dict[str, int | str]:
 def _fixture_manifest(tmp_path: Path) -> Path:
     docket_id = "EPA_FRDOC_0001"
     proceeding_id = "proceeding_fixture"
-    _write_table(tmp_path, "dockets", [{"docket_id": docket_id}])
+    _write_table(
+        tmp_path,
+        "dockets",
+        [{"docket_id": docket_id, "title": "PFAS source record"}],
+    )
     _write_table(
         tmp_path,
         "documents",
@@ -157,15 +173,21 @@ def _fixture_manifest(tmp_path: Path) -> Path:
     )
     for table in ("concepts", "concept_assignments", "concept_events"):
         _write_table(tmp_path, table, [])
+    write_segment_ledger(tmp_path, new_rows=())
 
     snapshot_id = "snapshot_fixture"
     prefix = f"materialized/ontology/snapshots/{snapshot_id}"
     artifacts = {}
-    for name in OntologyDatasetPipeline.published_outputs:
+    for name in OntologyDatasetPipeline.generation_outputs():
         path = tmp_path / name
         artifacts[name] = {
             **_source_record(path),
             "remote_key": f"{prefix}/{name}",
+            "visibility": (
+                "public"
+                if name in OntologyDatasetPipeline.published_outputs
+                else "internal"
+            ),
         }
     sources = {
         name: _source_record(tmp_path / name)
@@ -175,6 +197,7 @@ def _fixture_manifest(tmp_path: Path) -> Path:
         "format_version": 1,
         "dataset": "ontology",
         "snapshot_id": snapshot_id,
+        "run_id": "fixture-run",
         "inputs": {
             "sources": sources,
             "prior_artifacts": {},
@@ -187,19 +210,233 @@ def _fixture_manifest(tmp_path: Path) -> Path:
     return path
 
 
+def _refresh_artifact_record(
+    manifest_path: Path,
+    name: str,
+) -> None:
+    manifest = json.loads(manifest_path.read_text())
+    manifest["artifacts"][name].update(
+        _source_record(manifest_path.parent / name)
+    )
+    manifest_path.write_text(json.dumps(manifest))
+
+
+def _install_segment_fixture(
+    tmp_path: Path,
+    manifest_path: Path,
+) -> None:
+    artifact = next(
+        artifact
+        for artifact in iter_artifacts(tmp_path)
+        if artifact.source_table == "dockets"
+    )
+    subject = segment_artifact(artifact)[0]
+    context = RunContext(
+        run_id="fixture-run",
+        asserted_at="2026-07-24T12:00:00Z",
+    )
+    concept = seed_concept({"name": "PFAS"}, context)
+    assert concept is not None
+    field, text = next(iter(subject.fields.items()))
+    evidence_start = text.index("PFAS")
+    assignment = make_assignment(
+        subject=subject,
+        concept_id=str(concept["concept_id"]),
+        proposal=TagProposal(
+            concept_id=str(concept["concept_id"]),
+            proposed_label=None,
+            scheme="subject",
+            definition=None,
+            confidence=0.9,
+            evidence_text="PFAS",
+            evidence_field=field,
+            evidence_start=evidence_start,
+            evidence_end=evidence_start + 4,
+            justification="The exact title span names PFAS.",
+        ),
+        context=context,
+        actor_id="openai:gpt-test",
+        ordinal=0,
+    )
+    model_call: dict[str, object] = {
+        "response_id": "response-fixture",
+        "response_model": "gpt-test",
+        "status": "completed",
+        "duration_ms": 10.0,
+        "input_tokens": 100,
+        "output_tokens": 10,
+        "total_tokens": 110,
+        "attempt_count": 1,
+        "retry_count": 0,
+        "attempts": [
+            {
+                "attempt": 1,
+                "status": "completed",
+                "duration_ms": 10.0,
+                "response_id": "response-fixture",
+                "input_tokens": 100,
+                "output_tokens": 10,
+                "total_tokens": 110,
+            }
+        ],
+        "prompt_sha256": "a" * 64,
+        "prompt_token_estimate": 500,
+        "prompt_input_token_budget": 8_192,
+        "prompt_safety_margin_tokens": 1_024,
+        "tokenizer": subject.tokenizer,
+        "tokenizer_version": subject.tokenizer_version,
+        "max_output_tokens": 4_096,
+        "reasoning_effort": "medium",
+        "store": False,
+        "timeout_seconds": 120.0,
+        "max_retries": 3,
+        "sdk_max_retries": 0,
+    }
+    write_parquet_rows(
+        tmp_path / "concepts.parquet",
+        columns=tuple(column for column, _ in SCHEMAS["concepts"]),
+        rows=[concept],
+    )
+    write_parquet_rows(
+        tmp_path / "concept_assignments.parquet",
+        columns=tuple(
+            column
+            for column, _ in SCHEMAS["concept_assignments"]
+        ),
+        rows=[assignment],
+    )
+    write_segment_ledger(
+        tmp_path,
+        new_rows=[
+            segment_result_row(
+                subject=subject,
+                context=context,
+                actor_id="openai:gpt-test",
+                status="tagged",
+                assignments=[assignment],
+                model_call=model_call,
+            )
+        ],
+    )
+    for name in (
+        "concepts.parquet",
+        "concept_assignments.parquet",
+        "ontology_segment_ledger.parquet",
+    ):
+        _refresh_artifact_record(manifest_path, name)
+
+
 def test_generation_receipt_validates_every_manifest_artifact(tmp_path):
     manifest = _fixture_manifest(tmp_path)
     result = validate_generation(manifest)
 
     assert result["status"] == "pass"
     assert result["failures"]["total"] == 0
-    assert set(result["artifacts"]) == set(OntologyDatasetPipeline.published_outputs)
+    assert set(result["artifacts"]) == set(
+        OntologyDatasetPipeline.generation_outputs()
+    )
+    assert (
+        result["metrics"]["ontology_segment_ledger"][
+            "declared_profile_policies"
+        ]
+            == 17
+    )
     assert result["metrics"]["proceedings"]["citation_target_iris"] == 1
     assert result["metrics"]["source_membership"]["cross_posting_links"] == 1
     assert (
         result["metrics"]["source_membership"]["cross_posting_values_filtered"]
         == 1
     )
+
+
+def test_generation_receipt_replays_nonempty_segment_and_evidence(
+    tmp_path: Path,
+) -> None:
+    manifest = _fixture_manifest(tmp_path)
+    _install_segment_fixture(tmp_path, manifest)
+
+    result = validate_generation(manifest)
+
+    assert result["status"] == "pass"
+    metrics = result["metrics"]["ontology_segment_ledger"]
+    assert metrics["current_run_rows"] == 1
+    assert metrics["selected_artifacts"] == 1
+    assert metrics["status_counts"] == {"tagged": 1}
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_check"),
+    [
+        (
+            lambda row: row.update(
+                token_count=int(row["max_tokens"]) + 1
+            ),
+            "ontology_segment_ledger.token_budget",
+        ),
+        (
+            lambda row: row.update(segment_count=2),
+            "ontology_segment_ledger.segment_completeness",
+        ),
+        (
+            lambda row: row.update(
+                source_spans_json=json.dumps(
+                    {
+                        field: [1, len(value) + 1]
+                        for field, value in json.loads(
+                            row["fields_json"]
+                        ).items()
+                    }
+                )
+            ),
+            "ontology_segment_ledger.source_coverage",
+        ),
+        (
+            lambda row: row.update(
+                model_call_json=json.dumps(
+                    {
+                        **json.loads(row["model_call_json"]),
+                        "sdk_max_retries": 2,
+                    }
+                )
+            ),
+            "ontology_segment_ledger.model_call",
+        ),
+        (
+            lambda row: row.update(
+                error_message="sk-proj-" + ("x" * 30)
+            ),
+            "ontology_segment_ledger.secret_scan",
+        ),
+        (
+            lambda row: row.update(status="retry_exhausted"),
+            "ontology_segment_ledger.processing_status",
+        ),
+    ],
+)
+def test_generation_receipt_rejects_segment_ledger_corruption(
+    tmp_path: Path,
+    mutation,
+    expected_check: str,
+) -> None:
+    manifest = _fixture_manifest(tmp_path)
+    _install_segment_fixture(tmp_path, manifest)
+    ledger_path = tmp_path / "ontology_segment_ledger.parquet"
+    rows = pq.read_table(ledger_path).to_pylist()
+    mutation(rows[0])
+    write_parquet_rows(
+        ledger_path,
+        columns=SEGMENT_LEDGER_COLUMNS,
+        rows=rows,
+    )
+    _refresh_artifact_record(
+        manifest,
+        "ontology_segment_ledger.parquet",
+    )
+
+    result = validate_generation(manifest)
+
+    assert result["status"] == "fail"
+    assert result["failures"]["by_check"][expected_check] >= 1
 
 
 def test_generation_receipt_rejects_unknown_comment_period_reference(tmp_path):

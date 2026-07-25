@@ -81,7 +81,7 @@ see the Data Dictionary for columns):
 - Retrieval ontology: `concepts`, append-only `concept_assignments`, and structural `concept_events`
 - Source lifecycle: `federal_register` (published rules; RIN + CFR refs), `unified_agenda` (planned actions), `fr_docket_links`, `rulemaking_lifecycles`, `congress_bills`, `cfr_sections`
 - Organizations & influence: `sam_entities` (entity registry, keyed by `uei`), `lobbying_filings`, `fec_committees`
-- Outcomes & context: `usaspending_recipients` (keyed by `uei`), `court_dockets`, `gao_reports`, `crs_reports`
+- Outcomes & context: `usaspending_recipients` (keyed by `uei`), `court_dockets`, `court_opinions`, `gao_reports`, `crs_reports`
 
 Join keys across sources: `docket_id`, `rin`, and `cfr_ref` through
 `rule_targets`; statutory citations through `authority_edges`; `pl_number`

@@ -23,7 +23,11 @@ class TagQuality:
         return asdict(self)
 
 
-def evaluate_tag_quality(output_dir: Path) -> TagQuality:
+def evaluate_tag_quality(
+    output_dir: Path,
+    *,
+    document_ids: set[str] | None = None,
+) -> TagQuality:
     """Compare current subject-concept labels with FR topic labels.
 
     The Thesaurus is an intentionally imperfect ground truth; this harness is a
@@ -50,6 +54,8 @@ def evaluate_tag_quality(output_dir: Path) -> TagQuality:
     ):
         document_id = document_by_fr.get(str(row.get("document_number") or ""))
         if not document_id:
+            continue
+        if document_ids is not None and document_id not in document_ids:
             continue
         topics = parse_json_list(
             row.get("topics_json"),

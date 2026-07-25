@@ -13,6 +13,7 @@ import pytest
 from spicy_regs.ontology.common import RunContext, canonical_json, write_parquet_rows
 from spicy_regs.ontology.concepts import (
     ASSIGNMENT_COLUMNS,
+    CANDIDATE_REGISTRY_MAX_TOKENS,
     CONCEPT_COLUMNS,
     candidate_concept,
     generate_for_subject,
@@ -20,6 +21,7 @@ from spicy_regs.ontology.concepts import (
     merge_pass,
     rescore_candidates,
     seed_concept,
+    select_candidate_concepts,
 )
 from spicy_regs.ontology.invariants import (
     OntologyInvariantError,
@@ -29,10 +31,17 @@ from spicy_regs.ontology.invariants import (
     resolve_replacement,
 )
 from spicy_regs.ontology.llm import (
+    CONTEXT_MAX_TOKENS,
+    EVIDENCE_ALIGNMENT_PROVIDED,
+    EVIDENCE_ALIGNMENT_UNIQUE_EXACT,
+    TAG_MAX_OUTPUT_TOKENS,
+    OpenAIProviderExhaustedError,
     OpenAIOntologyModel,
     TagProposal,
     ValidationProposal,
+    ontology_concept_payload,
 )
+from spicy_regs.ontology.segmentation import TiktokenCounter
 from spicy_regs.ontology.subjects import Subject, balanced_subject_batch
 from spicy_regs.transforms.build_concept_assignments import build_concept_assignments
 from spicy_regs.transforms.build_concept_events import build_concept_events
@@ -77,16 +86,43 @@ def test_bounded_subject_batch_balances_types_without_losing_stable_order():
 
     selected = balanced_subject_batch(subjects, 4)
 
-    assert [(subject.subject_type, subject.subject_id) for subject in selected] == [
-        ("docket", "D-0"),
-        ("document", "F-0"),
-        ("docket", "D-1"),
-        ("document", "F-1"),
+    assert [subject.subject_type for subject in selected] == [
+        "docket",
+        "document",
+        "docket",
+        "document",
     ]
+    assert balanced_subject_batch(reversed(subjects), 4) == selected
+
+
+def test_candidate_budget_counts_only_the_model_visible_projection():
+    concepts = [
+        {
+            "concept_id": f"concept-{index:02d}",
+            "scheme": "subject",
+            "pref_label": f"topic {index:02d}",
+            "alt_labels_json": "[]",
+            "definition": None,
+            "status": "active",
+            "actor_id": "irrelevant-attestation-" + ("x" * 2_000),
+        }
+        for index in range(40)
+    ]
+
+    selected = select_candidate_concepts(_subject(), concepts)
+    counter = TiktokenCounter()
+
+    assert len(selected) == 40
+    assert (
+        counter.count(canonical_json([ontology_concept_payload(concept) for concept in selected]))
+        <= CANDIDATE_REGISTRY_MAX_TOKENS
+    )
+    assert counter.count(canonical_json(selected)) > (CANDIDATE_REGISTRY_MAX_TOKENS)
 
 
 class _FakeModel:
     model_id = "test-model:v1"
+    production_provider = False
 
     def __init__(self, *, concept_id: str | None = None) -> None:
         self.concept_id = concept_id
@@ -273,6 +309,8 @@ def test_openai_provider_uses_strict_responses_schema_and_grounded_evidence():
                                 "confidence": 0.91,
                                 "evidence_text": "PFAS",
                                 "evidence_field": "dockets.title",
+                                "evidence_start": 0,
+                                "evidence_end": 4,
                                 "justification": "The title names PFAS.",
                                 "external_ids": [],
                             }
@@ -292,6 +330,385 @@ def test_openai_provider_uses_strict_responses_schema_and_grounded_evidence():
     assert proposals[0].concept_id == seed["concept_id"]
     assert calls[0]["text"]["format"]["type"] == "json_schema"
     assert calls[0]["text"]["format"]["strict"] is True
+    assert calls[0]["reasoning"] == {"effort": "medium"}
+    assert calls[0]["service_tier"] == "auto"
+    assert calls[0]["store"] is False
+    assert calls[0]["max_output_tokens"] == TAG_MAX_OUTPUT_TOKENS
+    assert model.last_call_metadata["status"] == "completed"
+    assert model.last_call_metadata["store"] is False
+    assert model.last_call_metadata["reasoning_effort"] == "medium"
+    assert model.last_call_metadata["requested_service_tier"] == "auto"
+    assert model.last_call_metadata["sdk_max_retries"] == 0
+    assert model.last_call_metadata["attempt_count"] == 1
+    assert model.last_call_metadata["tag_output_item_count"] == 1
+    assert model.last_call_metadata["tag_accepted_item_count"] == 1
+    assert model.last_call_metadata["tag_rejection_count"] == 0
+    assert model.last_call_metadata["evidence_offset_repair_count"] == 0
+    assert proposals[0].evidence_alignment_method == (
+        EVIDENCE_ALIGNMENT_PROVIDED
+    )
+    assert (
+        model.last_call_metadata["prompt_token_estimate"] + model.last_call_metadata["prompt_safety_margin_tokens"]
+        <= model.last_call_metadata["prompt_input_token_budget"]
+    )
+
+
+def _provider_response(
+    *,
+    output_text: str | None = None,
+    status: str = "completed",
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=f"response-{status}",
+        model="gpt-test",
+        status=status,
+        usage=SimpleNamespace(
+            input_tokens=100,
+            output_tokens=10,
+            total_tokens=110,
+        ),
+        output_text=(json.dumps({"tags": []}) if output_text is None else output_text),
+    )
+
+
+def _provider_with_outcomes(
+    outcomes: list[BaseException | SimpleNamespace],
+    *,
+    max_retries: int,
+) -> tuple[OpenAIOntologyModel, list[dict]]:
+    calls: list[dict] = []
+
+    class _Responses:
+        def create(self, **kwargs):
+            calls.append(kwargs)
+            outcome = outcomes.pop(0)
+            if isinstance(outcome, BaseException):
+                raise outcome
+            return outcome
+
+    model = cast(Any, object.__new__(OpenAIOntologyModel))
+    model.model = "gpt-test"
+    model.model_id = "openai:gpt-test"
+    model.timeout_seconds = 10
+    model.max_retries = max_retries
+    model.retry_base_seconds = 0
+    model._client = SimpleNamespace(responses=_Responses())
+    return model, calls
+
+
+def _provider_tag_item(
+    concept_id: str,
+    *,
+    start: int,
+    end: int,
+) -> dict[str, object]:
+    return {
+        "concept_id": concept_id,
+        "proposed_label": None,
+        "scheme": "subject",
+        "definition": None,
+        "confidence": 0.91,
+        "evidence_text": "PFAS",
+        "evidence_field": "dockets.title",
+        "evidence_start": start,
+        "evidence_end": end,
+        "justification": "The title names PFAS.",
+        "external_ids": [],
+    }
+
+
+def test_openai_provider_repairs_only_unique_verbatim_evidence_offsets() -> None:
+    seed = seed_concept({"name": "PFAS"}, _CONTEXT)
+    assert seed is not None
+    response = _provider_response(
+        output_text=json.dumps(
+            {
+                "tags": [
+                    _provider_tag_item(
+                        str(seed["concept_id"]),
+                        start=1,
+                        end=5,
+                    )
+                ]
+            }
+        ),
+    )
+    model, _ = _provider_with_outcomes([response], max_retries=0)
+
+    proposals = model.tag(_subject(), [seed])
+
+    assert len(proposals) == 1
+    assert proposals[0].evidence_start == 0
+    assert proposals[0].evidence_end == 4
+    assert proposals[0].evidence_alignment_method == (
+        EVIDENCE_ALIGNMENT_UNIQUE_EXACT
+    )
+    assert model.last_call_metadata is not None
+    assert model.last_call_metadata["evidence_offset_repair_count"] == 1
+    assert model.last_call_metadata["tag_accepted_item_count"] == 1
+    assert model.last_call_metadata["tag_rejection_count"] == 0
+
+
+def test_openai_provider_rejects_ambiguous_evidence_offset_repair() -> None:
+    seed = seed_concept({"name": "PFAS"}, _CONTEXT)
+    assert seed is not None
+    response = _provider_response(
+        output_text=json.dumps(
+            {
+                "tags": [
+                    _provider_tag_item(
+                        str(seed["concept_id"]),
+                        start=1,
+                        end=5,
+                    )
+                ]
+            }
+        ),
+    )
+    model, _ = _provider_with_outcomes([response], max_retries=0)
+    repeated = replace(
+        _subject(),
+        text="PFAS and PFAS",
+        fields={"dockets.title": "PFAS and PFAS"},
+    )
+
+    assert model.tag(repeated, [seed]) == []
+    assert model.last_tag_rejections == [
+        {
+            "reason": "ungrounded_evidence",
+            "source_field": "dockets.title",
+        }
+    ]
+    assert model.last_call_metadata is not None
+    assert model.last_call_metadata["evidence_offset_repair_count"] == 0
+    assert model.last_call_metadata["tag_accepted_item_count"] == 0
+    assert model.last_call_metadata["tag_rejection_count"] == 1
+
+
+class _RateLimitEquivalent(RuntimeError):
+    status_code = 429
+    request_id = "request-rate-limit"
+
+
+class _QuotaLimitEquivalent(RuntimeError):
+    status_code = 429
+    request_id = "request-quota-limit"
+    body = {
+        "error": {
+            "code": "insufficient_quota",
+            "type": "insufficient_quota",
+        }
+    }
+
+
+@pytest.mark.parametrize(
+    "first_outcome,expected_error",
+    [
+        (TimeoutError("controlled timeout"), "TimeoutError"),
+        (
+            _RateLimitEquivalent("controlled rate limit"),
+            "_RateLimitEquivalent",
+        ),
+        (
+            _provider_response(output_text="{"),
+            "IncompleteStructuredResponseError",
+        ),
+        (
+            _provider_response(status="incomplete"),
+            "IncompleteStructuredResponseError",
+        ),
+    ],
+)
+def test_openai_provider_retries_visible_transient_failures(
+    first_outcome: BaseException | SimpleNamespace,
+    expected_error: str,
+) -> None:
+    model, calls = _provider_with_outcomes(
+        [first_outcome, _provider_response()],
+        max_retries=1,
+    )
+
+    assert model.tag(_subject(), []) == []
+    assert len(calls) == 2
+    metadata = model.last_call_metadata
+    assert metadata is not None
+    assert metadata["status"] == "completed"
+    assert metadata["attempt_count"] == 2
+    assert metadata["retry_count"] == 1
+    attempts = cast(list[dict[str, object]], metadata["attempts"])
+    assert attempts[0]["error_code"] == expected_error
+    assert attempts[1]["status"] == "completed"
+
+
+def test_openai_provider_reports_exact_retry_exhaustion() -> None:
+    model, calls = _provider_with_outcomes(
+        [
+            TimeoutError("controlled timeout one"),
+            TimeoutError("controlled timeout two"),
+            TimeoutError("controlled timeout three"),
+        ],
+        max_retries=2,
+    )
+
+    with pytest.raises(
+        OpenAIProviderExhaustedError,
+        match="exhausted 3 attempts",
+    ):
+        model.tag(_subject(), [])
+
+    assert len(calls) == 3
+    metadata = model.last_call_metadata
+    assert metadata is not None
+    assert metadata["status"] == "retry_exhausted"
+    assert metadata["attempt_count"] == 3
+    assert metadata["retry_count"] == 2
+    assert {attempt["error_code"] for attempt in cast(list[dict[str, object]], metadata["attempts"])} == {
+        "TimeoutError"
+    }
+
+
+def test_openai_provider_does_not_retry_insufficient_quota() -> None:
+    model, calls = _provider_with_outcomes(
+        [
+            _QuotaLimitEquivalent("controlled hard quota limit"),
+            _provider_response(),
+        ],
+        max_retries=3,
+    )
+
+    with pytest.raises(_QuotaLimitEquivalent):
+        model.tag(_subject(), [])
+
+    assert len(calls) == 1
+    metadata = model.last_call_metadata
+    assert metadata is not None
+    assert metadata["status"] == "failed"
+    assert metadata["attempt_count"] == 1
+    assert metadata["retry_count"] == 0
+    attempt = cast(list[dict[str, object]], metadata["attempts"])[0]
+    assert attempt["status_code"] == 429
+    assert attempt["provider_error_code"] == "insufficient_quota"
+
+
+def test_openai_prompt_context_is_bounded_and_non_evidentiary() -> None:
+    model, calls = _provider_with_outcomes(
+        [_provider_response()],
+        max_retries=0,
+    )
+    subject = replace(
+        _subject(),
+        context_fields={
+            "artifact_title": "PFAS " * 2_000,
+            "heading_path": "Section > Subsection",
+        },
+    )
+
+    assert model.tag(subject, []) == []
+
+    payload = json.loads(calls[0]["input"])
+    context = payload["non_evidentiary_context"]
+    assert context["max_tokens"] == CONTEXT_MAX_TOKENS
+    assert context["truncated_fields"] == ["artifact_title"]
+    assert context["omitted_fields"] == ["heading_path"]
+    assert TiktokenCounter().count(canonical_json(context["fields"])) <= CONTEXT_MAX_TOKENS
+    assert payload["untrusted_evidence_fields"]["fields"] == subject.fields
+
+
+def test_openai_provider_rejects_evidence_attributed_to_the_wrong_field():
+    seed = seed_concept({"name": "PFAS"}, _CONTEXT)
+    assert seed is not None
+    subject = Subject(
+        subject_type="document",
+        subject_id="DOC-1",
+        text="General notice\nPFAS chemicals in drinking water",
+        fields={
+            "documents.title": "General notice",
+            "federal_register.abstract": "PFAS chemicals in drinking water",
+        },
+        digest="subject-digest",
+    )
+
+    class _Responses:
+        def create(self, **kwargs):
+            del kwargs
+            return SimpleNamespace(
+                output_text=json.dumps(
+                    {
+                        "tags": [
+                            {
+                                "concept_id": seed["concept_id"],
+                                "proposed_label": None,
+                                "scheme": "subject",
+                                "definition": None,
+                                "confidence": 0.91,
+                                "evidence_text": "PFAS",
+                                "evidence_field": "documents.title",
+                                "evidence_start": 0,
+                                "evidence_end": 4,
+                                "justification": "The abstract names PFAS.",
+                                "external_ids": [],
+                            }
+                        ]
+                    }
+                )
+            )
+
+    model = cast(Any, object.__new__(OpenAIOntologyModel))
+    model.model = "gpt-5.6-luna"
+    model.model_id = "openai:gpt-5.6-luna"
+    model._client = SimpleNamespace(responses=_Responses())
+
+    assert model.tag(subject, [seed]) == []
+
+
+def test_openai_provider_rejects_a_facet_disallowed_by_the_subject_profile():
+    seed = seed_concept({"name": "PFAS"}, _CONTEXT)
+    assert seed is not None
+    calls: list[dict] = []
+    subject = Subject(
+        subject_type="sam_entity",
+        subject_id="UEI-1",
+        text="Example Chemical Company",
+        fields={"sam_entities.legal_business_name": "Example Chemical Company"},
+        digest="subject-digest",
+        profile_id="sam-entity-v1",
+        source_table="sam_entities",
+        allowed_schemes=("regulated_entity",),
+    )
+
+    class _Responses:
+        def create(self, **kwargs):
+            calls.append(kwargs)
+            return SimpleNamespace(
+                output_text=json.dumps(
+                    {
+                        "tags": [
+                            {
+                                "concept_id": seed["concept_id"],
+                                "proposed_label": None,
+                                "scheme": "subject",
+                                "definition": None,
+                                "confidence": 0.91,
+                                "evidence_text": "Example Chemical Company",
+                                "evidence_field": "sam_entities.legal_business_name",
+                                "evidence_start": 0,
+                                "evidence_end": 24,
+                                "justification": "The record names the company.",
+                                "external_ids": [],
+                            }
+                        ]
+                    }
+                )
+            )
+
+    model = cast(Any, object.__new__(OpenAIOntologyModel))
+    model.model = "gpt-5.6-luna"
+    model.model_id = "openai:gpt-5.6-luna"
+    model._client = SimpleNamespace(responses=_Responses())
+
+    assert model.tag(subject, [seed]) == []
+    assert "untrusted" in calls[0]["instructions"]
+    assert json.loads(calls[0]["input"])["subject"]["profile"] == "sam-entity-v1"
 
 
 def test_assignment_rollup_is_resumable_and_validation_supersedes(tmp_path):

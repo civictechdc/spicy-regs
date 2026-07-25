@@ -431,16 +431,16 @@ tables:
 
   concept_assignments:
     summary: >-
-      Append-only tag assertions connecting dockets and FR-backed
-      regulations.gov documents to concepts. Validation disagreements append a
-      lower-confidence superseding row; existing assertions are never updated.
+      Append-only artifact-to-concept assertions. Segment proposals aggregate
+      at source-artifact grain, and validation appends a superseding assertion;
+      existing rows are never updated.
     columns:
       assignment_id: "Stable assertion id. Primary key."
-      subject_type: "`docket`, `document`, or future `cfr_section`."
-      subject_id: "Foreign key into the table named by `subject_type`."
+      subject_type: "Source-artifact family, such as `docket`, `document`, `comment`, `cfr_section`, or `gao_report`."
+      subject_id: "Source-scoped artifact identifier for the declared subject type."
       concept_id: "Assigned concept; deprecated ids resolve through `concepts.replaced_by`."
       confidence: "Assertion confidence from 0 through 1, stored as VARCHAR."
-      evidence_json: "Grounding spans, source fields, source-text digest, justification, and optional validation result."
+      evidence_json: "Exact artifact-field offsets, quoted source text, deterministic alignment method, artifact digest, element and segment provenance, justifications, and optional per-span validation."
       method: "`llm`, `embedding`, `human`, or deterministic method."
       actor_id: "Model/version, ruleset, or human actor."
       run_id: "Resumable generation/validation run identifier."
@@ -621,6 +621,37 @@ tables:
       pacer_case_id: "PACER case id for the docket in its court's CM/ECF system."
       date_created: "Timestamp CourtListener first indexed the docket (ISO 8601 string, from the search-result `meta.date_created`)."
       absolute_url: "Absolute URL of the docket page on courtlistener.com."
+  court_opinions:
+    summary: >-
+      One row per official Supreme Court opinion package listed for an October
+      Term. Metadata and the PDF URL come from `supremecourt.gov`; embedded text
+      is extracted with the pinned pypdf adapter. A row is a source document,
+      not a docket. An official package can include the Court opinion and
+      separately authored concurrences or dissents; the ingest preserves that
+      package instead of guessing semantic subdocument boundaries.
+    columns:
+      opinion_id: "Stable Spicy Regs identifier derived from court, term, release number, and docket number. Primary key."
+      court_id: "Court identifier; currently always `scotus`."
+      term_year: "Calendar year in which the October Term began (for example `2022`)."
+      release_number: "Opinion release sequence number on the official term index."
+      date_decided: "Decision date normalized to ISO 8601."
+      docket_number: "Supreme Court docket number shown on the official term index."
+      case_name: "Case caption shown on the official term index."
+      holding: "Official index-page holding summary from the opinion link title."
+      author_code: "Justice code published in the official term index."
+      citation: "United States Reports citation shown on the official index."
+      opinion_type: "Source package classification; currently `official-opinion-package`."
+      source_index_url: "Official Supreme Court term-index URL."
+      source_url: "Official Supreme Court PDF URL."
+      source_etag: "HTTP ETag returned for the fetched PDF, when supplied."
+      source_last_modified: "HTTP Last-Modified value returned for the PDF, when supplied."
+      source_bytes: "Exact fetched PDF byte count, stored as a decimal string."
+      pdf_sha256: "SHA-256 digest of the exact fetched PDF bytes."
+      pdf_page_count: "Page count reported by the pinned PDF parser."
+      text_extraction_status: "Embedded-text extraction result; published rows require `ok`."
+      text_extraction_method: "Extraction implementation identifier, currently `pypdf-embedded-text`."
+      text_extraction_version: "Pinned pypdf package version used for extraction."
+      pdf_text: "Page-ordered embedded text extracted from the official PDF; not OCR."
   usaspending_recipients:
     summary: >-
       One row per federal-award recipient, ingested from the USASpending.gov

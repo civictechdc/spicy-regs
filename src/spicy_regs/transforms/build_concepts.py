@@ -28,8 +28,16 @@ from spicy_regs.ontology.concepts import (
     seed_concept,
 )
 from spicy_regs.ontology.invariants import assert_concept_graphs
-from spicy_regs.ontology.llm import OntologyModel, OpenAIOntologyModel
-from spicy_regs.ontology.subjects import balanced_subject_batch, build_subjects
+from spicy_regs.ontology.llm import (
+    OntologyModel,
+    OpenAIOntologyModel,
+    model_call_metadata,
+)
+from spicy_regs.ontology.subjects import (
+    balanced_artifact_batch,
+    iter_artifacts,
+    segment_artifact,
+)
 
 OUTPUT = "concepts.parquet"
 
@@ -95,21 +103,23 @@ def build_concepts(
     if model is None and limit:
         model = OpenAIOntologyModel.from_environment()
     if model is not None and limit:
-        subjects = build_subjects(output_dir)
         assignments_by_subject: dict[tuple[str, str], list[dict]] = {}
         for row in current_assignments:
             assignments_by_subject.setdefault(
                 (str(row.get("subject_type")), str(row.get("subject_id"))),
                 [],
             ).append(row)
-        pending = balanced_subject_batch(
+        pending = balanced_artifact_batch(
             (
-                subject
-                for subject in subjects
+                artifact
+                for artifact in iter_artifacts(output_dir)
                 if not any(
-                    _assignment_digest(assignment) == subject.digest
+                    _assignment_digest(assignment) == artifact.digest
                     for assignment in assignments_by_subject.get(
-                        (subject.subject_type, subject.subject_id),
+                        (
+                            artifact.subject_type,
+                            artifact.subject_id,
+                        ),
                         (),
                     )
                 )
@@ -117,31 +127,47 @@ def build_concepts(
             limit,
         )
         checkpoint = BatchCheckpoint(output_dir, run_id=context.run_id, phase="concept-discovery")
-        for subject in pending:
-            cached = checkpoint.get(subject.subject_type, subject.subject_id)
-            if cached is not None:
-                candidates = cached.get("concepts") or []
-            else:
-                try:
-                    candidates, _, _ = generate_for_subject(
-                        subject=subject,
-                        concepts=concepts,
-                        model=model,
-                        context=context,
-                    )
-                except Exception as exc:
-                    raise RuntimeError(
-                        f"Concept discovery failed for {subject.subject_type} "
-                        f"{subject.subject_id}; the checkpoint is resumable"
-                    ) from exc
-                checkpoint.append(
-                    {
-                        "subject_type": subject.subject_type,
-                        "subject_id": subject.subject_id,
-                        "concepts": candidates,
-                    }
+        for artifact in pending:
+            for subject in segment_artifact(artifact):
+                cached = checkpoint.get(
+                    subject.subject_type,
+                    subject.subject_id,
+                    artifact_digest=subject.version_digest,
+                    segment_id=subject.segment_id,
                 )
-            concepts = merge_seed_registry(concepts, candidates)
+                if cached is not None:
+                    candidates = cached.get("concepts") or []
+                else:
+                    try:
+                        candidates, _, _ = generate_for_subject(
+                            subject=subject,
+                            concepts=concepts,
+                            model=model,
+                            context=context,
+                        )
+                    except Exception as exc:
+                        raise RuntimeError(
+                            "Concept discovery failed for segment "
+                            f"{subject.segment_id} of "
+                            f"{subject.subject_type} "
+                            f"{subject.subject_id}; the checkpoint is "
+                            "resumable"
+                        ) from exc
+                    checkpoint.append(
+                        {
+                            "subject_type": subject.subject_type,
+                            "subject_id": subject.subject_id,
+                            "artifact_digest": (
+                                subject.version_digest
+                            ),
+                            "segment_id": subject.segment_id,
+                            "subject_profile": subject.profile_id,
+                            "source_table": subject.source_table,
+                            "concepts": candidates,
+                            "model_call": model_call_metadata(model),
+                        }
+                    )
+                concepts = merge_seed_registry(concepts, candidates)
 
     concepts, merge_events, review = merge_pass(concepts, current_assignments, context=context)
     concepts, rescore_events = rescore_candidates(concepts, current_assignments, context=context)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from spicy_regs.ontology.common import RunContext, write_parquet_rows
 from spicy_regs.ontology.concepts import (
     ASSIGNMENT_COLUMNS,
@@ -10,7 +12,10 @@ from spicy_regs.ontology.concepts import (
     seed_concept,
 )
 from spicy_regs.ontology.evaluation import evaluate_tag_quality
-from spicy_regs.ontology.llm import TagProposal
+from spicy_regs.ontology.llm import (
+    EVIDENCE_ALIGNMENT_UNIQUE_EXACT,
+    TagProposal,
+)
 from spicy_regs.ontology.subjects import Subject
 
 
@@ -60,6 +65,11 @@ def test_evaluation_counts_unassigned_gold_documents_as_false_negatives(tmp_path
         actor_id="test-model",
         ordinal=0,
     )
+    evidence = json.loads(str(assignment["evidence_json"]))
+    assert (
+        evidence["spans"][0]["alignment_method"]
+        == EVIDENCE_ALIGNMENT_UNIQUE_EXACT
+    )
     write_parquet_rows(
         tmp_path / "concept_assignments.parquet",
         columns=ASSIGNMENT_COLUMNS,
@@ -74,3 +84,13 @@ def test_evaluation_counts_unassigned_gold_documents_as_false_negatives(tmp_path
     assert result.precision == 1.0
     assert result.recall == 0.5
     assert result.f1 == 2 / 3
+
+    selected = evaluate_tag_quality(
+        tmp_path,
+        document_ids={"DOC-1"},
+    )
+    assert selected.evaluated_documents == 1
+    assert selected.true_positive == 1
+    assert selected.false_positive == 0
+    assert selected.false_negative == 0
+    assert selected.f1 == 1.0

@@ -1,0 +1,19 @@
+name: Rollup - court_opinions
+on:
+  schedule:
+    # Official opinions are normally released on weekday mornings.
+    - cron: '30 19 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-supreme-court-opinions
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}

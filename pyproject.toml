@@ -4,10 +4,12 @@ version = "0.1.0"
 description = "Regulations Data Analysis Tools"
 requires-python = ">=3.10"
 dependencies = [
+    "beautifulsoup4>=4.13,<5",
     "boto3",
     "python-dotenv",
     "polars",
     "pyarrow",
+    "numpy>=2,<3",
     "tqdm",
     "httpx",
     "duckdb>=1.4", # >=1.4 required to ATTACH an Iceberg REST catalog and MERGE INTO it
@@ -15,26 +17,34 @@ dependencies = [
     "cyclopts",
     "loguru",
     "mcp>=1.10.0",
-    "pypdf",
+    "pypdf>=6.14,<7",
     "pyyaml",  # data dictionary descriptions (src/spicy_regs/data_dictionary.py)
     "openai",  # optional-at-runtime structured-output provider for ontology tagging
+    "tiktoken>=0.9,<1",  # pinned encoding implementation for ontology segment budgets
 ]
 
 [project.optional-dependencies]
 embed = [
-    "sentence-transformers",
-    "torch",
+    "sentence-transformers==5.6.1",
+    "torch==2.10.0",
+]
+evaluation = [
+    "ir-measures==0.4.3",
+    "scikit-learn==1.7.2",
+    "scipy>=1.15,<2",
 ]
 
 [dependency-groups]
 dev = [
     "ipykernel",
+    "ir-measures==0.4.3",
     "matplotlib",
     "pre-commit",
     "pyrefly",
     "pytest",
     "ruff",
-    "scikit-learn",
+    "scikit-learn==1.7.2",
+    "scipy>=1.15,<2",
     "seaborn",
     "textblob",
     "ty",
@@ -64,6 +74,7 @@ run-rollup-fec-committees = "spicy_regs.pipelines.rollups.fec_committees:app"
 run-rollup-gao-reports = "spicy_regs.pipelines.rollups.gao_reports:app"
 run-rollup-crs-reports = "spicy_regs.pipelines.rollups.crs_reports:app"
 run-rollup-courtlistener = "spicy_regs.pipelines.rollups.courtlistener:app"
+run-rollup-supreme-court-opinions = "spicy_regs.pipelines.rollups.supreme_court_opinions:app"
 run-rollup-usaspending-recipients = "spicy_regs.pipelines.rollups.usaspending_recipients:app"
 materialize-ontology = "spicy_regs.pipelines.ontology_dataset:app"
 enrich-pdf-text = "spicy_regs.enrich_pdf:main"
@@ -74,6 +85,16 @@ spicy-regs-mcp = "spicy_regs.mcp_server:main"
 spicy-regs-dict = "spicy_regs.data_dictionary:main"
 spicy-regs-ontology-receipt = "spicy_regs.ontology.receipt:main"
 spicy-regs-evaluate-tags = "spicy_regs.evaluate_tag_quality:main"
+build-mixed-real-data-corpus = "spicy_regs.corpora.mixed_real_data:main"
+build-ontology-profile-eval = "spicy_regs.corpora.profile_evaluation:main"
+build-segmentation-evaluation = "spicy_regs.corpora.segmentation_evaluation:main"
+run-segmentation-experiment = "spicy_regs.corpora.segmentation_experiment:main"
+audit-segmentation-embeddings = "spicy_regs.corpora.segmentation_embedding_audit:main"
+run-segmentation-rerank = "spicy_regs.corpora.segmentation_rerank:main"
+run-segmentation-sparse-retrieval = "spicy_regs.corpora.segmentation_sparse_retrieval:main"
+run-segmentation-tagging = "spicy_regs.corpora.segmentation_tagging:main"
+run-artifact-retrieval-baseline = "spicy_regs.corpora.artifact_retrieval_baseline:main"
+build-document-acceptance-scope = "spicy_regs.corpora.document_acceptance_scope:main"
 
 [build-system]
 requires = ["uv_build<0.12"]

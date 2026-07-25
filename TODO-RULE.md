@@ -323,7 +323,8 @@ concept promotion.
   - proceedings and comment periods;
   - CFR units, congressional bills, and public laws;
   - FCC proceedings and filings;
-  - court dockets and later court opinions or orders;
+  - court dockets, current Supreme Court opinion packages, and later court
+    orders;
   - GAO and CRS reports;
   - lobbying filings and FEC committees;
   - SAM entities and USASpending recipients.
@@ -583,7 +584,10 @@ tests, row-level conformance, and at least one cross-family query.
 
 ### RULE-022 — Connect litigation, oversight, and analysis
 
-- [ ] Profile court dockets, opinions, orders, GAO reports, and CRS reports.
+- [x] Profile court dockets, official Supreme Court opinion packages, GAO
+      reports, and CRS reports.
+- [ ] Profile court orders and broader authored opinions when source-backed
+      structure supports their identity and grain.
 - [ ] Represent "mentions," "reviews," "challenges," "affects," and "invalidates"
       as distinct evidence-bearing relationships.
 - [ ] Require exact rule or artifact identity before claiming legal effect.
@@ -800,7 +804,9 @@ become portable, and retain its complete discovery history.
 
 ### RULE-051 — Bind legal-effect events
 
-- [ ] Define the profile for court opinions, orders, agency actions, and
+- [x] Define the source-document profile for official Supreme Court opinion
+      packages without inferring authored-opinion identity or legal effect.
+- [ ] Define legal-effect profiles for court orders, agency actions, and
       effective legal status.
 - [ ] Link legal-effect events to exact rule artifacts and assertions.
 - [ ] Distinguish vacatur, injunction, remand, stay, amendment, rescission, and

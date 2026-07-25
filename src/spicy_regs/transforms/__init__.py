@@ -25,6 +25,9 @@ from spicy_regs.transforms.build_regulatory_agenda import build_regulatory_agend
 from spicy_regs.transforms.build_rule_targets import build_rule_targets
 from spicy_regs.transforms.build_sam_entities import build_sam_entities
 from spicy_regs.transforms.build_search_index import INDEX_FILENAME, build_search_index
+from spicy_regs.transforms.build_supreme_court_opinions import (
+    build_supreme_court_opinions,
+)
 from spicy_regs.transforms.build_unified_agenda import build_unified_agenda
 from spicy_regs.transforms.build_usaspending_recipients import build_usaspending_recipients
 from spicy_regs.transforms.chain import Chain
@@ -74,6 +77,7 @@ __all__ = [
     "build_regulatory_agenda",
     "build_rule_targets",
     "build_sam_entities",
+    "build_supreme_court_opinions",
     "build_federal_register",
     "build_fr_docket_links",
     "build_gao_reports",

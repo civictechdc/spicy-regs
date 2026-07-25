@@ -12,7 +12,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote, unquote, urlparse
 
 import pyarrow as pa
@@ -28,7 +28,19 @@ from spicy_regs.ontology.citations import (
     normalize_regsgov_identifier,
     parse_cfr_citation,
 )
-from spicy_regs.ontology.common import iter_parquet_rows
+from spicy_regs.ontology.common import canonical_json, iter_parquet_rows
+from spicy_regs.ontology.concepts import latest_assignments
+from spicy_regs.ontology.ledger import (
+    FINAL_STATUSES,
+    KNOWN_STATUSES,
+    SEGMENT_LEDGER_COLUMNS,
+)
+from spicy_regs.ontology.llm import SUPPORTED_REASONING_EFFORTS
+from spicy_regs.ontology.subjects import (
+    PROFILE_SEGMENTATION_POLICIES,
+    iter_artifacts,
+    segment_artifact,
+)
 from spicy_regs.pipelines.ontology_dataset import OntologyDatasetPipeline
 from spicy_regs.transforms.build_proceedings import (
     STAGES,
@@ -43,6 +55,9 @@ _CFR_IRI = re.compile(
     r"(?:\.[0-9]+[a-z]{0,3}(?:-[0-9a-z]+)*)?$"
 )
 _SAFE_FR_DOCUMENT_NUMBER = re.compile(r"^[A-Za-z0-9-]+$")
+_SECRET_LIKE = re.compile(
+    r"\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b"
+)
 
 
 def _sha256(path: Path) -> str:
@@ -125,7 +140,7 @@ def _artifact_records(
     check_schema: bool,
     failures: FailureCollector,
 ) -> dict[str, dict[str, Any]]:
-    expected = set(OntologyDatasetPipeline.published_outputs)
+    expected = set(OntologyDatasetPipeline.generation_outputs())
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, dict):
         failures.add("manifest", manifest_path, "artifacts", "artifact map is missing")
@@ -162,6 +177,18 @@ def _artifact_records(
             failures.add("manifest", name, "bytes", "artifact byte count mismatch")
         if remote_key != f"{prefix}{name}":
             failures.add("manifest", name, "remote_key", "artifact key leaves snapshot prefix")
+        expected_visibility = (
+            "public"
+            if name in OntologyDatasetPipeline.published_outputs
+            else "internal"
+        )
+        if record.get("visibility", expected_visibility) != expected_visibility:
+            failures.add(
+                "manifest",
+                name,
+                "visibility",
+                f"expected {expected_visibility}",
+            )
 
         try:
             parquet = pq.ParquetFile(path)
@@ -179,7 +206,14 @@ def _artifact_records(
             failures.add("manifest", name, "rows", "artifact row count mismatch")
         table = name.removesuffix(".parquet")
         if check_schema:
-            expected_columns = [column for column, _ in EXPECTED_SCHEMAS[table]]
+            expected_columns = (
+                list(SEGMENT_LEDGER_COLUMNS)
+                if name == "ontology_segment_ledger.parquet"
+                else [
+                    column
+                    for column, _ in EXPECTED_SCHEMAS[table]
+                ]
+            )
             if columns != expected_columns:
                 failures.add(
                     table,
@@ -264,6 +298,662 @@ def _source_membership(
                 else:
                     metrics["cross_posting_links"] += 1
     return dockets, documents, fr_documents, dict(metrics)
+
+
+def _json_object_value(
+    value: object,
+    *,
+    table: str,
+    row_id: object,
+    column: str,
+    failures: FailureCollector,
+) -> dict[str, Any]:
+    try:
+        parsed = json.loads(str(value))
+    except (TypeError, json.JSONDecodeError):
+        failures.add(table, row_id, column, "malformed JSON object")
+        return {}
+    if not isinstance(parsed, dict):
+        failures.add(table, row_id, column, "value is not a JSON object")
+        return {}
+    return parsed
+
+
+def _valid_completed_model_call(metadata: dict[str, Any]) -> bool:
+    """Validate safe, application-owned OpenAI call telemetry."""
+    try:
+        attempt_count = int(str(metadata.get("attempt_count")))
+        retry_count = int(str(metadata.get("retry_count")))
+        prompt_estimate = int(
+            str(metadata.get("prompt_token_estimate"))
+        )
+        safety_margin = int(
+            str(metadata.get("prompt_safety_margin_tokens"))
+        )
+        input_budget = int(
+            str(metadata.get("prompt_input_token_budget"))
+        )
+        timeout_seconds = float(
+            str(metadata.get("timeout_seconds"))
+        )
+        max_retries = int(str(metadata.get("max_retries")))
+        max_output_tokens = int(
+            str(metadata.get("max_output_tokens"))
+        )
+        total_tokens = int(str(metadata.get("total_tokens")))
+    except (TypeError, ValueError):
+        return False
+    attempts_value = metadata.get("attempts")
+    if not isinstance(attempts_value, list) or not all(
+        isinstance(attempt, dict)
+        for attempt in attempts_value
+    ):
+        return False
+    attempts = [
+        cast(dict[str, Any], attempt)
+        for attempt in attempts_value
+    ]
+    return (
+        metadata.get("status") == "completed"
+        and metadata.get("store") is False
+        and metadata.get("reasoning_effort")
+        in SUPPORTED_REASONING_EFFORTS
+        and bool(metadata.get("response_id"))
+        and total_tokens > 0
+        and metadata.get("sdk_max_retries") == 0
+        and attempt_count > 0
+        and retry_count == attempt_count - 1
+        and len(attempts) == attempt_count
+        and all(
+            attempt.get("attempt") == index
+            for index, attempt in enumerate(attempts, start=1)
+        )
+        and bool(attempts)
+        and attempts[-1].get("status") == "completed"
+        and prompt_estimate > 0
+        and safety_margin >= 0
+        and prompt_estimate + safety_margin <= input_budget
+        and timeout_seconds > 0
+        and max_retries >= 0
+        and max_output_tokens > 0
+    )
+
+
+def _validate_segment_ledger(
+    path: Path,
+    *,
+    directory: Path,
+    run_id: str,
+    failures: FailureCollector,
+) -> dict[str, Any]:
+    """Validate segment completeness, token bounds, and exact evidence."""
+    rows = list(iter_parquet_rows(path))
+    current_rows = [
+        row
+        for row in rows
+        if not run_id or str(row.get("run_id") or "") == run_id
+    ]
+    status_counts = Counter(
+        str(row.get("status") or "") for row in current_rows
+    )
+    profile_counts = Counter(
+        str(row.get("subject_profile") or "")
+        for row in current_rows
+    )
+    result_ids: set[str] = set()
+    rows_by_segment: dict[str, dict] = {}
+    current_by_artifact: dict[str, list[dict]] = defaultdict(list)
+    selected_artifact_keys: set[tuple[str, str, str]] = set()
+    coverage: dict[
+        tuple[str, str],
+        list[tuple[int, int, str, str]],
+    ] = defaultdict(list)
+
+    token_counter = None
+    if rows:
+        from spicy_regs.ontology.segmentation import TiktokenCounter
+
+        token_counter = TiktokenCounter()
+
+    for row in rows:
+        result_id = str(row.get("segment_result_id") or "")
+        if not result_id or result_id in result_ids:
+            failures.add(
+                "ontology_segment_ledger",
+                result_id,
+                "segment_result_id",
+                "missing or duplicate result id",
+            )
+        result_ids.add(result_id)
+        status = str(row.get("status") or "")
+        if status not in KNOWN_STATUSES:
+            failures.add(
+                "ontology_segment_ledger",
+                result_id,
+                "status",
+                f"unknown status {status!r}",
+            )
+        segment_id = str(row.get("segment_id") or "")
+        if segment_id:
+            rows_by_segment[segment_id] = row
+        if row not in current_rows:
+            continue
+
+        digest = str(row.get("artifact_digest") or "")
+        subject_type = str(row.get("subject_type") or "")
+        subject_id = str(row.get("subject_id") or "")
+        profile_id = str(row.get("subject_profile") or "")
+        current_by_artifact[digest].append(row)
+        selected_artifact_keys.add(
+            (subject_type, subject_id, digest)
+        )
+        policy = PROFILE_SEGMENTATION_POLICIES.get(profile_id)
+        if policy is None:
+            failures.add(
+                "ontology_segment_ledger",
+                result_id,
+                "subject_profile",
+                f"undeclared profile {profile_id!r}",
+            )
+        elif status != "skipped_non_content":
+            if not str(row.get("segment_policy") or "").startswith(
+                f"{policy.policy_version}:"
+            ):
+                failures.add(
+                    "ontology_segment_ledger",
+                    result_id,
+                    "segment_policy",
+                    "policy differs from the profile declaration",
+                )
+            try:
+                token_count = int(str(row.get("token_count") or ""))
+                max_tokens = int(str(row.get("max_tokens") or ""))
+                min_tokens = int(str(row.get("min_tokens") or ""))
+            except ValueError:
+                token_count = -1
+                max_tokens = -1
+                min_tokens = -1
+            if (
+                token_count < 0
+                or max_tokens <= 0
+                or min_tokens <= 0
+                or min_tokens > max_tokens
+                or token_count > max_tokens
+            ):
+                failures.add(
+                    "ontology_segment_ledger",
+                    result_id,
+                    "token_budget",
+                    f"{token_count} violates {min_tokens}:{max_tokens}",
+                )
+            if token_counter is not None and (
+                row.get("tokenizer") != token_counter.name
+                or row.get("tokenizer_version")
+                != token_counter.version
+            ):
+                failures.add(
+                    "ontology_segment_ledger",
+                    result_id,
+                    "tokenizer",
+                    "tokenizer name or installed version differs",
+                )
+            fields = _json_object_value(
+                row.get("fields_json"),
+                table="ontology_segment_ledger",
+                row_id=result_id,
+                column="fields_json",
+                failures=failures,
+            )
+            spans = _json_object_value(
+                row.get("source_spans_json"),
+                table="ontology_segment_ledger",
+                row_id=result_id,
+                column="source_spans_json",
+                failures=failures,
+            )
+            field_sources = _json_object_value(
+                row.get("field_sources_json"),
+                table="ontology_segment_ledger",
+                row_id=result_id,
+                column="field_sources_json",
+                failures=failures,
+            )
+            source_hashes = _json_object_value(
+                row.get("source_sha256_json"),
+                table="ontology_segment_ledger",
+                row_id=result_id,
+                column="source_sha256_json",
+                failures=failures,
+            )
+            if token_counter is not None:
+                measured = token_counter.count(
+                    "\n".join(
+                        str(value) for value in fields.values()
+                    )
+                )
+                if measured != token_count:
+                    failures.add(
+                        "ontology_segment_ledger",
+                        result_id,
+                        "token_count",
+                        f"recorded {token_count}, measured {measured}",
+                    )
+            for field_name, field_text_value in fields.items():
+                field_text = str(field_text_value)
+                source_span = spans.get(field_name)
+                if (
+                    not isinstance(source_span, list)
+                    or len(source_span) != 2
+                    or not all(
+                        isinstance(value, int)
+                        and not isinstance(value, bool)
+                        for value in source_span
+                    )
+                ):
+                    failures.add(
+                        "ontology_segment_ledger",
+                        result_id,
+                        "source_spans",
+                        f"invalid span for {field_name}",
+                    )
+                    continue
+                start, end = source_span
+                if (
+                    start < 0
+                    or end <= start
+                    or end - start != len(field_text)
+                ):
+                    failures.add(
+                        "ontology_segment_ledger",
+                        result_id,
+                        "source_spans",
+                        f"span length differs for {field_name}",
+                    )
+                    continue
+                canonical_field = str(
+                    field_sources.get(field_name) or field_name
+                )
+                coverage[(digest, canonical_field)].append(
+                    (
+                        start,
+                        end,
+                        field_text,
+                        str(source_hashes.get(field_name) or ""),
+                    )
+                )
+        if status == "retry_exhausted":
+            failures.add(
+                "ontology_segment_ledger",
+                result_id,
+                "processing_status",
+                "selected segment exhausted its retry budget",
+            )
+        actor_id = str(row.get("actor_id") or "")
+        if (
+            actor_id.startswith("openai:")
+            and status in FINAL_STATUSES
+            and status != "skipped_non_content"
+        ):
+            metadata = _json_object_value(
+                row.get("model_call_json"),
+                table="ontology_segment_ledger",
+                row_id=result_id,
+                column="model_call_json",
+                failures=failures,
+            )
+            if not _valid_completed_model_call(metadata):
+                failures.add(
+                    "ontology_segment_ledger",
+                    result_id,
+                    "model_call",
+                    "OpenAI result lacks safe completed-call telemetry",
+                )
+        if _SECRET_LIKE.search(json.dumps(row, sort_keys=True)):
+            failures.add(
+                "ontology_segment_ledger",
+                result_id,
+                "secret_scan",
+                "secret-like OpenAI key prefix appears in the ledger",
+            )
+
+    for digest, artifact_rows in current_by_artifact.items():
+        statuses = {
+            str(row.get("status") or "")
+            for row in artifact_rows
+        }
+        if "skipped_non_content" in statuses:
+            if len(artifact_rows) != 1:
+                failures.add(
+                    "ontology_segment_ledger",
+                    digest,
+                    "segment_completeness",
+                    "non-content artifact has additional segment rows",
+                )
+            continue
+        try:
+            expected_count = max(
+                int(str(row.get("segment_count") or ""))
+                for row in artifact_rows
+            )
+            ordinals = {
+                int(str(row.get("segment_ordinal") or ""))
+                for row in artifact_rows
+            }
+        except ValueError:
+            expected_count = -1
+            ordinals = set()
+        if (
+            expected_count <= 0
+            or len(artifact_rows) != expected_count
+            or ordinals != set(range(expected_count))
+            or any(
+                str(row.get("status") or "") not in FINAL_STATUSES
+                for row in artifact_rows
+            )
+        ):
+            failures.add(
+                "ontology_segment_ledger",
+                digest,
+                "segment_completeness",
+                "selected artifact lacks one final row per segment",
+            )
+
+    for (digest, field_name), pieces in coverage.items():
+        cursor = 0
+        text_parts: list[str] = []
+        source_hashes: set[str] = set()
+        for start, end, text, source_hash in sorted(pieces):
+            if start != cursor:
+                failures.add(
+                    "ontology_segment_ledger",
+                    digest,
+                    "source_coverage",
+                    f"{field_name} has a gap or overlap at {cursor}",
+                )
+            cursor = end
+            text_parts.append(text)
+            source_hashes.add(source_hash)
+        measured_hash = hashlib.sha256(
+            "".join(text_parts).encode()
+        ).hexdigest()
+        if len(source_hashes) != 1 or measured_hash not in source_hashes:
+            failures.add(
+                "ontology_segment_ledger",
+                digest,
+                "source_digest",
+                f"{field_name} does not reconstruct its source digest",
+            )
+
+    unresolved_artifacts = set(selected_artifact_keys)
+    resolved_artifacts = {}
+    if unresolved_artifacts:
+        for artifact in iter_artifacts(directory):
+            key = (
+                artifact.subject_type,
+                artifact.subject_id,
+                artifact.digest,
+            )
+            if key in unresolved_artifacts:
+                resolved_artifacts[key] = artifact
+                unresolved_artifacts.discard(key)
+            if not unresolved_artifacts:
+                break
+    for subject_type, subject_id, digest in sorted(unresolved_artifacts):
+        failures.add(
+            "ontology_segment_ledger",
+            f"{subject_type}:{subject_id}",
+            "artifact_version",
+            f"artifact digest {digest} does not resolve to current inputs",
+        )
+
+    for artifact_key, artifact in resolved_artifacts.items():
+        digest = artifact_key[2]
+        artifact_rows = current_by_artifact[digest]
+        expected_segments = segment_artifact(artifact)
+        if not expected_segments:
+            if (
+                len(artifact_rows) != 1
+                or artifact_rows[0].get("status")
+                != "skipped_non_content"
+            ):
+                failures.add(
+                    "ontology_segment_ledger",
+                    digest,
+                    "source_replay",
+                    "non-content artifact does not replay to one skip row",
+                )
+            continue
+        expected_by_id = {
+            subject.segment_id: subject
+            for subject in expected_segments
+        }
+        actual_by_id = {
+            str(row.get("segment_id") or ""): row
+            for row in artifact_rows
+        }
+        if set(actual_by_id) != set(expected_by_id):
+            failures.add(
+                "ontology_segment_ledger",
+                digest,
+                "segment_identity",
+                "stored segment IDs differ from deterministic replay",
+            )
+            continue
+        for segment_id, subject in expected_by_id.items():
+            row = actual_by_id[segment_id]
+            replay_values = {
+                "segment_ordinal": str(subject.segment_ordinal),
+                "segment_count": str(subject.segment_count),
+                "segment_policy": subject.segment_policy,
+                "tokenizer": subject.tokenizer,
+                "tokenizer_version": subject.tokenizer_version,
+                "token_count": str(subject.token_count),
+                "max_tokens": str(subject.max_segment_tokens),
+                "min_tokens": str(subject.min_segment_tokens),
+                "fields_json": canonical_json(subject.fields),
+                "context_fields_json": canonical_json(
+                    subject.context_fields or {}
+                ),
+                "field_sources_json": canonical_json(
+                    subject.field_sources or {}
+                ),
+                "source_spans_json": canonical_json(
+                    subject.source_spans or {}
+                ),
+                "source_sha256_json": canonical_json(
+                    subject.source_sha256 or {}
+                ),
+                "previous_segment_id": subject.previous_segment_id,
+                "next_segment_id": subject.next_segment_id,
+                "parent_segment_id": subject.parent_segment_id,
+            }
+            for column, expected_value in replay_values.items():
+                if row.get(column) != expected_value:
+                    failures.add(
+                        "ontology_segment_ledger",
+                        segment_id,
+                        "source_replay",
+                        f"{column} differs from deterministic replay",
+                    )
+
+    assignments_path = directory / "concept_assignments.parquet"
+    if assignments_path.exists():
+        assignments = latest_assignments(
+            list(iter_parquet_rows(assignments_path))
+        )
+        for assignment in assignments:
+            if assignment.get("method") != "llm":
+                continue
+            assignment_id = str(
+                assignment.get("assignment_id") or ""
+            )
+            evidence = _json_object_value(
+                assignment.get("evidence_json"),
+                table="concept_assignments",
+                row_id=assignment_id,
+                column="evidence_json",
+                failures=failures,
+            )
+            evidence_spans = evidence.get("spans")
+            if not isinstance(evidence_spans, list) or not evidence_spans:
+                failures.add(
+                    "concept_assignments",
+                    assignment_id,
+                    "segment_evidence",
+                    "LLM assignment has no segment-backed spans",
+                )
+                continue
+            artifact_digest = str(
+                evidence.get("artifact_sha256")
+                or evidence.get("subject_sha256")
+                or ""
+            )
+            for span_value in evidence_spans:
+                if not isinstance(span_value, dict):
+                    failures.add(
+                        "concept_assignments",
+                        assignment_id,
+                        "segment_evidence",
+                        "evidence span is not an object",
+                    )
+                    continue
+                span = cast(dict[str, Any], span_value)
+                segment_id = str(span.get("segment_id") or "")
+                segment_row = rows_by_segment.get(segment_id)
+                if segment_row is None:
+                    failures.add(
+                        "concept_assignments",
+                        assignment_id,
+                        "segment_range",
+                        f"unknown segment {segment_id!r}",
+                    )
+                    continue
+                if (
+                    str(segment_row.get("artifact_digest") or "")
+                    != artifact_digest
+                ):
+                    failures.add(
+                        "concept_assignments",
+                        assignment_id,
+                        "artifact_digest",
+                        "assignment and segment artifact digests differ",
+                    )
+                fields = _json_object_value(
+                    segment_row.get("fields_json"),
+                    table="ontology_segment_ledger",
+                    row_id=segment_id,
+                    column="fields_json",
+                    failures=failures,
+                )
+                source_spans = _json_object_value(
+                    segment_row.get("source_spans_json"),
+                    table="ontology_segment_ledger",
+                    row_id=segment_id,
+                    column="source_spans_json",
+                    failures=failures,
+                )
+                field_sources = _json_object_value(
+                    segment_row.get("field_sources_json"),
+                    table="ontology_segment_ledger",
+                    row_id=segment_id,
+                    column="field_sources_json",
+                    failures=failures,
+                )
+                segment_source_hashes = _json_object_value(
+                    segment_row.get("source_sha256_json"),
+                    table="ontology_segment_ledger",
+                    row_id=segment_id,
+                    column="source_sha256_json",
+                    failures=failures,
+                )
+                field_name = str(span.get("source_field") or "")
+                evidence_field_key = str(
+                    span.get("evidence_field_key") or field_name
+                )
+                segment_text = fields.get(evidence_field_key)
+                segment_source_span = source_spans.get(
+                    evidence_field_key
+                )
+                try:
+                    start = int(str(span.get("start_char")))
+                    end = int(str(span.get("end_char")))
+                    if (
+                        not isinstance(segment_source_span, list)
+                        or len(segment_source_span) != 2
+                    ):
+                        raise ValueError
+                    segment_source_start = int(segment_source_span[0])
+                    segment_source_end = int(segment_source_span[1])
+                except (TypeError, ValueError):
+                    start = end = segment_source_start = (
+                        segment_source_end
+                    ) = -1
+                if (
+                    not isinstance(segment_text, str)
+                    or not isinstance(segment_source_span, list)
+                    or len(segment_source_span) != 2
+                    or start < segment_source_start
+                    or end > segment_source_end
+                    or end <= start
+                    or field_sources.get(evidence_field_key)
+                    != field_name
+                    or (
+                        span.get("source_sha256")
+                        and segment_source_hashes.get(
+                            evidence_field_key
+                        )
+                        != span.get("source_sha256")
+                    )
+                ):
+                    failures.add(
+                        "concept_assignments",
+                        assignment_id,
+                        "evidence_coordinates",
+                        "span coordinates leave the declared segment",
+                    )
+                    continue
+                local_start = start - segment_source_start
+                local_end = end - segment_source_start
+                if (
+                    segment_text[local_start:local_end]
+                    != span.get("text")
+                    or (
+                        span.get("segment_start_char") is not None
+                        and span.get("segment_start_char")
+                        != local_start
+                    )
+                    or (
+                        span.get("segment_end_char") is not None
+                        and span.get("segment_end_char")
+                        != local_end
+                    )
+                ):
+                    failures.add(
+                        "concept_assignments",
+                        assignment_id,
+                        "evidence_text",
+                        "span text differs from exact source coordinates",
+                    )
+
+    return {
+        "declared_profile_policies": len(
+            PROFILE_SEGMENTATION_POLICIES
+        ),
+        "rows": len(rows),
+        "current_run_rows": len(current_rows),
+        "selected_artifacts": len(current_by_artifact),
+        "profile_counts": dict(sorted(profile_counts.items())),
+        "status_counts": dict(sorted(status_counts.items())),
+        "zero_tag_segments": status_counts.get("zero_tags", 0),
+        "rejected_output_segments": status_counts.get(
+            "rejected_output",
+            0,
+        ),
+        "retry_exhausted_segments": status_counts.get(
+            "retry_exhausted",
+            0,
+        ),
+    }
 
 
 def _validate_rule_targets(
@@ -1039,7 +1729,7 @@ def validate_generation(
     }
     required_paths = {
         name: manifest_path.parent / name
-        for name in OntologyDatasetPipeline.published_outputs
+        for name in OntologyDatasetPipeline.generation_outputs()
     }
     if all(path.exists() for path in required_paths.values()):
         metrics["rule_targets"] = _validate_rule_targets(
@@ -1083,6 +1773,14 @@ def validate_generation(
             documents=documents,
             fr_documents=fr_documents,
             failures=failures,
+        )
+        metrics["ontology_segment_ledger"] = (
+            _validate_segment_ledger(
+                required_paths["ontology_segment_ledger.parquet"],
+                directory=manifest_path.parent,
+                run_id=str(manifest.get("run_id") or ""),
+                failures=failures,
+            )
         )
 
     baseline: dict[str, Any] | None = None

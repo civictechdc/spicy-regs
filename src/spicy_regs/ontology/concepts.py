@@ -17,6 +17,7 @@ from spicy_regs.ontology.common import (
     RunContext,
     canonical_json,
     stable_id,
+    text_digest,
 )
 from spicy_regs.ontology.invariants import (
     assert_append_only,
@@ -24,7 +25,15 @@ from spicy_regs.ontology.invariants import (
     assert_concept_graphs,
     resolve_replacement,
 )
-from spicy_regs.ontology.llm import OntologyModel, TagProposal
+from spicy_regs.ontology.llm import (
+    EVIDENCE_ALIGNMENT_PROVIDED,
+    EVIDENCE_ALIGNMENT_UNIQUE_EXACT,
+    OntologyModel,
+    TagProposal,
+    ontology_concept_payload,
+    resolve_exact_evidence_offsets,
+)
+from spicy_regs.ontology.segmentation import TiktokenCounter
 from spicy_regs.ontology.subjects import Subject
 
 CONCEPT_COLUMNS = (
@@ -63,6 +72,7 @@ EVENT_TYPES = frozenset({"merge", "split", "rename", "deprecate", "promote", "se
 
 SEED_ACTOR = "federal-register-thesaurus:v1"
 MERGE_ACTOR = "spicy-regs:concept-convergence:v1"
+CANDIDATE_REGISTRY_MAX_TOKENS = 2_400
 
 
 def normalize_label(label: object) -> str:
@@ -158,26 +168,49 @@ def merge_seed_registry(prior: Sequence[dict], seeds: Iterable[dict]) -> list[di
 
 def select_candidate_concepts(subject: Subject, concepts: Sequence[dict], *, limit: int = 40) -> list[dict]:
     """Bound prompt size using lexical overlap while retaining both facets."""
-    tokens = set(normalize_label(subject.text).split())
+    normalized_subject = normalize_label(subject.text)
+    tokens = set(normalized_subject.split())
     scored: list[tuple[float, str, dict]] = []
     for concept in concepts:
         if concept.get("status") == "deprecated":
             continue
+        if concept.get("scheme") not in subject.allowed_schemes:
+            continue
         aliases = concept_aliases(concept)
         label_tokens = set().union(*(alias.split() for alias in aliases)) if aliases else set()
         overlap = len(tokens & label_tokens) / max(1, len(label_tokens))
-        substring = 1.0 if any(alias and alias in normalize_label(subject.text) for alias in aliases) else 0.0
+        substring = 1.0 if any(alias and alias in normalized_subject for alias in aliases) else 0.0
         score = max(overlap, substring)
         scored.append((score, str(concept.get("concept_id")), concept))
     scored.sort(key=lambda item: (-item[0], item[1]))
-    selected = [item[2] for item in scored[:limit]]
-    for scheme in SCHEMES:
+    counter = TiktokenCounter()
+    prefix = [concept for _, _, concept in scored[: max(0, limit)]]
+    if (
+        counter.count(canonical_json([ontology_concept_payload(concept) for concept in prefix]))
+        <= CANDIDATE_REGISTRY_MAX_TOKENS
+    ):
+        selected = prefix
+    else:
+        selected = []
+        for _, _, concept in scored:
+            if len(selected) >= limit:
+                break
+            proposed = [*selected, concept]
+            if (
+                counter.count(canonical_json([ontology_concept_payload(item) for item in proposed]))
+                <= CANDIDATE_REGISTRY_MAX_TOKENS
+            ):
+                selected.append(concept)
+    for scheme in subject.allowed_schemes:
         if not any(concept.get("scheme") == scheme for concept in selected):
             fallback = next(
                 (concept for _, _, concept in scored if concept.get("scheme") == scheme),
                 None,
             )
-            if fallback is not None:
+            if fallback is not None and (
+                counter.count(canonical_json([ontology_concept_payload(item) for item in [*selected, fallback]]))
+                <= CANDIDATE_REGISTRY_MAX_TOKENS
+            ):
                 selected.append(fallback)
     return selected
 
@@ -204,10 +237,71 @@ def make_assignment(
     supersedes_id: str | None = None,
     validation: dict | None = None,
 ) -> dict:
+    field_text = subject.fields.get(proposal.evidence_field)
+    if field_text is None:
+        raise ValueError(f"Unknown evidence field {proposal.evidence_field!r}")
+    resolution = resolve_exact_evidence_offsets(
+        field_text,
+        proposal.evidence_text,
+        proposal.evidence_start,
+        proposal.evidence_end,
+    )
+    if resolution is None:
+        raise ValueError("Assignment evidence does not resolve in its segment")
+    local_start = resolution.start
+    local_end = resolution.end
+    alignment_method = (
+        proposal.evidence_alignment_method
+        if (
+            resolution.method == EVIDENCE_ALIGNMENT_PROVIDED
+            and proposal.evidence_alignment_method
+            in {
+                EVIDENCE_ALIGNMENT_PROVIDED,
+                EVIDENCE_ALIGNMENT_UNIQUE_EXACT,
+            }
+        )
+        else resolution.method
+    )
+    source_start, source_end = (subject.source_spans or {}).get(
+        proposal.evidence_field,
+        (0, len(field_text)),
+    )
+    artifact_start = source_start + local_start
+    artifact_end = source_start + local_end
+    if artifact_end > source_end:
+        raise ValueError("Assignment evidence exceeds its artifact source span")
+    canonical_source_field = (subject.field_sources or {}).get(
+        proposal.evidence_field,
+        proposal.evidence_field,
+    )
+    span = {
+        "text": proposal.evidence_text,
+        "source_field": canonical_source_field,
+        "evidence_field_key": proposal.evidence_field,
+        "start_char": artifact_start,
+        "end_char": artifact_end,
+        "segment_start_char": local_start,
+        "segment_end_char": local_end,
+        "alignment_method": alignment_method,
+        "segment_id": subject.segment_id,
+        "segment_policy": subject.segment_policy,
+        "element_id": (subject.element_ids or {}).get(proposal.evidence_field),
+        "element_kind": (subject.element_kinds or {}).get(proposal.evidence_field),
+        "source_sha256": (subject.source_sha256 or {}).get(proposal.evidence_field),
+    }
     evidence: dict[str, object] = {
-        "spans": [{"text": proposal.evidence_text, "source_field": proposal.evidence_field}],
+        "spans": [span],
         "justification": proposal.justification,
-        "subject_sha256": subject.digest,
+        "justifications": [proposal.justification],
+        "artifact_sha256": subject.version_digest,
+        # Retain the old key while readers migrate to artifact_sha256.
+        "subject_sha256": subject.version_digest,
+        "segment_sha256": subject.digest,
+        "subject_profile": subject.profile_id,
+        "source_table": subject.source_table,
+        "segment_ids": [subject.segment_id],
+        "segment_policy": subject.segment_policy,
+        "truncated_fields": [],
     }
     if validation is not None:
         evidence["validation"] = validation
@@ -217,6 +311,8 @@ def make_assignment(
         subject.subject_type,
         subject.subject_id,
         concept_id,
+        subject.version_digest,
+        subject.segment_id,
         ordinal,
         supersedes_id,
     )
@@ -236,8 +332,189 @@ def assignment_subject_digest(assignment: dict) -> str | None:
         evidence = json.loads(assignment.get("evidence_json") or "{}")
     except (TypeError, json.JSONDecodeError):
         return None
-    value = evidence.get("subject_sha256")
+    value = evidence.get("artifact_sha256") or evidence.get("subject_sha256")
     return str(value) if value else None
+
+
+def _evidence_payload(assignment: dict) -> dict:
+    try:
+        value = json.loads(assignment.get("evidence_json") or "{}")
+    except (TypeError, json.JSONDecodeError):
+        return {}
+    return cast(dict, value) if isinstance(value, dict) else {}
+
+
+def aggregate_segment_assignments(
+    assignments: Sequence[dict],
+    *,
+    context: RunContext,
+    actor_id: str,
+    supersedes_by_key: dict[tuple[str, str, str], str] | None = None,
+) -> list[dict]:
+    """Combine segment proposals into one artifact-and-concept assertion."""
+    grouped: dict[
+        tuple[str, str, str, str],
+        list[dict],
+    ] = defaultdict(list)
+    for assignment in assignments:
+        evidence = _evidence_payload(assignment)
+        key = (
+            str(assignment.get("subject_type") or ""),
+            str(assignment.get("subject_id") or ""),
+            str(assignment.get("concept_id") or ""),
+            str(evidence.get("artifact_sha256") or evidence.get("subject_sha256") or ""),
+        )
+        grouped[key].append(assignment)
+
+    result: list[dict] = []
+    for (
+        subject_type,
+        subject_id,
+        concept_id,
+        artifact_digest,
+    ), rows in sorted(grouped.items()):
+        span_by_key: dict[str, dict] = {}
+        justifications: set[str] = set()
+        segment_ids: set[str] = set()
+        profiles: set[str] = set()
+        source_tables: set[str] = set()
+        provenance: list[dict[str, object]] = []
+        for row in rows:
+            evidence = _evidence_payload(row)
+            for span_value in evidence.get("spans") or []:
+                if not isinstance(span_value, dict):
+                    continue
+                span = cast(dict, span_value)
+                span_key = canonical_json(
+                    {
+                        "element_id": span.get("element_id"),
+                        "source_field": span.get("source_field"),
+                        "start_char": span.get("start_char"),
+                        "end_char": span.get("end_char"),
+                        "text": span.get("text"),
+                    }
+                )
+                span_by_key[span_key] = span
+                if span.get("segment_id"):
+                    segment_ids.add(str(span["segment_id"]))
+            for justification in evidence.get("justifications") or [evidence.get("justification")]:
+                if justification:
+                    justifications.add(str(justification))
+            if evidence.get("subject_profile"):
+                profiles.add(str(evidence["subject_profile"]))
+            if evidence.get("source_table"):
+                source_tables.add(str(evidence["source_table"]))
+            provenance.append(
+                {
+                    "assignment_id": row.get("assignment_id"),
+                    "actor_id": row.get("actor_id"),
+                    "run_id": row.get("run_id"),
+                    "segment_ids": evidence.get("segment_ids") or [],
+                }
+            )
+        spans = sorted(
+            span_by_key.values(),
+            key=lambda span: (
+                str(span.get("source_field") or ""),
+                int(span.get("start_char") or 0),
+                int(span.get("end_char") or 0),
+                str(span.get("segment_id") or ""),
+            ),
+        )
+        evidence_set_digest = text_digest(canonical_json(spans))
+        supersedes_id = (supersedes_by_key or {}).get((subject_type, subject_id, concept_id))
+        assignment_id = stable_id(
+            "assignment",
+            context.run_id,
+            subject_type,
+            subject_id,
+            concept_id,
+            artifact_digest,
+            evidence_set_digest,
+            supersedes_id,
+        )
+        evidence = {
+            "spans": spans,
+            "justification": (sorted(justifications)[0] if justifications else ""),
+            "justifications": sorted(justifications),
+            "artifact_sha256": artifact_digest,
+            "subject_sha256": artifact_digest,
+            "subject_profile": (sorted(profiles)[0] if profiles else None),
+            "source_table": (sorted(source_tables)[0] if source_tables else None),
+            "segment_ids": sorted(segment_ids),
+            "segment_policy": (spans[0].get("segment_policy") if spans else None),
+            "proposal_provenance": provenance,
+            "truncated_fields": [],
+        }
+        result.append(
+            {
+                "assignment_id": assignment_id,
+                "subject_type": subject_type,
+                "subject_id": subject_id,
+                "concept_id": concept_id,
+                "confidence": (f"{max(float(row.get('confidence') or 0) for row in rows):.6f}"),
+                "evidence_json": canonical_json(evidence),
+                **context.provenance(
+                    method="llm",
+                    actor_id=actor_id,
+                    supersedes_id=supersedes_id,
+                ),
+            }
+        )
+    return result
+
+
+def supersede_assignment_with_validation(
+    assignment: dict,
+    *,
+    validations: Sequence[dict],
+    context: RunContext,
+    actor_id: str,
+) -> dict:
+    """Append a validated assertion without mutating its proposal history."""
+    if not validations:
+        raise ValueError("At least one validation result is required")
+    evidence = _evidence_payload(assignment)
+    agrees = [validation for validation in validations if validation.get("agrees") is True]
+    evidence["validation"] = {
+        "agrees": bool(agrees),
+        "accepted_span_count": len(agrees),
+        "evaluated_span_count": len(validations),
+        "spans": list(validations),
+    }
+    prior_confidence = float(assignment.get("confidence") or 0)
+    confidence = (
+        prior_confidence
+        if agrees
+        else min(
+            prior_confidence,
+            max(float(validation.get("confidence") or 0) for validation in validations),
+        )
+    )
+    prior_id = str(assignment.get("assignment_id") or "")
+    assignment_id = stable_id(
+        "assignment",
+        context.run_id,
+        assignment.get("subject_type"),
+        assignment.get("subject_id"),
+        assignment.get("concept_id"),
+        evidence.get("artifact_sha256"),
+        text_digest(canonical_json(validations)),
+        prior_id,
+    )
+    return {
+        "assignment_id": assignment_id,
+        "subject_type": assignment.get("subject_type"),
+        "subject_id": assignment.get("subject_id"),
+        "concept_id": assignment.get("concept_id"),
+        "confidence": f"{confidence:.6f}",
+        "evidence_json": canonical_json(evidence),
+        **context.provenance(
+            method="llm",
+            actor_id=actor_id,
+            supersedes_id=prior_id,
+        ),
+    }
 
 
 def generate_for_subject(

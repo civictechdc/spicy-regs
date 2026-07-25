@@ -41,6 +41,12 @@ class OntologyDatasetPipeline(MaterializedDatasetPipeline):
         ("concept_assignments.parquet", "_concept_assignments_prior.parquet"),
         ("concept_events.parquet", "_concept_events_prior.parquet"),
     )
+    optional_prior_outputs: ClassVar[tuple[tuple[str, str], ...]] = (
+        (
+            "ontology_segment_ledger.parquet",
+            "_ontology_segment_ledger_prior.parquet",
+        ),
+    )
     published_outputs: ClassVar[tuple[str, ...]] = (
         "rule_targets.parquet",
         "authority_edges.parquet",
@@ -51,6 +57,9 @@ class OntologyDatasetPipeline(MaterializedDatasetPipeline):
         "concepts.parquet",
         "concept_assignments.parquet",
         "concept_events.parquet",
+    )
+    internal_outputs: ClassVar[tuple[str, ...]] = (
+        "ontology_segment_ledger.parquet",
     )
 
     def __init__(
@@ -141,9 +150,23 @@ class OntologyDatasetPipeline(MaterializedDatasetPipeline):
             ("concepts.parquet", "_concepts_prior.parquet"),
             ("concept_assignments.parquet", "_concept_assignments_prior.parquet"),
             ("concept_events.parquet", "_concept_events_prior.parquet"),
+            (
+                "ontology_segment_ledger.parquet",
+                "_ontology_segment_ledger_prior.parquet",
+            ),
         ):
             prior = output_dir / prior_name
             if not prior.exists():
+                if output_name == "ontology_segment_ledger.parquet":
+                    from spicy_regs.ontology.ledger import (
+                        write_segment_ledger,
+                    )
+
+                    write_segment_ledger(
+                        output_dir,
+                        new_rows=(),
+                    )
+                    continue
                 raise RuntimeError(
                     f"An identity-only ontology refresh requires a prior complete generation; missing {output_name}"
                 )
@@ -276,6 +299,7 @@ class OntologyDatasetPipeline(MaterializedDatasetPipeline):
                             "concepts.parquet",
                             "concept_assignments.parquet",
                             "concept_events.parquet",
+                            "ontology_segment_ledger.parquet",
                         ),
                         build=assignments,
                     ),

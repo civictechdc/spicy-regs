@@ -97,7 +97,20 @@ class MaterializedDatasetPipeline(Pipeline):
     dataset_name: ClassVar[str]
     source_inputs: ClassVar[tuple[str, ...]] = ()
     prior_outputs: ClassVar[tuple[tuple[str, str], ...]] = ()
+    optional_prior_outputs: ClassVar[tuple[tuple[str, str], ...]] = ()
     published_outputs: ClassVar[tuple[str, ...]] = ()
+    internal_outputs: ClassVar[tuple[str, ...]] = ()
+
+    @classmethod
+    def generation_outputs(cls) -> tuple[str, ...]:
+        """Return public and internal artifacts bound to one generation."""
+        overlap = set(cls.published_outputs) & set(cls.internal_outputs)
+        if overlap:
+            raise RuntimeError(
+                "Materialized dataset outputs cannot be both public and "
+                f"internal: {sorted(overlap)}"
+            )
+        return (*cls.published_outputs, *cls.internal_outputs)
 
     def __init__(
         self,
@@ -162,7 +175,11 @@ class MaterializedDatasetPipeline(Pipeline):
             if missing:
                 raise RuntimeError(f"Materialized stage {stage.name!r} did not produce: {', '.join(missing)}")
 
-        missing_outputs = [name for name in self.published_outputs if not (output_dir / name).exists()]
+        missing_outputs = [
+            name
+            for name in self.generation_outputs()
+            if not (output_dir / name).exists()
+        ]
         if missing_outputs:
             raise RuntimeError(
                 f"Materialized dataset {self.dataset_name!r} is incomplete: {', '.join(missing_outputs)}"
@@ -200,7 +217,11 @@ class MaterializedDatasetPipeline(Pipeline):
             "R2_SECRET_ACCESS_KEY",
             "R2_ENDPOINT",
         ]
-        if self.source_inputs or self.prior_outputs:
+        if (
+            self.source_inputs
+            or self.prior_outputs
+            or self.optional_prior_outputs
+        ):
             required.append("R2_PUBLIC_URL")
         missing = [name for name in required if not getenv(name)]
         if missing:
@@ -254,7 +275,10 @@ class MaterializedDatasetPipeline(Pipeline):
             if not self.skip_upload:
                 pointer_path.unlink(missing_ok=True)
                 (output_dir / f"_{self.dataset_name}_previous_manifest.json").unlink(missing_ok=True)
-                for _, prior_name in self.prior_outputs:
+                for _, prior_name in (
+                    *self.prior_outputs,
+                    *self.optional_prior_outputs,
+                ):
                     (output_dir / prior_name).unlink(missing_ok=True)
             logger.info(
                 "No prior {} materialized generation; bootstrapping",
@@ -290,10 +314,33 @@ class MaterializedDatasetPipeline(Pipeline):
         artifacts = manifest.get("artifacts")
         if not isinstance(artifacts, dict):
             raise RuntimeError(f"{self.dataset_name} manifest has no artifact map")
-        for artifact_name, prior_name in self.prior_outputs:
+        required_prior_names = {
+            artifact_name
+            for artifact_name, _ in self.prior_outputs
+        }
+        prior_declarations = (
+            *self.prior_outputs,
+            *self.optional_prior_outputs,
+        )
+        if len({name for name, _ in prior_declarations}) != len(
+            prior_declarations
+        ):
+            raise RuntimeError(
+                "Materialized prior artifact declarations must be unique"
+            )
+        for artifact_name, prior_name in prior_declarations:
             target = output_dir / prior_name
             record = artifacts.get(artifact_name)
             if not isinstance(record, dict):
+                if artifact_name not in required_prior_names:
+                    target.unlink(missing_ok=True)
+                    logger.info(
+                        "Prior {} generation predates optional artifact {}; "
+                        "starting its migration history empty",
+                        self.dataset_name,
+                        artifact_name,
+                    )
+                    continue
                 raise RuntimeError(f"{self.dataset_name} manifest is missing stateful artifact {artifact_name}")
             remote_key = _safe_remote_key(record.get("remote_key"), prefix=expected_prefix)
             if remote_key != f"{expected_prefix}{artifact_name}":
@@ -315,7 +362,10 @@ class MaterializedDatasetPipeline(Pipeline):
         sources = {name: _file_record(output_dir / name) for name in self.source_inputs}
         prior = {
             artifact: _file_record(output_dir / local_name)
-            for artifact, local_name in self.prior_outputs
+            for artifact, local_name in (
+                *self.prior_outputs,
+                *self.optional_prior_outputs,
+            )
             if (output_dir / local_name).exists()
         }
         return {
@@ -357,7 +407,10 @@ class MaterializedDatasetPipeline(Pipeline):
         stages: tuple[DatasetStage, ...],
         input_snapshot: dict,
     ) -> tuple[Path, Path, dict[str, Path]]:
-        artifact_paths = {name: output_dir / name for name in self.published_outputs}
+        artifact_paths = {
+            name: output_dir / name
+            for name in self.generation_outputs()
+        }
         artifact_records = {
             name: {
                 **_file_record(path),
@@ -388,6 +441,11 @@ class MaterializedDatasetPipeline(Pipeline):
             name: {
                 **artifact_records[name],
                 "remote_key": f"{prefix}/{name}",
+                "visibility": (
+                    "public"
+                    if name in self.published_outputs
+                    else "internal"
+                ),
             }
             for name in artifact_paths
         }

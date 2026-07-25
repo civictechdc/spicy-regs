@@ -51,6 +51,7 @@ ROW_CHANGE_BUDGETS = {"usaspending_recipients": 14}
 SKIPPED = {
     "unified_agenda": "semiannual edition, not a daily date watermark",
     "sam_entities": "registration_date does not change when an existing entity is refreshed",
+    "court_opinions": "Supreme Court opinions are seasonal and have no daily freshness promise",
     # Promote these to DateChecks (date_created / date_received) once the first
     # publish lands — checking before then would 404 the whole freshness query.
     "fcc_proceedings": "not yet published to R2; first backfill pending",

@@ -2,7 +2,7 @@
 
 # `concept_assignments`
 
-Append-only tag assertions connecting dockets and FR-backed regulations.gov documents to concepts. Validation disagreements append a lower-confidence superseding row; existing assertions are never updated.
+Append-only artifact-to-concept assertions. Segment proposals aggregate at source-artifact grain, and validation appends a superseding assertion; existing rows are never updated.
 
 - **Parquet file:** `materialized/ontology/latest.json` (atomic snapshot manifest)
 - **Supported by MCP `query_sql` after first publication:** Yes
@@ -10,11 +10,11 @@ Append-only tag assertions connecting dockets and FR-backed regulations.gov docu
 | Column | Type | Description |
 | --- | --- | --- |
 | `assignment_id` | `VARCHAR` | Stable assertion id. Primary key. |
-| `subject_type` | `VARCHAR` | `docket`, `document`, or future `cfr_section`. |
-| `subject_id` | `VARCHAR` | Foreign key into the table named by `subject_type`. |
+| `subject_type` | `VARCHAR` | Source-artifact family, such as `docket`, `document`, `comment`, `cfr_section`, or `gao_report`. |
+| `subject_id` | `VARCHAR` | Source-scoped artifact identifier for the declared subject type. |
 | `concept_id` | `VARCHAR` | Assigned concept; deprecated ids resolve through `concepts.replaced_by`. |
 | `confidence` | `VARCHAR` | Assertion confidence from 0 through 1, stored as VARCHAR. |
-| `evidence_json` | `VARCHAR` | Grounding spans, source fields, source-text digest, justification, and optional validation result. |
+| `evidence_json` | `VARCHAR` | Exact artifact-field offsets, quoted source text, deterministic alignment method, artifact digest, element and segment provenance, justifications, and optional per-span validation. |
 | `method` | `VARCHAR` | `llm`, `embedding`, `human`, or deterministic method. |
 | `actor_id` | `VARCHAR` | Model/version, ruleset, or human actor. |
 | `run_id` | `VARCHAR` | Resumable generation/validation run identifier. |

@@ -34,7 +34,7 @@ when published):
 - Retrieval ontology: `concepts`, `concept_assignments`, `concept_events`
 - Source lifecycle: `federal_register.parquet`, `unified_agenda.parquet`, `congress_bills.parquet`, `cfr_sections.parquet`
 - Organizations & influence: `sam_entities.parquet`, `lobbying_filings.parquet`, `fec_committees.parquet`
-- Outcomes & context: `usaspending_recipients.parquet`, `court_dockets.parquet`, `gao_reports.parquet`, `crs_reports.parquet`
+- Outcomes & context: `usaspending_recipients.parquet`, `court_dockets.parquet`, `court_opinions.parquet`, `gao_reports.parquet`, `crs_reports.parquet`
 
 See the [Data Dictionary](https://civictechdc.github.io/spicy-regs/) for each table's columns, keys, and coverage/scope notes.
 

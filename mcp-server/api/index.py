@@ -71,6 +71,7 @@ TABLES = (
     "gao_reports",
     "crs_reports",
     "court_dockets",
+    "court_opinions",
     "usaspending_recipients",
     "fcc_proceedings",
     "fcc_filings",
