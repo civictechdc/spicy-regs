@@ -280,6 +280,7 @@ def _install_segment_fixture(
             }
         ],
         "prompt_sha256": "a" * 64,
+        "request_sha256": "b" * 64,
         "prompt_token_estimate": 500,
         "prompt_input_token_budget": 8_192,
         "prompt_safety_margin_tokens": 1_024,

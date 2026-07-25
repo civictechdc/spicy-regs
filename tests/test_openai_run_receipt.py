@@ -62,6 +62,7 @@ class _ReceiptModel:
                 }
             ],
             "prompt_sha256": "a" * 64,
+            "request_sha256": "b" * 64,
             "prompt_token_estimate": 500,
             "prompt_input_token_budget": 8_192,
             "prompt_safety_margin_tokens": 1_024,
@@ -229,5 +230,42 @@ def test_strict_openai_receipt_rejects_missing_segment_ledger_row(
     assert receipt["status"] == "fail"
     assert any(
         "segments lack ledger rows" in failure
+        for failure in receipt["failures"]
+    )
+
+
+def test_strict_openai_receipt_rejects_payload_only_prompt_hash(
+    tmp_path: Path,
+) -> None:
+    assert _build_receipted_run(tmp_path)["status"] == "pass"
+    checkpoint_path = (
+        tmp_path
+        / ".ontology-checkpoints"
+        / f"{_RUN_ID}-assignment-generation.jsonl"
+    )
+    rows = [
+        json.loads(line)
+        for line in checkpoint_path.read_text(encoding="utf-8").splitlines()
+    ]
+    for row in rows:
+        metadata = row["model_call"]
+        metadata.pop("request_sha256", None)
+    checkpoint_path.write_text(
+        "".join(
+            json.dumps(row, separators=(",", ":"), sort_keys=True) + "\n"
+            for row in rows
+        ),
+        encoding="utf-8",
+    )
+
+    receipt = build_openai_run_receipt(
+        tmp_path,
+        minimum_f1=0,
+        require_call_metadata=True,
+    )
+
+    assert receipt["status"] == "fail"
+    assert any(
+        "model-call telemetry rows are invalid" in failure
         for failure in receipt["failures"]
     )

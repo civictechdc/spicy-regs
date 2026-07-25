@@ -416,6 +416,24 @@ class OpenAIOntologyModel:
             "service_tier",
             DEFAULT_SERVICE_TIER,
         )
+        request: dict[str, Any] = {
+            "model": self.model,
+            "instructions": instructions,
+            "input": prompt,
+            "max_output_tokens": max_output_tokens,
+            "reasoning": {"effort": reasoning_effort},
+            "service_tier": service_tier,
+            "store": False,
+            "text": {
+                "format": {
+                    "type": "json_schema",
+                    "name": name,
+                    "strict": True,
+                    "schema": schema,
+                }
+            },
+        }
+        request_sha256 = hashlib.sha256(canonical_json(request).encode()).hexdigest()
         prompt_tokens = counter.count(instructions + "\n" + prompt)
         if prompt_tokens + PROMPT_SAFETY_MARGIN_TOKENS > (PROMPT_INPUT_TOKEN_BUDGET):
             self.last_call_metadata = {
@@ -425,6 +443,7 @@ class OpenAIOntologyModel:
                 "retry_count": 0,
                 "attempts": [],
                 "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
+                "request_sha256": request_sha256,
                 "prompt_token_estimate": prompt_tokens,
                 "prompt_input_token_budget": (PROMPT_INPUT_TOKEN_BUDGET),
                 "prompt_safety_margin_tokens": (PROMPT_SAFETY_MARGIN_TOKENS),
@@ -448,24 +467,6 @@ class OpenAIOntologyModel:
                 "sdk_max_retries": 0,
             }
             raise PromptBudgetExceededError("Ontology prompt exceeds the declared input-token budget")
-
-        request: dict[str, Any] = {
-            "model": self.model,
-            "instructions": instructions,
-            "input": prompt,
-            "max_output_tokens": max_output_tokens,
-            "reasoning": {"effort": reasoning_effort},
-            "service_tier": service_tier,
-            "store": False,
-            "text": {
-                "format": {
-                    "type": "json_schema",
-                    "name": name,
-                    "strict": True,
-                    "schema": schema,
-                }
-            },
-        }
         max_retries = getattr(
             self,
             "max_retries",
@@ -519,6 +520,7 @@ class OpenAIOntologyModel:
                     call_started=call_started,
                     attempts=attempts,
                     prompt=prompt,
+                    request_sha256=request_sha256,
                     prompt_tokens=prompt_tokens,
                     counter=counter,
                     max_output_tokens=max_output_tokens,
@@ -553,6 +555,7 @@ class OpenAIOntologyModel:
                     call_started=call_started,
                     attempts=attempts,
                     prompt=prompt,
+                    request_sha256=request_sha256,
                     prompt_tokens=prompt_tokens,
                     counter=counter,
                     max_output_tokens=max_output_tokens,
@@ -917,6 +920,7 @@ def _call_metadata(
     call_started: float,
     attempts: list[dict[str, object]],
     prompt: str,
+    request_sha256: str,
     prompt_tokens: int,
     counter: TiktokenCounter,
     max_output_tokens: int,
@@ -943,6 +947,7 @@ def _call_metadata(
         "retry_count": max(0, len(attempts) - 1),
         "attempts": [dict(attempt) for attempt in attempts],
         "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
+        "request_sha256": request_sha256,
         "prompt_token_estimate": prompt_tokens,
         "prompt_input_token_budget": PROMPT_INPUT_TOKEN_BUDGET,
         "prompt_safety_margin_tokens": PROMPT_SAFETY_MARGIN_TOKENS,

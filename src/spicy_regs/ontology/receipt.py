@@ -320,7 +320,43 @@ def _json_object_value(
 
 
 def _valid_completed_model_call(metadata: dict[str, Any]) -> bool:
-    """Validate safe, application-owned OpenAI call telemetry."""
+    """Validate safe, application-owned structured-model telemetry."""
+    if metadata.get("transport") == "codex-cli":
+        attempts = metadata.get("attempts")
+        disabled_features = metadata.get("disabled_features")
+        event_types = metadata.get("event_types")
+        try:
+            total_tokens = int(str(metadata.get("total_tokens") or 0))
+        except (TypeError, ValueError):
+            return False
+        return (
+            metadata.get("status") == "completed"
+            and metadata.get("store") is False
+            and metadata.get("session_persistence") == "ephemeral"
+            and metadata.get("tools_enabled") is False
+            and metadata.get("schema_validated_locally") is True
+            and metadata.get("exit_code") == 0
+            and bool(metadata.get("response_id"))
+            and bool(metadata.get("thread_id"))
+            and bool(metadata.get("cli_version"))
+            and bool(_SHA256.fullmatch(str(metadata.get("prompt_sha256") or "")))
+            and bool(_SHA256.fullmatch(str(metadata.get("request_sha256") or "")))
+            and bool(_SHA256.fullmatch(str(metadata.get("command_sha256") or "")))
+            and bool(_SHA256.fullmatch(str(metadata.get("event_stream_sha256") or "")))
+            and isinstance(disabled_features, list)
+            and "shell_tool" in disabled_features
+            and "plugins" in disabled_features
+            and "skill_search" in disabled_features
+            and isinstance(event_types, list)
+            and not metadata.get("unknown_event_types")
+            and not metadata.get("forbidden_item_types")
+            and not metadata.get("terminal_error_event_types")
+            and isinstance(attempts, list)
+            and len(attempts) == 1
+            and isinstance(attempts[0], dict)
+            and attempts[0].get("status") == "completed"
+            and total_tokens > 0
+        )
     try:
         attempt_count = int(str(metadata.get("attempt_count")))
         retry_count = int(str(metadata.get("retry_count")))
@@ -356,6 +392,8 @@ def _valid_completed_model_call(metadata: dict[str, Any]) -> bool:
     return (
         metadata.get("status") == "completed"
         and metadata.get("store") is False
+        and bool(_SHA256.fullmatch(str(metadata.get("prompt_sha256") or "")))
+        and bool(_SHA256.fullmatch(str(metadata.get("request_sha256") or "")))
         and metadata.get("reasoning_effort")
         in SUPPORTED_REASONING_EFFORTS
         and bool(metadata.get("response_id"))

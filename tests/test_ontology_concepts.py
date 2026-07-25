@@ -336,6 +336,7 @@ def test_openai_provider_uses_strict_responses_schema_and_grounded_evidence():
     assert calls[0]["max_output_tokens"] == TAG_MAX_OUTPUT_TOKENS
     assert model.last_call_metadata["status"] == "completed"
     assert model.last_call_metadata["store"] is False
+    assert len(str(model.last_call_metadata["request_sha256"])) == 64
     assert model.last_call_metadata["reasoning_effort"] == "medium"
     assert model.last_call_metadata["requested_service_tier"] == "auto"
     assert model.last_call_metadata["sdk_max_retries"] == 0
