@@ -550,6 +550,85 @@ available in `documents` and are counted as excluded projection values; they do
 not mint Artifact IRIs. `agency_code` is deliberately not mapped to
 `rkaf:hasAuthority`; agency identity alone is not legal authority.
 
+## Relationship assertions and comparison findings
+
+The relationship-comparison work is Experimental and is not part of the
+published L0 carrier. Its generic model applies across document types. The
+planned document identity seam composes existing vocabularies:
+
+| Object | Meaning |
+| --- | --- |
+| Stable work resource | Public or profile-owned identity across versions; Rulespec does not mint a universal work class. |
+| `Artifact` | One immutable edition, publication, snapshot, content payload, or source posting. |
+| `dcterms:isVersionOf` | Substantive version membership from an Artifact to its stable resource. |
+| `prov:wasRevisionOf` | Exact lineage from a later Artifact to an earlier Artifact. |
+| `dcterms:isFormatOf` / `dcterms:hasFormat` | Substantially identical content in another format or source posting. |
+
+Legal and regulatory profiles may use ELI's LegalResource and LegalExpression
+model. Other profiles may use BIBFRAME, Schema.org, or a domain vocabulary.
+The generic Rulespec core constrains only its Artifact endpoints and does not
+redefine those public models or infer legal effect.
+
+Relationship analysis uses these records:
+
+| Object | Meaning |
+| --- | --- |
+| `RelationshipAssertion` / `RelationAssertion` | An immutable subject-predicate-object proposition with affirmed or denied polarity and construction origin. |
+| `RelationEvidenceBinding` | An exact source span bound to one assertion occurrence and artifact version. |
+| `AssertionAttestation` | A consumer's scoped, temporal approval, rejection, abstention, or review state for an assertion. |
+| `RelationComparisonContext` | The artifact pair, consumer scope, evaluation time, detector version, and snapshot used for one comparison. |
+| `ResolverProofRecord` | A content-addressed decision record that binds one resolver outcome to its inputs, policy, version, evidence, and rationale. |
+| `RelationFinding` | A neutral, evidence-backed analytic result from the deterministic comparator. |
+| `RelationChangeEvent` | A proposed or effected adoption, removal, suspension, or supersession of a relation; currently evaluation-local. |
+| `ClosureClaim` | A bounded, revocable claim that a named observation process covered a declared subject, predicate, expected set, source set, and time range. |
+
+Assertion polarity answers only whether a source affirms or denies the
+canonical relation. It does not encode attribution, conditionality, lifecycle
+state, consumer acceptance, deontic force, or legal effect. Those concerns
+remain separate records or profile-owned interpretations.
+
+The extraction profile likewise keeps relation assertions separate from
+relation change events. A proposal to adopt, remove, suspend, or supersede a
+relation is an event with its own stage and intended-effect time; it is not a
+denied assertion. Applicability time, attribution, and conditionality remain
+orthogonal. `source_voice` identifies the document or issuing source speaking
+for itself. `attributed_source` identifies a distinct reported person,
+organization, instrument, opinion, amendment, or other claimant. Stored
+claimant wording remains verbatim, while comparison may normalize superficial
+determiners such as `the FCC` and `FCC`.
+
+One source span may support multiple claims. A rhetorical sentence can carry
+both the source speaker's proposition and a separately attributed embedded
+proposition with the opposite polarity. Each claim receives its own identity,
+claimant, polarity, time, and condition while retaining the shared exact
+evidence span.
+
+Evidence grounding and evidence scoring are separate. Submitted spans must
+remain exact substrings with exact offsets. The evaluator may recognize a
+terminal-punctuation-only boundary difference as equivalent, but reports it as
+boundary-equivalent rather than exact. Core relation/event semantics,
+orthogonal dimensions, evidence sufficiency, and boundary preference receive
+separate scores.
+
+The current comparator can emit an `affirmed_denied_discrepancy` when all
+predicate, state, evidence, baseline, pairing, and scope gates pass. A failed
+or unknown gate never becomes a negative fact. The model proposes candidates
+and exact evidence; deterministic resolvers and attestations decide whether a
+candidate may enter comparison.
+
+Silence remains unknown. A future longitudinal comparator may emit the neutral
+`expected_relation_not_observed` finding only after it proves artifact
+lineage, expected coverage, comparable scope, and an evidence-bound closure
+claim for the later observation. It must not turn omission into a denied
+assertion.
+
+See the
+[relationship assertion design](superpowers/specs/2026-07-24-relation-exclusion-findings-design.md),
+[resolver contract](superpowers/specs/2026-07-25-relation-comparison-resolver-contract.md),
+[longitudinal omission design](superpowers/specs/2026-07-25-longitudinal-relation-omission-design.md),
+[domain-profile boundary](superpowers/specs/2026-07-25-deontic-relation-profile-boundary.md),
+and [recent research synthesis](evidence/recent-document-relation-lookup-research-2026-07-25.md).
+
 ## Local descriptive-tag terms
 
 `concepts.scheme`, `status`, and `replaced_by`, along with event payloads, are

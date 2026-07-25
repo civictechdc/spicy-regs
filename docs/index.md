@@ -153,6 +153,37 @@ pre-segmentation, 18-source OpenAI baseline.
 - The [RIN revision goal](superpowers/specs/2026-07-24-rin-ontology-revision-agent-goal.md)
   and [RIN corpus report](rin-ontology-revision-report.md) define the current
   local rulemaking candidate. Rulespec remains Experimental and unpublished.
+- The [relationship assertion and exclusion decision](superpowers/specs/2026-07-24-relation-exclusion-findings-design.md)
+  records the general assertion kernel, the bounded OpenAI diagnostic, and the
+  v2 benchmark requirements. V1 is reproducible but is not a fair
+  model-comparison instrument.
+- The [v2 human adjudication protocol](superpowers/specs/2026-07-25-relation-exclusion-v2-human-adjudication-protocol.md)
+  defines the exposed-development-case rules and the sealed, model-blind review
+  gate required before a benchmark-eligible relation-exclusion run.
+- The focused
+  [proof-certificate v2 receipt](evidence/relation-exclusion-openai-v2-focused-five-proof-certificate-2026-07-25/receipt.json)
+  records the five-case development diagnostic that drove claimant,
+  conditionality, evidence-boundary, and prompt integration. It is explicitly
+  not holdout or provider-comparison evidence.
+- The [adversarial review synthesis](evidence/relation-assertion-adversarial-review-2026-07-25.md)
+  records which systemic ontology findings were incorporated and which gates
+  remain open.
+- The [recent document, relation, and lookup research](evidence/recent-document-relation-lookup-research-2026-07-25.md)
+  connects the last year's work to the generic work/version seam, four lookup
+  classes, bounded absence, and package-first implementation.
+- The [bare Codex CLI provider](codex-cli-provider.md) defines the tool-free
+  structured-output adapter and its distinct receipt contract.
+- The [resolver contract](superpowers/specs/2026-07-25-relation-comparison-resolver-contract.md)
+  defines the dependency-inverted comparison and proof boundary.
+- The [longitudinal omission design](superpowers/specs/2026-07-25-longitudinal-relation-omission-design.md)
+  distinguishes explicit denial, relation change, bounded omission, and
+  unknown.
+- The [deontic profile boundary](superpowers/specs/2026-07-25-deontic-relation-profile-boundary.md)
+  keeps neutral findings separate from regulatory or other domain judgments.
+- The [release and migration plan](superpowers/specs/2026-07-25-relationship-assertion-release-migration.md)
+  defines the Rulespec release, Spicy Regs pin, backfill, and rollback order.
+- The [v2 reviewer runbook](superpowers/specs/2026-07-25-relation-exclusion-v2-reviewer-runbook.md)
+  provides the short operator checklist for the two blind reviews.
 - The initial Rulespec feedback (`RULESPEC_FEEDBACK_ITERATION_1.md` at the
   repository root), [initial corpus report](ontology-friction-report.md), and
   [stabilization report](rulespec-repair-report.md) are historical evidence
