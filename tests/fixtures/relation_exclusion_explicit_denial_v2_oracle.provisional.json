@@ -1,0 +1,512 @@
+{
+  "format_version": 2,
+  "dataset_id": "urn:spicy-regs:evaluation:relation-exclusion-v2-pilot",
+  "corpus_content_id": "ad39e0c2a96cd5c89b9727163e9494882cf476046c84953ab772513a84bcff36",
+  "metadata": {
+    "oracle_status": "provisional-machine-assisted",
+    "oracle_content_sha256": null,
+    "frozen_at": null,
+    "omission_analysis": "disabled",
+    "publication_eligible": false,
+    "adjudication_policy": {
+      "required_blind_human_reviews": 2,
+      "human_resolution_required": true,
+      "provider_outputs_hidden": true,
+      "machine_proposals_hidden": true,
+      "protocol_sha256": "b75b54722637f7fc8c247761c4ffec64284d053ea5725fa6871350a758c324b4"
+    }
+  },
+  "adjudication": {
+    "blind_reviews": [],
+    "resolution": null,
+    "machine_proposal_sources": [
+      {
+        "review_id": "urn:spicy-regs:review:ai-precision-red-team-2026-07-24",
+        "reviewer_kind": "ai_agent",
+        "purpose": "Candidate policy proposal, not human adjudication"
+      },
+      {
+        "review_id": "urn:spicy-regs:review:schema-red-team-2026-07-24",
+        "reviewer_kind": "ai_agent",
+        "purpose": "Schema defect analysis, not human adjudication"
+      },
+      {
+        "review_id": "urn:spicy-regs:review:semantic-red-team-2026-07-24",
+        "reviewer_kind": "ai_agent",
+        "purpose": "Ontology defect analysis, not human adjudication"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "case_id": "relx-v2-973cdad68a5c36f0",
+      "role": "direct_denial",
+      "expected_outputs": [
+        {
+          "candidate_id": "urn:spicy-regs:evaluation:v2:gao-airworthiness:denied",
+          "requirement": "required",
+          "kind": "relation_assertion",
+          "polarity": "denied",
+          "temporal_scope": {
+            "relation_to_reference": "includes",
+            "reference": "document_time",
+            "start": null,
+            "end": null,
+            "raw_text": null
+          },
+          "attribution": {
+            "status": "attributed_source",
+            "claimant_text": "the emergency amendment"
+          },
+          "conditionality": {
+            "status": "not_explicit",
+            "condition_text": null
+          },
+          "accepted_evidence": [
+            {
+              "quote": "any logical or physical resources\r\nthat are internal or external to an aircraft and contribute to its\r\nairworthiness are excluded from the scope of the emergency amendment.",
+              "start": 63,
+              "end": 235,
+              "boundary_preference": "preferred",
+              "entailment": "sufficient"
+            }
+          ],
+          "rationale": "The excerpt explicitly attributes a present-at-document exclusion to the emergency amendment.",
+          "operation": null,
+          "stage": null,
+          "intended_effective_scope": null
+        }
+      ]
+    },
+    {
+      "case_id": "relx-v2-67a08387711d35c7",
+      "role": "direct_denial",
+      "expected_outputs": [
+        {
+          "candidate_id": "urn:spicy-regs:evaluation:v2:cfr-mining-terrain:denied",
+          "requirement": "required",
+          "kind": "relation_assertion",
+          "polarity": "denied",
+          "temporal_scope": {
+            "relation_to_reference": "includes",
+            "reference": "document_time",
+            "start": null,
+            "end": null,
+            "raw_text": null
+          },
+          "attribution": {
+            "status": "source_voice",
+            "claimant_text": null
+          },
+          "conditionality": {
+            "status": "explicit",
+            "condition_text": "where mining is done on a flat or gently rolling terrain with an occasional steep slope through which the mining proceeds and leaves a plain or predominantly flat area"
+          },
+          "accepted_evidence": [
+            {
+              "quote": "The standards of this section do not apply where mining is done on a flat or gently rolling terrain with an occasional steep slope through which the mining proceeds and leaves a plain or predominantly flat area;",
+              "start": 180,
+              "end": 391,
+              "boundary_preference": "preferred",
+              "entailment": "sufficient"
+            },
+            {
+              "quote": "The standards of this section do not apply where mining is done on a flat or gently rolling terrain with an occasional steep slope through which the mining proceeds and leaves a plain or predominantly flat area; or where the mining is governed by § 716.3.",
+              "start": 180,
+              "end": 435,
+              "boundary_preference": "accepted",
+              "entailment": "sufficient"
+            },
+            {
+              "quote": "The standards of this section do not apply",
+              "start": 180,
+              "end": 222,
+              "boundary_preference": "accepted",
+              "entailment": "insufficient"
+            }
+          ],
+          "rationale": "The first exclusion clause is sufficient for the target; the longer disjunction remains accepted but is not preferred.",
+          "operation": null,
+          "stage": null,
+          "intended_effective_scope": null
+        }
+      ]
+    },
+    {
+      "case_id": "relx-v2-a1d1e1a081f0c47f",
+      "role": "direct_denial",
+      "expected_outputs": [
+        {
+          "candidate_id": "urn:spicy-regs:evaluation:v2:scotus-maximum-relief:denied",
+          "requirement": "required",
+          "kind": "relation_assertion",
+          "polarity": "denied",
+          "temporal_scope": {
+            "relation_to_reference": "includes",
+            "reference": "document_time",
+            "start": null,
+            "end": null,
+            "raw_text": null
+          },
+          "attribution": {
+            "status": "source_voice",
+            "claimant_text": null
+          },
+          "conditionality": {
+            "status": "not_explicit",
+            "condition_text": null
+          },
+          "accepted_evidence": [
+            {
+              "quote": "Respondents Myra Brown and Alexander \nTaylor are two borrowers who do not qualify for the maximum relief \navailable under the Plan.",
+              "start": 113,
+              "end": 244,
+              "boundary_preference": "preferred",
+              "entailment": "sufficient"
+            }
+          ],
+          "rationale": "The opinion excerpt directly denies qualification for maximum relief.",
+          "operation": null,
+          "stage": null,
+          "intended_effective_scope": null
+        }
+      ]
+    },
+    {
+      "case_id": "relx-v2-e0cd2a13df6b172e",
+      "role": "direct_denial",
+      "expected_outputs": [
+        {
+          "candidate_id": "urn:spicy-regs:evaluation:v2:wioa-authority:denied",
+          "requirement": "required",
+          "kind": "relation_assertion",
+          "polarity": "denied",
+          "temporal_scope": {
+            "relation_to_reference": "includes",
+            "reference": "document_time",
+            "start": null,
+            "end": null,
+            "raw_text": null
+          },
+          "attribution": {
+            "status": "source_voice",
+            "claimant_text": null
+          },
+          "conditionality": {
+            "status": "not_explicit",
+            "condition_text": null
+          },
+          "accepted_evidence": [
+            {
+              "quote": "Section 188 of WIOA does not authorize the Department to require affirmative outreach.",
+              "start": 298,
+              "end": 384,
+              "boundary_preference": "preferred",
+              "entailment": "sufficient"
+            }
+          ],
+          "rationale": "The source directly denies the target authorization.",
+          "operation": null,
+          "stage": null,
+          "intended_effective_scope": null
+        }
+      ]
+    },
+    {
+      "case_id": "relx-v2-67d94648ba1643c0",
+      "role": "affirmed_control",
+      "expected_outputs": [
+        {
+          "candidate_id": "urn:spicy-regs:evaluation:v2:cfr-plan-satisfaction:affirmed",
+          "requirement": "required",
+          "kind": "relation_assertion",
+          "polarity": "affirmed",
+          "temporal_scope": {
+            "relation_to_reference": "includes",
+            "reference": "document_time",
+            "start": null,
+            "end": null,
+            "raw_text": null
+          },
+          "attribution": {
+            "status": "source_voice",
+            "claimant_text": null
+          },
+          "conditionality": {
+            "status": "not_explicit",
+            "condition_text": null
+          },
+          "accepted_evidence": [
+            {
+              "quote": "A profit-sharing, stock bonus, pre-ERISA money purchase pension, or rural cooperative plan does not fail to satisfy the requirements of section 401(a) merely because the plan includes a cash or deferred arrangement.",
+              "start": 89,
+              "end": 304,
+              "boundary_preference": "preferred",
+              "entailment": "sufficient"
+            }
+          ],
+          "rationale": "The target already incorporates the arrangement qualification, so the extracted relationship itself is not conditional.",
+          "operation": null,
+          "stage": null,
+          "intended_effective_scope": null
+        }
+      ]
+    },
+    {
+      "case_id": "relx-v2-d03a41262e20bf30",
+      "role": "conditional_affirmed_control",
+      "expected_outputs": [
+        {
+          "candidate_id": "urn:spicy-regs:evaluation:v2:assessment-rate:affirmed",
+          "requirement": "required",
+          "kind": "relation_assertion",
+          "polarity": "affirmed",
+          "temporal_scope": {
+            "relation_to_reference": "after",
+            "reference": "document_time",
+            "start": null,
+            "end": null,
+            "raw_text": null
+          },
+          "attribution": {
+            "status": "source_voice",
+            "claimant_text": null
+          },
+          "conditionality": {
+            "status": "explicit",
+            "condition_text": "unless modified, suspended, or terminated"
+          },
+          "accepted_evidence": [
+            {
+              "quote": "The assessment rate will remain in effect indefinitely unless modified, suspended, or terminated.",
+              "start": 160,
+              "end": 257,
+              "boundary_preference": "preferred",
+              "entailment": "sufficient"
+            }
+          ],
+          "rationale": "The statement is prospective relative to the document and expressly conditional.",
+          "operation": null,
+          "stage": null,
+          "intended_effective_scope": null
+        }
+      ]
+    },
+    {
+      "case_id": "relx-v2-71395ccd8ec8d8d0",
+      "role": "mixed_attribution_control",
+      "expected_outputs": [
+        {
+          "candidate_id": "urn:spicy-regs:evaluation:v2:fcc-community-service:affirmed",
+          "requirement": "required",
+          "kind": "relation_assertion",
+          "polarity": "affirmed",
+          "temporal_scope": {
+            "relation_to_reference": "includes",
+            "reference": "document_time",
+            "start": null,
+            "end": null,
+            "raw_text": null
+          },
+          "attribution": {
+            "status": "source_voice",
+            "claimant_text": null
+          },
+          "conditionality": {
+            "status": "not_explicit",
+            "condition_text": null
+          },
+          "accepted_evidence": [
+            {
+              "quote": "It’s beyond my understanding why the FCC would think that our local ABC station does not provide a service to our communities.",
+              "start": 0,
+              "end": 126,
+              "boundary_preference": "preferred",
+              "entailment": "sufficient"
+            },
+            {
+              "quote": "Important public safety information and world events are broadcasted by this station",
+              "start": 322,
+              "end": 406,
+              "boundary_preference": "accepted",
+              "entailment": "sufficient"
+            }
+          ],
+          "rationale": "The filer rhetorically rejects the attributed negative view and affirms the target relationship.",
+          "operation": null,
+          "stage": null,
+          "intended_effective_scope": null
+        },
+        {
+          "candidate_id": "urn:spicy-regs:evaluation:v2:fcc-community-service:attributed-denial",
+          "requirement": "allowed",
+          "kind": "relation_assertion",
+          "polarity": "denied",
+          "temporal_scope": {
+            "relation_to_reference": "includes",
+            "reference": "document_time",
+            "start": null,
+            "end": null,
+            "raw_text": null
+          },
+          "attribution": {
+            "status": "attributed_source",
+            "claimant_text": "FCC"
+          },
+          "conditionality": {
+            "status": "not_explicit",
+            "condition_text": null
+          },
+          "accepted_evidence": [
+            {
+              "quote": "It’s beyond my understanding why the FCC would think that our local ABC station does not provide a service to our communities.",
+              "start": 0,
+              "end": 126,
+              "boundary_preference": "preferred",
+              "entailment": "sufficient"
+            }
+          ],
+          "rationale": "A model may separately retain the negative proposition as the filer's uncertain attribution to the FCC.",
+          "operation": null,
+          "stage": null,
+          "intended_effective_scope": null
+        }
+      ]
+    },
+    {
+      "case_id": "relx-v2-4a1643ce48378c05",
+      "role": "conditional_affirmed_control",
+      "expected_outputs": [
+        {
+          "candidate_id": "urn:spicy-regs:evaluation:v2:retained-preamble:affirmed",
+          "requirement": "required",
+          "kind": "relation_assertion",
+          "polarity": "affirmed",
+          "temporal_scope": {
+            "relation_to_reference": "includes",
+            "reference": "document_time",
+            "start": null,
+            "end": null,
+            "raw_text": null
+          },
+          "attribution": {
+            "status": "source_voice",
+            "claimant_text": null
+          },
+          "conditionality": {
+            "status": "explicit",
+            "condition_text": "language remains unchanged and is not specifically modified by this rule's preamble"
+          },
+          "accepted_evidence": [
+            {
+              "quote": "Where language of previous \nregulations remains unchanged, the \npreamble explanation and interpretation \nof that language published with all prior \nfinal rules are also retained, unless \nspecifically modified in the preamble to \nthis rule.",
+              "start": 20,
+              "end": 259,
+              "boundary_preference": "preferred",
+              "entailment": "sufficient"
+            }
+          ],
+          "rationale": "Both unchanged language and lack of a specific modification constrain the retention claim.",
+          "operation": null,
+          "stage": null,
+          "intended_effective_scope": null
+        }
+      ]
+    },
+    {
+      "case_id": "relx-v2-7c90b40744e9f83d",
+      "role": "assertion_plus_change_event_control",
+      "expected_outputs": [
+        {
+          "candidate_id": "urn:spicy-regs:evaluation:v2:wioa-containment:affirmed",
+          "requirement": "required",
+          "kind": "relation_assertion",
+          "polarity": "affirmed",
+          "temporal_scope": {
+            "relation_to_reference": "includes",
+            "reference": "document_time",
+            "start": null,
+            "end": null,
+            "raw_text": null
+          },
+          "attribution": {
+            "status": "source_voice",
+            "claimant_text": null
+          },
+          "conditionality": {
+            "status": "not_explicit",
+            "condition_text": null
+          },
+          "accepted_evidence": [
+            {
+              "quote": "29 CFR 38.40 contains affirmative outreach requirements for recipients of financial assistance under Title I of WIOA.",
+              "start": 180,
+              "end": 297,
+              "boundary_preference": "preferred",
+              "entailment": "sufficient"
+            }
+          ],
+          "rationale": "The source states the relationship as present at document time.",
+          "operation": null,
+          "stage": null,
+          "intended_effective_scope": null
+        },
+        {
+          "candidate_id": "urn:spicy-regs:evaluation:v2:wioa-containment:proposed-removal",
+          "requirement": "required",
+          "kind": "relation_change_event",
+          "polarity": null,
+          "temporal_scope": {
+            "relation_to_reference": "includes",
+            "reference": "document_time",
+            "start": null,
+            "end": null,
+            "raw_text": "is therefore proposing"
+          },
+          "attribution": {
+            "status": "source_voice",
+            "claimant_text": null
+          },
+          "conditionality": {
+            "status": "not_explicit",
+            "condition_text": null
+          },
+          "accepted_evidence": [
+            {
+              "quote": "29 CFR 38.40 contains affirmative outreach requirements for recipients of financial assistance under Title I of WIOA. Section 188 of WIOA does not authorize the Department to require affirmative outreach. The Department is therefore proposing to remove this requirement from the regulations",
+              "start": 180,
+              "end": 470,
+              "boundary_preference": "preferred",
+              "entailment": "sufficient"
+            }
+          ],
+          "rationale": "The proposal is a change event targeting the currently stated requirement, not a present denied assertion.",
+          "operation": "remove",
+          "stage": "proposed",
+          "intended_effective_scope": {
+            "relation_to_reference": "after",
+            "reference": "document_time",
+            "start": null,
+            "end": null,
+            "raw_text": null
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "relx-v2-18e15c9465ef5a82",
+      "role": "unsupported_target_control",
+      "expected_outputs": []
+    },
+    {
+      "case_id": "relx-v2-d2ed304cb4e2256b",
+      "role": "unrelated_target_control",
+      "expected_outputs": []
+    },
+    {
+      "case_id": "relx-v2-45ec2b738d86c5f0",
+      "role": "unrelated_target_control",
+      "expected_outputs": []
+    }
+  ]
+}

@@ -97,6 +97,7 @@ run-segmentation-tagging = "spicy_regs.corpora.segmentation_tagging:main"
 run-artifact-retrieval-baseline = "spicy_regs.corpora.artifact_retrieval_baseline:main"
 build-document-acceptance-scope = "spicy_regs.corpora.document_acceptance_scope:main"
 run-relation-exclusion-evaluation = "spicy_regs.corpora.relation_exclusion_evaluation:main"
+validate-relation-exclusion-v2 = "spicy_regs.corpora.relation_exclusion_evaluation_v2:main"
 
 [build-system]
 requires = ["uv_build<0.12"]
