@@ -7,10 +7,13 @@ import sys
 import types
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from importlib import import_module
+from importlib.metadata import PackageNotFoundError
 from typing import Any
 
 import pytest
 
+from spicy_regs.docpipeline.adapters import sentence_transformers as adapter_module
 from spicy_regs.docpipeline.adapters.sentence_transformers import (
     DEFAULT_DENSE_DIMENSIONS,
     DEFAULT_DENSE_MODEL,
@@ -34,6 +37,7 @@ from spicy_regs.docpipeline.adapters.sentence_transformers import (
     SparseVector,
     installed_package_version,
     ranked_scores_in_input_order,
+    sparse_vectors_from_tensor,
     validate_sparse_vector,
 )
 
@@ -114,6 +118,97 @@ class FakeDenseEncoder:
         return self.vectors
 
 
+class FakeTensor:
+    """Dense tensor stand-in exposing only the surface the adapter reads.
+
+    The adapter identifies a tensor by that surface instead of by its torch
+    type, so this stand-in drives the real conversion branches -- including the
+    dense-to-COO one -- in an environment where torch is not installed.
+    """
+
+    is_sparse = False
+
+    def __init__(self, values: list[Any]) -> None:
+        self._values = values
+
+    @property
+    def shape(self) -> tuple[int, ...]:
+        if self._values and isinstance(self._values[0], list):
+            return (len(self._values), len(self._values[0]))
+        return (len(self._values),)
+
+    @property
+    def ndim(self) -> int:
+        return len(self.shape)
+
+    def detach(self) -> FakeTensor:
+        return self
+
+    def cpu(self) -> FakeTensor:
+        return self
+
+    def tolist(self) -> list[Any]:
+        return self._values
+
+    def unsqueeze(self, dimension: int) -> FakeTensor:
+        assert dimension == 0
+        return FakeTensor([self._values])
+
+    def to_sparse(self) -> FakeCooTensor:
+        return FakeCooTensor(
+            self.shape,
+            [
+                (row, column, value)
+                for row, values in enumerate(self._values)
+                for column, value in enumerate(values)
+                if value != 0.0
+            ],
+        )
+
+
+class FakeCooTensor:
+    """COO tensor stand-in: what ``to_sparse`` builds and SPLADE returns."""
+
+    is_sparse = True
+
+    def __init__(
+        self,
+        shape: tuple[int, ...],
+        entries: list[tuple[int, int, float]],
+        *,
+        coalesced: bool = False,
+    ) -> None:
+        self.shape = shape
+        self._entries = entries
+        self._coalesced = coalesced
+
+    @property
+    def ndim(self) -> int:
+        return len(self.shape)
+
+    def detach(self) -> FakeCooTensor:
+        return self
+
+    def cpu(self) -> FakeCooTensor:
+        return self
+
+    def coalesce(self) -> FakeCooTensor:
+        return FakeCooTensor(self.shape, sorted(self._entries), coalesced=True)
+
+    def indices(self) -> FakeTensor:
+        self._require_coalesced()
+        return FakeTensor([[row for row, _, _ in self._entries], [column for _, column, _ in self._entries]])
+
+    def values(self) -> FakeTensor:
+        self._require_coalesced()
+        return FakeTensor([value for _, _, value in self._entries])
+
+    def _require_coalesced(self) -> None:
+        # torch refuses the COO accessors on an uncoalesced tensor; so does this.
+        if not self._coalesced:
+            raise RuntimeError("COO accessors require a coalesced tensor")
+
+
 class FakeSparseEncoder:
     """Injected stand-in for ``sentence_transformers.SparseEncoder``."""
 
@@ -124,26 +219,23 @@ class FakeSparseEncoder:
         max_seq_length: int | None = 8_192,
         tokenizer: Any | None = None,
     ) -> None:
-        import torch
-
         self.dimensions = dimensions
         self.max_seq_length = max_seq_length
         self.tokenizer = WordTokenizer() if tokenizer is None else tokenizer
         self.device = "cpu"
         self.document_calls: list[tuple[list[str], dict[str, Any]]] = []
         self.query_calls: list[tuple[list[str], dict[str, Any]]] = []
-        self._torch = torch
 
     def get_embedding_dimension(self) -> int | None:
         return self.dimensions
 
     def encode_document(self, texts: list[str], **options: Any) -> Any:
         self.document_calls.append((list(texts), dict(options)))
-        return self._torch.tensor([[0.0, 2.0, 0.0, 1.0], [3.0, 0.0, 0.0, 0.0]])
+        return FakeTensor([[0.0, 2.0, 0.0, 1.0], [3.0, 0.0, 0.0, 0.0]])
 
     def encode_query(self, texts: list[str], **options: Any) -> Any:
         self.query_calls.append((list(texts), dict(options)))
-        return self._torch.tensor([[0.0, 1.0, 0.0, 1.0]])
+        return FakeTensor([[0.0, 1.0, 0.0, 1.0]])
 
 
 class FakeCrossEncoder:
@@ -169,35 +261,42 @@ class FakeCrossEncoder:
         return self.ranked
 
 
-class BlockedImportFinder:
-    """Meta-path finder that fails any import of the blocked package."""
+BLOCKED_PACKAGES = ("sentence_transformers", "torch")
 
-    def __init__(self, blocked: str) -> None:
-        self.blocked = blocked
+
+def blocked_package(name: str) -> bool:
+    return any(name == blocked or name.startswith(f"{blocked}.") for blocked in BLOCKED_PACKAGES)
+
+
+class BlockedImportFinder:
+    """Meta-path finder that fails any import of the blocked packages."""
 
     def find_spec(self, fullname: str, path: Any = None, target: Any = None) -> None:
-        if fullname == self.blocked or fullname.startswith(f"{self.blocked}."):
-            raise ImportError(f"{fullname} is deliberately unavailable in this test")
+        if blocked_package(fullname):
+            raise ImportError(f"{fullname} is deliberately unavailable in these tests")
         return None
 
 
-@contextmanager
-def sdk_unavailable() -> Iterator[None]:
-    """Prove the adapters never reach for the SDK when an encoder is injected."""
-    finder = BlockedImportFinder("sentence_transformers")
-    saved = {
-        name: module
-        for name, module in sys.modules.items()
-        if name == "sentence_transformers" or name.startswith("sentence_transformers.")
-    }
-    for name in saved:
-        del sys.modules[name]
-    sys.meta_path.insert(0, finder)
-    try:
-        yield
-    finally:
-        sys.meta_path.remove(finder)
-        sys.modules.update(saved)
+def uninstalled_distribution(package: str) -> str:
+    raise PackageNotFoundError(package)
+
+
+@pytest.fixture(autouse=True)
+def local_inference_stack_uninstalled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Run every test in this file without the ``embed`` extra installed.
+
+    The adapters promise that an injected encoder needs neither the Sentence
+    Transformers SDK, nor torch, nor either distribution's metadata. That is a
+    property of the whole file, not of one test that remembers to check it: both
+    packages are made unimportable and every distribution reports itself absent,
+    exactly as in a ``uv sync`` without the extra. Tests therefore inject a
+    version reader wherever the version check is not itself the subject, and the
+    model-loading tests inject a stand-in SDK module.
+    """
+    for name in [name for name in sys.modules if blocked_package(name)]:
+        monkeypatch.delitem(sys.modules, name)
+    monkeypatch.setattr(sys, "meta_path", [BlockedImportFinder(), *sys.meta_path])
+    monkeypatch.setattr(adapter_module, "version", uninstalled_distribution)
 
 
 @contextmanager
@@ -476,6 +575,22 @@ def test_sparse_encoder_rejects_a_response_that_does_not_cover_every_input():
         sparse_encoder(encoder=FakeSparseEncoder()).encode(["water quality"], task="document")
 
 
+def test_sparse_conversion_reads_a_tensor_through_its_own_surface():
+    single_row = sparse_vectors_from_tensor(FakeTensor([0.0, 2.0, 0.0, 1.0]), dimensions=4)
+    already_sparse = sparse_vectors_from_tensor(
+        FakeCooTensor((2, 4), [(1, 0, 3.0), (0, 3, 1.0), (0, 1, 2.0)]),
+        dimensions=4,
+    )
+
+    assert single_row == (SparseVector(4, (1, 3), (2.0, 1.0)),)
+    assert already_sparse == (SparseVector(4, (1, 3), (2.0, 1.0)), SparseVector(4, (0,), (3.0,)))
+
+    with pytest.raises(TypeError, match="non-tensor value"):
+        sparse_vectors_from_tensor([[0.0, 2.0, 0.0, 1.0]], dimensions=4)
+    with pytest.raises(ValueError, match="unexpected dimensions"):
+        sparse_vectors_from_tensor(FakeTensor([[0.0, 2.0, 0.0]]), dimensions=4)
+
+
 def test_validate_sparse_vector_rejects_malformed_vectors():
     assert validate_sparse_vector(SparseVector(4, (0, 2), (1.0, 2.0)), 4) == SparseVector(4, (0, 2), (1.0, 2.0))
 
@@ -673,6 +788,14 @@ def test_every_adapter_reads_versions_from_the_installation_by_default():
         assert default is installed_package_version
         assert "package_version" not in inspect.signature(adapter).parameters
 
+    # Nothing is installed here, so the default reader reports the pinned package
+    # absent and every adapter refuses: an injected encoder records the version of
+    # an installation, it never stands in for one.
+    assert installed_package_version(SENTENCE_TRANSFORMERS_PACKAGE) is None
+    for build in (dense_embedder, sparse_encoder, reranker):
+        with pytest.raises(RuntimeError, match="sentence-transformers version differs from the pinned contract"):
+            build(version_reader=installed_package_version)
+
 
 def test_every_adapter_records_whether_it_loaded_its_own_encoder():
     for adapter in (dense_embedder(), sparse_encoder(), reranker()):
@@ -760,16 +883,18 @@ def test_public_parameter_dicts_cannot_change_a_later_call_record():
 
 
 def test_injected_encoders_never_import_the_sentence_transformers_sdk():
-    with sdk_unavailable():
-        assert "sentence_transformers" not in sys.modules
-        dense = dense_embedder()
-        sparse = sparse_encoder()
-        cross = reranker()
-        dense_result = dense.embed(["alpha", "beta gamma"])
-        sparse_result = sparse.encode(["water quality", "air emissions"], task="document")
-        rerank_result = cross.rerank("water quality", ["air emissions", "water quality standard"])
-        assert "sentence_transformers" not in sys.modules
+    # First that the guard is armed -- otherwise this proves nothing where the
+    # extra happens to be installed -- then a full call on every adapter.
+    for package in BLOCKED_PACKAGES:
+        assert package not in sys.modules
+        with pytest.raises(ImportError):
+            import_module(package)
 
+    dense_result = dense_embedder().embed(["alpha", "beta gamma"])
+    sparse_result = sparse_encoder().encode(["water quality", "air emissions"], task="document")
+    rerank_result = reranker().rerank("water quality", ["air emissions", "water quality standard"])
+
+    assert not [package for package in BLOCKED_PACKAGES if package in sys.modules]
     assert len(dense_result.vectors) == 2
     assert len(sparse_result.vectors) == 2
     assert len(rerank_result.scores) == 2

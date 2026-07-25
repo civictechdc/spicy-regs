@@ -11,6 +11,10 @@ baseline. Constructors accept an ``encoder`` (and the reranker a
 ``cache_clearer``) so tests and offline runs never touch the real SDK, and a
 ``version_reader`` that resolves installed distribution versions: the pinned
 version is read from the environment, never declared by the caller.
+
+Only an adapter that loads its own encoder imports the package; an adapter that
+is handed one imports nothing at all, torch included, so an injected encoder
+runs where the ``embed`` extra is not installed.
 """
 
 from __future__ import annotations
@@ -45,6 +49,9 @@ DEFAULT_RERANK_MODEL = "BAAI/bge-reranker-v2-m3"
 DEFAULT_RERANK_REVISION = "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
 DEFAULT_RERANK_MAX_SEQ_LENGTH = 4_096
 DEFAULT_RERANK_BATCH_SIZE = 16
+
+# Every tensor this module reads exposes these; anything else is not a tensor.
+TENSOR_READ_SURFACE = ("detach", "cpu", "ndim", "shape", "is_sparse")
 
 EXACT_MODEL_TOKEN_AUDIT = "exact-untruncated-model-tokenizer"
 EXACT_PAIR_TOKEN_AUDIT = "exact-untruncated-pair-tokenizer"
@@ -169,26 +176,28 @@ def validate_sparse_vector(vector: SparseVector, dimensions: int) -> SparseVecto
 
 
 def sparse_vectors_from_tensor(value: Any, *, dimensions: int) -> tuple[SparseVector, ...]:
-    """Convert the package's dense or COO tensor into portable sparse rows."""
-    try:
-        import torch
-    except ImportError as exc:
-        raise RuntimeError("sparse retrieval requires the 'embed' extra") from exc
-    if not isinstance(value, torch.Tensor):
+    """Convert the package's dense or COO tensor into portable sparse rows.
+
+    A tensor is recognised by the reading surface it exposes, not by
+    ``isinstance(value, torch.Tensor)``, and every value is read back through
+    the tensor's own accessors. So this conversion imports nothing: whoever
+    produced a real tensor already has torch installed, and a stand-in tensor
+    runs the same branches the real one does.
+    """
+    if any(not hasattr(value, name) for name in TENSOR_READ_SURFACE):
         raise TypeError("SparseEncoder returned a non-tensor value")
     tensor = value.detach().cpu()
-    if tensor.ndim == 1:
+    if int(tensor.ndim) == 1:
         tensor = tensor.unsqueeze(0)
-    if tensor.ndim != 2 or int(tensor.shape[1]) != dimensions:
+    shape = tuple(int(size) for size in tensor.shape)
+    if len(shape) != 2 or shape[1] != dimensions:
         raise ValueError("SparseEncoder returned unexpected dimensions")
     sparse = tensor.coalesce() if tensor.is_sparse else tensor.to_sparse().coalesce()
-    coordinates = sparse.indices().numpy()
-    stored_values = sparse.values().to(dtype=torch.float64).numpy()
-    by_row: list[list[tuple[int, float]]] = [[] for _ in range(int(tensor.shape[0]))]
-    for position in range(stored_values.shape[0]):
-        by_row[int(coordinates[0, position])].append(
-            (int(coordinates[1, position]), float(stored_values[position])),
-        )
+    row_coordinates, column_coordinates = sparse.indices().tolist()
+    stored_values = sparse.values().tolist()
+    by_row: list[list[tuple[int, float]]] = [[] for _ in range(shape[0])]
+    for row, column, score in zip(row_coordinates, column_coordinates, stored_values, strict=True):
+        by_row[int(row)].append((int(column), float(score)))
     rows: list[SparseVector] = []
     for items in by_row:
         items.sort()
