@@ -115,6 +115,42 @@ tiebreaker:
   surface so a third party can ask "every section across this agency's
   rules tagged X, with exact offsets" without touching our pipeline.
 
+## Research notes adopted (2026-07-26)
+
+From FourCorners (ACL 2026 industry track; cited in
+[`recent-document-relation-lookup-research-2026-07-25.md`](../../evidence/recent-document-relation-lookup-research-2026-07-25.md))
+and VersionRAG. Purpose-built graded edges empirically beat generic
+GraphRAG on this document class (FourCorners Citation F1 0.812 vs 0.761
+on a 53× larger corpus, and fastest setting; VersionRAG beats GraphRAG
+on version-sensitive questions), so the trajectory stands. Five
+adopted practices:
+
+1. **Fragment-content-addressed extraction units** (steps 4 and 6):
+   key extraction work on fragment content digests, not artifact
+   versions, so a new document version pays the provider only for
+   changed fragments (FourCorners dedupes re-extraction by content
+   hash across a law's 83 versions).
+2. **References target works; validity targets versions** (edge
+   tables): citation and reference edges point at stable work identity
+   so they survive amendments; lineage and temporal edges connect
+   immutable Artifact instances.
+3. **Quantified honesty in receipts**: report edges discarded by
+   validation and citations unresolvable from source coverage as
+   first-class counts (FourCorners: ~7% of extracted edges discarded,
+   ~30% of court citations unmaterializable — both measured, not
+   hidden).
+4. **Evaluation contract additions** (`docs/retrieval-evaluation.md`):
+   include a golden-context ceiling arm (their LLM capped at F1 0.977
+   with perfect context — it tells you when retrieval work stops
+   paying) and an explicit precision-scope rule deciding whether
+   correct-but-out-of-scope context provisions count as errors or score
+   separately.
+5. **Query-capability telemetry** (platform-first): log local MCP
+   `query_sql` usage patterns so real queries — ours and eventually
+   third parties' — decide which edge tables and capabilities get
+   built next (FourCorners' hierarchy-50% / references-16% trace
+   analysis is the model).
+
 ## Goal
 
 Advance the remaining local work until every item is finished, blocked,
