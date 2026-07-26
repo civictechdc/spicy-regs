@@ -8,8 +8,8 @@
 - **Archived backlog:** [`TODO-RULE-2026-07-25-pre-vision-rewrite.md`](docs/archive/TODO-RULE-2026-07-25-pre-vision-rewrite.md)
 - **Last live validation:** 2026-07-25, on dirty local worktrees; not a release
   or clean-checkout certification
-- **Labels:** verified locally, local and unreleased, open, human gate, deferred,
-  or blocked
+- **Labels:** used by the Current state entries and gates: verified locally,
+  local and unreleased, open, human gate, deferred, or blocked
 
 The vision owns the architecture and long-term definition of done. This file
 contains only current state, executable work, gates, and deferred work.
@@ -100,37 +100,68 @@ and the comparison cannot freeze until the migrated carrier is stable.
 **Preserved IDs:** `RULE-003`, `RULE-007`, `RULE-010`, `RULE-014`,
 `RULE-015`, and the base contract from `RULE-040`.
 
-- [ ] Update `../rulespec/TODO.md` with the complete reshape and link this
-      backlog and its real carrier evidence.
-- [ ] Move U.S. identifiers, `publishedInProceeding`, and domain lifecycle
-      values from the universal kernel into explicit profiles.
-- [ ] Fix CUE composition in every projector so generated formats preserve
-      composed constraints.
-- [ ] Define a small `AssertionEnvelope` plus distinct
+- [x] Update `../rulespec/TODO.md` with the complete reshape and link this
+      backlog and its real carrier evidence. Done 2026-07-25:
+      `../rulespec/TODO.md` section "Assertion, concept, and analysis contract
+      reshape (paired with Spicy Regs)"; the release-train decision is folded
+      into that file's open release-shape item.
+- [x] Move U.S. identifiers, `publishedInProceeding`, and domain lifecycle
+      values from the universal kernel into explicit profiles. Done
+      2026-07-25: Rulespec commits `2cdf3ee` and `fcd8ba6`
+      (`../rulespec`, branch `us-regulatory-identifiers`); profile
+      `constraints/profiles/us-rulemaking/`, profile-extended lifecycle
+      closure per the maintainer decision recorded in
+      `../rulespec/TODO.md`, gates green (315 fixtures, 0 divergences).
+- [x] Fix CUE composition in every projector so generated formats preserve
+      composed constraints. Done 2026-07-25: Rulespec commit `c7055cb`
+      (`../rulespec`, branch `us-regulatory-identifiers`); composition with
+      facet-level unification, `#AssertionEnvelope` composed by both
+      assertion shapes, all gates green.
+- [x] Define a small `AssertionEnvelope` plus distinct
       `RelationshipAssertion` and typed-literal `ValueAssertion` contracts.
-- [ ] Keep immutable proposition content separate from acceptance,
+      Done 2026-07-25: Rulespec commit `85f6cbb`.
+- [x] Keep immutable proposition content separate from acceptance,
       disposition, confidence, attestation, and mutable consumer state.
-- [ ] Separate source claimant, extraction provenance, model derivation, and
-      human approval.
-- [ ] Define evidence bindings, confidence, derivation lineage, attestations,
+      Done 2026-07-25: Rulespec commit `85f6cbb`
+      (AssertionProposition/ConsumerDisposition split).
+- [x] Separate source claimant, extraction provenance, model derivation, and
+      human approval. Done 2026-07-25: Rulespec commit `85f6cbb`
+      (SourceClaimant, ExtractionActivity, mapped AILineage/Attestation);
+      AILineage approver made optional per the vision in `177ace3`.
+- [x] Define evidence bindings, confidence, derivation lineage, attestations,
       applicability, time, and access scope without provider-owned types.
-- [ ] Finish immutable Artifact version and revision identity without
-      inventing lineage absent from the source.
-- [ ] Stabilize `SourceFragment` identity with exact artifact, selector,
-      coordinate-system, and content-digest bindings.
-- [ ] Add `ConceptScheme`, SKOS-compatible concepts and mappings, and
+      Done 2026-07-25: Rulespec commits `85f6cbb` and `177ace3`
+      (gap-analysis over existing kernel contracts plus envelope edges).
+- [x] Finish immutable Artifact version and revision identity without
+      inventing lineage absent from the source. Done 2026-07-25: Rulespec
+      commit `177ace3` (evidence-or-nothing lineage conditionals).
+- [x] Stabilize `SourceFragment` identity with exact artifact, selector,
+      coordinate-system, and content-digest bindings. Done 2026-07-25:
+      Rulespec commit `177ace3` (typed OA selectors, required coordinate
+      system, content digests).
+- [x] Add `ConceptScheme`, SKOS-compatible concepts and mappings, and
       evidence-bearing `ConceptAssignment` for Artifacts and SourceFragments.
-- [ ] Place relation changes, comparison contexts, resolver proofs, and neutral
-      findings outside the kernel.
-- [ ] Keep `ClosureClaim` Experimental and disabled.
-- [ ] Update normative prose, CUE, context, vocabulary, SHACL, SDK types,
+      Done 2026-07-25: Rulespec commit `177ace3`.
+- [x] Place relation changes, comparison contexts, resolver proofs, and neutral
+      findings outside the kernel. Done 2026-07-26: Rulespec commit
+      `f01391d` (constraints/analysis/ module).
+- [x] Keep `ClosureClaim` Experimental and disabled. Done 2026-07-26:
+      Rulespec commit `f01391d` (four independent disablement mechanisms;
+      omission unrepresentable).
+- [x] Update normative prose, CUE, context, vocabulary, SHACL, SDK types,
       runtime behavior, fixtures, and reference corpora as each contract
-      requires.
-- [ ] Add semantic carrier tests for identity, direction, typed values,
+      requires. Done 2026-07-26: Rulespec commit `56686d9`
+      (cross-surface completeness sweep).
+- [x] Add semantic carrier tests for identity, direction, typed values,
       transformations, evidence resolution, composition, and profile
-      isolation; shape-only parity is insufficient.
-- [ ] Run the complete Rulespec compile, parity, fixture, runtime, and
-      conformance gates from a clean checkout.
+      isolation; shape-only parity is insufficient. Done 2026-07-26:
+      Rulespec commit `56686d9` (tools/test_semantic_carriers.py, 30
+      tests, 11 injected defects all detected).
+- [x] Run the complete Rulespec compile, parity, fixture, runtime, and
+      conformance gates from a clean checkout. Done 2026-07-26: detached
+      worktree at Rulespec `56686d9`; cold `make compile` reproduces the
+      committed pins (`sha256:5f287a1e…`); `make test` exit 0, 420
+      conformance fixtures, 0 divergences.
 - [ ] Complete the non-originating-consumer review and resolve its findings.
 - [ ] With maintainer authorization, publish one reachable pre-1.0 release and
       record its immutable contract digest.
@@ -141,8 +172,9 @@ comparison.
 
 ## Milestone B — Migrate Spicy Regs and complete the tag carrier
 
-**Preserved IDs:** `RULE-011`, `RULE-012`, `RULE-013`, `RULE-030`, and the
-carrier portion of `RULE-040`.
+**Preserved IDs:** `RULE-011`, `RULE-012`, `RULE-030`, and the
+carrier portion of `RULE-040`. (`RULE-013` completed pre-vision; see the
+archived backlog and the legacy ID map.)
 
 - [ ] Pin the released Rulespec version, canonical URL, archive, and contract
       digest.
@@ -198,9 +230,12 @@ vocabulary and can trace every document or fragment tag to exact evidence.
       set. Integrate the provider-neutral proof-certificate v2 prompt,
       assertion/change-event split, orthogonal time/attribution/conditionality,
       claimant normalization, and independent evidence-boundary scoring.
+      Evidence: commit `c3b6498`,
+      `src/spicy_regs/corpora/relation_exclusion_evaluation_v2.py`.
 - [x] Persist the focused OpenAI receipts as non-publication,
       non-benchmark diagnostics. Do not use their scores to rank providers or
-      set production thresholds.
+      set production thresholds. Evidence: commit `f180749`,
+      `docs/evidence/relation-exclusion-openai-v2-focused-five-2026-07-25/receipt.json`.
 - [ ] Have two distinct blinded humans review the explicit-denial v2 corpus,
       seal both reviews, resolve disagreements, and freeze the exposed cases as
       a reviewed regression oracle.
@@ -221,7 +256,7 @@ cannot change in response to model output.
 
 - [ ] Run direct citation and deterministic graph-path lookup with typed
       direction and exact evidence.
-- [ ] Implement the clean shared runner in the
+- [x] Implement the clean shared runner in the
       [Spicy Regs Document Pipeline v3](docs/superpowers/specs/2026-07-25-spicy-regs-document-pipeline-v3-design.md).
       Move the v2 relationship prompt, schema, response checks, scorer, and
       human-review gate into that runner instead of building a separate v2
@@ -229,8 +264,24 @@ cannot change in response to model output.
       benchmarks, use OpenAI or Codex through small adapters, preserve failed
       and empty work, resume safely, rebuild without another provider call,
       and record the final dataset and human-review file hashes.
+      Done 2026-07-25 (v3 build order steps 1–3): commits `a6d3627`
+      (runtime: work IDs, checkpoints, atomic rename, secrets, inventory,
+      required failures, empty-vs-failed, resume, validation, rebuild),
+      `054854f` (OpenAI + Codex structured-text adapters), `6622234`
+      (dense/sparse/reranker adapters), `56a2030` (v2 relationship
+      extraction moved; migration test proves byte-identical payloads,
+      schemas, candidates, scores, and gate decisions with every
+      difference approved explicitly). Each task adversarially reviewed
+      and confirmed findings fixed. Clean-checkout validation 2026-07-25:
+      detached worktree at `56a2030`, `uv sync --frozen --extra embed
+      --extra evaluation`, `uv run pytest` → 904 passed, 3 deselected
+      (Python 3.10.19). Old v2 runner stays active until cutover step 8.
 - [ ] Run lexical, dense, hybrid, and fixed-depth reranked retrieval against the
       same candidate universe and prefilters.
+- [ ] Run a model-assisted inferred lookup arm — the vision's fourth lookup
+      class — over the same corpus and evaluation contract, grounded in
+      approved extraction outputs and checked graph links, with model lineage,
+      validation, and attestation recorded in strict receipts.
 - [ ] Keep whole-artifact retrieval as a routing view and SourceFragment
       retrieval as the evidence-finding view.
 - [ ] Apply identity, version, authority, scope, access, graph, and concept

@@ -5,6 +5,18 @@
 - **Scope:** Document processing, search, AI extraction, approval, comparison,
   testing, and run records
 - **Governing vision:** [`2026-07-25-rulespec-spicy-regs-complete-vision-goal.md`](2026-07-25-rulespec-spicy-regs-complete-vision-goal.md)
+- **Related contracts:**
+  [`2026-07-25-relation-comparison-resolver-contract.md`](2026-07-25-relation-comparison-resolver-contract.md)
+  (comparison protocols),
+  [`2026-07-25-relation-exclusion-v2-human-adjudication-protocol.md`](2026-07-25-relation-exclusion-v2-human-adjudication-protocol.md)
+  (benchmark reviewer rules),
+  [`2026-07-24-document-ai-package-fit-decision.md`](2026-07-24-document-ai-package-fit-decision.md)
+  (Docling and package boundaries),
+  [`2026-07-24-production-document-segmentation-agent-goal.md`](2026-07-24-production-document-segmentation-agent-goal.md)
+  (segmentation baselines), and
+  [`TODO-RULE.md`](../../../TODO-RULE.md) (Milestone C owns
+  `docs/retrieval-evaluation.md`; Milestone D wires this pipeline into the
+  fair comparison)
 - **Approach:** Greenfield, reuse shared code, keep the design simple, use
   maintained packages, and keep providers replaceable
 
@@ -135,7 +147,7 @@ usually temporary.
 ## Code shape
 
 ```text
-src/spicy_regs/pipeline/
+src/spicy_regs/docpipeline/
 ├── runtime.py
 ├── source.py
 ├── segments.py
@@ -148,8 +160,14 @@ src/spicy_regs/pipeline/
 └── adapters/
     ├── openai.py
     ├── codex_cli.py
+    ├── docling.py
     └── sentence_transformers.py
 ```
+
+The package is named `docpipeline` to avoid colliding with the existing
+`spicy_regs.pipelines` ETL package. The legacy `run-pipeline` entry point is
+renamed `run-regulations-etl` in the same change that lands `cli.py`, so
+`spicy-regs pipeline …` unambiguously means this pipeline.
 
 | File | Job |
 | --- | --- |
@@ -162,7 +180,7 @@ src/spicy_regs/pipeline/
 | `comparison.py` | Compare approved relationship statements and produce neutral findings |
 | `workflow.py` | Call the steps in their fixed order |
 | `cli.py` | Expose pipeline commands |
-| `adapters/` | Connect OpenAI, Codex, and Sentence Transformers to the small interfaces above |
+| `adapters/` | Connect OpenAI, Codex, Sentence Transformers, and Docling to the small interfaces and source records above |
 
 `workflow.py` uses normal Python calls. V3 does not add a workflow language,
 plugin registry, event bus, scheduler, or dependency graph.
@@ -171,7 +189,10 @@ Rules for imports:
 
 - `runtime.py` never imports a pipeline step.
 - A step may use public data from an earlier step, but not its private helpers.
-- Provider libraries stay inside `adapters/`.
+- Provider libraries stay inside `adapters/`. Docling enters through
+  `adapters/docling.py` and is used only by `source.py`.
+- DuckDB is storage, not a provider; `retrieval.py` may use it directly for
+  exact and database search.
 - Comparison code does not import search or provider implementations.
 - General code never imports a regulatory, judicial, or other document
   profile.
@@ -407,6 +428,11 @@ filters before meaning-based ranking.
 Keep document search for routing and section search for evidence. Store the
 search method, level, rank, score, source region, and exclusion reasons in
 `RetrievalHit`. A score or rank never creates a relationship or tag.
+
+Inferred lookup — model-assisted multi-document relationship lookup, the
+vision's fourth lookup class — is not a v3 retrieval method. The fair
+comparison's inferred arm runs over approved extraction outputs and checked
+graph links that v3 materializes.
 
 ### Extract
 
