@@ -33,6 +33,48 @@
   approved migration test); clean checkout at `56a2030` passed 904 tests.
 - Old runners are all still active on purpose; removal is step 8.
 
+## North star
+
+Everything below serves one product goal: a universal metadata layer
+over all Spicy Regs data — and, eventually, sources beyond it — that
+lets people filter, query, sort, and evaluate documents to find
+insights: reliable alerts on changes that matter, and surfacing
+documents that look unrelated when they are in fact related or
+dependent. Related and dependent are different claims, and the contract
+keeps them distinct on purpose:
+
+- **Relatedness** is suggestive metadata — retrieval scores, shared
+  concepts, `ConceptAssignment`s. It powers discovery and never becomes
+  a fact on its own.
+- **Dependency** is an evidence-backed claim — `RelationshipAssertion`s,
+  `RelationChangeEvent`s, checked graph edges with exact source
+  evidence. This is what alerts and downstream conclusions may rely on.
+- **Alerts are only as reliable as the pipeline is honest** about what
+  it knows, what changed, and what failed — which is why receipts,
+  resume, validation, and fail-closed gates exist. They are alert
+  infrastructure, not ceremony.
+
+## Engineering posture
+
+Apply these when scoping and cutting tasks; the north star is the
+tiebreaker:
+
+- **DRY / KISS:** reuse the landed runtime, adapters, envelope, and
+  composition machinery. No new frameworks, no parallel abstractions, no
+  second way to do a thing that already has one.
+- **80/20, don't boil the ocean:** prefer the smallest slice that makes
+  real data queryable end-to-end over exhaustive coverage of any one
+  step. When a task offers a choice, pick what moves
+  filter/query/sort/evaluate/alert capability soonest; record the
+  remainder as a follow-up instead of building it now.
+- **Agile, forward-thinking:** land vertical slices that work, in
+  cutover order, each independently committed and reversible. Never
+  foreclose new data sources — a new document family must stay one
+  source adapter plus a profile (already a design rule; keep it true).
+- **Production-oriented:** bias toward the paths that will actually run
+  in production — `build` mode and real source data over diagnostic-only
+  affordances; gates that catch real failures over ceremonial checks.
+
 ## Goal
 
 Advance the remaining local work until every item is finished, blocked,
@@ -93,7 +135,9 @@ or waiting on a human gate:
   acceptance criteria (run the tests and gates) before committing it;
   commit per landed step with evidence; keep `TODO-RULE.md` checkboxes
   current — a checked item links a commit, artifact, receipt, or dated
-  record.
+  record. Scope every task through the engineering posture above: if a
+  piece of work does not move filter/query/sort/evaluate/alert
+  capability or a binding gate, cut it and record it as a follow-up.
 - **Dispatch mechanism:** chained workflows (implement → fix) with
   prompts embedded in the script body. Every agent is Opus xhigh.
 - **Review cadence — checkpoints, not per task.** Run one independent
