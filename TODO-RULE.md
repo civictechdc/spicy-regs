@@ -1,13 +1,15 @@
 # Rulespec and Spicy Regs execution backlog
 
-- **Status:** Active; local candidates exist, but the reshaped contract is
-  unreleased and the fair comparison is open
+- **Status:** Active; the reshaped contract and the v3 runner (steps 1–3) are
+  implemented and verified locally, but unreleased — maintainer direction
+  2026-07-26 is to keep everything local for the moment — and the fair
+  comparison is open
 - **Authority:** [`2026-07-25-rulespec-spicy-regs-complete-vision-goal.md`](docs/superpowers/specs/2026-07-25-rulespec-spicy-regs-complete-vision-goal.md)
 - **Scope:** Rulespec, Spicy Regs, and their versioned interface
 - **Active finish line:** the fair stopping point below
 - **Archived backlog:** [`TODO-RULE-2026-07-25-pre-vision-rewrite.md`](docs/archive/TODO-RULE-2026-07-25-pre-vision-rewrite.md)
-- **Last live validation:** 2026-07-25, on dirty local worktrees; not a release
-  or clean-checkout certification
+- **Last live validation:** 2026-07-26, from clean detached checkouts of both
+  repositories (records below); not a release certification
 - **Labels:** used by the Current state entries and gates: verified locally,
   local and unreleased, open, human gate, deferred, or blocked
 
@@ -21,21 +23,32 @@ needs coordination.
 
 ## Current state
 
-- **Session-local validation, unreceipted:** the dirty Rulespec worktree passed
-  312 fixtures with zero conformance divergences, code generation, and
-  cross-target parity; the dirty Spicy Regs worktree passed 167 focused tests;
-  `git diff --check` passed in both repositories. Final gates must replace
-  these session results with durable receipts.
+- **Clean-checkout validation, dated 2026-07-26:** Rulespec at `56686d9`
+  (branch `us-regulatory-identifiers`) — cold `make compile` reproduces the
+  committed contract pins (`sha256:5f287a1e…`) and `make test` exits 0 with
+  420 conformance fixtures, 0 divergences. Spicy Regs at `56a2030` (branch
+  `feat/document-ai-pipeline`) — `uv sync --frozen --extra embed --extra
+  evaluation` then `uv run pytest`: 904 passed, 3 deselected. These are
+  working records, not release receipts.
 - **Verified historical evidence:** the bounded segmentation comparison chose
   `structure-overlap-1800` and completed its named OpenAI path; the RIN corpus
   proved durable `RegulatoryAgendaItem` identity without reusing a RIN for a
   document or `Proceeding`.
-- **Local, unreleased:** Artifact lineage, SourceFragment, affirmed and denied
-  assertions, source-aware segmentation, concept aggregation, comparison,
-  checkpoints, resolver proofs, OpenAI, and Codex CLI candidates exist.
-- **Open:** Rulespec still needs the core/profile split, `ValueAssertion`,
-  evidence-bearing `ConceptAssignment`, composition repair, review, and a
-  reachable release. Spicy Regs then needs the paired carrier migration.
+- **Local, unreleased:** the complete reshaped Rulespec contract exists —
+  core/profile split with profile-extended lifecycle closure, repaired CUE
+  composition, `AssertionEnvelope`/`RelationshipAssertion`/typed-literal
+  `ValueAssertion` with the proposition/state split, separated provenance
+  roles, stabilized Artifact and `SourceFragment` identity,
+  `ConceptScheme`/`ConceptAssignment`, and the document-analysis module with
+  `ClosureClaim` disabled (Rulespec commits `c7055cb`…`56686d9`). The v3
+  `docpipeline` runner, its provider adapters, and the migrated v2
+  relationship extraction exist (Spicy Regs commits `a6d3627`…`56a2030`).
+- **Open:** the Rulespec release-shape decision, the non-originating review,
+  and a reachable release (all Milestone A human gates; deferred by the
+  2026-07-26 keep-it-local direction). Milestone B's paired carrier migration
+  waits on that release by design. V3 build order steps 4–8 (source and
+  segmentation move, retrieval, tagging and approval, comparison, frozen
+  mixed-data test, old-runner removal) remain local implementation work.
 - **Open evaluation:** production resolvers, the sealed v2 oracle, three
   blinded OpenAI repetitions, same-contract lookup arms, and final repository
   gates remain unfinished. Existing OpenAI and Codex diagnostics fail their
