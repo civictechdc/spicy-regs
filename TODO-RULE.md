@@ -205,7 +205,11 @@ archived backlog and the legacy ID map.)
       fresh local source evidence before accepting a fragment assignment.
 - [ ] Use `structure-overlap-1800` as the current segmentation baseline.
       Preserve exact offsets, hierarchy, tokenizer evidence, and truncation
-      status.
+      status. Local validation 2026-07-26:
+      [`document-segmentation-v3-step4-local-parity`](docs/evidence/document-segmentation-v3-step4-local-parity-2026-07-26/receipt.json)
+      recomputed 153 artifacts, 1,302 segments, 35/35 gold containment,
+      zero uncovered characters, and zero token overflows. The item stays open
+      until the local migration is committed and the release boundary is met.
 - [ ] Install production resolvers that return dereferenceable, content-bound
       proof records; retain static adapters as fixtures.
 - [ ] Backfill only records reconstructable from immutable source artifacts.

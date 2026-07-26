@@ -1,0 +1,197 @@
+{
+  "code": {
+    "branch": "feat/document-ai-pipeline",
+    "head_commit": "c171fa73d18df91e3037abc7f3b7fb2eb4d5c8b9",
+    "state": "local-uncommitted",
+    "uncommitted_file_sha256": {
+      "CONTRIBUTING.md": "b2dd241fb79f8478cfed38c0074469d2f3bfcdea999f8013dbb4a8f6244c1b23",
+      "TODO-RULE.md": "0942916ed4f5efcdc3bc113ce1dfd78cf823efffc47f05a40308210126071a8b",
+      "docs/index.md": "8fcde18272a9ed46b2c6ff4c7fb608c72bcc1f5f4643152a3b8f7bf8a42cf58f",
+      "docs/ontology.md": "83ea8fd52849ba6b394a56a8077f4d367b8bdfa0b186e5234041174734601de2",
+      "docs/superpowers/specs/2026-07-24-document-ai-package-fit-decision.md": "07665a998213e9798139a71dc1581ed1bde23b131396550b6b6608301e5370b4",
+      "pyproject.toml": "f21874dff18f298b26efbca521cd2360160f9286537bd984483e0d68f01eefe5",
+      "src/spicy_regs/docpipeline/adapters/__init__.py": "c54db41d10f5be76b2869822596975fbfc37f7ff890f41b59e21b5335e9fb894",
+      "src/spicy_regs/docpipeline/adapters/docling.py": "7f44a7dbb9b28177a8a2b29d2a06643b114d2a30fc5f1fe9b778bcaa1fc8821c",
+      "src/spicy_regs/docpipeline/segments.py": "c1fb7a972e2ad55c26c14ddf703a77e76875bd6508ac9263029186dcaf9d88e4",
+      "src/spicy_regs/docpipeline/source.py": "ee6af706c26138a12dfa9425b6b93d0e27966bab3f17a2b76b86b5d5e0f0e69d",
+      "tests/fixtures/docpipeline_segments_migration_v1.json": "fbdbaabc0fe2852188e188f66072e72eef10d9dd0a9e07c0ab2eeeddbe505f39",
+      "tests/fixtures/docpipeline_step4_expected_differences_v1.json": "4331c52220c9795dafc2d1865245d0502e40442db563852d7a80635818927abd",
+      "tests/test_docpipeline_adapter_docling.py": "90e25bd25770e9710e6d1f1e8e5507df71cfd94a3b5a7039d4eef0e7f8a6c2ad",
+      "tests/test_docpipeline_adapter_docling_real.py": "e7f871348b018beb8671c042c5cd5bf337ae3293f7a0e3657e91b16414e2ee0d",
+      "tests/test_docpipeline_segments.py": "e837c76b01b304039ac2cf885ee5cab1f2510675504ac215e05edf36283fb960",
+      "tests/test_docpipeline_segments_frozen_local.py": "c1bd714550dc124c4638427b9e664d55478bbdf7f042d026c1e9fe54308e1eef",
+      "tests/test_docpipeline_segments_migration.py": "53f4e16cd778755d916004c2a8fff88df1822184b40c8e12cb04924ad75b2ba4",
+      "tests/test_docpipeline_segments_review_fixes.py": "3ea83241ceeb0a1d208b97c7b01d942f9f2db28d6b125868edf72575dffddf86",
+      "tests/test_docpipeline_source.py": "4a18950b48653b1cfd5ce3461c39903cbed9bde33ed67cf9e8cd703b210447d2",
+      "tests/test_docpipeline_source_containment.py": "a30647d255b28b47a9019344074146015f4be14d0ebf3c454a91446f10a2eb69",
+      "tests/test_docpipeline_source_migration.py": "a578905a90811533715367317a4f8dc37e6741e962983199ca487f744623d8f3",
+      "tests/test_docpipeline_source_review_fixes.py": "c5afb5515a4b70664dc92af188d89cf4d655fe21facc0a444eab25e722be6583",
+      "tests/test_docpipeline_source_worker_validation.py": "deda7cfbd727f11c5b28ca4c3ba8281728569896a9f5f96f8c3c3a942892aa4a",
+      "uv.lock": "4e649c344f964f5cc9964a602c12a23fb4925ea26e6b5cf00812ce5d192163f7"
+    }
+  },
+  "execution": {
+    "command": "SPICY_REGS_FROZEN_SEGMENTATION_ROOT=\"$PWD/output\" R2_PUBLIC_URL='' uv run --frozen pytest tests/test_docpipeline_segments_frozen_local.py -q -rs",
+    "provider_calls": 0,
+    "provider_models_loaded": [],
+    "result": "7 passed in 24.11s"
+  },
+  "expected_differences": [
+    {
+      "id": "processing-segment-identity",
+      "kind": "identity",
+      "old": "experiment_segment_* over the experiment version and config",
+      "new": "processing_segment_* over Artifact identity, settings, and exact slices",
+      "reason": "The durable join surface names a processing record, not an experiment arm row.",
+      "values": [
+        "segment_id"
+      ]
+    },
+    {
+      "id": "versioned-settings-identity",
+      "kind": "settings",
+      "old": "five-arm-v3 plus loose config fields",
+      "new": "SegmentSettings with a complete settings_sha256",
+      "reason": "Every boundary-setting input now has one versioned, content-bound identity.",
+      "values": [
+        "policy",
+        "policy_version",
+        "settings_sha256"
+      ]
+    },
+    {
+      "id": "content-addressed-work",
+      "kind": "identity",
+      "old": "no reusable content identity independent of Artifact version",
+      "new": "content_digest over slice content digests and relevant settings",
+      "reason": "Unchanged fragment content in a new Artifact version keeps the same reusable content identity.",
+      "values": [
+        "content_digest"
+      ]
+    },
+    {
+      "id": "join-and-context-fields",
+      "kind": "added_fields",
+      "old": "experiment row with source slices",
+      "new": "Artifact, SourceFragment, neighbour, coordinate, hash, evidence, and separate context bindings",
+      "reason": "The v3 table is directly joinable while keeping context separate from citable evidence.",
+      "values": [
+        "artifact_id",
+        "fragment_id",
+        "previous_segment_id",
+        "next_segment_id",
+        "coordinates",
+        "text_sha256",
+        "context",
+        "evidence_slices"
+      ]
+    }
+  ],
+  "format_version": 2,
+  "generated_at": "2026-07-26T21:35:23Z",
+  "inputs": {
+    "baseline": {
+      "directory": "output/segmentation-experiment-document-bge-v3",
+      "experiment_id": "segmentation_experiment_de7d119e838ac153a0980337",
+      "experiment_segments_sha256": "0874cfae61b741b7d946bc47be62d583879b43f76269557262598c1e8e11dc78",
+      "manifest_sha256": "1c9764b0df7985b60666ef1bc69f1ed7bfee4cbdcf1fa0036457118729f80a10",
+      "receipt_sha256": "ebb71adadbac85e153c9d1986d7e5a6a75c6e8169bb950655cc51776f4d0b5aa"
+    },
+    "dataset": {
+      "directory": "output/segmented-real-data-evaluation-v2",
+      "evaluation_id": "segmentation_eval_627ba96e04872d870a2ccd6e",
+      "gold_spans_sha256": "8989994441e94f987a3f079ab26a59da9795ff2caba4d50a34d7e12b625ff4ca",
+      "manifest_sha256": "b1827a5bef8fef5d2a3e10d76e22429537be73b8b768cda726fbac6cd421039e",
+      "receipt_sha256": "19aae874169280746f0b8b2ff6c4a4ba3b6be83926302c68a374ff381cdc82c1"
+    },
+    "scope": {
+      "artifact_membership_sha256": "3fb361834b7dfc91e565932e2659a101951f840797e182f73531f71d94e63271",
+      "directory": "output/document-acceptance-scope-v2",
+      "manifest_sha256": "653c9c66101ee9ee7fbd79fa0805e3ad5e11d8d55d1d7d279174aa03500e92a6",
+      "receipt_sha256": "ffaa89ca5aa3ce5c171ec7fe391a39f1ac88240db14103844fbf99f4ae0c0dcc",
+      "scope_id": "document_scope_6b4f8a64ba43fc1b8e0a7e05"
+    }
+  },
+  "limitations": [
+    "The frozen source and Parquet files remain local and gitignored; this receipt records their hashes and copies no source text.",
+    "This proves Step 4 migration parity only. It does not complete Step 5 retrieval, the later mixed-data gate, Rulespec release work, or any human gate.",
+    "The code was local and uncommitted when this gate ran."
+  ],
+  "publication": {
+    "attempted": false,
+    "authorized": false,
+    "published": false
+  },
+  "red_before_green": {
+    "command": "R2_PUBLIC_URL='' uv run pytest tests/test_docpipeline_source_review_fixes.py tests/test_docpipeline_source_worker_validation.py tests/test_docpipeline_segments_review_fixes.py tests/test_docpipeline_segments_migration.py tests/test_docpipeline_segments_frozen_local.py -q -rs",
+    "initial_result": "collection failed with ImportError for missing GATE_INPUT_OVER_LIMIT; after the first source repair, 3 failed and 27 passed",
+    "repairs": [
+      "Added durable ParserAttempt receipts, parser-output validation, parser-derived identity binding, closed content-layer policy, active-table selection, and explicit attachment fallback rejection.",
+      "Separated evidence from context in processing segments, added evidence containment, renamed reusable segment work fields to content identity fields, and made parser coordinate ownership explicit.",
+      "Replaced narrative migration exceptions with one immutable four-entry ledger and exhaustive frozen-corpus row-difference checks."
+    ]
+  },
+  "receipt_sha256": "476a684311898a47c7107a14ab4f0d9ecda87462a99df91bc30810f948ff8ed4",
+  "results": {
+    "accepted_artifacts": 153,
+    "aggregate_row_sha256": "34f757e1fa12a431c720da46e68c78e9c58ca25a78ad51c664f2c0274ff9acf9",
+    "boundary_method": "source-native-oversized-overlap",
+    "difference_counts": {
+      "content-addressed-work": 1302,
+      "join-and-context-fields": 1302,
+      "processing-segment-identity": 1302,
+      "versioned-settings-identity": 1302
+    },
+    "duplicated_characters_from_declared_overlap": 158261,
+    "expected_differences_sha256": "4331c52220c9795dafc2d1865245d0502e40442db563852d7a80635818927abd",
+    "gold_contained": 35,
+    "gold_span_count": 35,
+    "gold_uncontained": 0,
+    "inactive_source_tables": [
+      "comments"
+    ],
+    "inactive_table_audit_rows": 1,
+    "provider_calls": 0,
+    "selected_config": "structure-overlap-1800",
+    "selected_segments": 1302,
+    "token_overflow_count": 0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "uncovered_character_count": 0
+  },
+  "status": "pass",
+  "verification": [
+    {
+      "command": "R2_PUBLIC_URL='' uv run --frozen pytest tests/test_docpipeline_source_review_fixes.py tests/test_docpipeline_source_worker_validation.py tests/test_docpipeline_segments_review_fixes.py tests/test_docpipeline_source_migration.py tests/test_docpipeline_segments_migration.py -q -rs",
+      "result": "62 passed in 1.11s"
+    },
+    {
+      "command": "R2_PUBLIC_URL='' uv run --frozen pytest tests/test_docpipeline*.py -q -rs",
+      "result": "927 passed, 9 skipped in 9.53s"
+    },
+    {
+      "command": "uv run --extra docling pytest tests/test_docpipeline_source_review_fixes.py tests/test_docpipeline_source_worker_validation.py tests/test_docpipeline_source.py tests/test_docpipeline_source_containment.py tests/test_docpipeline_source_migration.py -q -rs",
+      "result": "99 passed, 1 skipped in 13.76s"
+    },
+    {
+      "command": "SPICY_REGS_FROZEN_SEGMENTATION_ROOT=\"$PWD/output\" R2_PUBLIC_URL='' uv run --frozen pytest tests/test_docpipeline_segments_frozen_local.py -q -rs",
+      "result": "7 passed in 24.11s"
+    },
+    {
+      "command": "env -u SPICY_REGS_FROZEN_SEGMENTATION_ROOT R2_PUBLIC_URL='' uv run --frozen pytest tests/test_docpipeline_segments_frozen_local.py -q -rs",
+      "result": "1 passed, 6 skipped in 0.24s; unset root skips only the requested live gate"
+    },
+    {
+      "command": "SPICY_REGS_FROZEN_SEGMENTATION_ROOT=\"$PWD/tests/fixtures/does-not-exist-frozen-root\" R2_PUBLIC_URL='' uv run --frozen pytest tests/test_docpipeline_segments_frozen_local.py -q -rs",
+      "result": "1 passed, 6 errors in 0.30s; pytest exit 1 with a precise missing-input error"
+    },
+    {
+      "command": "R2_PUBLIC_URL='' uv run pytest -q",
+      "result": "1687 passed, 7 skipped, 3 deselected in 156.23s"
+    },
+    {
+      "command": "uv run ruff check + ruff format --check + ty check over the Step 4 source, Docling, segment, and test files; uv lock --check; git diff --check; forbidden-import and old-runner-preservation guards",
+      "result": "pass"
+    }
+  ]
+}

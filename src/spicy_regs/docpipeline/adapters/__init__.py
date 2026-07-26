@@ -16,7 +16,10 @@ What lives here:
 * The defaults and the shared call-detail key list both arms honor.
 
 The other three interfaces (dense embedder, sparse encoder, reranker) keep their
-protocols in ``adapters/sentence_transformers.py`` for now.
+protocols in ``adapters/sentence_transformers.py`` for now. ``adapters/docling.py``
+is not one of the four: it is the fallback document parser, used only by
+``source.py``, and it keeps its own narrow interface and records so no Docling
+type reaches this shared boundary.
 """
 
 from __future__ import annotations

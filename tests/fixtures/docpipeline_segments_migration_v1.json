@@ -1,0 +1,49 @@
+{
+  "fixture_id": "docpipeline-segments-migration-v1",
+  "license": "CC0-1.0",
+  "provenance": "Synthetic public-domain test data created for Spicy Regs migration verification.",
+  "tables": {
+    "cfr_sections": [
+      {
+        "granule_id": "CFR-public-domain-fixture-sec-1",
+        "heading": "Section 1 - Monitoring",
+        "text": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      }
+    ],
+    "federal_register": [
+      {
+        "document_number": "2026-PUBLIC-DOMAIN-1",
+        "title": "Public-domain monitoring notice",
+        "abstract": "Facilities monitor and report.",
+        "body_html": "<?xml version=\"1.0\"?>\n<article><h1>Monitoring Notice</h1><section><h2>Reports</h2><p>Facilities submit reports quarterly.</p><ul><li>Keep source records.</li></ul></section></article>"
+      }
+    ],
+    "lobbying_filings": [
+      {
+        "filing_uuid": "PUBLIC-DOMAIN-FILING-1",
+        "client_name": "Example Client",
+        "registrant_name": "Example Registrant",
+        "lobbying_activities_json": "[{\"general_issue_code\":\"ENV\",\"description\":\"Monitoring\"},{\"general_issue_code\":\"ENG\",\"description\":\"Grid\"}]",
+        "government_entities_json": "[\"EPA\",\"DOE\"]"
+      }
+    ]
+  },
+  "gold_spans": [
+    {
+      "gold_id": "contained-inside-first-leaf",
+      "artifact_subject_id": "CFR-public-domain-fixture-sec-1",
+      "source_field": "cfr_sections.text",
+      "start_char": 10,
+      "end_char": 20,
+      "expected_contained": true
+    },
+    {
+      "gold_id": "boundary-straddling-negative-control",
+      "artifact_subject_id": "CFR-public-domain-fixture-sec-1",
+      "source_field": "cfr_sections.text",
+      "start_char": 78,
+      "end_char": 92,
+      "expected_contained": false
+    }
+  ]
+}

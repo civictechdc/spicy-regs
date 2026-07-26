@@ -629,6 +629,73 @@ See the
 [domain-profile boundary](superpowers/specs/2026-07-25-deontic-relation-profile-boundary.md),
 and [recent research synthesis](evidence/recent-document-relation-lookup-research-2026-07-25.md).
 
+## Anchor semantics: what an offset addresses and what a digest covers
+
+Cross-project evidence references only translate mechanically when both sides
+agree on the unit, the interval, and the exact bytes each digest covers. The v3
+`source` step (`src/spicy_regs/docpipeline/source.py`) states all three, and
+these are the semantics any consumer of its `Artifact`, `SourceFragment`, or
+evidence records should assume.
+
+**Offsets are Python unicode codepoints over half-open `[start, end)`
+intervals.** Not bytes, not UTF-16 code units, and never an inclusive end. A
+section sign, an em dash, a curly quote, and an astral emoji are each exactly
+one codepoint, so `region.text == field_text[start_char:end_char]` holds for
+every record — and the step refuses to emit one where it does not. Consecutive
+sibling regions abut: one region's `end_char` is the next one's `start_char`,
+and they share no codepoint. Every record carries its own
+`coordinate_target` / `coordinate_unit` / `coordinate_interval`, so nothing has
+to be inferred. Two targets exist and stay distinct:
+`artifact-source-field` means the offsets index one exact field of one
+Artifact, and `adapter-parsed-text` means they index text a parser built, which
+is graded `parser-derived` and never `source-exact`.
+
+**Each digest names its own scope.** `Artifact.content_sha256` covers the
+canonical JSON of the profile id, source table, subject type, subject id, and
+every declared source value in declaration order — nulls included, and each
+attached byte rendition contributed as its own content digest. It is the exact
+immutable source state and nothing else; it is not a digest of the concatenated
+text. `field_sha256` covers the UTF-8 bytes of one whole source field's exact
+text, unnormalized and untrimmed. `text_sha256` covers the UTF-8 bytes of one
+region's or fragment's own slice — that is, `field_text[start_char:end_char]` —
+so it agrees with `field_sha256` only when the region spans the whole field.
+Region and fragment ids are derived, not covering digests: they hash the
+adapter version, subject identity, artifact digest, source field, span, kind,
+and ordinal for native source fields, preserving the frozen native identity
+recipe. Parser-derived region ids bind those facts plus `parser_id` and the
+parsed field digest. The fragment id inherits the region id. The same Office
+bytes parsed under two mapping revisions therefore cannot produce colliding
+region or fragment ids.
+
+Parser metadata remains explicit on every derived region, fragment, and segment
+slice. `content_layer=body` may supply durable evidence. `furniture` and
+`notes` remain durable `context_only` fragments but do not enter processing or
+evidence slices. `background` and `invisible` stay held, appear in exclusion
+accounting, and never become fragments or segments. Native fields use
+`content_layer=body` and `coordinate_grade=source-exact`; parser-derived fields
+retain the adapter's closed `content_layer` and `coordinate_grade` values.
+
+`ProcessingSegment.text` is migration-compatible processing text, so it still
+contains context-only heading slices where the frozen segment boundary requires
+them. `ProcessingSegment.evidence_slices` is the citable subset and excludes
+headings, syntax, and non-body context. `content_digest` identifies the slice
+content and segmentation settings without the Artifact version or adjacent
+context. It is not a complete provider reuse identity. A later `WorkIdentity`
+must also bind the prompt, schema, provider, model, revision, provider settings,
+context digest, approval and evidence policies, and the earlier run before a
+provider result may be reused.
+
+These records are **local run outputs, not published tables.** `source/artifacts.parquet`,
+`source/fragments.parquet`, `source/coverage.parquet`, and the immutable
+`source/parser-attempts.parquet` live inside one run directory. The parser table
+retains success, unavailability, declared failure, malformed output, timeout,
+exit, signal, result oversize, input oversize, and preflight quarantine with
+source and attachment digests, parser policy, the full flattened process-gate
+receipt, and sanitized call JSON. Nothing in the R2 surface or the data
+dictionary above publishes these tables yet. The anchor semantics are
+documented now so the published projection, when it lands, inherits them rather
+than inventing its own.
+
 ## Local descriptive-tag terms
 
 `concepts.scheme`, `status`, and `replaced_by`, along with event payloads, are

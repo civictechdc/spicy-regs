@@ -1,0 +1,54 @@
+{
+  "format_version": 1,
+  "differences": [
+    {
+      "id": "processing-segment-identity",
+      "kind": "identity",
+      "old": "experiment_segment_* over the experiment version and config",
+      "new": "processing_segment_* over Artifact identity, settings, and exact slices",
+      "reason": "The durable join surface names a processing record, not an experiment arm row.",
+      "values": [
+        "segment_id"
+      ]
+    },
+    {
+      "id": "versioned-settings-identity",
+      "kind": "settings",
+      "old": "five-arm-v3 plus loose config fields",
+      "new": "SegmentSettings with a complete settings_sha256",
+      "reason": "Every boundary-setting input now has one versioned, content-bound identity.",
+      "values": [
+        "policy",
+        "policy_version",
+        "settings_sha256"
+      ]
+    },
+    {
+      "id": "content-addressed-work",
+      "kind": "identity",
+      "old": "no reusable content identity independent of Artifact version",
+      "new": "content_digest over slice content digests and relevant settings",
+      "reason": "Unchanged fragment content in a new Artifact version keeps the same reusable content identity.",
+      "values": [
+        "content_digest"
+      ]
+    },
+    {
+      "id": "join-and-context-fields",
+      "kind": "added_fields",
+      "old": "experiment row with source slices",
+      "new": "Artifact, SourceFragment, neighbour, coordinate, hash, evidence, and separate context bindings",
+      "reason": "The v3 table is directly joinable while keeping context separate from citable evidence.",
+      "values": [
+        "artifact_id",
+        "fragment_id",
+        "previous_segment_id",
+        "next_segment_id",
+        "coordinates",
+        "text_sha256",
+        "context",
+        "evidence_slices"
+      ]
+    }
+  ]
+}

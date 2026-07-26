@@ -25,6 +25,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Fallback parser for sources with no native XML, HTML, or JSON structure.
+# Optional on purpose: the default environment parses native structure, and the
+# adapter (src/spicy_regs/docpipeline/adapters/docling.py) imports Docling lazily.
+docling = [
+    "docling==2.115.0",
+]
 embed = [
     "sentence-transformers==5.6.1",
     "torch==2.10.0",

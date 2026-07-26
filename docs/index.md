@@ -134,7 +134,10 @@ The complementary sources join through normalized identity tables:
 - **`agency_code` / agency name** appears across nearly every table.
 
 The compact identifiers, provenance mapping, and Rulespec Level-0 posture are
-documented in [Ontology and Rulespec L0](ontology.md). The
+documented in [Ontology and Rulespec L0](ontology.md), whose
+[anchor semantics](ontology.md#anchor-semantics-what-an-offset-addresses-and-what-a-digest-covers)
+section states the offset unit, the interval convention, and exactly what each
+artifact, field, region, and fragment digest covers. The
 [document segmentation research](ontology-segmentation-research.md) defines the
 source-aware chunking policy for LLM tagging and retrieval. The
 [RIN ontology revision report](rin-ontology-revision-report.md) records the

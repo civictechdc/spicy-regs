@@ -73,6 +73,40 @@ Docling coordinates remain parser evidence until the adapter proves their
 relationship to locked source bytes. The Docling object model does not become
 the ontology.
 
+#### Implementation clarification (2026-07-26): Office first, PDF and images deferred
+
+This clarifies staging, not the package choice. Docling remains the selected
+fallback for unstructured documents; what the implemented adapter serves today
+is narrower than the table row above.
+
+`src/spicy_regs/docpipeline/adapters/docling.py` serves **DOCX, PPTX, and XLSX
+only**, through Docling's model-free `SimplePipeline`, so a receipt can name
+every input that affected the output. PDF and image inputs are *recognized and
+refused by name* with a `format_not_implemented` record, before the provider is
+invoked: they run the paginated pipeline, whose layout, table, and OCR models
+this adapter cannot yet identify. Serving them needs four things first — a
+content-addressed model manifest, one explicitly chosen OCR engine, the process
+containment `source.py` now owns, and real model-backed tests.
+
+Nothing that already works loses ground in the meantime. The existing
+pypdf-derived text columns (`pdf_text`, and the other body columns) stay
+**native**: they are exact fields of the immutable source record, so `source.py`
+reads them through its native-prose branch and never hands them to a parser. The
+Office fallback is reachable only for a record that publishes no usable native
+text at all.
+
+Containment moved where it can be enforced. An in-process adapter cannot bound
+a library call it is inside of, so `adapters/docling.py` records wall-clock,
+CPU, memory, and archive-expansion limits as *unenforced* and `source.py` runs
+the adapter as a child process — its own session, a credential-stripped
+environment, a wall timeout, SIGTERM-then-SIGKILL over the whole process group,
+and a result byte cap checked before that file is read. Stderr is never read;
+its byte count and over-threshold flag are observed facts and do not turn a
+successful parse into a failure. CPU,
+resident memory, archive expansion, temporary disk, descendant count, network,
+and filesystem scope stay explicitly unenforced there too, and are named as
+such in every gate receipt.
+
 ### Sentence Transformers
 
 Sentence Transformers already implements:

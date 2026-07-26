@@ -28,6 +28,20 @@ Prerequisites: **Python 3.10+** and [**uv**](https://docs.astral.sh/uv/getting-s
    ```bash
    uv run pytest
    ```
+   The default suite is hermetic: tests for optional-extra adapters run
+   against injected stand-ins. The Docling fallback parser — which today
+   serves DOCX, PPTX, and XLSX only, through the model-free
+   `SimplePipeline`, and refuses PDF and image inputs by name — also has
+   real-provider tests, which skip themselves unless the pinned extra is
+   installed:
+   ```bash
+   uv run --frozen --extra docling pytest tests/test_docpipeline_adapter_docling_real.py
+   ```
+   Installing that extra raises `pydantic-settings` to the version
+   `docling-core` requires (2.14.2); `mcp` shares that dependency in the
+   default environment, so the lock change is not extra-only. Re-sync the
+   default environment afterwards with
+   `uv sync --frozen --extra embed --extra evaluation`.
 5. Run the linter:
    ```bash
    uv run ruff check .
