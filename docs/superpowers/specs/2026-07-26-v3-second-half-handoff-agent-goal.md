@@ -151,6 +151,35 @@ adopted practices:
    built next (FourCorners' hierarchy-50% / references-16% trace
    analysis is the model).
 
+## Ecosystem addendum — Axiom (maintainer decisions, 2026-07-26)
+
+Verified by an org-wide code review of The Axiom Foundation
+(see `product_goals.md`, "The Axiom Foundation"). Five standing
+decisions, so this session does not re-derive them:
+
+1. **No Axiom integration or change-feed work this session.** Their
+   pipeline cannot consume such a feed yet; the feed is a later query
+   over v3 outputs plus existing edge tables.
+2. **Keep CFR identity first-class in published outputs.** Wherever
+   docpipeline output references a CFR target, the published projection
+   carries `cfr_title` / `cfr_part` / `cfr_section` as separate
+   queryable columns (as `rule_targets` already does), so an external
+   join to `us/regulation/{title}/{part}/{section}` is a string format
+   away. Applies to the post-step-8 capability slice.
+3. **Document anchor semantics in the published fragment grain**:
+   offset unit (unicode codepoints), half-open versus closed intervals,
+   and exactly what each digest covers. One paragraph; makes
+   cross-project evidence references mechanically translatable.
+4. **Steps 6 and 7 keep effective dates, document numbers, and
+   amendment targets typed**, never fuzzy tags — already a design rule;
+   the future change feed is the concrete reason. Checkpoint reviewers
+   enforce it.
+5. **Never build a CFR-to-encoding crosswalk** (Axiom ships a
+   CI-enforced one we will consume; federal CFR only). If a task
+   appears to need one, treat it as a scope-creep flag. **Receipts stay
+   unsigned** JSON with a self-hash; signing decisions wait for
+   Milestone E and a review of `TheAxiomFoundation/receipt`.
+
 ## Goal
 
 Advance the remaining local work until every item is finished, blocked,
