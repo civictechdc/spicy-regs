@@ -73,6 +73,19 @@ Scope discipline (maintainer, 2026-07-26):
   reliable as the pipeline is honest about what it knows, what changed,
   and what failed — receipts, resume, validation, and fail-closed gates
   are alert infrastructure, not ceremony.
+- **Trajectory (recorded, not built now): a graph layer as a projection
+  of the edge tables.** Nodes are artifacts, fragments, concepts, and
+  agencies; edges are the graded, evidence-bearing records this pipeline
+  produces (lineage, docket/FR/RIN joins, citations, assertions,
+  assignments) materialized as Parquet edge tables. That is already a
+  graph; a dedicated graph engine or GraphRAG layer waits for a measured
+  traversal need (the backlog's serving rule; a kuzu-vs-DuckDB bakeoff
+  exists in docs/evidence/graph-engine-bakeoff-2026-07-24/). The first
+  vector-on-graph capability is similarity over edge *evidence spans*
+  ("find edges like this one"), which needs only step 5's embedding
+  infrastructure plus published edge tables. Traversals must never
+  launder grades: a path that includes a suggestive hop is itself
+  suggestive, and consumers choose the grades their paths may use.
 
 ## Engineering posture
 
