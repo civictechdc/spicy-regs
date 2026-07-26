@@ -294,18 +294,48 @@ Encodes statutes and regulations as executable, testable RuleSpec YAML:
 scrapers → corpus → AI-assisted encoding → Rust engine, across federal,
 state, and international jurisdictions. Young and fast-moving.
 
-- **Ingestion overlap.** `axiom-corpus` hits the same Federal Register API
-  we do. One of the two corpora could feed the other instead of both
-  running parallel ingestion; regulations.gov comments remain uniquely
-  ours either way.
-- **Semantic links.** A crosswalk from `cfr_sections` to RuleSpec encodings
-  would turn "this rule changed" into "these eligibility criteria changed"
-  — a diff at the meaning level.
-- **Change feeds.** Our change-detection goal (goal 2) produces exactly the
-  signal an encoding project needs to know what to re-encode; their
-  pipeline is a natural consumer to keep in mind when the feed schema takes
-  shape.
-- Early-stage: a partner to track and shape rather than a dependency, for
+Code-verified 2026-07-26 (org-wide review of `axiom-corpus`,
+`axiom-encode`, `axiom-scrapers`, `rulespec-us`, `axiom-bills`,
+`axiom-rules-engine`):
+
+- **Ingestion overlap is narrower than the earlier note assumed.** Their
+  Federal Register adapter exists but has effectively run once (a
+  term-scoped smoke test yielding 3 provision rows, docket/RIN fields in
+  an untyped metadata blob). Their documentary layer is a stub: no
+  dockets, RINs, comment windows, proceedings, litigation, or
+  point-in-time text lineage (their own `historical-versioning.md`:
+  `as_of` is a no-op outside eCFR; the version-aware migration was
+  reverted). Nothing in our deterministic edge layer is duplicated
+  there — do not cut scope on their account.
+- **One genuine new overlap: `axiom-bills`** pulls Congress.gov plus 22
+  state legislatures directly, overlapping `congress_bills` and the
+  Tier-1 state-legislation plan. Decide feed-versus-parallel with them
+  before building state bills.
+- **Semantic crosswalk: consume, don't build.** `rulespec-us` ships a
+  CI-enforced reverse index (`.axiom/index/provisions_to_rules.json`,
+  ~1,184 regulation citation paths) mapping each corpus provision to
+  every dependent encoding. It joins to our `rule_targets` /
+  `cfr_sections` by rendering `us/regulation/{title}/{part}/{section}` —
+  federal CFR only; their state paths are not uniform.
+- **Change feeds: the seam is sharper than hoped.** They already have a
+  staleness command (`axiom-encode check-source-staleness`) and a weekly
+  CI job, but it is vacuous today (43 of ~4,484 modules pinned) and
+  lagging by design — hash-only, firing after re-ingest, with no reason,
+  dates, or lead time. Our leading signal — which FR documents amend a
+  section, publication and effective dates, docket/RIN, comment window,
+  proceeding stage — is precisely the trigger their own platform plan
+  (A5) declares. Frame the feed as supplying that trigger, keyed on
+  their citation-path identity; don't ask them to build a consumer.
+- **Their provenance engineering exceeds the earlier assumption**:
+  byte-verified provision anchors with char offsets and parent-body
+  digests, `machine_asserted` vs `label_inferred` confidence grading
+  (independent convergence on our deterministic-vs-inferred split), and
+  Ed25519-signed content-addressed releases. Their new `receipt` repo
+  (chained attestation manifests, RFC 3161 witnesses) is worth reviewing
+  before we harden our own attestation chain. Do not offer them
+  point-in-time *text* lineage — they have scoped that internally;
+  documentary lineage is the complementary, non-colliding offer.
+- Still: a partner to track and shape rather than a dependency, for
   now.
 
 ### PolicyEngine (policyengine.org)
