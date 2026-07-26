@@ -35,24 +35,44 @@
 
 ## North star
 
-Everything below serves one product goal: a universal metadata layer
-over all Spicy Regs data — and, eventually, sources beyond it — that
-lets people filter, query, sort, and evaluate documents to find
-insights: reliable alerts on changes that matter, and surfacing
-documents that look unrelated when they are in fact related or
-dependent. Related and dependent are different claims, and the contract
-keeps them distinct on purpose:
+Spicy Regs is a substrate, not an end-user product. The goal is a
+reliable, queryable, evidence-preserving metadata layer over the
+document corpus that **other people build on top of** — slicing the data
+to run their own experiments, composing their own retrieval paths,
+training custom models, and joining their own infrastructure or
+data-science metadata against ours. Everything below is judged by
+whether it makes that layer more queryable, more joinable, or more
+trustworthy.
 
-- **Relatedness** is suggestive metadata — retrieval scores, shared
-  concepts, `ConceptAssignment`s. It powers discovery and never becomes
-  a fact on its own.
-- **Dependency** is an evidence-backed claim — `RelationshipAssertion`s,
-  `RelationChangeEvent`s, checked graph edges with exact source
-  evidence. This is what alerts and downstream conclusions may rely on.
-- **Alerts are only as reliable as the pipeline is honest** about what
-  it knows, what changed, and what failed — which is why receipts,
-  resume, validation, and fail-closed gates exist. They are alert
-  infrastructure, not ceremony.
+Scope discipline (maintainer, 2026-07-26):
+
+- **Files only, for now.** Public comments stay out until the
+  document-only work is proven (already the backlog rule). The
+  hackathon problem spaces are illustrative tests, not a roadmap — we
+  do not need to solve them; we need the layer they would all stand on.
+- **Tagging is primarily agency-scoped.** Files from one agency share a
+  vocabulary; cross-agency discovery (FCC ↔ HHS) is not a near-term
+  requirement. The existing scheme/profile machinery already supports
+  per-agency scoping — use it, and do not invest in global concept
+  unification or cross-scheme mappings now (the backlog defers those
+  anyway). Keep cross-agency linking *possible* through the existing
+  registered-concept and mapping seams; do not build for it.
+- **The join surface is the product.** Because outsiders bring their own
+  tooling, what matters most is stable identifiers, documented table
+  grain, exact offsets, content digests, and provenance that external
+  enrichment can join against without adopting our ontology. A filtered
+  slice plus its digests is a reproducible experiment input — the run
+  receipts already make that possible; keep it true.
+- **Grades of connection stay labeled.** Suggestive metadata (retrieval,
+  shared concepts) powers discovery and never becomes fact; attributed
+  claims carry their claimant; deterministic edges (checked identifiers,
+  version lineage) and evidence-backed assertions are what alerts and
+  conclusions may rely on. A consumer must always be able to tell which
+  grade an edge is.
+- **Reliable alerts remain the later payoff**, and they are only as
+  reliable as the pipeline is honest about what it knows, what changed,
+  and what failed — receipts, resume, validation, and fail-closed gates
+  are alert infrastructure, not ceremony.
 
 ## Engineering posture
 
@@ -74,6 +94,13 @@ tiebreaker:
 - **Production-oriented:** bias toward the paths that will actually run
   in production — `build` mode and real source data over diagnostic-only
   affordances; gates that catch real failures over ceremonial checks.
+- **Platform-first:** prefer work that makes the layer easier for
+  outsiders to query and join (published tables, stable IDs, documented
+  grain) over work that only makes our own internal tools smarter. After
+  step 8, the first capability slice is wiring docpipeline output
+  (fragment-grain concept assignments) into the published/MCP query
+  surface so a third party can ask "every section across this agency's
+  rules tagged X, with exact offsets" without touching our pipeline.
 
 ## Goal
 
