@@ -7,7 +7,8 @@
   [`evidence/testbed-execution-2026-07-26.md`](evidence/testbed-execution-2026-07-26.md).
 - **Goal:** the smallest end-to-end Rulespec implementation over real Spicy
   Regs data: source → segments → concept assignments with Rulespec roles and
-  exact evidence → human-attested review → atomically published tables
+  exact evidence → attested review (machine-graded until the wiki
+  interface exists) → atomically published tables
   conforming to Rulespec L0.
 - **Acceptance is split:** **MVP-local** = one locally published generation
   with identity tables plus reviewed, contract-shaped concept assignments,
@@ -77,18 +78,23 @@ small edits (constants become parameters; `split` column on
 `TagExtractionTask.score`) — no new corpus machinery.
 
 1. Adjudicate the 35 gold assignments as exact / close / broader / narrower /
-   related / wrong, **blind**: the judge sees the gold concept and the fixed
-   top-12 candidates, never the model output. Record the
-   adequate-target-vs-abstention branch per item against the recorded
-   registry generation; that branch assignment is frozen thereafter.
+   related / wrong, **blind and machine-adjudicated**: two judge models
+   from different families than the tagger, each seeing the gold concept
+   and the fixed top-12 candidates, never the tagger output. Disagreements
+   are recorded, the agreement rate is published as the residual-error
+   estimate, and every adjudication row carries its machine attestor.
+   Record the adequate-target-vs-abstention branch per item against the
+   recorded registry generation; that branch assignment is frozen
+   thereafter.
 2. Add Rulespec assignment roles (primary, substantive, mention, contextual)
    to `TAG_SCHEMA`; score roles separately.
 3. Expand gold to **~80 artifact assignments** (35 adjudicated + ~45 new) —
    sized for the MVP, not for accuracy claims. Generation protocol: gold
    drafted by a *different model family* than the tagger, blind to tagger
-   output; the held-out slice is **100% human-adjudicated** (one sitting);
-   train-side gold may remain model-drafted with disagreements adjudicated.
-   Freeze `gold_sha256` before any tuning.
+   output; the held-out slice gets **dual-model adjudication** (two judge
+   families, agreement rate published; disagreements resolved by a third
+   family or excluded, never silently kept); every gold row is labeled
+   machine-adjudicated. Freeze `gold_sha256` before any tuning.
 4. Split by **gold concept** (not artifact — alias edits leak across
    artifacts through the lexical selector). Pin `registry_sha256` per
    iteration; add a regression test asserting no new alias normalizes to a
@@ -122,11 +128,21 @@ only when they beat the prior best by more than one MDE, otherwise "no
 change." Two "no change" iterations in a row → stop tuning and re-examine
 the instrument.
 
-**Human-task ledger (honest count to MVP-local):** phase 1 carries three
-(adjudication sitting, held-out adjudication, disagreement pass); each
-phase 2 iteration at most one confirmation; phase 4 carries the attestation
-sampling and the deletion-review commit. Roughly 7–10 total; the "one per
-iteration" budget applies to the loop, not the endpoints.
+## Attestation capacity (no standing human review)
+
+There is no human review capacity; the earlier human-task ledger (7–10
+sittings) is void. The system does what it can with pipeline-generated
+metadata, **honestly graded**: every adjudication and attestation records
+its machine attestor, and no output is ever presented as human-verified.
+The protections against the repo's two prior oracle failures move from
+human sittings to structure: different-family judge models, blind
+protocols (a judge never sees tagger output), dual-model adjudication with
+published agreement rates, frozen digests. Human validation arrives later
+through a **wiki-style interface for validating and discussing records**
+(recorded in `decisions.md`); its judgments supersede machine attestations
+through the same attestation table, so nothing built now is discarded. The
+one human dependency left is the Rulespec release gate for MVP-public,
+outside this repo.
 
 ## Phase 3 — Cleanup track (parallel, MVP-relevant only)
 
@@ -161,9 +177,13 @@ release.
    unknown, never negative" — omission cannot mean rejected). So phase 4.1
    is one small contract-shaped `attestations` table targeting assignment
    rows. This is the second named stop-rule exception (a new carrier, on
-   the ontology side; run directories stay sealed). Supersession stays a
-   separate correction path, not an approval. Replace the `review_gate`
-   stub's `eligible: False` only insofar as diagnostic mode requires.
+   the ontology side; run directories stay sealed). **The MVP attestor is
+   a machine**: a judge model from a different family than the extractor
+   (a model never attests its own output), `attestorKind` recording it
+   honestly; wiki-sourced human attestations later supersede through the
+   same table. Supersession stays a separate correction path, not an
+   approval. Replace the `review_gate` stub's `eligible: False` only
+   insofar as diagnostic mode requires.
 2. **The bridge, named as scope:** replace the legacy
    `ontology/llm.py` → `build_concept_assignments` source path with the
    docpipeline tag-task output. Explicit identity mapping:

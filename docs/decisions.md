@@ -209,3 +209,25 @@ so explicitly. Plans cite this file; this file cites evidence.
   scope carve-outs (`excluded_terms:`) instead of freeform notes prose.
 - **Revisit trigger:** phase 4 implementation, or the next Rulespec
   contract revision.
+
+## 2026-07-27 — Review capacity: machine-first attestation, wiki later
+
+- **Decision (maintainer):** Spicy Regs has no standing human review
+  capacity. The human-task ledger and "one human task per iteration"
+  budget in earlier entries are void. Initially the system publishes what
+  the pipeline can produce, honestly graded: adjudications and
+  attestations record a machine attestor (`attestorKind`), judge models
+  come from different families than the model being judged, blind
+  protocols hold, dual-model adjudication publishes its agreement rate as
+  the residual-error estimate, and nothing is ever presented as
+  human-verified. Accuracy numbers are always labeled machine-adjudicated.
+- **Wiki-style validation interface (future capability, not designed
+  now):** a later interface for validating and discussing records is the
+  standing channel for human judgment. It writes attestations into the
+  same attestation table (superseding machine rows), which is why the
+  phase 4.1 schema carries attestor/attestorKind/decision/scope from day
+  one. Do not build any part of it before MVP-local.
+- **Unchanged:** the Rulespec release human gates for MVP-public (outside
+  this repo); "a model never attests its own output."
+- **Revisit trigger:** the wiki interface becomes buildable, or human
+  review capacity appears.
