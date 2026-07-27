@@ -1,0 +1,287 @@
+{
+ "date": "2026-07-27",
+ "attestor": "claude-fable-5 subagents (blind, machine adjudication)",
+ "input_sha256": "3ef68ec7b18ccb802f41f07107da6dad6fe9a72a3769c34f022f9cd05126f8ab",
+ "items": [
+  {
+   "item_id": "gold-adjudication-gold_05485aadf13d9175a11ffec9",
+   "grade": "close",
+   "adequate_target": true,
+   "best_candidate_id": "concept_1bb91a13c23812dfcbfeaa6c",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_0b65e53875522836cc5abf83",
+   "grade": "related",
+   "adequate_target": false,
+   "best_candidate_id": "concept_5c1bd6c50d911fc8e83bef32",
+   "best_candidate_alt": "concept_4e315c5153400704df79f8be",
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_0d2bd9fd692cc0e0444738e4",
+   "grade": "narrower",
+   "adequate_target": false,
+   "best_candidate_id": "concept_8510abf814abc6fb7492f087",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_0dafb4a87922aa267974a26c",
+   "grade": "broader",
+   "adequate_target": false,
+   "best_candidate_id": "concept_377acd934c73cadb14132e99",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_15089382a3c588e7e9ac9476",
+   "grade": "broader",
+   "adequate_target": false,
+   "best_candidate_id": "concept_b38cfd9a3b0427c8f043b325",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_156f26dea7ec0dd9908020bb",
+   "grade": "related",
+   "adequate_target": false,
+   "best_candidate_id": "concept_2a3c714a0baa7f2edc5d68d3",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_196c4943e8d6f605578c5bbe",
+   "grade": "broader",
+   "adequate_target": false,
+   "best_candidate_id": "concept_4da60a37329fb30a6bd56a19",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_2211124f731f5f06456877eb",
+   "grade": "close",
+   "adequate_target": true,
+   "best_candidate_id": "concept_4ab12c7e94d4c1070fd89c36",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_2cb09b5e636b53797247b356",
+   "grade": "broader",
+   "adequate_target": false,
+   "best_candidate_id": "concept_a097fdd7b7a6ea23f77571ff",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_2f46b09af5e1049c9ca0675b",
+   "grade": "broader",
+   "adequate_target": false,
+   "best_candidate_id": "concept_1af86fe0efa34f128068b2d9",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_3ce05d58feb8e6463dab726f",
+   "grade": "broader",
+   "adequate_target": false,
+   "best_candidate_id": "concept_a3326f30ce1b70d0cc11e6dc",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_46af63a049ee1964b9ae13f4",
+   "grade": "broader",
+   "adequate_target": false,
+   "best_candidate_id": "concept_6e537d33318a228cb9631540",
+   "best_candidate_alt": "concept_05e99e6fbe0036f3de71895c",
+   "resolution": "2-of-3 (A: related; B: broader; C: broader)"
+  },
+  {
+   "item_id": "gold-adjudication-gold_540c04525b1d09a5f11f02d7",
+   "grade": "broader",
+   "adequate_target": false,
+   "best_candidate_id": "concept_eb4f5eb5694d17eb711c3447",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_5701a4a8af60217ae1c86123",
+   "grade": "broader",
+   "adequate_target": false,
+   "best_candidate_id": "concept_a22a665c2476bf70472e2be6",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_6893b7d3b29ad03d749ce926",
+   "grade": "related",
+   "adequate_target": false,
+   "best_candidate_id": "concept_315af3aa1b293dd956b34ff2",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_6dda7e7b3619b79e8902749f",
+   "grade": "related",
+   "adequate_target": false,
+   "best_candidate_id": "concept_389ca90f2125f063429d4785",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_73e66810cc4e3d464d85ac1c",
+   "grade": "related",
+   "adequate_target": false,
+   "best_candidate_id": "concept_4746e217a7b9fa12a9cdce9c",
+   "best_candidate_alt": "concept_f410c4d97c01088f765d808f",
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_8a226f76fb07a004dd6f88de",
+   "grade": "close",
+   "adequate_target": true,
+   "best_candidate_id": "concept_f6bb075d8f51f4a3f8cc58ab",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_8b15306d5c256dd55b8b5a9e",
+   "grade": "broader",
+   "adequate_target": false,
+   "best_candidate_id": "concept_377acd934c73cadb14132e99",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_8c11eda68fb5ecd98629db3c",
+   "grade": "broader",
+   "adequate_target": false,
+   "best_candidate_id": "concept_eb4f5eb5694d17eb711c3447",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_8d2e1db6a6a6016e3131fa8b",
+   "grade": "close",
+   "adequate_target": true,
+   "best_candidate_id": "concept_9f7e64fe876f79f9bc59bb7c",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_9699f26de500ef0bce70b53c",
+   "grade": "wrong",
+   "adequate_target": false,
+   "best_candidate_id": null,
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_9bcfbe38aca881716c3cf1e8",
+   "grade": "broader",
+   "adequate_target": false,
+   "best_candidate_id": "concept_eb4f5eb5694d17eb711c3447",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_a474a8d29ec59ec6ba159606",
+   "grade": "broader",
+   "adequate_target": false,
+   "best_candidate_id": "concept_1af86fe0efa34f128068b2d9",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_aa9146564ffb454114411888",
+   "grade": "broader",
+   "adequate_target": false,
+   "best_candidate_id": "concept_54d821eb1fd9eabb52e1f212",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_bb672610d9e0f861a8d0d0cf",
+   "grade": "broader",
+   "adequate_target": false,
+   "best_candidate_id": "concept_6930364156c85e16d789a430",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_bcd5ef6aa4616cead8192c66",
+   "grade": "broader",
+   "adequate_target": false,
+   "best_candidate_id": "concept_a1e2b375f3960883c536ab82",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_bedd662ed4eee85e2f379d07",
+   "grade": "related",
+   "adequate_target": false,
+   "best_candidate_id": "concept_02cce33e4314611bb6837353",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_ccc7eb2c1ef62fc9ddacf2c5",
+   "grade": "related",
+   "adequate_target": false,
+   "best_candidate_id": "concept_9f1fdf64a35b9530214fcc97",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_d43a5acdb46c9af6b37b76fc",
+   "grade": "related",
+   "adequate_target": false,
+   "best_candidate_id": "concept_dfae116844393891d8c14ac0",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_e7aa84bceab8eaa0ba85619b",
+   "grade": "broader",
+   "adequate_target": false,
+   "best_candidate_id": "concept_54d821eb1fd9eabb52e1f212",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_f5d9863ba4507643eb91e184",
+   "grade": "broader",
+   "adequate_target": false,
+   "best_candidate_id": "concept_03927a16347b565119e5238e",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_f5de44fd6f2a2ef8ad88f302",
+   "grade": "broader",
+   "adequate_target": false,
+   "best_candidate_id": "concept_3a660bb704471d033aaae586",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_f6bda7557c925438539fafed",
+   "grade": "broader",
+   "adequate_target": false,
+   "best_candidate_id": "concept_389ca90f2125f063429d4785",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  },
+  {
+   "item_id": "gold-adjudication-gold_f9e29337911aa882dffe9870",
+   "grade": "exact",
+   "adequate_target": true,
+   "best_candidate_id": "concept_4e8c788bdc0d7ce8a13dfc0c",
+   "best_candidate_alt": null,
+   "resolution": "unanimous"
+  }
+ ]
+}

@@ -77,17 +77,20 @@ small edits (constants become parameters; `split` column on
 `gold_spans.parquet`; one more scope dimension in
 `TagExtractionTask.score`) — no new corpus machinery.
 
-1. Adjudicate the 35 gold assignments as exact / close / broader / narrower /
-   related / wrong, **blind and machine-adjudicated**: two judge models
-   from different families than the tagger, each seeing the gold concept
-   and the fixed top-12 candidates, never the tagger output. Disagreements
-   are recorded, the agreement rate is published as the residual-error
-   estimate, and every adjudication row carries its machine attestor.
-   Record the adequate-target-vs-abstention branch per item against the
-   recorded registry generation; that branch assignment is frozen
-   thereafter.
-2. Add Rulespec assignment roles (primary, substantive, mention, contextual)
-   to `TAG_SCHEMA`; score roles separately.
+1. ~~Adjudicate the 35 gold assignments~~ — done 2026-07-27, blind
+   dual-judge (claude-fable-5) + third-judge tiebreak:
+   `docs/evidence/gold-adjudication-2026-07-27/`. Grade agreement 34/35,
+   adequacy agreement 35/35. Resolved: 1 exact, 4 close, 20 broader,
+   1 narrower, 8 related, 1 wrong; **adequate target 5/35 (14.3%),
+   frozen**. The old exact-label baseline measured registry coverage, not
+   model quality.
+2. ~~Add Rulespec assignment roles to `TAG_SCHEMA`~~ — done (`df2b177`;
+   reader parameterization + split column `54d02de`). The single intended
+   re-keying: TAG_SCHEMA and TAG_INSTRUCTIONS digests both moved.
+   **Rerun prerequisite:** the +69-token prompt growth pushes one frozen
+   segment to 8213 against the 8192 budget — bundle the budget/margin
+   decision into the rerun (work identity re-keys anyway); preflight
+   fails loudly, so run `--preflight-only` first.
 3. Expand gold to **~80 artifact assignments** (35 adjudicated + ~45 new) —
    sized for the MVP, not for accuracy claims. Generation protocol: gold
    drafted by a *different model family* than the tagger, blind to tagger

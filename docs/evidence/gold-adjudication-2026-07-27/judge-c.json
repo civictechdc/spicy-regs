@@ -1,0 +1,12 @@
+{
+ "judge": "C",
+ "items": [
+  {
+   "item_id": "gold-adjudication-gold_46af63a049ee1964b9ae13f4",
+   "best_candidate_id": "concept_05e99e6fbe0036f3de71895c",
+   "grade": "broader",
+   "adequate_target": false,
+   "rationale": "Poultry inspection is FSIS food-safety inspection; 'Safety' properly contains it but is far too general to satisfy gold intent."
+  }
+ ]
+}
