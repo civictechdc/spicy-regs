@@ -30,6 +30,7 @@ from spicy_regs.docpipeline.source import (
 from spicy_regs.docpipeline.tag_task import TagExtractionTask, tag_unit
 from spicy_regs.ontology.common import canonical_json
 from spicy_regs.ontology.llm import (
+    ASSIGNMENT_ROLES,
     EVIDENCE_ALIGNMENT_PROVIDED,
     EVIDENCE_ALIGNMENT_UNIQUE_EXACT,
     TAG_INSTRUCTIONS,
@@ -111,6 +112,7 @@ def _tag(
     *,
     concept_id: str | None = "concept:water",
     scheme: str = "subject",
+    role: str = "substantive",
     proposed_label: str | None = None,
     definition: str | None = None,
     **overrides: Any,
@@ -119,6 +121,7 @@ def _tag(
         "concept_id": concept_id,
         "proposed_label": proposed_label,
         "scheme": scheme,
+        "role": role,
         "definition": definition,
         "confidence": 0.8,
         "evidence_text": evidence,
@@ -165,6 +168,10 @@ def test_tag_task_uses_the_canonical_prompt_schema_and_a_gold_free_payload() -> 
         lambda response: response["tags"][0].update({"scheme": "unknown"}),
         lambda response: response["tags"][0].update({"confidence": 2.0}),
         lambda response: response["tags"][0].update({"evidence_start": -1}),
+        lambda response: response["tags"][0].pop("role"),
+        lambda response: response["tags"][0].update({"role": "central"}),
+        lambda response: response["tags"][0].update({"role": None}),
+        lambda response: response["tags"][0].update({"role": "Primary"}),
     ],
 )
 def test_tag_response_schema_rejects_structural_violations(mutate: Any) -> None:
@@ -176,6 +183,21 @@ def test_tag_response_schema_rejects_structural_violations(mutate: Any) -> None:
 
     with pytest.raises(Exception):
         TASK.check_response(response, TASK.build_schema(payload))
+
+
+@pytest.mark.parametrize("role", ASSIGNMENT_ROLES)
+def test_every_assignment_role_is_accepted_and_carried_onto_the_candidate_row(role: str) -> None:
+    _, _, unit = _unit("Water discharges require a permit.")
+    payload = TASK.build_payload(unit.input)
+    field_key, text = _field(payload)
+    response = {"tags": [_tag(field_key, "Water", text.index("Water"), role=role)]}
+
+    TASK.check_response(response, TASK.build_schema(payload))
+    normalized = TASK.build_candidates(response, payload)
+
+    assert normalized["rejections"] == []
+    assert [row["role"] for row in normalized["candidates"]] == [role]
+    assert ("role", "string") in TASK.candidate_columns()
 
 
 def test_offsets_are_kept_or_repaired_only_for_one_exact_match() -> None:
@@ -392,6 +414,7 @@ def _candidate(
     profile_id: str,
     subject_id: str,
     status: str = "existing",
+    role: str = "substantive",
 ) -> dict[str, Any]:
     return {
         "candidate_id": f"{artifact_digest}:{segment_id}:{label}",
@@ -404,6 +427,7 @@ def _candidate(
         "concept_label": label,
         "concept_status": status,
         "scheme": "subject",
+        "role": role,
         "confidence": 0.8,
         "source_field": "documents.text",
         "source_start_char": 0,
@@ -480,6 +504,129 @@ def test_scoring_reports_exact_overall_profile_and_error_metrics() -> None:
     assert len(metrics["false_positives"]) == 1
     assert len(metrics["false_negatives"]) == 1
     assert len(metrics["novel_tags"]) == 1
+
+
+def _artifact_answer(
+    digest: str,
+    subject_id: str,
+    concept_id: str,
+    label: str,
+    *,
+    profile_id: str = "p1",
+    **extra: Any,
+) -> dict[str, Any]:
+    expected: dict[str, Any] = {
+        "gold_id": f"gold-{concept_id}",
+        "scheme": "subject",
+        "label": label,
+        "concept_id": concept_id,
+    }
+    role = extra.pop("expected_role", None)
+    if role is not None:
+        expected["role"] = role
+    return {
+        "profile_id": profile_id,
+        "subject_type": "document",
+        "subject_id": subject_id,
+        "artifact_digest": digest,
+        "expected_tags": [expected],
+        **extra,
+    }
+
+
+def test_scoring_partitions_predictions_by_assignment_role() -> None:
+    answers = {
+        "artifacts": [
+            _artifact_answer("a1", "a", "c1", "one"),
+            _artifact_answer("b1", "b", "c2", "two"),
+            _artifact_answer("c1", "c", "c3", "three"),
+            _artifact_answer("d1", "d", "c4", "four", expected_role="primary"),
+        ],
+        "segments": [],
+    }
+    candidates = {
+        "segments": [],
+        "candidates": [
+            _candidate("a1", "s1", "c1", "one", profile_id="p1", subject_id="a", role="primary"),
+            _candidate("b1", "s2", "cx", "extra", profile_id="p1", subject_id="b", role="mention"),
+            _candidate("c1", "s3", "c3", "three", profile_id="p1", subject_id="c", role="contextual"),
+            _candidate("d1", "s4", "c4", "four", profile_id="p1", subject_id="d", role="primary"),
+        ],
+        "rejections": [],
+    }
+
+    metrics = TASK.score(answers, candidates)
+    by_role = {row["role"]: row for row in metrics["per_role"]}
+
+    assert [row["role"] for row in metrics["per_role"]] == list(ASSIGNMENT_ROLES)
+    assert {row["scope"] for row in metrics["per_role"]} == {"role"}
+    # Roles partition the scored prediction set exactly once.
+    assert sum(row["predicted_positive_count"] for row in metrics["per_role"]) == (
+        metrics["predicted_positive_count"]
+    )
+    assert (by_role["primary"]["true_positive_count"], by_role["primary"]["false_positive_count"]) == (2, 0)
+    assert by_role["primary"]["micro_precision"] == 1.0
+    assert by_role["mention"]["true_positive_count"] == 0
+    assert by_role["mention"]["micro_precision"] == 0.0
+    assert by_role["contextual"]["true_positive_count"] == 1
+    assert by_role["substantive"]["predicted_positive_count"] == 0
+    # Gold that declares a role scores only in that role; role-free gold is a
+    # target for every role.
+    assert by_role["primary"]["gold_positive_count"] == 4
+    assert by_role["mention"]["gold_positive_count"] == 3
+    assert metrics["role"] is None and metrics["scope"] == "all-gold-artifacts"
+    assert [row["role"] for row in metrics["false_positives"]] == ["mention"]
+
+
+def test_scoring_reports_every_gold_split_separately() -> None:
+    answers = {
+        "artifacts": [
+            _artifact_answer("a1", "a", "c1", "one", split="train"),
+            _artifact_answer("b1", "b", "c2", "two", split="holdout"),
+        ],
+        "segments": [],
+    }
+    candidates = {
+        "segments": [],
+        "candidates": [
+            _candidate("a1", "s1", "c1", "one", profile_id="p1", subject_id="a"),
+            _candidate("b1", "s2", "cx", "extra", profile_id="p1", subject_id="b"),
+        ],
+        "rejections": [],
+    }
+
+    metrics = TASK.score(answers, candidates)
+    by_split = {row["split"]: row for row in metrics["per_split"]}
+
+    assert sorted(by_split) == ["holdout", "train"]
+    assert {row["scope"] for row in metrics["per_split"]} == {"split"}
+    assert by_split["train"]["artifact_count"] == 1
+    assert by_split["train"]["micro_f1"] == 1.0
+    assert by_split["holdout"]["artifact_count"] == 1
+    assert by_split["holdout"]["micro_f1"] == 0.0
+    assert sum(row["artifact_count"] for row in metrics["per_split"]) == metrics["artifact_count"]
+    assert [row["split"] for row in metrics["false_negatives"]] == ["holdout"]
+
+
+def test_scoring_treats_answers_without_a_split_as_one_train_partition() -> None:
+    answers = {
+        "artifacts": [_artifact_answer("a1", "a", "c1", "one")],
+        "segments": [],
+    }
+    candidates = {
+        "segments": [],
+        "candidates": [_candidate("a1", "s1", "c1", "one", profile_id="p1", subject_id="a")],
+        "rejections": [],
+    }
+
+    metrics = TASK.score(answers, candidates)
+
+    assert len(metrics["per_split"]) == 1
+    train = metrics["per_split"][0]
+    assert train["split"] == "train"
+    assert metrics["split"] is None
+    comparable = [key for key in train if key not in {"scope", "split"}]
+    assert {key: train[key] for key in comparable} == {key: metrics[key] for key in comparable}
 
 
 def test_scoring_reports_the_non_gold_control_artifacts_directly() -> None:

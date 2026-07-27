@@ -30,6 +30,7 @@ from spicy_regs.docpipeline.source import SourceArtifact
 from spicy_regs.ontology.common import canonical_json, stable_id
 from spicy_regs.ontology.concepts import concept_aliases, normalize_label
 from spicy_regs.ontology.llm import (
+    ASSIGNMENT_ROLES,
     TAG_INSTRUCTIONS,
     TAG_MAX_OUTPUT_TOKENS,
     TAG_SCHEMA,
@@ -43,6 +44,11 @@ SCHEMA_NAME = "ontology_tags"
 CANDIDATE_TABLE = "extraction/tag-candidates.parquet"
 REJECTION_TABLE = "extraction/tag-rejections.parquet"
 
+# Evaluation-side gold partitions. ``holdout`` rows are scored and never tuned
+# against; gold that declares no partition is ``train``.
+GOLD_SPLITS: tuple[str, ...] = ("train", "holdout")
+DEFAULT_GOLD_SPLIT = "train"
+
 MODEL_INPUT_FORBIDDEN_KEYS = frozenset(
     {
         "answer",
@@ -55,6 +61,7 @@ MODEL_INPUT_FORBIDDEN_KEYS = frozenset(
         "gold_ids_json",
         "oracle",
         "selection_role",
+        "split",
         "adversarial_case_ids",
         "adversarial_case_ids_json",
     }
@@ -74,6 +81,7 @@ CANDIDATE_COLUMNS: tuple[tuple[str, str], ...] = (
     ("concept_label", "string"),
     ("concept_status", "string"),
     ("scheme", "string"),
+    ("role", "string"),
     ("definition", "string"),
     ("confidence", "double"),
     ("evidence_field_key", "string"),
@@ -342,6 +350,16 @@ def _expected_key(item: Mapping[str, Any]) -> str:
     return f"label:{item.get('scheme')}:{normalize_label(item.get('label'))}"
 
 
+def _declared_role(item: Mapping[str, Any]) -> str | None:
+    """Return the Rulespec assignment role a row declares, or ``None``."""
+    return str(item.get("role") or "").strip() or None
+
+
+def _declared_split(item: Mapping[str, Any]) -> str:
+    """Return the gold partition an answer row declares, defaulting to train."""
+    return str(item.get("split") or "").strip() or DEFAULT_GOLD_SPLIT
+
+
 @dataclass
 class TagExtractionTask:
     """The minimal tag task consumed by :func:`run_extraction`."""
@@ -364,6 +382,12 @@ class TagExtractionTask:
         return cast(dict[str, Any], _plain(TAG_SCHEMA))
 
     def check_response(self, response: Mapping[str, Any], schema: Mapping[str, Any]) -> None:
+        """Refuse any response the strict tag schema does not admit.
+
+        The schema is the single source of truth for the response contract,
+        including the closed ``role`` enum, so a missing or unknown assignment
+        role fails here rather than reaching a candidate row.
+        """
         errors = sorted(Draft202012Validator(dict(schema)).iter_errors(dict(response)), key=lambda item: list(item.path))
         if errors:
             raise ResponseCheckError(f"tag response violates the strict schema at {list(errors[0].path)}")
@@ -506,6 +530,7 @@ class TagExtractionTask:
                     "concept_label": label,
                     "concept_status": "existing" if concept is not None else "novel",
                     "scheme": scheme,
+                    "role": str(item.get("role") or ""),
                     "definition": definition,
                     "confidence": max(0.0, min(1.0, float(item.get("confidence") or 0.0))),
                     "evidence_field_key": field_key,
@@ -586,6 +611,13 @@ class TagExtractionTask:
         ]
 
     def score(self, answers: Mapping[str, Any], candidates: Mapping[str, Any]) -> dict[str, Any]:
+        """Score candidates against gold overall and per profile, role, and split.
+
+        Three scope dimensions are reported beside the overall numbers:
+        ``per_profile`` and ``per_split`` select gold artifacts, and
+        ``per_role`` partitions predictions by their Rulespec assignment role.
+        Answers that declare no ``split`` are scored as one ``train`` partition.
+        """
         artifact_answers = [
             _object(raw, "answers.artifact")
             for raw in _array(answers.get("artifacts"), "answers.artifacts")
@@ -630,40 +662,62 @@ class TagExtractionTask:
                 predicted_by_artifact[digest][key] = candidate
 
         profiles = sorted({str(artifact["profile_id"]) for artifact in artifact_answers})
+        splits = sorted({_declared_split(artifact) for artifact in artifact_answers})
 
-        def scope_metrics(profile_id: str | None) -> dict[str, Any]:
+        def scope_metrics(
+            scope: str,
+            *,
+            profile_id: str | None = None,
+            role: str | None = None,
+            split: str | None = None,
+        ) -> dict[str, Any]:
+            """Score one slice of the gold set along profile, role, or split.
+
+            ``profile_id`` and ``split`` select gold artifacts; ``role``
+            partitions the deduplicated prediction set by the Rulespec
+            assignment role each prediction claims. Gold rows that declare no
+            role are role-agnostic targets and count in every role scope, so a
+            role scope's recall reads as "how much of this gold slice this role
+            alone recovers".
+            """
             digests = [
                 digest
                 for digest, artifact in artifact_by_digest.items()
-                if profile_id is None or str(artifact["profile_id"]) == profile_id
+                if (profile_id is None or str(artifact["profile_id"]) == profile_id)
+                and (split is None or _declared_split(artifact) == split)
             ]
-            expected = {
-                (digest, key)
+            expected_keys = {
+                digest: {
+                    key
+                    for key, item in expected_by_artifact[digest].items()
+                    if role is None or _declared_role(item) in (None, role)
+                }
                 for digest in digests
-                for key in expected_by_artifact[digest]
             }
-            predicted = {
-                (digest, key)
+            predicted_keys = {
+                digest: {
+                    key
+                    for key, candidate in predicted_by_artifact[digest].items()
+                    if role is None or _declared_role(candidate) == role
+                }
                 for digest in digests
-                for key in predicted_by_artifact[digest]
             }
             counts = _score_counts(
-                {canonical_json(item) for item in expected},
-                {canonical_json(item) for item in predicted},
+                {canonical_json([digest, key]) for digest in digests for key in expected_keys[digest]},
+                {canonical_json([digest, key]) for digest in digests for key in predicted_keys[digest]},
             )
             artifact_scores = [
-                _score_counts(
-                    set(expected_by_artifact[digest]),
-                    set(predicted_by_artifact[digest]),
-                )
+                _score_counts(expected_keys[digest], predicted_keys[digest])
                 for digest in digests
             ]
             return {
-                "scope": "all-gold-artifacts" if profile_id is None else "profile",
+                "scope": scope,
                 "profile_id": profile_id,
+                "role": role,
+                "split": split,
                 "artifact_count": len(digests),
-                "gold_positive_count": sum(len(expected_by_artifact[digest]) for digest in digests),
-                "predicted_positive_count": sum(len(predicted_by_artifact[digest]) for digest in digests),
+                "gold_positive_count": sum(len(expected_keys[digest]) for digest in digests),
+                "predicted_positive_count": sum(len(predicted_keys[digest]) for digest in digests),
                 **counts,
                 "artifact_macro_precision": (
                     sum(float(item["micro_precision"]) for item in artifact_scores) / len(artifact_scores)
@@ -681,18 +735,17 @@ class TagExtractionTask:
                     else 0.0
                 ),
                 "artifact_exact_match_rate": (
-                    sum(
-                        set(expected_by_artifact[digest]) == set(predicted_by_artifact[digest])
-                        for digest in digests
-                    )
+                    sum(expected_keys[digest] == predicted_keys[digest] for digest in digests)
                     / len(digests)
                     if digests
                     else 0.0
                 ),
             }
 
-        overall = scope_metrics(None)
-        per_profile = [scope_metrics(profile_id) for profile_id in profiles]
+        overall = scope_metrics("all-gold-artifacts")
+        per_profile = [scope_metrics("profile", profile_id=profile_id) for profile_id in profiles]
+        per_role = [scope_metrics("role", role=role) for role in ASSIGNMENT_ROLES]
+        per_split = [scope_metrics("split", split=split) for split in splits]
         false_positives: list[dict[str, Any]] = []
         false_negatives: list[dict[str, Any]] = []
         novel_tags: list[dict[str, Any]] = []
@@ -710,6 +763,7 @@ class TagExtractionTask:
                         "concept_id": candidate.get("concept_id"),
                         "concept_label": candidate.get("concept_label"),
                         "scheme": candidate.get("scheme"),
+                        "role": candidate.get("role"),
                         "confidence": candidate.get("confidence"),
                         "source_field": candidate.get("source_field"),
                         "start_char": candidate.get("source_start_char"),
@@ -726,9 +780,11 @@ class TagExtractionTask:
                         "subject_id": artifact["subject_id"],
                         "artifact_digest": digest,
                         "gold_id": item.get("gold_id"),
+                        "split": _declared_split(artifact),
                         "concept_id": item.get("concept_id"),
                         "concept_label": item.get("label"),
                         "scheme": item.get("scheme"),
+                        "role": _declared_role(item),
                         "source_field": item.get("source_field"),
                         "start_char": item.get("start_char"),
                         "end_char": item.get("end_char"),
@@ -745,6 +801,7 @@ class TagExtractionTask:
                             "artifact_digest": digest,
                             "concept_label": candidate.get("concept_label"),
                             "scheme": candidate.get("scheme"),
+                            "role": candidate.get("role"),
                             "definition": candidate.get("definition"),
                             "source_field": candidate.get("source_field"),
                             "start_char": candidate.get("source_start_char"),
@@ -836,7 +893,7 @@ class TagExtractionTask:
         grounded = sum(candidate.get("grounded") is True for candidate in raw_candidates)
         novel_count = sum(str(candidate.get("concept_status") or "") == "novel" for candidate in raw_candidates)
         return {
-            "metric_version": "tag-diagnostic-v1",
+            "metric_version": "tag-diagnostic-v2",
             **overall,
             "selected_segment_count": len(segment_answers),
             "accepted_candidate_count": len(raw_candidates),
@@ -859,6 +916,8 @@ class TagExtractionTask:
             "control_artifact_count": len(controls),
             "controls": controls,
             "per_profile": per_profile,
+            "per_role": per_role,
+            "per_split": per_split,
             "false_positives": sorted(
                 false_positives,
                 key=lambda item: (
