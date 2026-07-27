@@ -102,3 +102,20 @@ embedding candidate selection, then re-run this protocol.
 
 Verdicts: `judge-a2-fused.json`, `judge-b2-fused.json`,
 `judge-c2-fused.json`, `resolved-fused.json`.
+
+### Round-2 root-cause correction (2026-07-27, selector-v2 build)
+
+The round-2 finding attributed non-surfacing to substring noise. Building
+v2 revealed the larger cause: v1's `allowed_schemes` gate restricted
+candidates to the `subject` scheme (936 of 513,236 rows; 420/420 of
+round-2's candidate slots), making 7 of the 8 exact-alias targets
+structurally unreachable regardless of scoring. Substring noise was real
+but secondary. v2 (`anchored-hybrid-v2`, commit `2b91622`) removes the
+scheme gate (scheme balance via quotas instead), anchors matches at word
+boundaries, and fuses an anchored-lexical channel with a char-3-gram
+channel (RRF k=60): exact-alias targets surfaced 1/8 → **4/8** (5/8
+without quotas — the quota trades `judicial power` at fused rank 9 for
+scheme diversity). Remaining misses are channel-shaped: `immigration
+law` and `fisheries management` have only non-adjacent alt-label
+aliases (no lexical channel can reach them); `free speech` sits at
+fused rank 91. Mean v1∩v2 overlap: 1.83/12 candidates.
