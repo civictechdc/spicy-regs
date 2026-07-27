@@ -166,15 +166,22 @@ def merge_seed_registry(prior: Sequence[dict], seeds: Iterable[dict]) -> list[di
     return concepts
 
 
-def select_candidate_concepts(subject: Subject, concepts: Sequence[dict], *, limit: int = 40) -> list[dict]:
-    """Bound prompt size using lexical overlap while retaining both facets."""
-    normalized_subject = normalize_label(subject.text)
+def select_candidate_concepts_for_text(
+    text: str,
+    allowed_schemes: Sequence[str],
+    concepts: Sequence[dict],
+    *,
+    limit: int = 40,
+) -> list[dict]:
+    """Bound a tag prompt's registry using text and the allowed facets."""
+    normalized_subject = normalize_label(text)
     tokens = set(normalized_subject.split())
+    allowed = tuple(str(scheme) for scheme in allowed_schemes)
     scored: list[tuple[float, str, dict]] = []
     for concept in concepts:
         if concept.get("status") == "deprecated":
             continue
-        if concept.get("scheme") not in subject.allowed_schemes:
+        if concept.get("scheme") not in allowed:
             continue
         aliases = concept_aliases(concept)
         label_tokens = set().union(*(alias.split() for alias in aliases)) if aliases else set()
@@ -201,7 +208,7 @@ def select_candidate_concepts(subject: Subject, concepts: Sequence[dict], *, lim
                 <= CANDIDATE_REGISTRY_MAX_TOKENS
             ):
                 selected.append(concept)
-    for scheme in subject.allowed_schemes:
+    for scheme in allowed:
         if not any(concept.get("scheme") == scheme for concept in selected):
             fallback = next(
                 (concept for _, _, concept in scored if concept.get("scheme") == scheme),
@@ -213,6 +220,16 @@ def select_candidate_concepts(subject: Subject, concepts: Sequence[dict], *, lim
             ):
                 selected.append(fallback)
     return selected
+
+
+def select_candidate_concepts(subject: Subject, concepts: Sequence[dict], *, limit: int = 40) -> list[dict]:
+    """Compatibility wrapper for ontology subjects using the shared selector."""
+    return select_candidate_concepts_for_text(
+        subject.text,
+        subject.allowed_schemes,
+        concepts,
+        limit=limit,
+    )
 
 
 def match_existing_concept(proposal: TagProposal, concepts: Sequence[dict]) -> str | None:
