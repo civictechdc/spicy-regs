@@ -18,10 +18,14 @@ dependencies = [
     "loguru",
     "mcp>=1.10.0",
     "pypdf>=6.14,<7",
-    "pyyaml",  # data dictionary descriptions (src/spicy_regs/data_dictionary.py)
-    "jsonschema>=4.23",  # strict structured-output and locked-corpus validation
-    "openai",  # optional-at-runtime structured-output provider for ontology tagging
-    "tiktoken>=0.9,<1",  # pinned encoding implementation for ontology segment budgets
+    "pyyaml", # data dictionary descriptions (src/spicy_regs/data_dictionary.py)
+    "jsonschema>=4.23", # strict structured-output and locked-corpus validation
+    "openai", # optional-at-runtime structured-output provider for ontology tagging
+    "tiktoken>=0.9,<1", # pinned encoding implementation for ontology segment budgets
+    # optional-at-runtime provider for the native, enforced structured-output
+    # arm (src/spicy_regs/docpipeline/adapters/anthropic.py). >=0.120 is where
+    # `output_config.format` json_schema is the GA schema-enforcement surface.
+    "anthropic>=0.120,<1",
 ]
 
 [project.optional-dependencies]
