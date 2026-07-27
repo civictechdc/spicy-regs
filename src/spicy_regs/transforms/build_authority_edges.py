@@ -27,11 +27,20 @@ COLUMNS = (
     "usc_title",
     "usc_section",
     "pl_number",
+    "statute_at_large",
+    "executive_order",
     "authority_type",
     "parse_status",
     "agenda_edition",
     *ATTESTATION_COLUMNS,
 )
+
+# Every parsed field discriminates a row. Deriving the dedup key from ``COLUMNS``
+# instead of restating it keeps the two in step: a hand-copied key that omitted
+# the citation columns collapsed two distinct Executive Orders parsed from one
+# authority string into a single row. Attestation columns are excluded because
+# they are constant within a run and carry no citation identity.
+IDENTITY_COLUMNS = tuple(column for column in COLUMNS if column not in ATTESTATION_COLUMNS)
 
 
 def build_authority_edges(
@@ -71,6 +80,8 @@ def build_authority_edges(
                         "usc_title": parsed.usc_title,
                         "usc_section": parsed.usc_section,
                         "pl_number": parsed.pl_number,
+                        "statute_at_large": parsed.statute_at_large,
+                        "executive_order": parsed.executive_order,
                         "authority_type": parsed.authority_type,
                         "parse_status": parsed.parse_status,
                         "agenda_edition": edition,
@@ -78,19 +89,7 @@ def build_authority_edges(
                     }
                 )
 
-    rows = unique_rows(
-        rows,
-        key_columns=(
-            "rin",
-            "authority_raw",
-            "usc_title",
-            "usc_section",
-            "pl_number",
-            "authority_type",
-            "parse_status",
-            "agenda_edition",
-        ),
-    )
+    rows = unique_rows(rows, key_columns=IDENTITY_COLUMNS)
     rows.sort(
         key=lambda row: (
             row.get("rin") or "",

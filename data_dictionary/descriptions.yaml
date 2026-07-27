@@ -297,15 +297,19 @@ tables:
 
   authority_edges:
     summary: >-
-      Parsed Unified Agenda statutory-authority citations. Failed parses are
-      deliberately retained with their raw text so parser coverage can improve
-      without hiding evidence. All columns are VARCHAR.
+      Parsed Unified Agenda statutory-authority citations. One row per distinct
+      citation parsed from an authority string, so a string naming several
+      authorities yields several rows. Failed parses are deliberately retained
+      with their raw text so parser coverage can improve without hiding
+      evidence. All columns are VARCHAR.
     columns:
       rin: "RIN whose agenda entry cited the authority."
       authority_raw: "Original authority string, always retained."
       usc_title: "Parsed U.S. Code title, when present."
       usc_section: "Parsed U.S. Code section with subsection parentheses omitted."
       pl_number: "Parsed Public Law number `<congress>-<law-number>`; joins to `congress_bills.pl_number`."
+      statute_at_large: "Parsed Statutes at Large citation as `<volume>-<page>` (e.g. `117-429` for `117 Stat. 429`), when present."
+      executive_order: "Parsed Executive Order number without leading zeros (e.g. `13985`), when present. Distinct orders cited in one authority string are separate rows."
       authority_type: "`usc`, `public_law`, `statute_at_large`, `eo`, or `other`."
       parse_status: "`ok`, `partial`, or `failed`; failed rows are searchable and never dropped."
       agenda_edition: "Unified Agenda edition that supplied the citation."

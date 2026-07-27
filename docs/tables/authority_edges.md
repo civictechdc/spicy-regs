@@ -2,7 +2,7 @@
 
 # `authority_edges`
 
-Parsed Unified Agenda statutory-authority citations. Failed parses are deliberately retained with their raw text so parser coverage can improve without hiding evidence. All columns are VARCHAR.
+Parsed Unified Agenda statutory-authority citations. One row per distinct citation parsed from an authority string, so a string naming several authorities yields several rows. Failed parses are deliberately retained with their raw text so parser coverage can improve without hiding evidence. All columns are VARCHAR.
 
 - **Parquet file:** `materialized/ontology/latest.json` (atomic snapshot manifest)
 - **Supported by MCP `query_sql` after first publication:** Yes
@@ -14,6 +14,8 @@ Parsed Unified Agenda statutory-authority citations. Failed parses are deliberat
 | `usc_title` | `VARCHAR` | Parsed U.S. Code title, when present. |
 | `usc_section` | `VARCHAR` | Parsed U.S. Code section with subsection parentheses omitted. |
 | `pl_number` | `VARCHAR` | Parsed Public Law number `<congress>-<law-number>`; joins to `congress_bills.pl_number`. |
+| `statute_at_large` | `VARCHAR` | Parsed Statutes at Large citation as `<volume>-<page>` (e.g. `117-429` for `117 Stat. 429`), when present. |
+| `executive_order` | `VARCHAR` | Parsed Executive Order number without leading zeros (e.g. `13985`), when present. Distinct orders cited in one authority string are separate rows. |
 | `authority_type` | `VARCHAR` | `usc`, `public_law`, `statute_at_large`, `eo`, or `other`. |
 | `parse_status` | `VARCHAR` | `ok`, `partial`, or `failed`; failed rows are searchable and never dropped. |
 | `agenda_edition` | `VARCHAR` | Unified Agenda edition that supplied the citation. |
