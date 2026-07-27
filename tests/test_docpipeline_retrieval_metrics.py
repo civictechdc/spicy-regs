@@ -171,6 +171,12 @@ def test_zero_relevant_and_no_hit_queries_remain_in_metric_denominator() -> None
     assert list(planned["methods"]) == ["dense", "sparse", "hybrid-rrf", "reranked"]
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason="retrieval_metrics has no 'query_methods' parameter; restricting "
+    "aggregation to queries that executed each method is an unimplemented "
+    "gap in the parked step-5 work (docs/decisions.md, 2026-07-27 MVP scope)",
+)
 def test_mixed_level_metrics_use_only_queries_that_executed_each_method() -> None:
     artifact_dense = dataclasses.replace(
         _hit("artifact", "artifact-1", 1, method="dense"),

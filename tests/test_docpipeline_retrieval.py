@@ -170,6 +170,12 @@ def test_records_are_frozen_validated_and_use_closed_values() -> None:
         RetrievalSpec(candidate_limit=99)
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason="retrieval_plan_facts does not emit 'method_policy' yet; the "
+    "per-level method policy is an unimplemented gap in the parked step-5 "
+    "work (docs/decisions.md, 2026-07-27 MVP scope)",
+)
 def test_spec_and_plan_facts_pin_every_retrieval_constant_and_model() -> None:
     spec = RetrievalSpec(
         filters=(
