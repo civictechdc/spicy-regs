@@ -225,6 +225,48 @@ def test_materialized_publication_validates_before_first_upload(
     assert uploads == []
 
 
+def test_local_publication_runs_the_semantic_gate_in_position(tmp_path) -> None:
+    """A skip-upload run must execute validate_before_publish, not bypass it."""
+
+    def build(output_dir: Path, context: RunContext) -> None:
+        del context
+        _write_parquet(output_dir / "result.parquet", ["result"])
+
+    gate_calls: list[Path] = []
+
+    class LocallyValidatedDataset(MaterializedDatasetPipeline):
+        name = "locally-validated-dataset"
+        dataset_name = "locally-validated"
+        published_outputs = ("result.parquet",)
+
+        def stages(self):
+            return (
+                DatasetStage(
+                    "build",
+                    (),
+                    ("result.parquet",),
+                    build,
+                ),
+            )
+
+        def validate_before_publish(self, manifest_path: Path) -> None:
+            assert manifest_path.exists()
+            gate_calls.append(manifest_path)
+
+    LocallyValidatedDataset(output_dir=tmp_path, skip_upload=True).run()
+    assert len(gate_calls) == 1
+
+    class LocallyFailingDataset(LocallyValidatedDataset):
+        name = "locally-failing-dataset"
+        dataset_name = "locally-failing"
+
+        def validate_before_publish(self, manifest_path: Path) -> None:
+            raise RuntimeError("semantic gate failed locally")
+
+    with pytest.raises(RuntimeError, match="semantic gate failed locally"):
+        LocallyFailingDataset(output_dir=tmp_path / "failing", skip_upload=True).run()
+
+
 def test_materialized_publication_requires_complete_r2_configuration(tmp_path, monkeypatch) -> None:
     class PublishedDataset(MaterializedDatasetPipeline):
         name = "published-dataset"

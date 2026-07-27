@@ -191,6 +191,7 @@ class MaterializedDatasetPipeline(Pipeline):
             stages=ordered,
             input_snapshot=input_snapshot,
         )
+        self.validate_before_publish(manifest_path)
         if self.skip_upload:
             logger.info(
                 "skip_upload=True — materialized dataset {} left at {}",
@@ -198,7 +199,6 @@ class MaterializedDatasetPipeline(Pipeline):
                 output_dir,
             )
             return
-        self.validate_before_publish(manifest_path)
         self._publish(
             manifest_path=manifest_path,
             pointer_path=pointer_path,

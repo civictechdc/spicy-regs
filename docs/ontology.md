@@ -7,7 +7,7 @@ L1–L4 parsing, shape, constraint, or runtime conformance.
 
 The implementation targets the repaired candidate US identifier and
 Experimental rulemaking contract whose content digest is
-`sha256:2aefd3fad7782a7b16a7fa8fc08e8ceb26b5db741e0371b8fa8a9ccc1982124d`
+`sha256:5f287a1e266feb4bec73317c3dca2d10654a61b1502f13ace176d1e9f4e23446`
 (2026-07-24). This digest pins the exact local contract used by the carrier
 audit; it is not a release claim. The local paired corpus receipt is complete.
 The module remains Experimental
@@ -76,7 +76,7 @@ The fenced block below is normative and machine-audited by Rulespec's
 `tools/l0_mapping_audit.py`.
 
 ```yaml rkaf-l0-mapping
-rulespec_version: "sha256:2aefd3fad7782a7b16a7fa8fc08e8ceb26b5db741e0371b8fa8a9ccc1982124d"
+rulespec_version: "sha256:5f287a1e266feb4bec73317c3dca2d10654a61b1502f13ace176d1e9f4e23446"
 mappings:
   - table: rule_targets
     column: docket_id
