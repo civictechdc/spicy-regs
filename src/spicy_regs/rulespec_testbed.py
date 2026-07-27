@@ -44,7 +44,12 @@ from spicy_regs.docpipeline.source import (
     build_source_artifact,
     iter_source_records,
 )
-from spicy_regs.docpipeline.tag_task import TagExtractionTask, tag_unit
+from spicy_regs.docpipeline.tag_task import (
+    DEFAULT_GOLD_SPLIT,
+    GOLD_SPLITS,
+    TagExtractionTask,
+    tag_unit,
+)
 from spicy_regs.ontology.common import canonical_json, read_parquet_rows
 from spicy_regs.ontology.concepts import (
     concept_aliases,
@@ -53,6 +58,9 @@ from spicy_regs.ontology.concepts import (
 )
 from spicy_regs.ontology.llm import resolve_exact_evidence_offsets
 
+# Defaults for the frozen 2026-07 sample. Every one of them is a parameter of
+# :func:`load_testbed_inputs` and of the command line, so expanding gold is a
+# data-and-invocation change, never a code edit.
 GOLD_FILE = "gold_spans.parquet"
 EXPECTED_GOLD_ARTIFACTS = 35
 EXPECTED_SELECTED_SEGMENTS = 109
@@ -226,6 +234,17 @@ def _containing_segments(
     )
 
 
+def _gold_split(row: Mapping[str, Any]) -> str:
+    """Read one gold row's evaluation partition; an absent column means train."""
+    split = str(row.get("split") or "").strip() or DEFAULT_GOLD_SPLIT
+    if split not in GOLD_SPLITS:
+        raise DiagnosticInputError(
+            f"gold row {row.get('gold_id')} declares unknown split {split!r}; "
+            f"expected one of {list(GOLD_SPLITS)}"
+        )
+    return split
+
+
 def _answers(
     gold_rows: Sequence[Mapping[str, Any]],
     artifacts: Mapping[tuple[str, str, str, str], SourceArtifact],
@@ -234,6 +253,7 @@ def _answers(
     concepts: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     aliases = _registry_aliases(concepts)
+    split_by_artifact: dict[tuple[str, str, str, str], str] = {}
     selected_by_artifact: dict[tuple[str, str, str, str], list[ProcessingSegment]] = defaultdict(list)
     for key, segment in selected.items():
         selected_by_artifact[key[:4]].append(segment)
@@ -286,9 +306,19 @@ def _answers(
             )
         scheme = str(raw.get("concept_scheme") or "")
         label = str(raw.get("concept_label") or "")
+        split = _gold_split(raw)
+        # One artifact carries one partition: a mixed artifact would attribute
+        # the same false positives to both sides of the split.
+        prior_split = split_by_artifact.setdefault(key, split)
+        if prior_split != split:
+            raise DiagnosticInputError(
+                f"gold row {raw.get('gold_id')} puts artifact {key} in split {split!r} "
+                f"after an earlier row placed it in {prior_split!r}"
+            )
         expected_by_artifact[key].append(
             {
                 "gold_id": str(raw.get("gold_id") or ""),
+                "split": split,
                 "scheme": scheme,
                 "label": label,
                 "concept_id": aliases.get((scheme, normalize_label(label))),
@@ -307,6 +337,7 @@ def _answers(
             "subject_type": key[1],
             "subject_id": key[2],
             "artifact_digest": key[3],
+            "split": split_by_artifact[key],
             "expected_tags": sorted(
                 values,
                 key=lambda item: (
@@ -366,10 +397,23 @@ def load_testbed_inputs(
     selection_file: Path,
     registry_file: Path,
     *,
+    expected_gold_artifacts: int = EXPECTED_GOLD_ARTIFACTS,
+    expected_selected_segments: int = EXPECTED_SELECTED_SEGMENTS,
+    gold_file: str | Path = GOLD_FILE,
     prompt_input_token_budget: int = PROMPT_INPUT_TOKEN_BUDGET,
     prompt_safety_margin_tokens: int = PROMPT_SAFETY_MARGIN_TOKENS,
 ) -> TestbedInputs:
-    """Translate the frozen sample into current source, segment, and tag inputs."""
+    """Translate one declared sample into current source, segment, and tag inputs.
+
+    The caller declares the sample it expects: ``gold_file`` (a name under
+    ``dataset_dir`` or an absolute path) and the two counts the loaded tables
+    must match. Expanding gold therefore changes data and invocation, never
+    this module.
+    """
+    if expected_gold_artifacts < 1:
+        raise ValueError("expected_gold_artifacts must be positive")
+    if expected_selected_segments < 1:
+        raise ValueError("expected_selected_segments must be positive")
     if prompt_input_token_budget <= 0:
         raise ValueError("prompt_input_token_budget must be positive")
     if prompt_safety_margin_tokens < 0:
@@ -377,17 +421,17 @@ def load_testbed_inputs(
     dataset_dir = Path(dataset_dir)
     selection_file = Path(selection_file)
     registry_file = Path(registry_file)
-    gold_file = dataset_dir / GOLD_FILE
-    for path in (gold_file, selection_file, registry_file):
+    gold_path = dataset_dir / gold_file
+    for path in (gold_path, selection_file, registry_file):
         if not path.is_file():
             raise FileNotFoundError(path)
 
     selected_rows = read_parquet_rows(selection_file)
-    gold_rows = read_parquet_rows(gold_file)
+    gold_rows = read_parquet_rows(gold_path)
     concepts = read_parquet_rows(registry_file)
-    if len(selected_rows) != EXPECTED_SELECTED_SEGMENTS:
+    if len(selected_rows) != expected_selected_segments:
         raise DiagnosticInputError(
-            f"the selected sample has {len(selected_rows)} segments, expected {EXPECTED_SELECTED_SEGMENTS}"
+            f"the selected sample has {len(selected_rows)} segments, expected {expected_selected_segments}"
         )
     selected_artifact_keys = {_artifact_key(row) for row in selected_rows}
     gold_artifact_keys = {
@@ -399,9 +443,9 @@ def load_testbed_inputs(
         )
         for row in gold_rows
     }
-    if len(gold_artifact_keys) != EXPECTED_GOLD_ARTIFACTS:
+    if len(gold_artifact_keys) != expected_gold_artifacts:
         raise DiagnosticInputError(
-            f"the gold sample has {len(gold_artifact_keys)} artifacts, expected {EXPECTED_GOLD_ARTIFACTS}"
+            f"the gold sample has {len(gold_artifact_keys)} artifacts, expected {expected_gold_artifacts}"
         )
     if not gold_artifact_keys <= selected_artifact_keys:
         raise DiagnosticInputError("the selected segment sample does not cover every gold artifact")
@@ -463,9 +507,13 @@ def load_testbed_inputs(
         source_facts={
             "dataset_files": _source_file_facts(dataset_dir, active_tables),
             "selection_sha256": sha256_file(selection_file),
-            "gold_sha256": sha256_file(gold_file),
+            "gold_file": gold_path.name,
+            "gold_sha256": sha256_file(gold_path),
             "selected_artifact_count": len(selected_artifact_keys),
             "gold_artifact_count": len(gold_artifact_keys),
+            "gold_artifacts_by_split": dict(
+                sorted(Counter(str(artifact["split"]) for artifact in answers["artifacts"]).items())
+            ),
         },
         segmentation_facts={
             **settings.identity(),
@@ -570,6 +618,7 @@ def _preflight_summary(inputs: TestbedInputs) -> dict[str, Any]:
         "selected_segment_count": inputs.selected_segment_count,
         "selected_artifact_count": inputs.source_facts["selected_artifact_count"],
         "gold_artifact_count": inputs.gold_artifact_count,
+        "gold_artifacts_by_split": inputs.source_facts["gold_artifacts_by_split"],
         "gold_span_count": inputs.segmentation_facts["gold_span_count"],
         "gold_profile_count": inputs.profile_facts["gold_profile_count"],
         "gold_coordinate_resolution_counts": inputs.segmentation_facts[
@@ -594,6 +643,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--run-id")
     parser.add_argument(
+        "--gold-file",
+        default=GOLD_FILE,
+        help="Gold table name under --dataset-dir, or an absolute path.",
+    )
+    parser.add_argument(
+        "--expected-gold-artifacts",
+        type=int,
+        default=EXPECTED_GOLD_ARTIFACTS,
+        help="The number of distinct gold artifacts the run declares.",
+    )
+    parser.add_argument(
+        "--expected-selected-segments",
+        type=int,
+        default=EXPECTED_SELECTED_SEGMENTS,
+        help="The number of selected segments the run declares.",
+    )
+    parser.add_argument(
         "--preflight-only",
         action="store_true",
         help="Validate all source, segment, gold, and registry mappings without calling a model.",
@@ -614,6 +680,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.dataset_dir,
         args.selection_file,
         args.registry_file,
+        expected_gold_artifacts=args.expected_gold_artifacts,
+        expected_selected_segments=args.expected_selected_segments,
+        gold_file=args.gold_file,
         prompt_input_token_budget=prompt_input_token_budget,
         prompt_safety_margin_tokens=prompt_safety_margin_tokens,
     )
