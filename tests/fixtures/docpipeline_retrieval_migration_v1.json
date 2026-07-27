@@ -1,0 +1,310 @@
+{
+  "format_version": 1,
+  "query": {
+    "query_id": "gold-hermetic",
+    "text": "water quality",
+    "dense_vector": [
+      1.0,
+      0.0
+    ],
+    "sparse_vector": {
+      "dimensions": 4,
+      "indices": [
+        0
+      ],
+      "values": [
+        1.0
+      ]
+    }
+  },
+  "gold_span": {
+    "source_field": "body",
+    "start_char": 8,
+    "end_char": 12
+  },
+  "segment_candidates": [
+    {
+      "target_id": "experiment_segment_b",
+      "artifact_id": "legacy_artifact_b",
+      "source_table": "documents",
+      "subject_id": "subject-b",
+      "artifact_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "dense_vector": [
+        1.0,
+        0.0
+      ],
+      "sparse_vector": {
+        "dimensions": 4,
+        "indices": [
+          0
+        ],
+        "values": [
+          1.0
+        ]
+      },
+      "slices": [
+        {
+          "source_field": "body",
+          "start_char": 0,
+          "end_char": 20
+        }
+      ]
+    },
+    {
+      "target_id": "experiment_segment_a",
+      "artifact_id": "legacy_artifact_a",
+      "source_table": "documents",
+      "subject_id": "subject-a",
+      "artifact_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "dense_vector": [
+        1.0,
+        0.0
+      ],
+      "sparse_vector": {
+        "dimensions": 4,
+        "indices": [
+          0
+        ],
+        "values": [
+          1.0
+        ]
+      },
+      "slices": [
+        {
+          "source_field": "body",
+          "start_char": 0,
+          "end_char": 10
+        }
+      ]
+    },
+    {
+      "target_id": "experiment_segment_c",
+      "artifact_id": "legacy_artifact_c",
+      "source_table": "documents",
+      "subject_id": "subject-c",
+      "artifact_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "dense_vector": [
+        0.0,
+        1.0
+      ],
+      "sparse_vector": {
+        "dimensions": 4,
+        "indices": [
+          1
+        ],
+        "values": [
+          1.0
+        ]
+      },
+      "slices": [
+        {
+          "source_field": "title",
+          "start_char": 0,
+          "end_char": 20
+        }
+      ]
+    }
+  ],
+  "candidate_text": {
+    "experiment_segment_a": "nearby water text",
+    "experiment_segment_b": "water quality evidence",
+    "experiment_segment_c": "unrelated evidence"
+  },
+  "rerank_tokenizer_id": "BAAI/bge-reranker-v2-m3",
+  "stored_rerank_scores": [
+    {
+      "target_id": "experiment_segment_a",
+      "score": 0.2,
+      "untruncated_token_count": 10
+    },
+    {
+      "target_id": "experiment_segment_b",
+      "score": 0.9,
+      "untruncated_token_count": 11
+    },
+    {
+      "target_id": "experiment_segment_c",
+      "score": 0.9,
+      "untruncated_token_count": 12
+    }
+  ],
+  "expected": {
+    "dense": [
+      [
+        "experiment_segment_a",
+        1,
+        1.0
+      ],
+      [
+        "experiment_segment_b",
+        2,
+        1.0
+      ],
+      [
+        "experiment_segment_c",
+        3,
+        0.0
+      ]
+    ],
+    "sparse": [
+      [
+        "experiment_segment_a",
+        1,
+        1.0
+      ],
+      [
+        "experiment_segment_b",
+        2,
+        1.0
+      ],
+      [
+        "experiment_segment_c",
+        3,
+        0.0
+      ]
+    ],
+    "hybrid_rrf": [
+      [
+        "experiment_segment_a",
+        1,
+        0.03278688524590164
+      ],
+      [
+        "experiment_segment_b",
+        2,
+        0.03225806451612903
+      ],
+      [
+        "experiment_segment_c",
+        3,
+        0.031746031746031744
+      ]
+    ],
+    "reranked": [
+      [
+        "experiment_segment_b",
+        1,
+        0.9
+      ],
+      [
+        "experiment_segment_c",
+        2,
+        0.9
+      ],
+      [
+        "experiment_segment_a",
+        3,
+        0.2
+      ]
+    ],
+    "metrics": {
+      "dense": {
+        "recall_at_1": 0.0,
+        "recall_at_3": 1.0,
+        "recall_at_5": 1.0,
+        "recall_at_10": 1.0,
+        "recall_at_25": 1.0,
+        "recall_at_50": 1.0,
+        "recall_at_100": 1.0,
+        "recall_at_200": 1.0,
+        "precision_at_1": 0.0,
+        "precision_at_3": 0.3333333333333333,
+        "precision_at_5": 0.2,
+        "precision_at_10": 0.1,
+        "mrr": 0.5,
+        "ndcg_at_5": 0.6309297535714575,
+        "ndcg_at_10": 0.6309297535714575
+      },
+      "sparse": {
+        "recall_at_1": 0.0,
+        "recall_at_3": 1.0,
+        "recall_at_5": 1.0,
+        "recall_at_10": 1.0,
+        "recall_at_25": 1.0,
+        "recall_at_50": 1.0,
+        "recall_at_100": 1.0,
+        "recall_at_200": 1.0,
+        "precision_at_1": 0.0,
+        "precision_at_3": 0.3333333333333333,
+        "precision_at_5": 0.2,
+        "precision_at_10": 0.1,
+        "mrr": 0.5,
+        "ndcg_at_5": 0.6309297535714575,
+        "ndcg_at_10": 0.6309297535714575
+      },
+      "hybrid-rrf": {
+        "recall_at_1": 0.0,
+        "recall_at_3": 1.0,
+        "recall_at_5": 1.0,
+        "recall_at_10": 1.0,
+        "recall_at_25": 1.0,
+        "recall_at_50": 1.0,
+        "recall_at_100": 1.0,
+        "recall_at_200": 1.0,
+        "precision_at_1": 0.0,
+        "precision_at_3": 0.3333333333333333,
+        "precision_at_5": 0.2,
+        "precision_at_10": 0.1,
+        "mrr": 0.5,
+        "ndcg_at_5": 0.6309297535714575,
+        "ndcg_at_10": 0.6309297535714575
+      },
+      "reranked": {
+        "recall_at_1": 1.0,
+        "recall_at_3": 1.0,
+        "recall_at_5": 1.0,
+        "recall_at_10": 1.0,
+        "recall_at_25": 1.0,
+        "recall_at_50": 1.0,
+        "recall_at_100": 1.0,
+        "recall_at_200": 1.0,
+        "precision_at_1": 1.0,
+        "precision_at_3": 0.3333333333333333,
+        "precision_at_5": 0.2,
+        "precision_at_10": 0.1,
+        "mrr": 1.0,
+        "ndcg_at_5": 1.0,
+        "ndcg_at_10": 1.0
+      }
+    }
+  },
+  "stored_receipt_metrics": {
+    "dense": {
+      "recall_at_50": 0.0
+    }
+  },
+  "artifact_replay": {
+    "query_vector": [
+      1.0,
+      0.0
+    ],
+    "candidates": [
+      {
+        "target_id": "artifact_vector_z",
+        "vector": [
+          1.0,
+          0.0
+        ]
+      },
+      {
+        "target_id": "artifact_vector_a",
+        "vector": [
+          1.0,
+          0.0
+        ]
+      }
+    ],
+    "expected": [
+      [
+        "artifact_vector_a",
+        1,
+        1.0
+      ],
+      [
+        "artifact_vector_z",
+        2,
+        1.0
+      ]
+    ]
+  }
+}

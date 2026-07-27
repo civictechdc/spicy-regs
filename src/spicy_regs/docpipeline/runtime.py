@@ -100,6 +100,11 @@ IMMUTABLE_RUN_PATTERNS: tuple[str, ...] = (
     "transitions.jsonl",
     "source/*",
     "extraction/calls/*",
+    "retrieval/join-inputs.json",
+    "retrieval/dense-embeddings.parquet",
+    "retrieval/sparse-embeddings.parquet",
+    "retrieval/rerank-scores.parquet",
+    "retrieval/rerank-checkpoints.jsonl",
     "*request.json",
     "*response.json",
 )

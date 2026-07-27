@@ -1,0 +1,102 @@
+{
+  "format_version": 1,
+  "differences": [
+    {
+      "id": "provider-output-file-layout",
+      "kind": "run_file_layout",
+      "old": "The predecessor stored provider output beside each experiment.",
+      "new": "The v3 pipeline stores provider output below one retrieval directory.",
+      "reason": "The v3 run directory groups immutable provider output by pipeline stage.",
+      "proof": {
+        "old_files": [
+          "embedding_cache.parquet",
+          "rerank_requests.parquet",
+          "reranked_candidates.parquet",
+          "sparse_embeddings.parquet"
+        ],
+        "new_files": [
+          "retrieval/dense-embeddings.parquet",
+          "retrieval/rerank-scores.parquet",
+          "retrieval/sparse-embeddings.parquet"
+        ]
+      }
+    },
+    {
+      "id": "rerank-row-layout",
+      "kind": "row_layout",
+      "old": "The predecessor split one request from its candidate rows.",
+      "new": "The v3 pipeline stores one typed immutable score row per candidate.",
+      "reason": "Each v3 row keeps the provider input, result, and provenance together.",
+      "proof": {
+        "old_request_file": "rerank_requests.parquet",
+        "old_request_schema": {
+          "field_count": 25,
+          "fields_sha256": "71479e9699cc82613f126408182af4b56fe1ddf7e3dab9615088f0b9c1aff70e"
+        },
+        "old_candidate_file": "reranked_candidates.parquet",
+        "old_candidate_schema": {
+          "field_count": 32,
+          "fields_sha256": "d9e02470a1f4a3c172bb58f0c2fa4e3c18596a405136377bbaefbb538eb37d3f"
+        },
+        "new_score_file": "retrieval/rerank-scores.parquet",
+        "new_storage_schema": {
+          "field_count": 45,
+          "fields_sha256": "819652c1691e128ce78c3fa76b4d601119bbfa4a337c4b5dbc46e83cab442d83"
+        },
+        "new_row_schema": {
+          "field_count": 45,
+          "fields_sha256": "e414ecc8f22ea7f2908ad1355d28cbd6e4e78dc66dd74bbee961fad31c817ca8"
+        }
+      }
+    },
+    {
+      "id": "derived-result-container-layout",
+      "kind": "container_layout",
+      "old": "The predecessor stored one Parquet row per scope and method.",
+      "new": "The v3 pipeline stores one JSON object grouped by method.",
+      "reason": "The v3 run receipt keeps aggregate evaluation results in one deterministic object.",
+      "proof": {
+        "old_metric_files": {
+          "experiment_config_metrics.parquet": {
+            "field_count": 48,
+            "fields_sha256": "e810c79f7d893750107171ee344b284c4215c4448e975e6dbbfae768de62a48c"
+          },
+          "rerank_config_metrics.parquet": {
+            "field_count": 23,
+            "fields_sha256": "1b90a99dc123f15740d14f079778b568ab5129eaf63c5e0bbeaef666fcc9e2f7"
+          },
+          "retrieval_metrics.parquet": {
+            "field_count": 25,
+            "fields_sha256": "f580f84278a0fa92fac411cf518097b4229db4ac2c6d69a1093bf53d727f398e"
+          }
+        },
+        "new_result_shape": {
+          "format_version": "int",
+          "ir_measures_version": "str",
+          "methods": {
+            "dense": {
+              "mrr": "float",
+              "ndcg_at_10": "float",
+              "ndcg_at_5": "float",
+              "precision_at_1": "float",
+              "precision_at_10": "float",
+              "precision_at_3": "float",
+              "precision_at_5": "float",
+              "recall_at_1": "float",
+              "recall_at_10": "float",
+              "recall_at_100": "float",
+              "recall_at_200": "float",
+              "recall_at_25": "float",
+              "recall_at_3": "float",
+              "recall_at_5": "float",
+              "recall_at_50": "float"
+            }
+          },
+          "metric_provider": "str",
+          "query_count": "int",
+          "zero_relevant_query_count": "int"
+        }
+      }
+    }
+  ]
+}

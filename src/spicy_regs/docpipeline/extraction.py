@@ -74,6 +74,27 @@ PROVIDER_CALL_TABLE = "extraction/provider-calls.parquet"
 #: access-control record scans for these rather than asserting their absence.
 ANSWER_FILE_NAME_FRAGMENTS: tuple[str, ...] = ("answer", "oracle", "gold")
 
+#: Ranking aids may select source text for extraction, but they are never part
+#: of the factual payload.  Reject these keys at every nesting depth so a
+#: caller cannot accidentally teach an extraction task that a rank is truth.
+RETRIEVAL_AID_FORBIDDEN_KEYS: frozenset[str] = frozenset(
+    {
+        "score",
+        "rank",
+        "score_kind",
+        "candidate_rank",
+        "dense_score",
+        "dense_rank",
+        "sparse_score",
+        "sparse_rank",
+        "fusion_score",
+        "rerank_score",
+        "rerank_rank",
+        "retrieval_score",
+        "retrieval_rank",
+    }
+)
+
 #: How good a check status is. A rebuild may lower one, never raise one.
 _CHECK_STATUS_RANK: dict[str, int] = {"fail": 0, "unknown": 1, "pass": 2}
 
@@ -272,7 +293,15 @@ def _nested_keys(value: Any) -> set[str]:
     return set()
 
 
+def refuse_retrieval_aids(payload: Mapping[str, Any]) -> None:
+    """Refuse retrieval score/rank fields before they reach a factual prompt."""
+    leaked = sorted(_nested_keys(payload) & RETRIEVAL_AID_FORBIDDEN_KEYS)
+    if leaked:
+        raise ModelInputLeakError(f"the model payload leaked retrieval score or rank fields: {leaked}")
+
+
 def _refuse_leaked_answers(task: ExtractionTask, payload: Mapping[str, Any]) -> None:
+    refuse_retrieval_aids(payload)
     leaked = sorted(_nested_keys(payload) & set(task.forbidden_payload_keys))
     if leaked:
         raise ModelInputLeakError(f"the model payload for {task.name} leaked hidden test fields: {leaked}")

@@ -128,6 +128,7 @@ class Reranker(Protocol):
     model_id: str
     tokenizer_id: str
     max_seq_length: int
+    batch_size: int
     production_provider: bool
 
     def rerank(self, query: str, documents: Sequence[str]) -> RerankResult: ...
