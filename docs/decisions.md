@@ -175,10 +175,37 @@ so explicitly. Plans cite this file; this file cites evidence.
   (`method_policy` plan fact, `query_methods` metrics parameter) — resolve
   when step 5 unparks.
 - `retrieval.py` `_authority_id()` falls through to `authority_raw` for EO
-  and statute rows, re-collapsing distinct citations that `91db195` fixed
-  on the published side — same bug shape, retrieval side; fix when step 5
-  unparks.
+  **and statute_at_large** rows (neither has a branch), re-collapsing
+  distinct citations that `91db195` fixed on the published side — same bug
+  shape, retrieval side; fix both when step 5 unparks. Deferral is safe:
+  nothing under `src/` imports `retrieval` (validated 2026-07-27).
 - `data_dictionary.py check --source r2` will report authority_edges
   column drift until the next publish (inherent to any published-schema
   change).
 - **Revisit trigger:** the named feature unparks.
+
+## 2026-07-27 — Contract-assumption validation results
+
+- **Decision:** the adversarial validation of the plan's Rulespec-contract
+  assumptions (seven claims, session record) is folded into the plan.
+  Corrections adopted: approval requires a real contract-shaped
+  `attestations` table (the per-row provenance block is not an
+  Attestation; rejection must be recordable, never implied by omission);
+  `assertionOrigin` joins the required assignment columns;
+  `assignmentEvidence` stays unclaimed at L0 (SourceFragment range, no
+  fragments carrier); phase 1 adjudication/gold expansion are
+  identity-neutral and decoupled from the roles schema edit.
+- **EO mapping deferral, corrected rationale:** adding `executive_order` →
+  `agendaAuthorityCitation` is mechanically trivial (template + one
+  sample passes the audit) — the real boundary is semantic: the
+  `urn:rkaf:us:eo:{n}` pattern is registered under
+  `hasRegulatoryIdentifier`/`us-eo`, and reusing it under a different
+  predicate is a new, unchecked semantic claim. Deferred on those
+  grounds, not tooling.
+- **Optional future Rulespec simplifications (informational, Rulespec is
+  accepted as-is; none block the plan):** a normative tabular/inlined
+  Attestation pattern for L0 implementers; letting `assignmentEvidence`
+  cite a carrier-local fragment URN derived from offsets; machine-legible
+  scope carve-outs (`excluded_terms:`) instead of freeform notes prose.
+- **Revisit trigger:** phase 4 implementation, or the next Rulespec
+  contract revision.

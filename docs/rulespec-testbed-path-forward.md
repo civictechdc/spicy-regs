@@ -66,10 +66,14 @@ that future is gated in `decisions.md` and none of it is in the MVP.
 
 ## Phase 1 — Fix the measurement instrument (one schema change, one rerun)
 
-`WorkIdentity.schema_digest` re-keys every stored call on any schema edit,
-so adjudication, roles, and gold expansion land **together**, then one
-rerun. Reader changes are three small edits (constants become parameters;
-`split` column on `gold_spans.parquet`; one more scope dimension in
+Only schema and prompt edits re-key stored provider calls
+(`schema_digest`/`prompt_digest` feed `work_id`); adjudication and gold
+expansion are identity-neutral — new gold artifacts mint new work items
+without invalidating old ones (validated 2026-07-27). So: **the
+adjudication sitting can start immediately**; the roles change (one
+schema+prompt edit) lands once, then one rerun. Reader changes are three
+small edits (constants become parameters; `split` column on
+`gold_spans.parquet`; one more scope dimension in
 `TagExtractionTask.score`) — no new corpus machinery.
 
 1. Adjudicate the 35 gold assignments as exact / close / broader / narrower /
@@ -148,28 +152,46 @@ release.
 
 ## Phase 4 — MVP assembly (runner cutover + attested review)
 
-1. **Approval as attestation, not a column.** The pinned contract
-   (`rkaf-core.md` §4.7.3) forbids approval fields on the assignment;
-   run directories are sealed and cannot be mutated post-hoc. Review is
-   recorded as ontology-side rows using the existing `ATTESTATION_COLUMNS`
-   (`method="human"`) + `supersedes_id` — genuinely no new subsystem, on the
-   ontology side of the seam. Replace the `review_gate` stub's
-   `eligible: False` only insofar as diagnostic mode requires.
+1. **Approval is a real Attestation, in a minimal attestations table.**
+   The contract forbids approval fields on the assignment (`rkaf-core.md`
+   §4.7.3), and — validated 2026-07-27 — the per-row `ATTESTATION_COLUMNS`
+   block is *provenance*, not an Attestation: `#Attestation` requires
+   attestor, attestorKind, targets, a closed-enum decision, scope, and
+   attestedAt, and rejection must be recordable ("missing tags remain
+   unknown, never negative" — omission cannot mean rejected). So phase 4.1
+   is one small contract-shaped `attestations` table targeting assignment
+   rows. This is the second named stop-rule exception (a new carrier, on
+   the ontology side; run directories stay sealed). Supersession stays a
+   separate correction path, not an approval. Replace the `review_gate`
+   stub's `eligible: False` only insofar as diagnostic mode requires.
 2. **The bridge, named as scope:** replace the legacy
    `ontology/llm.py` → `build_concept_assignments` source path with the
    docpipeline tag-task output. Explicit identity mapping:
    `assignment_id` derives from docpipeline `candidate_id`/`work_id`,
    documented and tested. Add the contract-required columns
    (`assignmentRole`, `assignmentDerivation`, `inScheme`,
-   `assignmentSubjectType`) to `ASSIGNMENT_COLUMNS`. The legacy tag path
-   retires in the same commit (no two active tagging implementations).
+   `assignmentSubjectType`, **and `assertionOrigin`** — validated count)
+   to `ASSIGNMENT_COLUMNS`; `subject_type` values map to the closed
+   `rkaf:Artifact|rkaf:SourceFragment` enum. `assignmentEvidence` stays
+   **unclaimed at L0**: its registered range is `SourceFragment` and we
+   publish no fragments table — offsets stay in `evidence_json`
+   (legitimate narrowing; see the ledger's optional-future notes). The
+   legacy tag path retires in the same commit (no two active tagging
+   implementations).
    This identity mapping is exempt from the "migration identities" stop
    rule — it is the MVP's critical path, not harness expansion.
-3. Rewrite the L0 carve-out (`conformance/rulespec-l0.yaml` lines 70–72)
+3. Rewrite the L0 carve-out (`conformance/rulespec-l0.yaml` lines 69–71)
    and claim the `ConceptAssignment` terms; omitting
    RelationshipAssertion/ValueAssertion narrows scope legitimately
-   (verified: the audit has no class-level closure requirement). Local →
-   *registered* concept promotion stays deferred.
+   (verified: the audit has no class-level closure, and
+   `rkaf-conformance.md` licenses mapping "whichever registered terms the
+   carrier actually holds"). Concretely this is *authoring*: new
+   `table: concept_assignments` mapping blocks in `docs/ontology.md` with
+   `enum_map`s for role/derivation/subjectType, `terms_used` updated to
+   exact equality, and `test_corpus_version`/`test_evidence_sha256`
+   re-pinned to a corpus containing assignments. The rewritten note stops
+   promising promotion (the contract permits LocalConcept targets); local
+   → *registered* promotion stays deferred.
 4. Local publish with every local gate executing and green (phase 0.3 makes
    this falsifiable).
 5. Retire the v2 `corpora` runners per `decisions.md`, keeping stored v4
@@ -197,7 +219,8 @@ provider-free recreation of old experiments are permanently non-goals.
 
 - If work requires retrieval, new storage *carriers* (columns on existing
   carriers are fine), or a generalized workflow engine — stop; scope
-  drifted. (The phase 4.2 bridge is the named exception.)
+  drifted. (Two named exceptions: the phase 4.2 bridge and the phase 4.1
+  attestations table.)
 - If the tag task cannot directly import existing prompt/schema/offset
   behavior, stop and identify the coupling; do not copy frameworks.
 - If a rerun is less accurate, keep the result and use its errors.
