@@ -30,6 +30,11 @@ _USC_STANDARD = re.compile(
     r"(?P<section>\d+[A-Za-z]?(?:-\d+[A-Za-z]?)?)",
     re.IGNORECASE,
 )
+_USC_LIST_TAIL = re.compile(
+    r"(?:,|\band\b|\bor\b)\s*(?P<section>\d+[A-Za-z]?(?:-\d+[A-Za-z]?)?)\b"
+    r"(?!\s*(?:U\.?\s*S\.?\s*C|C\.?\s*F\.?\s*R|stat\b))",
+    re.IGNORECASE,
+)
 _USC_TITLE_FORM = re.compile(
     r"(?:sec(?:tion)?\.?\s+)(?P<section>\d+[A-Za-z]?(?:-\d+[A-Za-z]?)?)"
     r"\s+of\s+title\s+(?P<title>[1-9]\d*)",
@@ -246,6 +251,30 @@ def parse_cfr_citation(value: object) -> list[CfrCitation]:
     return found
 
 
+def _usc_list_expansion(text: str) -> list[tuple[str, str]]:
+    """Expand a U.S.C. section list under the title that introduces it.
+
+    Common UA form: "42 U.S.C. 1395, 1396, 1397". The primary expression
+    requires a title before every section, so it finds only the first; expand
+    simple trailing section numbers under the same title, mirroring the CFR
+    tail expansion in :func:`parse_cfr_citation`. Each expansion stops at the
+    next explicit U.S.C. citation so a later title is never mis-attributed, and
+    a number that leads another citation form ("117 Stat. 429") is not taken.
+    """
+    matches = list(_USC_STANDARD.finditer(text))
+    expanded: list[tuple[str, str]] = []
+    for index, match in enumerate(matches):
+        title = _digits(match.group("title"))
+        if not title:
+            continue
+        stop = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        for tail in _USC_LIST_TAIL.finditer(text[match.end() : stop]):
+            section = _section(tail.group("section"))
+            if section is not None:
+                expanded.append((title, section))
+    return expanded
+
+
 def _status_for_match(text: str, match: re.Match[str]) -> str:
     remainder = f"{text[: match.start()]} {text[match.end() :]}"
     return "ok" if _IGNORABLE_TAIL.fullmatch(remainder) else "partial"
@@ -300,6 +329,19 @@ def parse_authority_citation(value: object) -> list[AuthorityCitation]:
                 )
             if citation not in citations:
                 citations.append(citation)
+
+    # A section list is never covered by a single citation, so every member is
+    # ``partial`` — the same status the multi-citation normalization below
+    # would assign anyway.
+    for usc_title, usc_section in _usc_list_expansion(text):
+        listed = AuthorityCitation(
+            authority_type="usc",
+            parse_status="partial",
+            usc_title=usc_title,
+            usc_section=usc_section,
+        )
+        if listed not in citations:
+            citations.append(listed)
 
     if not citations:
         return [AuthorityCitation(authority_type="other", parse_status="failed")]

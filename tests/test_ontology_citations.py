@@ -85,6 +85,62 @@ def test_parse_authority_fixture_forms(raw, expected):
     assert parse_authority_citation(raw) == [expected]
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (
+            "42 U.S.C. 1395, 1396, 1397",
+            [("42", "1395"), ("42", "1396"), ("42", "1397")],
+        ),
+        ("42 U.S.C. 7401 and 7412", [("42", "7401"), ("42", "7412")]),
+        ("42 U.S.C. 7401, 7412, and 7413 et seq.", [("42", "7401"), ("42", "7412"), ("42", "7413")]),
+        # A later title governs its own list rather than the first one.
+        (
+            "5 U.S.C. 553 and 42 U.S.C. 7401, 7412",
+            [("5", "553"), ("42", "7401"), ("42", "7412")],
+        ),
+        # Section suffixes survive the expansion.
+        ("42 U.S.C. 1395w-4, 1395x", [("42", "1395w-4"), ("42", "1395x")]),
+    ],
+)
+def test_usc_section_lists_yield_one_citation_per_section(raw, expected):
+    parsed = parse_authority_citation(raw)
+    assert [(item.usc_title, item.usc_section) for item in parsed] == expected
+    assert {item.authority_type for item in parsed} == {"usc"}
+    # No member of a list covers the whole string, so none of them is ``ok``.
+    assert {item.parse_status for item in parsed} == {"partial"}
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # Ranges stay one citation — the hyphen is part of the section grammar.
+        ("42 U.S.C. 1395-1397", [AuthorityCitation("usc", "ok", usc_title="42", usc_section="1395-1397")]),
+        # A number leading a different citation form is not a section.
+        (
+            "42 U.S.C. 7401, 117 Stat. 429",
+            [
+                AuthorityCitation("usc", "partial", usc_title="42", usc_section="7401"),
+                AuthorityCitation("statute_at_large", "partial", statute_at_large="117-429"),
+            ],
+        ),
+        (
+            "42 U.S.C. 7401 and 40 CFR 60",
+            [AuthorityCitation("usc", "partial", usc_title="42", usc_section="7401")],
+        ),
+        # Malformed lists keep whatever parsed and never invent a section.
+        (
+            "42 U.S.C. 1395, , and",
+            [AuthorityCitation("usc", "partial", usc_title="42", usc_section="1395")],
+        ),
+        ("42 U.S.C., 1396", [AuthorityCitation("other", "failed")]),
+        ("42 U.S.C.", [AuthorityCitation("other", "failed")]),
+    ],
+)
+def test_usc_list_expansion_stays_fail_closed(raw, expected):
+    assert parse_authority_citation(raw) == expected
+
+
 def test_parse_multiple_authorities_returns_one_partial_edge_each():
     parsed = parse_authority_citation("42 U.S.C. 7401; Public Law 117-58")
     assert {(item.authority_type, item.parse_status) for item in parsed} == {

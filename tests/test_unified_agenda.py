@@ -13,9 +13,11 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
+import pytest
+
 from spicy_regs.sources import unified_agenda
 from spicy_regs.sources.unified_agenda import UnifiedAgendaReader
-from spicy_regs.transforms.build_unified_agenda import COLUMNS, _shape
+from spicy_regs.transforms.build_unified_agenda import COLUMNS, _iso_dates, _shape
 
 # A two-record slice of the real export, matching the observed tag structure:
 # <REGINFO_RIN_DATA> root, repeated <RIN_INFO> records, nested AGENCY / CFR_LIST /
@@ -166,6 +168,39 @@ def test_shape_handles_missing_and_unparseable_dates():
     # Absent fields are null.
     assert row["abstract"] is None
     assert row["priority_category"] is None
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("06/15/2024", ["2024-06-15"]),
+        ("02/29/2024", ["2024-02-29"]),  # a real leap day survives
+        ("06/00/2024", ["2024-06-01"]),  # reginfo's month-only marker
+        ("02/30/2024", []),  # never existed — dropped, not moved to the 29th
+        ("02/29/2023", []),  # not a leap year
+        ("04/31/2024", []),
+        ("06/32/2024", []),  # was clamped to the 31st
+        ("13/01/2024", []),
+        ("00/15/2024", []),
+        ("To Be Determined", []),
+    ],
+)
+def test_iso_dates_rejects_impossible_calendar_dates(raw, expected):
+    assert _iso_dates([{"action": "NPRM", "date": raw}]) == expected
+
+
+def test_shape_drops_impossible_dates_without_fabricating_a_neighbour():
+    doc = dict(_read_fixture("202510")[0])
+    doc["timetable"] = [
+        {"action": "NPRM", "date": "02/30/2024"},
+        {"action": "Final Rule", "date": "07/04/2024"},
+    ]
+    row = _shape(doc)
+    # The impossible date is absent, so the real one becomes the first action.
+    assert row["first_action_date"] == "2024-07-04"
+    assert row["next_action_date"] is None
+    # The raw timetable is still carried through verbatim.
+    assert json.loads(row["timetable_json"])[0]["date"] == "02/30/2024"
 
 
 def test_download_rejects_non_xml_body(monkeypatch):
