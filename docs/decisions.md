@@ -121,11 +121,57 @@ so explicitly. Plans cite this file; this file cites evidence.
 ## 2026-07-27 — MVP scope
 
 - **Decision:** the MVP is source → segments → concept assignments with
-  Rulespec roles and exact evidence → reviewed scoring → atomically
+  Rulespec roles and exact evidence → human-attested review → atomically
   published tables conforming to Rulespec L0, on the existing corpus.
-  Out of MVP: retrieval serving, relation benchmark unblocking, cascade
-  classifiers and every gated slot above, signed receipts, the comments
-  corpus, state bills, MCP additions beyond the existing surface.
-- **Evidence:** `docs/rulespec-testbed-path-forward.md` (the MVP plan).
+  Acceptance splits into **MVP-local** (locally published generation, every
+  local gate executing and green) and **MVP-public** (same generation
+  uploaded; additionally requires the Rulespec human gates and the
+  release-preflight rule fix). Out of MVP: retrieval serving, relation
+  benchmark unblocking, cascade classifiers and every gated slot above,
+  signed receipts, the comments corpus, state bills, MCP additions beyond
+  the existing surface.
+- **Evidence:** `docs/rulespec-testbed-path-forward.md` (the MVP plan);
+  three independent plan reviews 2026-07-27, all SOUND-WITH-CORRECTIONS.
 - **Revisit trigger:** MVP acceptance, or a gate proving a scoped-out item
   is on the critical path.
+
+## 2026-07-27 — Gold and held-out protocol
+
+- **Decision:** MVP gold is ~80 artifact assignments (35 adjudicated + ~45
+  new), split by **gold concept** (artifact-level splitting leaks through
+  alias edits and the lexical selector). Gold is drafted by a different
+  model family than the tagger, blind to tagger output; the held-out slice
+  is 100% human-adjudicated; `gold_sha256` and per-item
+  adequate-target-vs-abstention branch assignments freeze before tuning;
+  `registry_sha256` is pinned per iteration and a regression test asserts
+  no new alias normalizes to a held-out gold label. At this size the
+  held-out slice **vetoes regressions only** — it cannot certify gains.
+- **Accuracy-claim tier (separate, post-MVP-local):** claims of improvement
+  require the powered set (~780 assignments at a 30% held-out and ~0.3
+  adequate-target branch rate for a 15-point MDE; sizing math in the
+  2026-07-27 measurement review) and the pre-committed bar below.
+- **Exit-bar form (instantiated with real numbers at re-baseline, in a
+  commit preceding the re-baseline run):** bar = max(trivial baselines on
+  the same held-out set [always-abstain, lexical top-1], baseline +
+  2×bootstrap SE); one-sided paired test at α=0.05; held-out results are
+  reported only when they beat the prior best by more than one MDE.
+- **Revisit trigger:** the re-baseline run (instantiates the bar), or a
+  gold-set expansion (re-derives the sizing).
+
+## 2026-07-27 — Post-MVP repairs (recorded, not forgotten)
+
+- Mirrulations attachment ordinal numeric sort
+  (`sources/derived_text.py:82`) — waits for the comments corpus.
+- `rulespec_release.py` `_CONTRACT_FILES` becomes a rule — every `.cue`
+  under `constraints/{core,analysis,profiles}` recursively plus every
+  `l0-ranges.cue` under `constraints/` plus the context file — so the
+  tarball recomputation can match a real release (today: 40-file set →
+  `sha256:f1e71af4…` vs rulespec's 50-file → `sha256:5f287a1e…`). Only
+  MVP-public needs it.
+- `refuse_retrieval_aids` bans bare `score`/`rank` at every depth; the ban
+  fires the moment retrieval candidates enter an extraction payload —
+  namespace the keys or scope the ban when retrieval unparks.
+- Two strict xfails in the retrieval tests mark unimplemented API
+  (`method_policy` plan fact, `query_methods` metrics parameter) — resolve
+  when step 5 unparks.
+- **Revisit trigger:** the named feature unparks.
