@@ -68,3 +68,37 @@ score the 5 adequate items on identity, the 30 others on abstention and
 local-concept quality, and may report broader-assignment availability
 separately. Per-item resolved grades: `resolved.json`; raw verdicts:
 `judge-a.json`, `judge-b.json`, `judge-c.json`.
+
+## Round 2 — fused registry, frozen selector (2026-07-27)
+
+Same protocol, same 35 items, same frozen selector
+(`lexical-overlap-v1`, limit 12); the only change is the registry:
+`fused-concept-registry-v1` (513,236 rows, sha256 `a82cdebc…`; FR
+Thesaurus enriched + crs-subjects + crs-policy-areas + epa-tsca +
+fast-topical; built by `tools/fuse_concept_registries.py`, commit
+`ce0a2e7`). Judges A2/B2 + tiebreak C2, agreement 31/35 grades,
+34/35 adequacy; all four splits resolved 2-of-3.
+
+| Measure | Round 1 (901 rows) | Round 2 (513,236 rows) |
+| --- | ---: | ---: |
+| exact | 1 | 1 |
+| close | 4 | 4 |
+| broader | 20 | 24 |
+| narrower | 1 | 1 |
+| related | 8 | 4 |
+| wrong | 1 | 1 |
+| **adequate (surfaced)** | **5/35** | **5/35 — identical items** |
+| exact-alias present in registry (mechanical) | 1/35 | **8/35** |
+
+**Finding:** the fusion fixed registry coverage (7 new exact-alias
+targets: poultry inspection, immigration law, judicial power, human
+rights, free speech, fisheries management, Army Corps of Engineers —
+none surfaced) and improved candidate quality at the margins (4
+related→broader), but surfaced adequacy did not move because the
+frozen selector's unanchored substring scoring floods the top-12 with
+short-label noise at 513k rows. The binding constraint moved from the
+registry to the selector. Next single-change iteration: anchored/
+embedding candidate selection, then re-run this protocol.
+
+Verdicts: `judge-a2-fused.json`, `judge-b2-fused.json`,
+`judge-c2-fused.json`, `resolved-fused.json`.

@@ -1,0 +1,33 @@
+{
+  "judge": "C2",
+  "items": [
+    {
+      "item_id": "gold-adjudication-gold_6893b7d3b29ad03d749ce926",
+      "best_candidate_id": "concept_315af3aa1b293dd956b34ff2",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Health insurance domain contains No Surprises Act IDR, but misses the specific dispute-resolution mechanism."
+    },
+    {
+      "item_id": "gold-adjudication-gold_6dda7e7b3619b79e8902749f",
+      "best_candidate_id": "concept_389ca90f2125f063429d4785",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Hazardous substances topically contains OSHA hazard communication; the communication/labeling program itself is unrepresented."
+    },
+    {
+      "item_id": "gold-adjudication-gold_73e66810cc4e3d464d85ac1c",
+      "best_candidate_id": "concept_e5bd01226318c41e9f6331ea",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Information broadly contains health information privacy; privacy of uses and disclosures is far more specific."
+    },
+    {
+      "item_id": "gold-adjudication-gold_8a226f76fb07a004dd6f88de",
+      "best_candidate_id": "concept_f6bb075d8f51f4a3f8cc58ab",
+      "grade": "close",
+      "adequate_target": true,
+      "rationale": "Indexing term Science and technology tags S&T policy content; dropping 'policy' is trivial granularity here."
+    }
+  ]
+}

@@ -1,0 +1,250 @@
+{
+  "judge": "A2",
+  "items": [
+    {
+      "item_id": "gold-adjudication-gold_05485aadf13d9175a11ffec9",
+      "best_candidate_id": "concept_1bb91a13c23812dfcbfeaa6c",
+      "grade": "close",
+      "adequate_target": true,
+      "rationale": "Trademarks topic covers trademark law; trivially different phrasing."
+    },
+    {
+      "item_id": "gold-adjudication-gold_0b65e53875522836cc5abf83",
+      "best_candidate_id": "concept_4e315c5153400704df79f8be",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Generic Credit contains the specific clean fuel tax credit."
+    },
+    {
+      "item_id": "gold-adjudication-gold_0d2bd9fd692cc0e0444738e4",
+      "best_candidate_id": "concept_8510abf814abc6fb7492f087",
+      "grade": "narrower",
+      "adequate_target": false,
+      "rationale": "Oranges covers only half the gold's fruit pair."
+    },
+    {
+      "item_id": "gold-adjudication-gold_0dafb4a87922aa267974a26c",
+      "best_candidate_id": "concept_377acd934c73cadb14132e99",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Safety zones are one specific marine safety measure."
+    },
+    {
+      "item_id": "gold-adjudication-gold_15089382a3c588e7e9ac9476",
+      "best_candidate_id": "concept_b38cfd9a3b0427c8f043b325",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Workplace religious accommodation is one facet of EEO."
+    },
+    {
+      "item_id": "gold-adjudication-gold_156f26dea7ec0dd9908020bb",
+      "best_candidate_id": "concept_2a3c714a0baa7f2edc5d68d3",
+      "grade": "related",
+      "adequate_target": false,
+      "rationale": "Cybersecurity associates with aviation safety; security is not safety."
+    },
+    {
+      "item_id": "gold-adjudication-gold_196c4943e8d6f605578c5bbe",
+      "best_candidate_id": "concept_4da60a37329fb30a6bd56a19",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Affirmative action is a specific civil rights topic."
+    },
+    {
+      "item_id": "gold-adjudication-gold_2211124f731f5f06456877eb",
+      "best_candidate_id": "concept_4ab12c7e94d4c1070fd89c36",
+      "grade": "close",
+      "adequate_target": true,
+      "rationale": "Immigration topic covers immigration law; phrasing differs trivially."
+    },
+    {
+      "item_id": "gold-adjudication-gold_2cb09b5e636b53797247b356",
+      "best_candidate_id": "concept_a097fdd7b7a6ea23f77571ff",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Title IX exemption is narrow slice of sex discrimination."
+    },
+    {
+      "item_id": "gold-adjudication-gold_2f46b09af5e1049c9ca0675b",
+      "best_candidate_id": "concept_1af86fe0efa34f128068b2d9",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Courts subject subsumes judicial power doctrine."
+    },
+    {
+      "item_id": "gold-adjudication-gold_3ce05d58feb8e6463dab726f",
+      "best_candidate_id": "concept_a3326f30ce1b70d0cc11e6dc",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Steep-slope mining is a type of surface mining."
+    },
+    {
+      "item_id": "gold-adjudication-gold_46af63a049ee1964b9ae13f4",
+      "best_candidate_id": "concept_6e537d33318a228cb9631540",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Poultry inspection sits within agriculture; no inspection concept offered."
+    },
+    {
+      "item_id": "gold-adjudication-gold_540c04525b1d09a5f11f02d7",
+      "best_candidate_id": "concept_eb4f5eb5694d17eb711c3447",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Law broadly contains human rights; no closer candidate."
+    },
+    {
+      "item_id": "gold-adjudication-gold_5701a4a8af60217ae1c86123",
+      "best_candidate_id": "concept_a22a665c2476bf70472e2be6",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Elections Clause is a specific elections-law provision."
+    },
+    {
+      "item_id": "gold-adjudication-gold_6893b7d3b29ad03d749ce926",
+      "best_candidate_id": "concept_315af3aa1b293dd956b34ff2",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Federal IDR is a health insurance payment-dispute mechanism."
+    },
+    {
+      "item_id": "gold-adjudication-gold_6dda7e7b3619b79e8902749f",
+      "best_candidate_id": "concept_389ca90f2125f063429d4785",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Hazard communication regulates hazardous substances; a subtopic."
+    },
+    {
+      "item_id": "gold-adjudication-gold_73e66810cc4e3d464d85ac1c",
+      "best_candidate_id": "concept_4746e217a7b9fa12a9cdce9c",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Health domain contains health information privacy; no privacy candidate."
+    },
+    {
+      "item_id": "gold-adjudication-gold_8a226f76fb07a004dd6f88de",
+      "best_candidate_id": "concept_f6bb075d8f51f4a3f8cc58ab",
+      "grade": "close",
+      "adequate_target": true,
+      "rationale": "Science and technology tag satisfies S&T policy intent."
+    },
+    {
+      "item_id": "gold-adjudication-gold_8b15306d5c256dd55b8b5a9e",
+      "best_candidate_id": "concept_377acd934c73cadb14132e99",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Safety zones are one specific marine safety measure."
+    },
+    {
+      "item_id": "gold-adjudication-gold_8c11eda68fb5ecd98629db3c",
+      "best_candidate_id": "concept_eb4f5eb5694d17eb711c3447",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Law contains free speech doctrine; no speech candidate."
+    },
+    {
+      "item_id": "gold-adjudication-gold_8d2e1db6a6a6016e3131fa8b",
+      "best_candidate_id": "concept_9f7e64fe876f79f9bc59bb7c",
+      "grade": "close",
+      "adequate_target": true,
+      "rationale": "Fisheries topic covers fisheries management; satisfies gold intent."
+    },
+    {
+      "item_id": "gold-adjudication-gold_9699f26de500ef0bce70b53c",
+      "best_candidate_id": "concept_094c1900e74d93759d8ff0ce",
+      "grade": "wrong",
+      "adequate_target": false,
+      "rationale": "No candidate relates to tariffs or duty suspension."
+    },
+    {
+      "item_id": "gold-adjudication-gold_9bcfbe38aca881716c3cf1e8",
+      "best_candidate_id": "concept_eb4f5eb5694d17eb711c3447",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "True threats is a legal doctrine within law."
+    },
+    {
+      "item_id": "gold-adjudication-gold_a474a8d29ec59ec6ba159606",
+      "best_candidate_id": "concept_1af86fe0efa34f128068b2d9",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Personal jurisdiction is a doctrine about courts' authority."
+    },
+    {
+      "item_id": "gold-adjudication-gold_aa9146564ffb454114411888",
+      "best_candidate_id": "concept_54d821eb1fd9eabb52e1f212",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Loan relief is one aspect of education loan programs."
+    },
+    {
+      "item_id": "gold-adjudication-gold_bb672610d9e0f861a8d0d0cf",
+      "best_candidate_id": "concept_6930364156c85e16d789a430",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Climate pollution falls under environmental protection; no GHG candidate."
+    },
+    {
+      "item_id": "gold-adjudication-gold_bcd5ef6aa4616cead8192c66",
+      "best_candidate_id": "concept_a1e2b375f3960883c536ab82",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Retirement plans are one kind of employee benefit plan."
+    },
+    {
+      "item_id": "gold-adjudication-gold_bedd662ed4eee85e2f379d07",
+      "best_candidate_id": "concept_02cce33e4314611bb6837353",
+      "grade": "related",
+      "adequate_target": false,
+      "rationale": "Burden reduced concerns grant programs; neither concept subsumes other."
+    },
+    {
+      "item_id": "gold-adjudication-gold_ccc7eb2c1ef62fc9ddacf2c5",
+      "best_candidate_id": "concept_9f1fdf64a35b9530214fcc97",
+      "grade": "related",
+      "adequate_target": false,
+      "rationale": "Critical habitat protects listed animals; no habitat/species candidate."
+    },
+    {
+      "item_id": "gold-adjudication-gold_d43a5acdb46c9af6b37b76fc",
+      "best_candidate_id": "concept_dfae116844393891d8c14ac0",
+      "grade": "related",
+      "adequate_target": false,
+      "rationale": "Agency associated with engineers profession; not subsumed either way."
+    },
+    {
+      "item_id": "gold-adjudication-gold_e7aa84bceab8eaa0ba85619b",
+      "best_candidate_id": "concept_54d821eb1fd9eabb52e1f212",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Forgiveness is one aspect of education loan programs."
+    },
+    {
+      "item_id": "gold-adjudication-gold_f5d9863ba4507643eb91e184",
+      "best_candidate_id": "concept_03927a16347b565119e5238e",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "Government property includes real plus personal property."
+    },
+    {
+      "item_id": "gold-adjudication-gold_f5de44fd6f2a2ef8ad88f302",
+      "best_candidate_id": "concept_3a660bb704471d033aaae586",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "VA software assets are government property being managed."
+    },
+    {
+      "item_id": "gold-adjudication-gold_f6bda7557c925438539fafed",
+      "best_candidate_id": "concept_389ca90f2125f063429d4785",
+      "grade": "broader",
+      "adequate_target": false,
+      "rationale": "PFAS are a class of hazardous substances."
+    },
+    {
+      "item_id": "gold-adjudication-gold_f9e29337911aa882dffe9870",
+      "best_candidate_id": "concept_4e8c788bdc0d7ce8a13dfc0c",
+      "grade": "exact",
+      "adequate_target": true,
+      "rationale": "Medicaid candidate matches gold Medicaid concept exactly."
+    }
+  ]
+}

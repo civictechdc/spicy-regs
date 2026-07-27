@@ -329,3 +329,27 @@ so explicitly. Plans cite this file; this file cites evidence.
   going public, alongside the phase 4.3 carve-out rewrite, which should
   now use `excluded_terms` instead of prose.
 - **Revisit trigger:** phase 4 implementation.
+
+## 2026-07-27 — Registry fusion: measured, not yet adopted
+
+- **Built:** `fused-concept-registry-v1` (513,236 rows; FR Thesaurus
+  full enrichment, CRS legislative subjects + policy areas via GPO
+  BILLSTATUS carrier, EPA TSCA inventory, FAST topical facet under
+  ODC-By with per-row attribution; schemes distinct, no cross-scheme
+  merging; frozen 901 ids byte-stable; tool `ce0a2e7`). EuroVoc and
+  Wikidata excluded by maintainer direction.
+- **Measured (evidence: gold-adjudication README round 2):** registry
+  exact-alias coverage of gold intents 1/35 → 8/35; surfaced adequacy
+  under the frozen lexical selector unchanged at 5/35 (identical
+  items); 4 related→broader improvements. The selector, not the
+  registry, is now the binding constraint (unanchored substring
+  scoring floods top-12 with short-label noise at this scale).
+- **Disposition:** the fused registry is an evaluation artifact, not
+  yet the production candidate registry. Adoption trigger: a selector
+  change (anchored lexical matching and/or the existing
+  sentence-transformers embedding baseline, one change, same
+  protocol) that converts present-but-not-surfaced items — expected
+  adequacy in the low 20s/35. If that holds, the fused registry +
+  new selector become the phase-2 baseline together, metric version
+  bumped.
+- **Revisit trigger:** the selector iteration's re-measurement.
