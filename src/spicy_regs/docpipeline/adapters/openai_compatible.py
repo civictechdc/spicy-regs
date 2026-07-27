@@ -24,10 +24,19 @@ it does not own:
   when the endpoint accepts it, and schema-embedded instructions otherwise. Both
   ways the parsed response is validated locally against the caller's schema, and
   a response that fails is *rejected* — never repaired. ``structured_mode`` in
-  the call details says which mechanism actually produced the answer.
+  the call details says which mechanism actually produced the answer. A
+  brokering endpoint that picks an upstream provider per request gets the
+  routing constraint that keeps a json_schema request off a provider which would
+  ignore it (see :data:`PROVIDER_ROUTING_REQUIRE_PARAMETERS`).
 * **Token counting.** ``tiktoken`` counts are exact only for OpenAI models; for
   every provider here they are estimates. The budget is still enforced, and
   ``token_count_method``/``token_count_is_estimate`` record what the number is.
+
+Claude-family models are reachable here through ``openrouter``, which is what
+makes a cross-route comparison possible. They are *not* reachable through a
+first-party Anthropic compat profile: that endpoint accepts ``response_format``
+and ignores it, and a prompted-mode workaround for it existed only while there
+was no native arm. ``adapters/anthropic.py`` is now the enforced route.
 
 Only ``StructuredTextCallError.call`` is receipt-safe. A raised error's message
 and its ``__cause__`` chain may contain provider-supplied text — including key
@@ -94,6 +103,21 @@ PROMPTED_SCHEMA_INSTRUCTIONS = (
 #: placeholder is not a credential and never reaches call details or a receipt.
 KEYLESS_PLACEHOLDER_API_KEY = "not-required"
 
+#: OpenRouter's documented provider-routing field for "only use providers that
+#: support all parameters in your request" (``provider.require_parameters``,
+#: default ``false``). It rides in ``extra_body`` — the OpenAI SDK's escape
+#: hatch for a vendor field — so it is part of the request identity and hashes
+#: into ``request_sha256`` like everything else.
+#:
+#: Why it matters here: a broker chooses an upstream provider per request, and
+#: without this a ``json_schema`` request can be routed to a provider that does
+#: not honor it. The endpoint would answer, the receipt would say
+#: ``response_format``, and nothing would have been enforced. With it, such a
+#: provider never receives the request at all. Sent only on a json_schema
+#: request: in prompted mode there is no parameter to require, and demanding one
+#: would narrow routing for no gain.
+PROVIDER_ROUTING_REQUIRE_PARAMETERS: Mapping[str, Any] = MappingProxyType({"require_parameters": True})
+
 LOCAL_BASE_URL_ENVIRONMENT_VARIABLE = "SPICY_REGS_LOCAL_LLM_BASE_URL"
 TIMEOUT_ENVIRONMENT_VARIABLE = "SPICY_REGS_DOCPIPELINE_TIMEOUT_SECONDS"
 MAX_RETRIES_ENVIRONMENT_VARIABLE = "SPICY_REGS_DOCPIPELINE_MAX_RETRIES"
@@ -116,11 +140,17 @@ class ProviderProfile:
     api_key_environment_variable: str | None
     base_url_environment_variable: str | None = None
     #: ``False`` when the endpoint is known not to honor ``response_format``
-    #: json_schema. Anthropic's OpenAI-compatibility layer is the case that
-    #: matters: it accepts the field and ignores it, which would silently
-    #: downgrade a strict-schema call into an unconstrained one.
+    #: json_schema — it accepts the field and ignores it, which would silently
+    #: downgrade a strict-schema call into an unconstrained one. Such a profile
+    #: starts in prompted mode, where the local validator is the only guarantee
+    #: and the receipt says so.
     supports_response_format: bool = True
     requires_api_key: bool = True
+    #: ``True`` for an endpoint that brokers the request to some upstream
+    #: provider of its choosing, so a json_schema request must additionally
+    #: constrain routing (:data:`PROVIDER_ROUTING_REQUIRE_PARAMETERS`) or it can
+    #: land on a provider that ignores the schema.
+    routes_to_upstream_providers: bool = False
     #: ``True`` for a profile whose name promises a local endpoint. A receipt
     #: that says "local" must not describe a call that left the machine.
     loopback_only: bool = False
@@ -135,12 +165,7 @@ PROVIDER_PROFILES: Mapping[str, ProviderProfile] = MappingProxyType(
                 base_url="https://openrouter.ai/api/v1",
                 api_key_environment_variable="OPENROUTER_API_KEY",
                 supports_response_format=True,
-            ),
-            ProviderProfile(
-                label="anthropic",
-                base_url="https://api.anthropic.com/v1/",
-                api_key_environment_variable="ANTHROPIC_API_KEY",
-                supports_response_format=False,
+                routes_to_upstream_providers=True,
             ),
             ProviderProfile(
                 label="gemini",
@@ -298,6 +323,7 @@ class OpenAICompatibleStructuredTextModel:
             "structured_mode": self.structured_mode,
             "structured_mode_requested": self.requested_structured_mode,
             "structured_mode_fallback_allowed": self.structured_mode_fallback_allowed,
+            "provider_routing": self.provider_routing(self.structured_mode),
             "reasoning_effort": reasoning_effort,
             "timeout_seconds": timeout_seconds,
             "max_retries": max_retries,
@@ -375,6 +401,17 @@ class OpenAICompatibleStructuredTextModel:
         settings.update(overrides)
         return cls(provider=profile.label, model=model, api_key=api_key, **settings)
 
+    def provider_routing(self, structured_mode: str) -> dict[str, Any] | None:
+        """Return the routing constraint this profile owes a strict-schema call.
+
+        ``None`` for an endpoint that serves the model itself, and for any
+        prompted-mode request: there is nothing to route around when no strict
+        parameter is being sent.
+        """
+        if structured_mode != STRUCTURED_MODE_RESPONSE_FORMAT or not self.profile.routes_to_upstream_providers:
+            return None
+        return dict(PROVIDER_ROUTING_REQUIRE_PARAMETERS)
+
     def secret_free_request(
         self,
         *,
@@ -412,6 +449,9 @@ class OpenAICompatibleStructuredTextModel:
                 "type": "json_schema",
                 "json_schema": {"name": name, "strict": True, "schema": dict(schema)},
             }
+            routing = self.provider_routing(mode)
+            if routing is not None:
+                request["extra_body"] = {"provider": routing}
         if self.reasoning_effort is not None:
             request["reasoning_effort"] = self.reasoning_effort
         return request
@@ -688,6 +728,7 @@ class OpenAICompatibleStructuredTextModel:
             "structured_mode": structured_mode,
             "structured_mode_requested": self.requested_structured_mode,
             "structured_mode_fallback": structured_mode != self.structured_mode,
+            "provider_routing": self.provider_routing(structured_mode),
             "response_unfenced": response_unfenced,
             "store": False,
             "timeout_seconds": self.timeout_seconds,

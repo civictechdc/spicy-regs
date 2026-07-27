@@ -7,9 +7,11 @@ in one immutable result. Every test is hermetic — the client is injected, and 
 test reaches a network, a credential, or provider internals.
 
 What this arm owes on top of interface parity, and therefore what is pinned
-here: the structured mechanism it actually used, the honesty of its token
-counts, unambiguous provider identity in the receipt, and a registry that
-refuses an unknown label or a missing credential before any call.
+here: the structured mechanism it actually used, the routing constraint a
+brokering endpoint needs so a strict-schema request cannot be served by a
+provider that ignores it, the honesty of its token counts, unambiguous provider
+identity in the receipt, and a registry that refuses an unknown label or a
+missing credential before any call.
 """
 
 from __future__ import annotations
@@ -31,6 +33,7 @@ from spicy_regs.docpipeline.adapters import (
 from spicy_regs.docpipeline.adapters.openai_compatible import (
     PROMPTED_SCHEMA_INSTRUCTIONS,
     PROVIDER_PROFILES,
+    PROVIDER_ROUTING_REQUIRE_PARAMETERS,
     TOKEN_COUNT_METHOD,
     IncompleteStructuredResponseError,
     InvalidOutputSchemaError,
@@ -62,18 +65,24 @@ LOCAL_BASE_URL = "http://127.0.0.1:8012/v1"
 
 # Registry pins. Written out in full, never derived from the module under test:
 # a constant that supplies its own expectation pins nothing. Adding a provider,
-# changing a base URL, or changing which endpoint is trusted with strict schema
-# output must fail here first and be reviewed deliberately.
-EXPECTED_PROFILES: dict[str, tuple[str | None, str | None, bool, bool]] = {
-    "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", True, True),
-    "anthropic": ("https://api.anthropic.com/v1/", "ANTHROPIC_API_KEY", False, True),
+# changing a base URL, changing which endpoint is trusted with strict schema
+# output, or changing which endpoint brokers to upstream providers must fail
+# here first and be reviewed deliberately.
+#
+# There is deliberately no first-party ``anthropic`` profile: that endpoint
+# accepts ``response_format`` and ignores it, and Claude via ``openrouter``
+# covers the cross-route comparison. The enforced route is the native arm,
+# ``adapters/anthropic.py``.
+EXPECTED_PROFILES: dict[str, tuple[str | None, str | None, bool, bool, bool]] = {
+    "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", True, True, True),
     "gemini": (
         "https://generativelanguage.googleapis.com/v1beta/openai/",
         "GEMINI_API_KEY",
         True,
         True,
+        False,
     ),
-    "local": (None, None, False, False),
+    "local": (None, None, False, False, False),
 }
 
 
@@ -144,6 +153,20 @@ def _model(
     return built, completions
 
 
+def _prompted_model(
+    outcomes: list[BaseException | SimpleNamespace],
+    **overrides: Any,
+) -> tuple[OpenAICompatibleStructuredTextModel, _FakeCompletions]:
+    """Build a model on a profile known not to honor json_schema."""
+    return _model(
+        outcomes,
+        provider="local",
+        model="mlx-community/Qwen3-30B",
+        base_url=LOCAL_BASE_URL,
+        **overrides,
+    )
+
+
 def _call(model: OpenAICompatibleStructuredTextModel, **overrides: Any) -> StructuredTextResult:
     request = {
         "name": "test_answer",
@@ -181,14 +204,29 @@ class _QuotaLimitEquivalent(RuntimeError):
 
 def test_the_provider_registry_holds_exactly_the_reviewed_profiles() -> None:
     assert set(PROVIDER_PROFILES) == set(EXPECTED_PROFILES)
-    for label, (base_url, key_variable, response_format, requires_key) in EXPECTED_PROFILES.items():
+    for label, expected in EXPECTED_PROFILES.items():
+        base_url, key_variable, response_format, requires_key, routes_upstream = expected
         profile = PROVIDER_PROFILES[label]
         assert profile.base_url == base_url
         assert profile.api_key_environment_variable == key_variable
         assert profile.supports_response_format is response_format
         assert profile.requires_api_key is requires_key
+        assert profile.routes_to_upstream_providers is routes_upstream
     assert PROVIDER_PROFILES["local"].base_url_environment_variable == "SPICY_REGS_LOCAL_LLM_BASE_URL"
     assert PROVIDER_PROFILES["local"].loopback_only is True
+
+
+def test_the_retired_anthropic_compat_profile_is_gone() -> None:
+    """Claude has a native enforced arm; the compat workaround is retired."""
+    assert "anthropic" not in PROVIDER_PROFILES
+
+    with pytest.raises(UnknownProviderProfileError, match="unknown provider 'anthropic'"):
+        OpenAICompatibleStructuredTextModel(provider="anthropic", model="claude-opus-5", api_key=FAKE_API_KEY)
+
+
+def test_the_routing_constraint_is_openrouters_documented_field() -> None:
+    """``provider.require_parameters`` is the field name; nothing else routes."""
+    assert dict(PROVIDER_ROUTING_REQUIRE_PARAMETERS) == {"require_parameters": True}
 
 
 def test_an_unknown_provider_label_is_refused_before_anything_is_built() -> None:
@@ -199,13 +237,16 @@ def test_an_unknown_provider_label_is_refused_before_anything_is_built() -> None
 def test_a_missing_credential_is_refused_and_names_only_the_variable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
 
     with pytest.raises(ProviderConfigurationError) as failure:
-        OpenAICompatibleStructuredTextModel.from_environment(provider="anthropic", model="claude-sonnet-5")
+        OpenAICompatibleStructuredTextModel.from_environment(
+            provider="openrouter",
+            model="anthropic/claude-sonnet-5",
+        )
 
     message = str(failure.value)
-    assert "ANTHROPIC_API_KEY is unset" in message
+    assert "OPENROUTER_API_KEY is unset" in message
     assert SECRET_PATTERN.search(message) is None
 
 
@@ -270,11 +311,14 @@ def test_response_format_mode_sends_a_strict_schema_and_reports_the_mechanism() 
         "type": "json_schema",
         "json_schema": {"name": "test_answer", "strict": True, "schema": SCHEMA},
     }
+    # A broker must not be free to serve this from a provider that ignores it.
+    assert sent["extra_body"] == {"provider": {"require_parameters": True}}
     assert "reasoning_effort" not in sent
     assert result.output == {"answer": "ok"}
     assert result.call["structured_mode"] == "response_format"
     assert result.call["structured_mode_requested"] == "auto"
     assert result.call["structured_mode_fallback"] is False
+    assert result.call["provider_routing"] == {"require_parameters": True}
     assert result.call["schema_validated_locally"] is True
     assert (
         model.secret_free_request(
@@ -289,13 +333,16 @@ def test_response_format_mode_sends_a_strict_schema_and_reports_the_mechanism() 
 
 
 def test_a_provider_known_to_ignore_json_schema_starts_in_prompted_mode() -> None:
-    model, completions = _model([_response()], provider="anthropic", model="claude-sonnet-5")
+    model, completions = _prompted_model([_response()])
 
     result = _call(model)
 
     sent = completions.calls[0]
     system = sent["messages"][0]["content"]
     assert "response_format" not in sent
+    # No strict parameter is being sent, so nothing needs routing around.
+    assert "extra_body" not in sent
+    assert result.call["provider_routing"] is None
     assert system.startswith(INSTRUCTIONS)
     assert PROMPTED_SCHEMA_INSTRUCTIONS in system
     assert json.dumps(SCHEMA, sort_keys=True, separators=(",", ":")) in system
@@ -317,6 +364,9 @@ def test_a_rejected_response_format_falls_back_to_prompted_and_says_so() -> None
     assert len(completions.calls) == 2
     assert "response_format" in completions.calls[0]
     assert "response_format" not in completions.calls[1]
+    # The routing constraint is dropped with the mechanism it was protecting.
+    assert completions.calls[0]["extra_body"] == {"provider": {"require_parameters": True}}
+    assert "extra_body" not in completions.calls[1]
     assert PROMPTED_SCHEMA_INSTRUCTIONS in completions.calls[1]["messages"][0]["content"]
     assert result.output == {"answer": "ok"}
     assert result.call["structured_mode"] == "prompted"
@@ -365,7 +415,7 @@ def test_the_fallback_happens_at_most_once_per_call() -> None:
 
 def test_a_whole_response_code_fence_is_unwrapped_and_recorded() -> None:
     fenced = "```json\n" + json.dumps({"answer": "ok"}) + "\n```"
-    model, _ = _model([_response(content=fenced)], provider="anthropic", model="claude-sonnet-5")
+    model, _ = _prompted_model([_response(content=fenced)])
 
     result = _call(model)
 
@@ -374,11 +424,7 @@ def test_a_whole_response_code_fence_is_unwrapped_and_recorded() -> None:
 
 
 def test_json_wrapped_in_prose_is_rejected_rather_than_scavenged() -> None:
-    model, _ = _model(
-        [_response(content='Here is the answer: {"answer": "ok"}')],
-        provider="anthropic",
-        model="claude-sonnet-5",
-    )
+    model, _ = _prompted_model([_response(content='Here is the answer: {"answer": "ok"}')])
 
     with pytest.raises(OpenAICompatibleProviderExhaustedError) as failure:
         _call(model)
@@ -401,11 +447,7 @@ def test_a_schema_violating_response_is_rejected_and_never_repaired() -> None:
 
 
 def test_prompted_mode_validates_locally_exactly_as_response_format_mode_does() -> None:
-    model, _ = _model(
-        [_response(content=json.dumps({"wrong": "shape"}))],
-        provider="anthropic",
-        model="claude-sonnet-5",
-    )
+    model, _ = _prompted_model([_response(content=json.dumps({"wrong": "shape"}))])
 
     with pytest.raises(StructuredOutputSchemaError) as failure:
         _call(model)
@@ -526,31 +568,35 @@ def test_a_truncated_response_is_incomplete_rather_than_accepted() -> None:
 
 
 def test_call_details_distinguish_the_same_model_reached_through_two_providers() -> None:
-    through_openrouter, _ = _model([_response()], provider="openrouter", model="claude-sonnet-5")
-    through_anthropic, _ = _model([_response()], provider="anthropic", model="claude-sonnet-5")
+    through_openrouter, _ = _model([_response()], provider="openrouter", model="gemini-3-pro")
+    through_gemini, _ = _model([_response()], provider="gemini", model="gemini-3-pro")
 
     first = _call(through_openrouter).call
-    second = _call(through_anthropic).call
+    second = _call(through_gemini).call
 
     assert (first["provider"], first["model_id"], first["base_url_host"]) == (
         "openrouter",
-        "openrouter:claude-sonnet-5",
+        "openrouter:gemini-3-pro",
         "openrouter.ai",
     )
     assert (second["provider"], second["model_id"], second["base_url_host"]) == (
-        "anthropic",
-        "anthropic:claude-sonnet-5",
-        "api.anthropic.com",
+        "gemini",
+        "gemini:gemini-3-pro",
+        "generativelanguage.googleapis.com",
     )
-    assert first["model"] == second["model"] == "claude-sonnet-5"
+    # Same mechanism, but only the broker needs the routing constraint.
+    assert first["structured_mode"] == second["structured_mode"] == "response_format"
+    assert first["provider_routing"] == {"require_parameters": True}
+    assert second["provider_routing"] is None
+    assert first["model"] == second["model"] == "gemini-3-pro"
     assert first["provider_family"] == second["provider_family"] == "openai-compatible"
     assert first["transport"] == second["transport"] == "openai-chat-completions"
 
 
 def test_call_details_and_request_carry_no_api_key_material() -> None:
     model = OpenAICompatibleStructuredTextModel(
-        provider="anthropic",
-        model="claude-sonnet-5",
+        provider="openrouter",
+        model="anthropic/claude-sonnet-5",
         api_key=FAKE_API_KEY,
         client=_client(_FakeCompletions([_response()])),
     )
@@ -613,7 +659,7 @@ def test_every_success_and_failure_path_emits_the_shared_call_detail_keys() -> N
     success_model, _ = _model([_response()])
     calls.append(_call(success_model).call)
 
-    prompted_model, _ = _model([_response()], provider="anthropic", model="claude-sonnet-5")
+    prompted_model, _ = _prompted_model([_response()])
     calls.append(_call(prompted_model).call)
 
     fallback_model, _ = _model([_BadRequestEquivalent("controlled refusal"), _response()])
