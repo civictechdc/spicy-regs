@@ -55,13 +55,11 @@ that future is gated in `decisions.md` and none of it is in the MVP.
 
 1. ~~Commit drafts~~ (`46e8206`, `d3b8acb`, rulespec `03ac8ed`) and
    ~~integrate the tag prototype~~ (`ea0e6bc`) — done.
-2. Bump the pinned contract digest in `conformance/rulespec-l0.yaml` and the
-   `docs/ontology.md` mapping block to the current rulespec contract digest;
-   L0 mapping audit must return 1/1.
-3. Make `validate_before_publish` run before the `--skip-upload` return in
-   `pipelines/materialized.py`, with a test proving it executes in position
-   on a local publish. Release preflight and upload-environment checks stay
-   upload-only by design.
+2. ~~Bump the pinned contract digest~~ — done (`ced2b8e`; audit 1/1, 34
+   mappings, 29 terms).
+3. ~~Make `validate_before_publish` run under `--skip-upload`~~ — done
+   (`ced2b8e`, with the in-position test). Release preflight and
+   upload-environment checks stay upload-only by design.
 4. **Ask the human gate now (calendar time, not engineering):** request the
    non-originating-consumer Rulespec review so it runs during phases 1–3.
    Owner: maintainer.
@@ -133,9 +131,11 @@ iteration" budget applies to the loop, not the endpoints.
    mechanical** — touches published schema, `data_dictionary.py`,
    `descriptions.yaml`, generated `docs/tables/*.md`, and the receipt
    ordered-column check. Own commit, regression test.
-2. U.S.C. section lists → one citation per section (copy the tail-expansion
-   pattern from `parse_cfr_citation`). Mechanical.
-3. Real calendar validation replacing invalid-day clamping. Mechanical.
+2. ~~U.S.C. section lists → one citation per section~~ — done (`538780c`,
+   with title-boundary and citation-form-bleed hardening).
+3. ~~Real calendar validation replacing invalid-day clamping~~ — done
+   (`538780c`; impossible dates drop, matching `_iso_dates` semantics; the
+   raw value survives in `timetable_json`).
 4. After phase 2's first completed iteration: execute the deletion
    authorization in `decisions.md` in one reviewed commit.
 
