@@ -231,3 +231,38 @@ so explicitly. Plans cite this file; this file cites evidence.
   this repo); "a model never attests its own output."
 - **Revisit trigger:** the wiki interface becomes buildable, or human
   review capacity appears.
+
+## 2026-07-27 — Multi-provider model backend
+
+- **Decision:** running and comparing different model families happens
+  through one new arm of the existing structured-text-model interface,
+  `docpipeline/adapters/openai_compatible.py`, which speaks OpenAI
+  chat-completions to an injected `base_url` using the already-declared
+  `openai` SDK — **zero new dependencies**. A registry of provider
+  profiles keys the only things that differ: `openrouter`
+  (`OPENROUTER_API_KEY`), `anthropic` (its OpenAI-compatibility endpoint,
+  `ANTHROPIC_API_KEY`), `gemini` (its OpenAI-compatibility endpoint,
+  `GEMINI_API_KEY`), and `local` (base URL from
+  `SPICY_REGS_LOCAL_LLM_BASE_URL`, loopback-only, no key). Model IDs are
+  always caller-pinned; no provider gets a default model. Strict
+  `response_format` json_schema is used where the endpoint honors it and
+  schema-embedded instructions elsewhere; either way the response is
+  validated locally against the caller's schema and a failure is a
+  rejection, never a repair. `structured_mode` records which mechanism
+  answered, `token_count_method` records that `tiktoken` counts are
+  estimates off OpenAI models (the budget is still enforced), and
+  provider label + base URL host + model ID make "claude-sonnet-5 via
+  openrouter" distinguishable from "via anthropic" in a receipt.
+- **Why this now:** the MVP's blind adjudication requires judges from
+  families other than the tagger's, and model comparison is a standing
+  need; both were blocked on having exactly one paid arm.
+- **Why not LiteLLM (or another gateway) now:** the arms owe receipts the
+  *exact* request they sent and the exact response body they received, and
+  a translating layer owns that payload instead of this repo; and a new
+  package must pass the package-first extension gate (a paired run
+  improving accuracy or removing substantial owned code). An
+  OpenAI-compatible client the project already ships costs neither.
+- **Revisit trigger:** a provider we need has no OpenAI-compatible
+  endpoint, or per-provider compatibility workarounds accumulate into
+  substantial owned code — then adopt LiteLLM and re-verify exact request
+  and response custody under it.
