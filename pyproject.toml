@@ -100,6 +100,7 @@ audit-segmentation-embeddings = "spicy_regs.corpora.segmentation_embedding_audit
 run-segmentation-rerank = "spicy_regs.corpora.segmentation_rerank:main"
 run-segmentation-sparse-retrieval = "spicy_regs.corpora.segmentation_sparse_retrieval:main"
 run-segmentation-tagging = "spicy_regs.corpora.segmentation_tagging:main"
+run-rulespec-testbed-tags = "spicy_regs.rulespec_testbed:main"
 run-artifact-retrieval-baseline = "spicy_regs.corpora.artifact_retrieval_baseline:main"
 build-document-acceptance-scope = "spicy_regs.corpora.document_acceptance_scope:main"
 run-relation-exclusion-evaluation = "spicy_regs.corpora.relation_exclusion_evaluation:main"
