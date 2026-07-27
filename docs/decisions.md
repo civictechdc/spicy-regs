@@ -307,3 +307,25 @@ so explicitly. Plans cite this file; this file cites evidence.
   re-check whether the four arms have accumulated enough shared transport
   code to justify extracting it (still without letting any arm import
   another).
+
+## 2026-07-27 — The three Rulespec simplifications landed
+
+- **Landed on rulespec `us-regulatory-identifiers`:** `b613ba3` normative
+  tabular attestation pattern (six-column table; `approved_by` columns may
+  never map to Attestation terms; rejection is a row, absent = unreviewed;
+  revocation is a timestamp, never a delete); `bc88c02` carrier-local
+  fragment URN (`urn:rkaf:fragment:<artifact>:<start>:<end>:sha256-<hex>`,
+  half-open codepoint offsets matching our anchor semantics) making
+  `assignmentEvidence` claimable at L0 without a fragments table;
+  `f2a939d` machine-legible `excluded_terms`/`excluded_tables` carve-outs.
+  Contract digest moved to `sha256:5aaac340…`; spicy-regs re-pinned at
+  `ce75ffe`, audit 1/1.
+- **Breaking consequence for phase 4.2:** `assignmentEvidenceScheme` is
+  REQUIRED whenever assignment evidence is present — add it to the
+  contract-required columns (value: the fragment-URN scheme).
+- **MVP-public checklist addition:** rulespec's gate expects a partner
+  declaration at `conformance/partners/spicy-regs.yaml` (its L0 audit
+  currently reports 0/0 — no declaration exists); authoring it is part of
+  going public, alongside the phase 4.3 carve-out rewrite, which should
+  now use `excluded_terms` instead of prose.
+- **Revisit trigger:** phase 4 implementation.
