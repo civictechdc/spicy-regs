@@ -1,6 +1,6 @@
 partner: "Civic Tech DC / Spicy Regs"
 implementation: "spicy-regs@0.1.0"
-rulespec_version: "sha256:5f287a1e266feb4bec73317c3dca2d10654a61b1502f13ace176d1e9f4e23446"
+rulespec_version: "sha256:5aaac340bc21c7728fa70c250b7f74134dbb855804076f571a31144923d65cb7"
 # Publication remains locked until a maintainer replaces these nulls with the
 # released VERSION and its canonical GitHub release URL.
 rulespec_release: null
