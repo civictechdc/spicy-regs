@@ -266,3 +266,44 @@ so explicitly. Plans cite this file; this file cites evidence.
   endpoint, or per-provider compatibility workarounds accumulate into
   substantial owned code — then adopt LiteLLM and re-verify exact request
   and response custody under it.
+
+## 2026-07-27 — Native SDK arms where a compat surface cannot enforce
+
+- **Decision (maintainer):** when a provider's OpenAI-compatible surface
+  cannot enforce a strict JSON schema, the project takes that provider's
+  native SDK as a new arm of the structured-text-model interface rather
+  than shipping a per-provider workaround inside
+  `docpipeline/adapters/openai_compatible.py`. The first such arm is
+  `docpipeline/adapters/anthropic.py`, built on the `anthropic` SDK:
+  Claude-family calls now go through the Messages API's
+  `output_config.format` json_schema, which the endpoint actually
+  enforces, instead of a `response_format` the compat endpoint accepts
+  and ignores. The arm has one mode — there is no prompted fallback,
+  because a schema the endpoint cannot enforce is a refusal (locally,
+  before any paid call, when the unenforceable construct is detectable;
+  on the API's own rejection otherwise). It counts tokens with the
+  provider's own `messages.count_tokens` rather than a foreign-tokenizer
+  estimate, derives the Messages API's required `max_tokens` from the
+  caller's output budget, pins model IDs from the caller, and raises
+  (naming `ANTHROPIC_API_KEY`, never its value) when asked to build
+  itself from an unconfigured environment.
+- **This supersedes** the "native-Anthropic-arm later" revisit trigger in
+  the 2026-07-27 multi-provider entry. The zero-new-dependency principle
+  stands for every provider whose compat surface is honest; it does not
+  stand where honoring it would mean publishing an unenforced call as an
+  enforced one.
+- **Consequences in the compat arm:** the `anthropic` provider profile and
+  its prompted-mode workaround are removed — they existed only while no
+  native arm did. Claude via `openrouter` stays, which is what makes a
+  cross-route comparison (enforced native vs brokered compat) possible.
+  OpenRouter's structured requests now carry its documented provider
+  routing field, `provider.require_parameters: true` (sent in
+  `extra_body`, so it hashes into `request_sha256`), and only in
+  `response_format` mode: without it a broker may route a json_schema
+  request to an upstream provider that ignores the field, and the receipt
+  would claim enforcement that never happened. `provider_routing` records
+  the constraint that actually rode along.
+- **Revisit trigger:** a second provider needs a native arm, at which point
+  re-check whether the four arms have accumulated enough shared transport
+  code to justify extracting it (still without letting any arm import
+  another).
