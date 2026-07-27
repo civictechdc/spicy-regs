@@ -174,4 +174,11 @@ so explicitly. Plans cite this file; this file cites evidence.
 - Two strict xfails in the retrieval tests mark unimplemented API
   (`method_policy` plan fact, `query_methods` metrics parameter) — resolve
   when step 5 unparks.
+- `retrieval.py` `_authority_id()` falls through to `authority_raw` for EO
+  and statute rows, re-collapsing distinct citations that `91db195` fixed
+  on the published side — same bug shape, retrieval side; fix when step 5
+  unparks.
+- `data_dictionary.py check --source r2` will report authority_edges
+  column drift until the next publish (inherent to any published-schema
+  change).
 - **Revisit trigger:** the named feature unparks.

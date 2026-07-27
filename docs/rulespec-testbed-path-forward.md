@@ -126,11 +126,12 @@ iteration" budget applies to the loop, not the endpoints.
 
 ## Phase 3 — Cleanup track (parallel, MVP-relevant only)
 
-1. `authority_edges`: carry `statute_at_large`/`executive_order` through
-   `COLUMNS` and fix the dedup key that collapses distinct EOs. **Not
-   mechanical** — touches published schema, `data_dictionary.py`,
-   `descriptions.yaml`, generated `docs/tables/*.md`, and the receipt
-   ordered-column check. Own commit, regression test.
+1. ~~`authority_edges`: carry `statute_at_large`/`executive_order`~~ — done
+   (`91db195`). The dedup key is now derived (`IDENTITY_COLUMNS` = all
+   non-attestation columns), so a future parsed field cannot publish
+   without discriminating rows. An `executive_order` →
+   `agendaAuthorityCitation` L0 mapping is *available* (canonical EO IRI
+   exists) but is a new claim, not a carry-through — deliberately not made.
 2. ~~U.S.C. section lists → one citation per section~~ — done (`538780c`,
    with title-boundary and citation-form-bleed hardening).
 3. ~~Real calendar validation replacing invalid-day clamping~~ — done
