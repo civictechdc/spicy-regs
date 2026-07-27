@@ -1,20 +1,21 @@
 # Rulespec and Spicy Regs execution backlog
 
-- **Status:** Active; the reshaped contract and the v3 runner (steps 1–3) are
-  implemented and verified locally, but unreleased — maintainer direction
-  2026-07-26 is to keep everything local for the moment — and the fair
-  comparison is open
-- **Authority:** [`2026-07-25-rulespec-spicy-regs-complete-vision-goal.md`](docs/superpowers/specs/2026-07-25-rulespec-spicy-regs-complete-vision-goal.md)
+- **Status:** Active accuracy testbed; migration and fair-comparison expansion
+  are deferred
+- **Near-term authority:** [`rulespec-testbed-path-forward.md`](docs/rulespec-testbed-path-forward.md)
+- **Long-term reference:** [`2026-07-25-rulespec-spicy-regs-complete-vision-goal.md`](docs/superpowers/specs/2026-07-25-rulespec-spicy-regs-complete-vision-goal.md)
 - **Scope:** Rulespec, Spicy Regs, and their versioned interface
-- **Active finish line:** the fair stopping point below
+- **Active finish line:** one small, inspectable tagging accuracy loop at a
+  time
 - **Archived backlog:** [`TODO-RULE-2026-07-25-pre-vision-rewrite.md`](docs/archive/TODO-RULE-2026-07-25-pre-vision-rewrite.md)
 - **Last live validation:** 2026-07-26, from clean detached checkouts of both
   repositories (records below); not a release certification
 - **Labels:** used by the Current state entries and gates: verified locally,
   local and unreleased, open, human gate, deferred, or blocked
 
-The vision owns the architecture and long-term definition of done. This file
-contains only current state, executable work, gates, and deferred work.
+The testbed plan owns near-term execution. The vision remains a long-term
+reference. This file contains current state, executable work, gates, and
+deferred work.
 
 An unchecked item is active unless its section says deferred. A checked item
 must link a commit, immutable artifact, receipt, or dated validation record.
@@ -34,6 +35,12 @@ needs coordination.
   `structure-overlap-1800` and completed its named OpenAI path; the RIN corpus
   proved durable `RegulatoryAgendaItem` identity without reusing a RIN for a
   document or `Proceeding`.
+- **Verified accuracy loop, dated 2026-07-26:** the new pipeline processed 44
+  selected artifacts and 109 segments with 35 separately held gold labels.
+  One prompt-only refinement reduced accepted candidates from 351 to 76 and
+  counted false positives from 260 to 55 while keeping evidence grounding at
+  `1.0`. Both diagnostics passed integrity and provider-free recomputation.
+  See `RULESPEC_FEEDBACK_ITERATION_2.md`.
 - **Local, unreleased:** the complete reshaped Rulespec contract exists —
   core/profile split with profile-extended lifecycle closure, repaired CUE
   composition, `AssertionEnvelope`/`RelationshipAssertion`/typed-literal
@@ -43,16 +50,14 @@ needs coordination.
   `ClosureClaim` disabled (Rulespec commits `c7055cb`…`56686d9`). The v3
   `docpipeline` runner, its provider adapters, and the migrated v2
   relationship extraction exist (Spicy Regs commits `a6d3627`…`56a2030`).
-- **Open:** the Rulespec release-shape decision, the non-originating review,
-  and a reachable release (all Milestone A human gates; deferred by the
-  2026-07-26 keep-it-local direction). Milestone B's paired carrier migration
-  waits on that release by design. V3 build order steps 4–8 (source and
-  segmentation move, retrieval, tagging and approval, comparison, frozen
-  mixed-data test, old-runner removal) remain local implementation work.
-- **Open evaluation:** production resolvers, the sealed v2 oracle, three
-  blinded OpenAI repetitions, same-contract lookup arms, and final repository
-  gates remain unfinished. Existing OpenAI and Codex diagnostics fail their
-  declared quality gates.
+- **Deferred:** the Rulespec release shape, paired carrier migration,
+  retrieval, approval, publication, complete historical comparison, frozen
+  mixed-data release gate, and old-runner removal. Do not resume these merely
+  because their older checklist items remain unchecked.
+- **Open evaluation:** adjudicate exact, close, broader, narrower, related, and
+  wrong concept results; carry Rulespec's existing assignment roles into the
+  local tag output; correct gold excerpts that identify documents without
+  supporting their expected topics.
 - **Human gate:** a non-originating consumer must review Rulespec; two distinct
   humans must seal the oracle; a maintainer must authorize any Git tag,
   release, push, upload, publication, concept promotion, or legal-effect
@@ -102,11 +107,23 @@ documentation, full-suite, clean-checkout, release, or publication gates.
   or weaken the deferred participation profile.
 - Keep oMLX outside the active baseline.
 
-## Critical path
+## Near-term accuracy path
 
-Complete the milestones in order. Corpus and reviewer preparation may run in
-parallel, but Spicy Regs cannot complete migration before the Rulespec release,
-and the comparison cannot freeze until the migrated carrier is stable.
+- [x] Run current source parsing, selected segmentation, tag extraction,
+      storage, and scoring on the 44-artifact sample.
+- [x] Apply one focused prompt correction and rerun the same 109 segments.
+- [x] Record Rulespec, Spicy Regs, prompt, source, and gold findings in
+      `RULESPEC_FEEDBACK_ITERATION_2.md`.
+- [ ] Adjudicate the 35 iteration-2 results by concept relation and assignment
+      role.
+- [ ] Add Rulespec's existing `assignmentRole` values to the local tag output
+      and score primary topics separately from substantive and mention tags.
+
+## Deferred long-term program
+
+The milestones below preserve the long-term plan and history. They are not the
+active implementation queue. Resume them only after a maintainer explicitly
+reopens migration, retrieval, publication, or release work.
 
 ## Milestone A — Reshape, review, and release Rulespec
 
@@ -295,6 +312,10 @@ cannot change in response to model output.
       (Python 3.10.19). Old v2 runner stays active until cutover step 8.
 - [ ] Run lexical, dense, hybrid, and fixed-depth reranked retrieval against the
       same candidate universe and prefilters.
+- [ ] Before the v3 step-8 cutover, reuse content/model-addressed candidate
+      dense and sparse vectors across query work items. Record the originating
+      provider call and explicit reuse provenance so receipts never count a
+      reused vector as a new provider call.
 - [ ] Run a model-assisted inferred lookup arm — the vision's fourth lookup
       class — over the same corpus and evaluation contract, grounded in
       approved extraction outputs and checked graph links, with model lineage,
