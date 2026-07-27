@@ -18,6 +18,12 @@ Two properties matter more than convenience here:
   local reimplementation. Each call is additionally compared against the
   ``available_concepts`` list the payload builder put in front of the model for
   the same segment, and the agreement is recorded per segment.
+
+``--selector anchored-hybrid-v2`` swaps in the candidate-generation experiment
+(``select_candidate_concepts_anchored_v2``) for a comparison round. It is not
+the production selector, so the payload-parity check does not apply to it — the
+stored payloads were built by ``lexical-overlap-v1`` — and that is recorded in
+the metadata rather than reported as 35 mismatches. The default is unchanged.
 """
 
 from __future__ import annotations
@@ -33,7 +39,11 @@ from spicy_regs.docpipeline.adapters.openai import PROMPT_INPUT_TOKEN_BUDGET
 from spicy_regs.docpipeline.extraction import ExtractionUnit
 from spicy_regs.docpipeline.runtime import sha256_file
 from spicy_regs.ontology.common import read_parquet_rows
-from spicy_regs.ontology.concepts import select_candidate_concepts_for_text
+from spicy_regs.ontology.concepts import (
+    ANCHORED_SELECTOR_VERSION,
+    select_candidate_concepts_anchored_v2,
+    select_candidate_concepts_for_text,
+)
 from spicy_regs.rulespec_testbed import (
     GOLD_FILE,
     PROMPT_CONCEPT_LIMIT,
@@ -43,6 +53,12 @@ from spicy_regs.rulespec_testbed import (
 # The production selector, held by reference. Tests assert this *is* the
 # ontology function, so no copy of the ranking logic can drift in beside it.
 SELECT_CANDIDATES = select_candidate_concepts_for_text
+# The candidate-generation experiment, held the same way.
+SELECT_CANDIDATES_V2 = select_candidate_concepts_anchored_v2
+
+SELECTOR_V1 = "lexical-overlap-v1"
+SELECTOR_V2 = ANCHORED_SELECTOR_VERSION
+SELECTOR_CHOICES = (SELECTOR_V1, SELECTOR_V2)
 
 SCHEMA_VERSION = "gold-adjudication-input-v1"
 
@@ -94,7 +110,7 @@ def candidate_record(concept: Mapping[str, Any]) -> dict[str, Any]:
     (``actor_id``, ``run_id``, ``method``, ``asserted_at``) and any table this
     builder is pointed at may carry more. Nothing outside these keys is copied.
     """
-    return {
+    record = {
         "concept_id": str(concept.get("concept_id") or ""),
         "scheme": str(concept.get("scheme") or ""),
         "pref_label": _text_or_none(concept.get("pref_label")),
@@ -103,6 +119,12 @@ def candidate_record(concept: Mapping[str, Any]) -> dict[str, Any]:
         "broader_id": _text_or_none(concept.get("broader_id")),
         "status": _text_or_none(concept.get("status")),
     }
+    # A selector that stamps its own version on the rows it returns carries
+    # that stamp through; the production selector does not stamp anything.
+    version = _text_or_none(concept.get("selector_version"))
+    if version:
+        record["selector_version"] = version
+    return record
 
 
 def segment_candidates(
@@ -110,18 +132,23 @@ def segment_candidates(
     registry_rows: Sequence[Mapping[str, Any]],
     *,
     limit: int = PROMPT_CONCEPT_LIMIT,
-) -> tuple[list[dict[str, Any]], bool]:
+    selector: str = SELECTOR_V1,
+) -> tuple[list[dict[str, Any]], bool | None]:
     """Return one segment's ranked candidates plus its payload-parity flag.
 
     ``tag_unit`` stores each slice's exact text under ``evidence_<index>`` in
     slice order, so joining those values with newlines reconstructs
     ``ProcessingSegment.text`` — the string the payload builder handed to the
     selector. The parity flag reports whether this call reproduced the payload's
-    ``available_concepts`` ordering exactly.
+    ``available_concepts`` ordering exactly, and is ``None`` for any selector
+    other than the production one, whose ordering the payload records.
     """
     unit_input = unit.input
     fields = unit_input.get("untrusted_evidence_fields", {}).get("fields", {})
     segment_text = "\n".join(str(value) for value in fields.values())
+    if selector == SELECTOR_V2:
+        selected = SELECT_CANDIDATES_V2(segment_text, registry_rows, limit=limit)
+        return [candidate_record(concept) for concept in selected], None
     allowed_schemes = [str(scheme) for scheme in unit_input.get("subject", {}).get("allowed_schemes", ())]
     selected = SELECT_CANDIDATES(segment_text, allowed_schemes, registry_rows, limit=limit)
     selected_ids = [str(concept.get("concept_id") or "") for concept in selected]
@@ -173,7 +200,7 @@ def _artifact_identity(answer: Mapping[str, Any], unit: ExtractionUnit | None) -
     }
 
 
-def _segment_context(unit: ExtractionUnit, *, selector_matches_payload: bool) -> dict[str, Any]:
+def _segment_context(unit: ExtractionUnit, *, selector_matches_payload: bool | None) -> dict[str, Any]:
     unit_input = unit.input
     segment = unit_input.get("processing_segment", {})
     context = unit_input.get("non_evidentiary_context", {})
@@ -195,14 +222,17 @@ def build_document(
     file_metadata: Mapping[str, Any],
     generated_at: str,
     limit: int = PROMPT_CONCEPT_LIMIT,
+    selector: str = SELECTOR_V1,
 ) -> dict[str, Any]:
     """Assemble the blind adjudication document from already-loaded inputs.
 
     Kept free of file access so a hermetic test can drive it with a tiny
     synthetic fixture.
     """
+    if selector not in SELECTOR_CHOICES:
+        raise GoldAdjudicationError(f"unknown candidate selector: {selector!r}")
     units_by_id = {unit.unit_id: unit for unit in units}
-    candidate_cache: dict[str, tuple[list[dict[str, Any]], bool]] = {}
+    candidate_cache: dict[str, tuple[list[dict[str, Any]], bool | None]] = {}
     items: list[dict[str, Any]] = []
     unbuilt: list[dict[str, Any]] = []
 
@@ -219,7 +249,9 @@ def build_document(
                     missing.append(segment_id)
                     continue
                 if segment_id not in candidate_cache:
-                    candidate_cache[segment_id] = segment_candidates(unit, registry_rows, limit=limit)
+                    candidate_cache[segment_id] = segment_candidates(
+                        unit, registry_rows, limit=limit, selector=selector
+                    )
                 candidates, parity = candidate_cache[segment_id]
                 per_segment.append((segment_id, candidates))
                 segment_contexts.append(_segment_context(unit, selector_matches_payload=parity))
@@ -268,18 +300,21 @@ def build_document(
 
     items.sort(key=lambda item: str(item["item_id"]))
     unbuilt.sort(key=lambda item: str(item["item_id"]))
+    selected_fn = SELECT_CANDIDATES_V2 if selector == SELECTOR_V2 else SELECT_CANDIDATES
     return {
         "schema_version": SCHEMA_VERSION,
         "blind": BLINDNESS_STATEMENT,
         "generated_at": generated_at,
         "candidate_selector": {
-            "function": f"{SELECT_CANDIDATES.__module__}.{SELECT_CANDIDATES.__qualname__}",
+            "selector": selector,
+            "function": f"{selected_fn.__module__}.{selected_fn.__qualname__}",
             "limit": limit,
-            "method": f"lexical-overlap-v1-limit-{limit}",
+            "method": f"{selector}-limit-{limit}",
             "scope": "processing segment; multi-segment gold spans take the per-segment union, capped at the limit",
-            "payload_parity_checked": len(candidate_cache),
+            "payload_parity_applicable": selector == SELECTOR_V1,
+            "payload_parity_checked": sum(1 for _, parity in candidate_cache.values() if parity is not None),
             "payload_parity_mismatches": sorted(
-                segment_id for segment_id, (_, parity) in candidate_cache.items() if not parity
+                segment_id for segment_id, (_, parity) in candidate_cache.items() if parity is False
             ),
         },
         "inputs": dict(file_metadata),
@@ -303,6 +338,7 @@ def build_from_stored_inputs(
     selection_file: Path,
     registry_file: Path,
     generated_at: str | None = None,
+    selector: str = SELECTOR_V1,
 ) -> dict[str, Any]:
     """Load the frozen benchmark through the production reader and build."""
     inputs = load_testbed_inputs(
@@ -352,6 +388,7 @@ def build_from_stored_inputs(
         registry_rows=registry_rows,
         file_metadata=file_metadata,
         generated_at=generated_at or datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        selector=selector,
     )
 
 
@@ -387,6 +424,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=None,
         help=f"Gold-free concept registry (default: <run-dir>/{REGISTRY_FILE_NAME}).",
     )
+    parser.add_argument(
+        "--selector",
+        choices=SELECTOR_CHOICES,
+        default=SELECTOR_V1,
+        help=(
+            "Candidate selector. The default is the production selector, whose ordering the stored "
+            "tag payloads record; anchored-hybrid-v2 is the candidate-generation experiment."
+        ),
+    )
     args = parser.parse_args(argv)
 
     selection_file = args.selection_file or (args.run_dir / SELECTION_FILE_NAME)
@@ -395,6 +441,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         dataset_dir=args.dataset_dir,
         selection_file=selection_file,
         registry_file=registry_file,
+        selector=args.selector,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
@@ -402,6 +449,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         json.dumps(
             {
                 "output": str(args.output),
+                "selector": document["candidate_selector"]["method"],
                 "item_count": document["item_count"],
                 "unbuilt_item_count": document["unbuilt_item_count"],
                 "registry_sha256": document["inputs"]["registry_sha256"],

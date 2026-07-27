@@ -6,9 +6,10 @@ import json
 import math
 import re
 from collections import Counter, defaultdict
+from dataclasses import dataclass
 from datetime import datetime
 from difflib import SequenceMatcher
-from typing import Iterable, Sequence, cast
+from typing import Any, Iterable, Sequence, cast
 
 from loguru import logger
 
@@ -230,6 +231,380 @@ def select_candidate_concepts(subject: Subject, concepts: Sequence[dict], *, lim
         concepts,
         limit=limit,
     )
+
+
+# --------------------------------------------------------------------------
+# Anchored hybrid candidate selector (v2)
+#
+# ``select_candidate_concepts_for_text`` above scores every concept by
+# unanchored substring containment inside one flat scheme gate. At 901 rows
+# that is adequate; at the 513,236-row fused registry it fails twice over —
+# short labels match inside longer words ("Ants" inside "pollutants") and the
+# ``allowed_schemes`` gate hides every scheme a subject profile does not name,
+# which is where 7 of the 8 exact-alias gold targets live
+# (docs/evidence/gold-adjudication-2026-07-27/README.md, round 2).
+#
+# v2 is additive and independent: v1 is untouched so the two remain
+# comparable on the same inputs. The design follows recommendations 1-4 of
+# docs/evidence/candidate-selection-research-2026-07-27.md:
+#
+#   1. vocabulary conditioning — normalized alias table, per-alias ambiguity,
+#      ≤2-character alias suppression, token IDF over the alias corpus;
+#   2. channel A, anchored lexical — token-sequence (word-boundary) alias
+#      containment, an IDF-floor anchor requirement, and a fixed linear
+#      combination of MLLM-style deterministic features;
+#   3. channel B, character 3-gram TF-IDF over each concept's label string
+#      (the scispaCy candidate-generator recipe);
+#   4. RRF fusion at k=60, then scheme-stratified quotas for the final list.
+#
+# Two deliberate differences from v1, both required by the finding above:
+# there is no ``allowed_schemes`` gate (scheme balance is enforced by quota,
+# not by exclusion), and there is no prompt-token trim — v2 currently feeds
+# adjudication input, not a provider call, so it selects by rank alone.
+# --------------------------------------------------------------------------
+
+ANCHORED_SELECTOR_VERSION = "anchored-hybrid-v2"
+
+# --- conditioning -----------------------------------------------------------
+# MetaMap suppresses aliases of two characters or fewer; they carry no
+# evidence and cost precision outright.
+ANCHOR_MIN_ALIAS_CHARS = 3
+# Aliases longer than this are still reachable through channel B, but are not
+# indexed for token-sequence matching: they never appear verbatim in a segment
+# and they set the per-call n-gram budget.
+ANCHOR_MAX_ALIAS_TOKENS = 8
+# A match must be anchored by at least one token that is specific in the
+# vocabulary: present in no more than 1% of alias strings. Expressed as an IDF
+# floor derived from that share so the threshold is scale-free — the same rule
+# means the same thing on a 12-row fixture and on a 513k-row registry. The
+# absolute minimum keeps the share from collapsing on small vocabularies: a
+# token seen in two aliases is not evidence of genericness at any corpus size.
+ANCHOR_MAX_ANCHOR_ALIAS_SHARE = 0.01
+ANCHOR_MIN_ANCHOR_ALIAS_COUNT = 3
+
+# --- channel A scoring ------------------------------------------------------
+# A fixed, documented linear combination. No trained weights: nothing in this
+# repo yet has labelled data to fit them with.
+ANCHOR_PREF_LABEL_SCORE = 1.0
+ANCHOR_ALT_LABEL_SCORE = 0.6
+ANCHOR_SPREAD_WEIGHT = 0.8
+ANCHOR_AMBIGUITY_WEIGHT = 0.5
+# Ambiguity penalty saturates here: an alias shared by 32 or more distinct
+# concepts is treated as maximally ambiguous.
+ANCHOR_AMBIGUITY_SATURATION = 32.0
+
+# --- channel B --------------------------------------------------------------
+ANCHOR_CHAR_NGRAM_SIZE = 3
+# The query is the segment's most specific terms rather than its full text:
+# a 1,800-token segment's character profile is dominated by function words.
+ANCHOR_SEGMENT_TOP_TERMS = 24
+
+# --- fusion and quotas ------------------------------------------------------
+ANCHOR_CHANNEL_DEPTH = 50
+# Matches ``spicy_regs.docpipeline.retrieval.RETRIEVAL_RRF_K``; kept as a local
+# constant so the ontology package does not import the pipeline.
+ANCHOR_RRF_K = 60
+# Structural protection for small schemes: without it the 440,599-row
+# fast-topical scheme crowds out the 33-row policy-area scheme on score alone.
+ANCHOR_SCHEME_QUOTAS: dict[str, int] = {
+    "subject": 3,
+    "crs-subjects": 3,
+    "crs-policy-areas": 1,
+    "epa-tsca": 1,
+    "fast-topical": 2,
+}
+ANCHOR_WILDCARD_SLOTS = 2
+ANCHOR_QUOTA_TOTAL = sum(ANCHOR_SCHEME_QUOTAS.values()) + ANCHOR_WILDCARD_SLOTS
+
+ANCHOR_CONDITIONING_CACHE_SIZE = 4
+
+
+@dataclass(frozen=True)
+class _RegistryConditioning:
+    """Everything v2 derives from a registry once, before any segment text."""
+
+    concepts: tuple[dict, ...]
+    concept_ids: tuple[str, ...]
+    schemes: tuple[str, ...]
+    scheme_set: frozenset[str]
+    # normalized alias -> ((concept index, alias is the pref label), ...)
+    alias_postings: dict[str, tuple[tuple[int, bool], ...]]
+    # normalized alias -> number of distinct concepts sharing it
+    alias_ambiguity: dict[str, int]
+    token_idf: dict[str, float]
+    unseen_token_idf: float
+    idf_floor: float
+    max_alias_tokens: int
+    vectorizer: Any
+    label_matrix: Any
+
+
+# Keyed by ``id(concepts)``; the entry holds the sequence itself, so the id
+# cannot be recycled underneath a live entry. In-place mutation of a cached
+# registry is not detected — registries are loaded and then read.
+_ANCHOR_CONDITIONING_CACHE: dict[int, tuple[Any, _RegistryConditioning]] = {}
+
+
+def clear_anchored_conditioning_cache() -> None:
+    """Drop the in-process conditioning cache (tests and long-lived workers)."""
+    _ANCHOR_CONDITIONING_CACHE.clear()
+
+
+def _concept_labels(concept: dict) -> list[tuple[str, bool]]:
+    """Normalized (alias, is_pref_label) pairs for one concept, deduplicated."""
+    try:
+        alternatives = json.loads(concept.get("alt_labels_json") or "[]")
+    except (TypeError, json.JSONDecodeError):
+        alternatives = []
+    if not isinstance(alternatives, list):
+        alternatives = []
+    labels: list[tuple[str, bool]] = []
+    seen: set[str] = set()
+    for value, is_pref in [(concept.get("pref_label"), True), *((value, False) for value in alternatives)]:
+        alias = normalize_label(value)
+        if not alias or alias in seen:
+            continue
+        seen.add(alias)
+        labels.append((alias, is_pref))
+    return labels
+
+
+def _condition_registry(concepts: Sequence[dict]) -> _RegistryConditioning:
+    """Build (or reuse) the alias table, IDF table, and char-ngram matrix."""
+    cached = _ANCHOR_CONDITIONING_CACHE.get(id(concepts))
+    if cached is not None and cached[0] is concepts:
+        return cached[1]
+
+    eligible = [concept for concept in concepts if concept.get("status") != "deprecated"]
+    postings: dict[str, list[tuple[int, bool]]] = defaultdict(list)
+    label_documents: list[str] = []
+    for index, concept in enumerate(eligible):
+        labels = _concept_labels(concept)
+        label_documents.append(" ".join(alias for alias, _ in labels))
+        for alias, is_pref in labels:
+            if len(alias) < ANCHOR_MIN_ALIAS_CHARS:
+                continue
+            if len(alias.split()) > ANCHOR_MAX_ALIAS_TOKENS:
+                continue
+            postings[alias].append((index, is_pref))
+
+    document_frequency: Counter[str] = Counter()
+    for alias in postings:
+        document_frequency.update(set(alias.split()))
+    alias_count = len(postings)
+    token_idf = {token: math.log((alias_count + 1) / (count + 1)) + 1.0 for token, count in document_frequency.items()}
+    unseen_token_idf = math.log(alias_count + 1) + 1.0
+    # A token seen in at most ``share`` of aliases can anchor a match; the
+    # floor is that token's IDF.
+    anchor_ceiling = max(float(ANCHOR_MIN_ANCHOR_ALIAS_COUNT), ANCHOR_MAX_ANCHOR_ALIAS_SHARE * alias_count)
+    idf_floor = math.log((alias_count + 1) / (anchor_ceiling + 1)) + 1.0
+
+    vectorizer, label_matrix = _fit_char_ngram_matrix(label_documents)
+
+    conditioning = _RegistryConditioning(
+        concepts=tuple(eligible),
+        concept_ids=tuple(str(concept.get("concept_id") or "") for concept in eligible),
+        schemes=tuple(str(concept.get("scheme") or "") for concept in eligible),
+        scheme_set=frozenset(str(concept.get("scheme") or "") for concept in eligible),
+        alias_postings={alias: tuple(entries) for alias, entries in postings.items()},
+        alias_ambiguity={alias: len({index for index, _ in entries}) for alias, entries in postings.items()},
+        token_idf=token_idf,
+        unseen_token_idf=unseen_token_idf,
+        idf_floor=idf_floor,
+        max_alias_tokens=max((len(alias.split()) for alias in postings), default=1),
+        vectorizer=vectorizer,
+        label_matrix=label_matrix,
+    )
+    if len(_ANCHOR_CONDITIONING_CACHE) >= ANCHOR_CONDITIONING_CACHE_SIZE:
+        _ANCHOR_CONDITIONING_CACHE.pop(next(iter(_ANCHOR_CONDITIONING_CACHE)))
+    _ANCHOR_CONDITIONING_CACHE[id(concepts)] = (concepts, conditioning)
+    return conditioning
+
+
+def _fit_char_ngram_matrix(label_documents: Sequence[str]) -> tuple[Any, Any]:
+    """Fit the scispaCy-style char-3-gram TF-IDF matrix over label strings."""
+    # Imported lazily: scikit-learn costs about a second to import and most
+    # callers of this module never reach the v2 selector.
+    import numpy
+    from sklearn.feature_extraction.text import TfidfVectorizer
+
+    vectorizer = TfidfVectorizer(
+        analyzer="char_wb",
+        ngram_range=(ANCHOR_CHAR_NGRAM_SIZE, ANCHOR_CHAR_NGRAM_SIZE),
+        dtype=numpy.float32,
+    )
+    try:
+        matrix = vectorizer.fit_transform(label_documents)
+    except ValueError:
+        # Empty vocabulary: a registry whose labels carry no ngrams at all.
+        return None, None
+    return vectorizer, matrix
+
+
+def _segment_term_weights(tokens: Sequence[str], conditioning: _RegistryConditioning) -> dict[str, float]:
+    """TF-IDF weight of each distinct segment token, TF normalized by length."""
+    counts = Counter(tokens)
+    total = max(1, len(tokens))
+    return {
+        token: (count / total) * conditioning.token_idf.get(token, conditioning.unseen_token_idf)
+        for token, count in counts.items()
+    }
+
+
+def _anchored_channel(
+    tokens: Sequence[str],
+    weights: dict[str, float],
+    conditioning: _RegistryConditioning,
+    *,
+    depth: int,
+) -> list[int]:
+    """Channel A: word-boundary alias matches scored by fixed features."""
+    peak = max(weights.values(), default=0.0)
+    if not peak:
+        return []
+    best: dict[int, float] = {}
+    seen_aliases: set[str] = set()
+    span = min(conditioning.max_alias_tokens, ANCHOR_MAX_ALIAS_TOKENS, len(tokens))
+    for size in range(1, span + 1):
+        for start in range(len(tokens) - size + 1):
+            alias_tokens = tokens[start : start + size]
+            alias = " ".join(alias_tokens)
+            if alias in seen_aliases:
+                continue
+            seen_aliases.add(alias)
+            postings = conditioning.alias_postings.get(alias)
+            if not postings:
+                continue
+            idfs = [conditioning.token_idf.get(token, conditioning.unseen_token_idf) for token in alias_tokens]
+            if max(idfs) < conditioning.idf_floor:
+                # Every token in the alias is vocabulary-generic: the match is
+                # not anchored by anything specific enough to trust.
+                continue
+            spread = min(1.0, sum(weights[token] for token in set(alias_tokens)) / peak)
+            ambiguity = conditioning.alias_ambiguity[alias]
+            penalty = ANCHOR_AMBIGUITY_WEIGHT * min(
+                1.0, math.log(max(1, ambiguity), 2) / math.log(ANCHOR_AMBIGUITY_SATURATION, 2)
+            )
+            for index, is_pref in postings:
+                label_score = ANCHOR_PREF_LABEL_SCORE if is_pref else ANCHOR_ALT_LABEL_SCORE
+                score = label_score + (ANCHOR_SPREAD_WEIGHT * spread) - penalty
+                if score > best.get(index, -math.inf):
+                    best[index] = score
+    ordered = sorted(best.items(), key=lambda item: (-item[1], conditioning.concept_ids[item[0]]))
+    return [index for index, _ in ordered[:depth]]
+
+
+def _char_ngram_channel(
+    weights: dict[str, float],
+    conditioning: _RegistryConditioning,
+    *,
+    depth: int,
+) -> list[int]:
+    """Channel B: char-3-gram TF-IDF cosine against the segment's top terms."""
+    if conditioning.label_matrix is None or not weights:
+        return []
+    import numpy
+
+    top_terms = sorted(weights.items(), key=lambda item: (-item[1], item[0]))[:ANCHOR_SEGMENT_TOP_TERMS]
+    query = conditioning.vectorizer.transform([" ".join(token for token, _ in top_terms)])
+    if query.nnz == 0:
+        return []
+    # TfidfVectorizer L2-normalizes rows, so the product is the cosine.
+    similarity = numpy.asarray((conditioning.label_matrix @ query.T).todense()).ravel()
+    width = min(similarity.shape[0], depth * 4)
+    if width < similarity.shape[0]:
+        window = numpy.argpartition(-similarity, width - 1)[:width]
+    else:
+        window = numpy.arange(similarity.shape[0])
+    ordered = sorted(
+        (int(index) for index in window),
+        key=lambda index: (-float(similarity[index]), conditioning.concept_ids[index]),
+    )
+    return [index for index in ordered[:depth] if similarity[index] > 0.0]
+
+
+def _fuse_reciprocal_rank(channels: Sequence[Sequence[int]]) -> dict[int, float]:
+    """Reciprocal-rank fusion at k=60 over each channel's ranking."""
+    fused: dict[int, float] = defaultdict(float)
+    for channel in channels:
+        for rank, index in enumerate(channel, start=1):
+            fused[index] += 1.0 / (ANCHOR_RRF_K + rank)
+    return dict(fused)
+
+
+def _apply_scheme_quotas(
+    ranked: Sequence[int],
+    conditioning: _RegistryConditioning,
+    *,
+    limit: int,
+) -> list[int]:
+    """Fill the shortlist by scheme quota, ceding empty schemes to wildcards."""
+    quota_applies = limit >= ANCHOR_QUOTA_TOTAL and set(ANCHOR_SCHEME_QUOTAS) <= conditioning.scheme_set
+    if not quota_applies:
+        return list(ranked[:limit])
+    chosen: list[int] = []
+    taken: set[int] = set()
+    for scheme in sorted(ANCHOR_SCHEME_QUOTAS):
+        quota = ANCHOR_SCHEME_QUOTAS[scheme]
+        for index in ranked:
+            if len(chosen) >= limit:
+                break
+            if conditioning.schemes[index] != scheme or index in taken:
+                continue
+            chosen.append(index)
+            taken.add(index)
+            quota -= 1
+            if quota <= 0:
+                break
+    # Wildcard pool: the reserved slots plus every slot a scheme could not fill.
+    for index in ranked:
+        if len(chosen) >= limit:
+            break
+        if index in taken:
+            continue
+        chosen.append(index)
+        taken.add(index)
+    order = {index: rank for rank, index in enumerate(ranked)}
+    return sorted(chosen, key=lambda index: order[index])
+
+
+def select_candidate_concepts_anchored_v2(
+    text: str,
+    concepts: Sequence[dict],
+    *,
+    limit: int = ANCHOR_QUOTA_TOTAL,
+) -> list[dict]:
+    """Select candidates by anchored lexical + char-ngram retrieval, fused.
+
+    Two independent deterministic channels each retrieve their top
+    ``ANCHOR_CHANNEL_DEPTH``; RRF at k=60 fuses them; scheme quotas cut the
+    result to ``limit``. A registry whose schemes do not cover
+    ``ANCHOR_SCHEME_QUOTAS`` (or a ``limit`` below the quota total) takes the
+    fused ranking unmodified, so the selector still works on the 901-row
+    single-scheme registry.
+
+    Registry conditioning is cached in-process on the identity of ``concepts``:
+    the first call over a large registry pays for the alias table and the
+    char-ngram matrix, and later calls do not.
+
+    Each returned row is a copy of the registry row carrying
+    ``selector_version``; the registry rows themselves are never mutated.
+    """
+    if limit <= 0:
+        return []
+    conditioning = _condition_registry(concepts)
+    tokens = normalize_label(text).split()
+    if not tokens or not conditioning.concepts:
+        return []
+    weights = _segment_term_weights(tokens, conditioning)
+    channels = [
+        _anchored_channel(tokens, weights, conditioning, depth=ANCHOR_CHANNEL_DEPTH),
+        _char_ngram_channel(weights, conditioning, depth=ANCHOR_CHANNEL_DEPTH),
+    ]
+    fused = _fuse_reciprocal_rank(channels)
+    ranked = sorted(fused.items(), key=lambda item: (-item[1], conditioning.concept_ids[item[0]]))
+    selected = _apply_scheme_quotas([index for index, _ in ranked], conditioning, limit=limit)
+    return [{**conditioning.concepts[index], "selector_version": ANCHORED_SELECTOR_VERSION} for index in selected]
 
 
 def match_existing_concept(proposal: TagProposal, concepts: Sequence[dict]) -> str | None:
