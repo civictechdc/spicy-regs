@@ -1,0 +1,131 @@
+# Decision ledger
+
+Append-only. One entry per decision: what was decided, the evidence, and the
+trigger that reopens it. Newer entries supersede older ones only when they say
+so explicitly. Plans cite this file; this file cites evidence.
+
+## 2026-07-24 — Segmentation policy: `structure-overlap-1800`
+
+- **Decision:** all segmentation uses `structure-overlap-1800` (1,200-token
+  leaves, pinned `o200k_base`, structural boundaries, bounded backward
+  overlap).
+- **Evidence:** `docs/evidence/document-segmentation-fair-comparison-2026-07-24.md`
+  — 35/35 gold spans contained, hybrid Recall@50 0.800, rerank lifts R@10
+  0.543→0.714.
+- **Revisit trigger:** a segmentation-policy experiment (e.g. syntok
+  sentence boundaries) that beats it on the frozen sample — noting that any
+  boundary change also changes segment identities and the frozen baseline.
+
+## 2026-07-24 — Document-AI package fit
+
+- **Decision:** Docling 2.115.0 (DOCX/PPTX/XLSX only, PDF refused),
+  `tiktoken`, sentence-transformers 5.6.1 (pinned models/revisions),
+  `ir-measures` 0.4.3, scikit-learn, official provider SDKs, `jsonschema`,
+  DuckDB over Parquet. Chonkie rejected as a production dependency.
+- **Evidence:** `docs/superpowers/specs/2026-07-24-document-ai-package-fit-decision.md`.
+- **Revisit trigger:** a paired run on frozen + held-out real data showing a
+  package improves accuracy or removes substantial owned code without
+  weakening source evidence.
+
+## 2026-07-24 — No dedicated graph engine
+
+- **Decision:** serve traversal from DuckDB over published Parquet; no second
+  engine. Kuzu held as a deferred rebuildable projection.
+- **Evidence:** `docs/evidence/graph-engine-bakeoff-2026-07-24/` — DuckPGQ
+  variable-length operator crashes; Kuzu wins at 1M edges (2.1 ms vs 9.6 ms)
+  but the corpus lacks the edges that would justify it
+  (`docs/corpus-edge-coverage-findings-2026-07-24.md`).
+- **Revisit trigger:** a real query DuckDB cannot serve, measured.
+
+## 2026-07-25 — Relation benchmark publication blocked
+
+- **Decision:** the v2 relation-exclusion benchmark is not publication
+  eligible until two blind human reviews seal the oracle
+  (`REQUIRED_BLIND_HUMAN_REVIEWS = 2`).
+- **Evidence:** three adversarial reviews attributed the v1 score to oracle
+  defects, not model failure; six Codex runs swung baseline F1 0.273→0.600 on
+  identical inputs.
+- **Revisit trigger:** the two reviews happen. Until then this work is
+  formally waived from the review budget, not queued.
+
+## 2026-07-27 — Package-first extension slots
+
+- **Decision:** each slot below is one bounded computation behind a
+  project-owned interface. A package enters the default path only when a
+  paired run on frozen and held-out real data improves accuracy or removes
+  substantial owned code without weakening source evidence. Package IDs and
+  object models never enter durable tables; every accepted span must resolve
+  to exact locked source text.
+
+| Slot | Candidate | Disposition |
+| --- | --- | --- |
+| Legal citation recognition | CiteURL (U.S.C./CFR), eyecite (judicial, FR volume/page) | Run one bounded regulatory bakeoff with CiteURL; eyecite only for an active judicial need |
+| Mention detection / concept linking | existing lexical + Sentence Transformers baselines; GLinker as comparator | Baselines first; GLinker only if candidate recall stays a measured problem |
+| Bounded classifiers (multi-label, role, mapping) | scikit-learn linear/OvR; SetFit only if linear underfits | After corrected labels support a leakage-free artifact-level split |
+| Calibration and label-error diagnosis | `CalibratedClassifierCV`, cleanlab | After out-of-sample probabilities exist; warnings create review items, never auto-corrections |
+| Unknown/local-concept grouping | scikit-learn HDBSCAN over existing embeddings | When enough unresolved examples accumulate; clusters are review bundles, not concepts |
+| Cross-source record linkage | Splink | Defer until a real cross-source identity set exists; never auto-merge |
+| Typed relation extraction | GLiREL | Defer until entity linking and relation labels are stable |
+| RDF conformance | pySHACL | Only when an RDF projection serves a real consumer; CUE stays authoritative |
+
+- **Evidence:** `docs/rulespec-testbed-path-forward.md` revision of
+  2026-07-27 (git history) carries the full rationale text.
+
+## 2026-07-27 — Citation parsing: supplement-first
+
+- **Decision:** three separate jobs — packages may *recognize* free-text
+  spans; existing code parses source-specific fields; project-owned
+  `canonical_*` functions assign identity. Package URLs and internal IDs
+  never become durable identity or provenance. Recognized raw text must
+  equal `SourceFragment[start:end]` before projection.
+- **Evidence:** exploratory probe over all 4,777 distinct Unified Agenda
+  authority strings: 4,157 recognized by both the current parser and CiteURL,
+  233 current-parser-only, 108 CiteURL-only, 279 neither. Detection coverage,
+  not correctness; no committed command yet makes it reproducible.
+- **Bakeoff protocol (when run):** freeze fixtures + the 4,777 strings;
+  compare current vs current+CiteURL; adjudicate a stratified disagreement
+  sample (frontier model first pass, async human correction); require a
+  material held-out gain before retiring any regex; block unreviewed identity
+  changes; save the exact command and pinned versions. CiteURL stays
+  experimental (its package imports `markdown` without declaring it).
+- **Revisit trigger:** the bakeoff runs, or judicial/FR volume-page
+  extraction becomes active (then evaluate eyecite separately).
+
+## 2026-07-27 — Manual parser dispositions
+
+- **Decision:** keep project-owned code for identity and safety grammars
+  (RINs, FR document numbers, Regulations.gov IDs, source keys, exact-offset
+  HTML/XML boundaries); adopt established packages only at the listed
+  triggers: Beautiful Soup when `build_search_index.py` next changes;
+  feedparser if GAO RSS variants multiply; defusedxml at source-reader
+  hardening; ijson on an observed bulk-extract memory failure; python-stdnum
+  if more standard identifiers arrive; official NAICS registry data when
+  semantic validation matters; stdlib `datetime` with real calendar
+  validation.
+- **Evidence:** parser audit in the 2026-07-27 path-forward revision (git
+  history); the expensive formats are already covered by packages.
+
+## 2026-07-27 — Deletion authorization
+
+- **Decision:** after the integrated tag loop completes one full iteration on
+  this branch (MVP plan phase 2, first iteration), the following are
+  authorized for removal in one reviewed commit: migration-only fixtures and
+  expected-difference files, legacy identity/storage compatibility shims, and
+  intermediate-equivalence checks that exist only to prove compatibility with
+  the retired `corpora` runner. The v2 `corpora` runners themselves retire at
+  MVP cutover (phase 4), with the stored v4 outputs kept read-only as the
+  benchmark artifact. This supersedes the "no deletion is authorized"
+  ambiguity in earlier revisions.
+- **Revisit trigger:** none — this is the trigger.
+
+## 2026-07-27 — MVP scope
+
+- **Decision:** the MVP is source → segments → concept assignments with
+  Rulespec roles and exact evidence → reviewed scoring → atomically
+  published tables conforming to Rulespec L0, on the existing corpus.
+  Out of MVP: retrieval serving, relation benchmark unblocking, cascade
+  classifiers and every gated slot above, signed receipts, the comments
+  corpus, state bills, MCP additions beyond the existing surface.
+- **Evidence:** `docs/rulespec-testbed-path-forward.md` (the MVP plan).
+- **Revisit trigger:** MVP acceptance, or a gate proving a scoped-out item
+  is on the critical path.

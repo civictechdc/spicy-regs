@@ -1,7 +1,11 @@
 # V3 Execution Handoff, Second Half — Agent Goal
 
 - **Date:** 2026-07-26
-- **Status:** Ready to execute
+- **Status:** SUPERSEDED IN SEQUENCING 2026-07-27 — steps 4–5 executed
+  (`414964d`, `9591c6d`); steps 6–8 are absorbed in reduced form by the MVP
+  plan (`docs/rulespec-testbed-path-forward.md`), which owns execution
+  order. Retrieval and parity gates are parked per `docs/decisions.md`. Do
+  not execute this document.
 - **Predecessor:** [`2026-07-25-v3-execution-handoff-agent-goal.md`](2026-07-25-v3-execution-handoff-agent-goal.md)
   (executed 2026-07-26; see its execution record)
 - **Role:** orchestrator prompt for the next working session. The

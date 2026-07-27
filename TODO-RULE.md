@@ -1,12 +1,15 @@
 # Rulespec and Spicy Regs execution backlog
 
-- **Status:** Active accuracy testbed; migration and fair-comparison expansion
-  are deferred
+- **Status:** Executing the Rulespec MVP path (measurement → accuracy loop →
+  cleanup → MVP assembly); migration and fair-comparison expansion stay
+  deferred
 - **Near-term authority:** [`rulespec-testbed-path-forward.md`](docs/rulespec-testbed-path-forward.md)
+  (the MVP plan); durable decisions in [`docs/decisions.md`](docs/decisions.md)
 - **Long-term reference:** [`2026-07-25-rulespec-spicy-regs-complete-vision-goal.md`](docs/superpowers/specs/2026-07-25-rulespec-spicy-regs-complete-vision-goal.md)
 - **Scope:** Rulespec, Spicy Regs, and their versioned interface
-- **Active finish line:** one small, inspectable tagging accuracy loop at a
-  time
+- **Active finish line:** MVP acceptance — one locally published generation
+  with identity tables plus reviewed concept assignments under the pinned
+  Rulespec contract, every gate green
 - **Archived backlog:** [`TODO-RULE-2026-07-25-pre-vision-rewrite.md`](docs/archive/TODO-RULE-2026-07-25-pre-vision-rewrite.md)
 - **Last live validation:** 2026-07-26, from clean detached checkouts of both
   repositories (records below); not a release certification
