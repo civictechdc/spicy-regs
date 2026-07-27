@@ -214,6 +214,14 @@ release.
    → *registered* promotion stays deferred.
 4. Local publish with every local gate executing and green (phase 0.3 makes
    this falsifiable).
+   Additional gate, **diagnostic not claimed**: project a sample of the
+   generation (assignments, attestations, fragment URNs) to JSON-LD and
+   run rulespec's own L2/L3 gates (`conformance_report.py`,
+   `ci_validate.py`) — free machine checking of carriage invariants
+   (URN grammar, attestation target joins, cross-property shapes) that
+   nobody will hand-review. The public claim stays L0: L0 and L1+ are
+   separate carrier paths and the audit rejects mixed claims; a public
+   L1+ claim waits for a real RDF consumer (ledger trigger unchanged).
 5. Retire the v2 `corpora` runners per `decisions.md`, keeping stored v4
    outputs read-only as the benchmark artifact.
 
