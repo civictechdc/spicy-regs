@@ -1,11 +1,11 @@
-"""Ablate candidate-selector configurations against the frozen 35-item gold set.
+"""Ablate candidate selectors against the frozen 35-item development set.
 
 The question this answers is narrow and mechanical: *which candidate channels,
 fused how, put the right registry concept in front of a judge?* It computes the
 top-12 candidate list every configuration would produce for each of the 35
 stored gold assignments, and scores those lists on facts that need no model:
 
-* **exact-alias targets.** Eight of the 35 gold labels normalize onto an alias
+* **exact-alias targets.** Eight of the 35 development labels normalize onto an alias
   of some concept in the fused registry (``docs/evidence/gold-adjudication-2026-07-27/README.md``,
   round 2). Those eight are the only items where a mechanically correct answer
   exists, so "did the target surface" is checkable without a judge. The set is
@@ -14,8 +14,8 @@ stored gold assignments, and scores those lists on facts that need no model:
   blind judges (``resolved.json``); their ``best_candidate_id`` is a concept a
   panel already accepted. Whether a configuration keeps it is a direct
   regression check on the graded round.
-* **rank** of the surfaced targets, and the **scheme mix** of the emitted lists,
-  which is what the quota rule exists to control.
+* **rank** of the surfaced targets, and the **source-vocabulary mix** of the
+  emitted lists, which is what the quota rule exists to control.
 
 Configurations are compositions of five channel sources:
 
@@ -27,12 +27,14 @@ Configurations are compositions of five channel sources:
 * ``D`` — free-keyword generate-then-map.
 
 Every non-``v1`` configuration fuses its channels with the same RRF at k=60 that
-v2 uses, then either applies v2's scheme quotas or takes the fused ranking
+v2 uses, then either applies v2's source-vocabulary quotas or takes the fused ranking
 straight. Both fusion and quota steps are v2's own functions, imported rather
 than reimplemented, so a configuration named ``v2`` here *is* v2; a test asserts
 that against the public selector.
 
-Nothing here adopts anything. It measures, prints a table, and stops.
+Nothing here adopts anything. The original 35 were repeatedly inspected and
+are permanently train/development data. The emitted record is ineligible for
+an accuracy or adoption verdict, even when one configuration scores best.
 """
 
 from __future__ import annotations
@@ -49,9 +51,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from spicy_regs.docpipeline.adapters.openai import PROMPT_INPUT_TOKEN_BUDGET
+from spicy_regs.docpipeline.adapters.openai import (
+    PROMPT_INPUT_TOKEN_BUDGET,
+    PROMPT_SAFETY_MARGIN_TOKENS,
+    TiktokenCounter,
+)
 from spicy_regs.docpipeline.extraction import ExtractionUnit
 from spicy_regs.docpipeline.runtime import sha256_file
+from spicy_regs.docpipeline.tag_task import TagExtractionTask
+from spicy_regs.evaluation_boundary import (
+    DEFAULT_BOUNDARY_MANIFEST,
+    DEVELOPMENT_DATASET_ID,
+)
 from spicy_regs.ontology.candidate_channels import (
     CHANNEL_DEPTH,
     DENSE_CHANNEL_VERSION,
@@ -63,12 +74,13 @@ from spicy_regs.ontology.candidate_channels import (
     generate_segment_keywords,
     keyword_channel_ranking,
 )
-from spicy_regs.ontology.common import read_parquet_rows
+from spicy_regs.ontology.common import canonical_json, read_parquet_rows
 from spicy_regs.ontology.concepts import (
     ANCHOR_CHANNEL_DEPTH,
     ANCHOR_RRF_K,
     _anchored_channel,
-    _apply_scheme_quotas,
+    _allowed_facet_ranking,
+    _apply_source_vocabulary_quotas,
     _char_ngram_channel,
     _condition_registry,
     _fuse_reciprocal_rank,
@@ -77,6 +89,7 @@ from spicy_regs.ontology.concepts import (
     normalize_label,
     select_candidate_concepts_for_text,
 )
+from spicy_regs.ontology.llm import ontology_concept_payload
 from spicy_regs.rulespec_testbed import GOLD_FILE, PROMPT_CONCEPT_LIMIT, load_testbed_inputs
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -86,12 +99,6 @@ DEFAULT_REGISTRY = REPO_ROOT / "output" / "fused-concept-registry-v1" / "registr
 DEFAULT_INDEX_DIR = REPO_ROOT / "output" / "fused-concept-registry-v1"
 DEFAULT_RESOLVED = REPO_ROOT / "docs" / "evidence" / "gold-adjudication-2026-07-27" / "resolved.json"
 SELECTION_FILE_NAME = "tagging_segments.parquet"
-
-# ``load_testbed_inputs`` refuses to return when a tag prompt exceeds the
-# provider budget. This harness makes no tag call, and a prompt that no longer
-# fits must not be allowed to withhold the measurement, so the budget is lifted
-# here and recorded in the emitted facts instead.
-UNENFORCED_PROMPT_TOKEN_BUDGET = 1_000_000_000
 
 CHANNEL_A = "A"
 CHANNEL_B = "B"
@@ -110,8 +117,8 @@ class Configuration:
 
 
 CONFIGURATIONS: tuple[Configuration, ...] = (
-    Configuration("v1", (), False, "production selector, whole (scheme gate + token trim)"),
-    Configuration("v2", (CHANNEL_A, CHANNEL_B), True, "anchored + char-ngram, RRF, scheme quotas"),
+    Configuration("v1", (), False, "production selector, whole (facet gate + token trim)"),
+    Configuration("v2", (CHANNEL_A, CHANNEL_B), True, "anchored + char-ngram, RRF, source-vocabulary quotas"),
     Configuration("v2-noquota", (CHANNEL_A, CHANNEL_B), False, "v2 fused ranking, no quotas"),
     Configuration("v2+C", (CHANNEL_A, CHANNEL_B, CHANNEL_C), True, "v2 channels plus dense retrieval"),
     Configuration("v2+D", (CHANNEL_A, CHANNEL_B, CHANNEL_D), True, "v2 channels plus generate-then-map"),
@@ -220,6 +227,8 @@ class SegmentChannels:
     """Every channel's ranking for one segment, in v2 conditioning index space."""
 
     segment_id: str
+    allowed_facets: tuple[str, ...]
+    unit_input: Mapping[str, Any]
     v1_ids: tuple[str, ...]
     rankings: dict[str, tuple[int, ...]]
 
@@ -281,6 +290,8 @@ def segment_channels(
     v1_selected = select_candidate_concepts_for_text(text, _allowed_schemes(unit), registry_rows, limit=limit)
     return SegmentChannels(
         segment_id=str(unit.unit_id),
+        allowed_facets=tuple(_allowed_schemes(unit)),
+        unit_input=unit.input,
         v1_ids=tuple(str(concept.get("concept_id") or "") for concept in v1_selected),
         rankings=rankings,
     )
@@ -308,7 +319,12 @@ def configuration_ranking(
     if configuration.name == "v1":
         return list(segment.v1_ids[:limit]), list(segment.v1_ids)
     ranked = fuse([segment.rankings.get(name, ()) for name in configuration.channels], conditioning)
-    selected = _apply_scheme_quotas(ranked, conditioning, limit=limit) if configuration.quotas else ranked[:limit]
+    ranked = _allowed_facet_ranking(ranked, conditioning, segment.allowed_facets)
+    selected = (
+        _apply_source_vocabulary_quotas(ranked, conditioning, limit=limit)
+        if configuration.quotas
+        else ranked[:limit]
+    )
     return (
         [conditioning.concept_ids[index] for index in selected],
         [conditioning.concept_ids[index] for index in ranked],
@@ -330,6 +346,87 @@ def merge_across_segments(per_segment: Sequence[Sequence[str]], *, limit: int) -
     return [concept_id for concept_id, _ in ordered[:limit]]
 
 
+def configuration_prompt_preflight(
+    configuration: Configuration,
+    *,
+    channels_by_segment: Mapping[str, SegmentChannels],
+    conditioning: Any,
+    concepts_by_id: Mapping[str, Mapping[str, Any]],
+    limit: int,
+) -> dict[str, Any]:
+    """Validate each experimental shortlist through the real tag prompt path."""
+    facts, _ = fit_configuration_prompts(
+        configuration,
+        channels_by_segment=channels_by_segment,
+        conditioning=conditioning,
+        concepts_by_id=concepts_by_id,
+        limit=limit,
+    )
+    return facts
+
+
+def fit_configuration_prompts(
+    configuration: Configuration,
+    *,
+    channels_by_segment: Mapping[str, SegmentChannels],
+    conditioning: Any,
+    concepts_by_id: Mapping[str, Mapping[str, Any]],
+    limit: int,
+) -> tuple[dict[str, Any], dict[str, list[str]]]:
+    """Fit every shortlist through the validated production prompt boundary."""
+    task = TagExtractionTask()
+    counter = TiktokenCounter()
+    totals: list[tuple[int, str]] = []
+    candidate_counts: list[tuple[int, int, str]] = []
+    fitted_by_segment: dict[str, list[str]] = {}
+    for segment_id, segment in channels_by_segment.items():
+        selected, _ = configuration_ranking(
+            configuration,
+            segment,
+            conditioning,
+            limit=limit,
+        )
+        ranked_count = len(selected)
+        while True:
+            unit_input = {
+                **segment.unit_input,
+                "available_concepts": [
+                    ontology_concept_payload(dict(concepts_by_id[concept_id])) for concept_id in selected
+                ],
+            }
+            payload = task.build_payload(unit_input)
+            total = (
+                counter.count(task.instructions + "\n" + canonical_json(payload))
+                + counter.count(canonical_json(task.build_schema(payload)))
+                + PROMPT_SAFETY_MARGIN_TOKENS
+            )
+            if total <= PROMPT_INPUT_TOKEN_BUDGET:
+                totals.append((total, segment_id))
+                candidate_counts.append((ranked_count, len(selected), segment_id))
+                fitted_by_segment[segment_id] = list(selected)
+                break
+            if not selected:
+                raise AblationError(
+                    f"{configuration.name} prompt {segment_id} needs {total} tokens "
+                    f"with no candidates, over the {PROMPT_INPUT_TOKEN_BUDGET}-token budget"
+                )
+            selected.pop()
+    return (
+        {
+            "payload_validation": "pass",
+            "prompt_input_token_budget": PROMPT_INPUT_TOKEN_BUDGET,
+            "prompt_input_token_max": max((total for total, _ in totals), default=0),
+            "prompt_budget_trimmed_segment_count": sum(ranked != fitted for ranked, fitted, _ in candidate_counts),
+            "prompt_candidate_count_min": min(
+                (fitted for _, fitted, _ in candidate_counts),
+                default=0,
+            ),
+            "passed": True,
+        },
+        fitted_by_segment,
+    )
+
+
 # --------------------------------------------------------------------------
 # measurement
 # --------------------------------------------------------------------------
@@ -346,27 +443,31 @@ def measure_configuration(
     items: Sequence[GoldItem],
     channels_by_segment: Mapping[str, SegmentChannels],
     conditioning: Any,
-    scheme_by_id: Mapping[str, str],
+    source_vocabulary_by_id: Mapping[str, str],
     limit: int,
+    fitted_by_segment: Mapping[str, Sequence[str]] | None = None,
 ) -> dict[str, Any]:
     """Score one configuration over every gold item."""
     started = time.monotonic()
     cache: dict[str, tuple[list[str], list[str]]] = {}
     per_item: list[dict[str, Any]] = []
-    scheme_mix: Counter[str] = Counter()
+    source_vocabulary_mix: Counter[str] = Counter()
     for item in items:
         per_segment: list[list[str]] = []
         full: list[list[str]] = []
         for segment_id in item.segment_ids:
             if segment_id not in cache:
-                cache[segment_id] = configuration_ranking(
+                selected, ranking = configuration_ranking(
                     configuration, channels_by_segment[segment_id], conditioning, limit=limit
                 )
+                if fitted_by_segment is not None:
+                    selected = list(fitted_by_segment[segment_id])
+                cache[segment_id] = (selected, ranking)
             selected, ranking = cache[segment_id]
             per_segment.append(selected)
             full.append(ranking)
         candidates = merge_across_segments(per_segment, limit=limit)
-        scheme_mix.update(scheme_by_id.get(concept_id, "") for concept_id in candidates)
+        source_vocabulary_mix.update(source_vocabulary_by_id.get(concept_id, "") for concept_id in candidates)
         fused_ranks = [
             rank for rank in (_first_rank(ranking, item.exact_alias_ids) for ranking in full) if rank is not None
         ]
@@ -390,7 +491,7 @@ def measure_configuration(
     adequate = [row for row in per_item if row["adequate_target"]]
     adequate_kept = [row for row in adequate if row["adequate_rank"] is not None]
     ranks = [int(row["exact_alias_rank"]) for row in surfaced]
-    total = sum(scheme_mix.values())
+    total = sum(source_vocabulary_mix.values())
     return {
         "configuration": configuration.name,
         "channels": list(configuration.channels) or ["v1"],
@@ -407,16 +508,18 @@ def measure_configuration(
         "surfaced_rank_mean": round(statistics.mean(ranks), 2) if ranks else None,
         "surfaced_rank_median": round(statistics.median(ranks), 2) if ranks else None,
         "candidate_slots": total,
-        "scheme_mix": dict(sorted(scheme_mix.items(), key=lambda entry: (-entry[1], entry[0]))),
+        "source_vocabulary_mix": dict(sorted(source_vocabulary_mix.items(), key=lambda entry: (-entry[1], entry[0]))),
         "seconds": round(time.monotonic() - started, 3),
         "items": per_item,
     }
 
 
-def _scheme_share(scheme_mix: Mapping[str, int], slots: int) -> str:
+def _source_vocabulary_share(source_vocabulary_mix: Mapping[str, int], slots: int) -> str:
     if not slots:
         return "—"
-    parts = [f"{scheme or '∅'} {count * 100 // slots}%" for scheme, count in list(scheme_mix.items())[:4]]
+    parts = [
+        f"{vocabulary or '∅'} {count * 100 // slots}%" for vocabulary, count in list(source_vocabulary_mix.items())[:4]
+    ]
     return ", ".join(parts)
 
 
@@ -424,7 +527,7 @@ def markdown_table(results: Sequence[Mapping[str, Any]]) -> str:
     """Render the ablation as one markdown table plus the per-target detail."""
     header = (
         "| Configuration | Channels | Quotas | Exact-alias surfaced | Adequate kept | "
-        "Mean rank | Median rank | Scheme mix (top-12 slots) |\n"
+        "Mean rank | Median rank | Source vocabulary mix (top-12 slots) |\n"
         "| --- | --- | :---: | ---: | ---: | ---: | ---: | --- |"
     )
     lines = [header]
@@ -441,7 +544,7 @@ def markdown_table(results: Sequence[Mapping[str, Any]]) -> str:
                 adequate=result["adequate_target_count"],
                 mean=result["surfaced_rank_mean"] if result["surfaced_rank_mean"] is not None else "—",
                 median=result["surfaced_rank_median"] if result["surfaced_rank_median"] is not None else "—",
-                mix=_scheme_share(result["scheme_mix"], int(result["candidate_slots"])),
+                mix=_source_vocabulary_share(result["source_vocabulary_mix"], int(result["candidate_slots"])),
             )
         )
     lines.append("")
@@ -527,6 +630,7 @@ def run_ablation(
     generate: bool = False,
     keywords_file: Path | None = None,
     fallback_mapper: bool = False,
+    require_adoption_verdict: bool = False,
 ) -> dict[str, Any]:
     """Load the frozen inputs, run every configuration, and write the record."""
     unknown = [name for name in configuration_names if name not in CONFIGURATIONS_BY_NAME]
@@ -541,7 +645,9 @@ def run_ablation(
         dataset_dir,
         selection_file,
         registry_file,
-        prompt_input_token_budget=UNENFORCED_PROMPT_TOKEN_BUDGET,
+        evaluation_manifest=DEFAULT_BOUNDARY_MANIFEST,
+        evaluation_dataset_id=DEVELOPMENT_DATASET_ID,
+        require_adoption_verdict=require_adoption_verdict,
     )
     registry_rows = read_parquet_rows(registry_file)
     timings["load_inputs"] = round(time.monotonic() - started, 3)
@@ -560,8 +666,8 @@ def run_ablation(
     conditioning = _condition_registry(registry_rows)
     timings["condition_registry"] = round(time.monotonic() - started, 3)
     index_by_id = {concept_id: index for index, concept_id in enumerate(conditioning.concept_ids)}
-    scheme_by_id = {
-        concept_id: conditioning.schemes[index] for index, concept_id in enumerate(conditioning.concept_ids)
+    source_vocabulary_by_id = {
+        concept_id: conditioning.source_vocabularies[index] for index, concept_id in enumerate(conditioning.concept_ids)
     }
 
     # Keywords come before the index: a provider failure should surface in
@@ -607,23 +713,42 @@ def run_ablation(
         for segment_id in segment_ids
     }
     timings["channel_rankings"] = round(time.monotonic() - started, 3)
+    concepts_by_id = {
+        str(concept.get("concept_id") or ""): concept for concept in registry_rows if concept.get("concept_id")
+    }
+    prompt_preflight: dict[str, dict[str, Any]] = {}
+    fitted_by_configuration: dict[str, dict[str, list[str]]] = {}
+    for configuration in configurations:
+        facts, fitted = fit_configuration_prompts(
+            configuration,
+            channels_by_segment=channels_by_segment,
+            conditioning=conditioning,
+            concepts_by_id=concepts_by_id,
+            limit=limit,
+        )
+        prompt_preflight[configuration.name] = facts
+        fitted_by_configuration[configuration.name] = fitted
 
     started = time.monotonic()
-    results = [
-        measure_configuration(
+    results = []
+    for configuration in configurations:
+        measured = measure_configuration(
             configuration,
             items=items,
             channels_by_segment=channels_by_segment,
             conditioning=conditioning,
-            scheme_by_id=scheme_by_id,
+            source_vocabulary_by_id=source_vocabulary_by_id,
             limit=limit,
+            fitted_by_segment=fitted_by_configuration[configuration.name],
         )
-        for configuration in configurations
-    ]
+        measured["prompt_preflight"] = prompt_preflight[configuration.name]
+        measured["evaluation_scope"] = "development_only"
+        measured["accuracy_verdict_eligible"] = False
+        results.append(measured)
     timings["measure"] = round(time.monotonic() - started, 3)
 
     return {
-        "schema_version": "candidate-selector-ablation-v1",
+        "schema_version": "candidate-selector-ablation-v2",
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "inputs": {
             "dataset_dir": str(dataset_dir),
@@ -646,6 +771,7 @@ def run_ablation(
             "keyword_channel_version": KEYWORD_CHANNEL_VERSION,
         },
         "item_count": len(items),
+        "evaluation_boundary": inputs.evaluation_facts,
         "segment_count": len(segment_ids),
         "exact_alias_targets": [
             {"item_id": item.item_id, "label": item.label, "concept_ids": list(item.exact_alias_ids)}
@@ -827,6 +953,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="Map through the char-3-gram space instead of the dense index (channel C unavailable).",
     )
+    parser.add_argument(
+        "--require-adoption-ready",
+        action="store_true",
+        help="Refuse this run as an adoption verdict unless the untouched-holdout gate passes.",
+    )
     args = parser.parse_args(argv)
 
     document = run_ablation(
@@ -841,6 +972,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         generate=args.generate_keywords,
         keywords_file=args.keywords,
         fallback_mapper=args.fallback_mapper,
+        require_adoption_verdict=args.require_adoption_ready,
     )
     table = markdown_table(document["results"])
     output_dir = Path(args.output_dir)

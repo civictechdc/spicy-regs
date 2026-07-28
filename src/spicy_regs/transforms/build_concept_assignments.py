@@ -31,6 +31,7 @@ from spicy_regs.ontology.concepts import (
     merge_seed_registry,
     supersede_assignment_with_validation,
 )
+from spicy_regs.ontology.concept_dimensions import concept_facet, concept_source_vocabulary
 from spicy_regs.ontology.invariants import (
     assert_append_only,
     assert_attestation_complete,
@@ -625,7 +626,8 @@ def build_concept_assignments(
 
     concepts.sort(
         key=lambda row: (
-            row.get("scheme") or "",
+            concept_facet(row),
+            concept_source_vocabulary(row),
             row.get("pref_label") or "",
             row["concept_id"],
         )

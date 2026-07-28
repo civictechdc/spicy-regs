@@ -61,9 +61,10 @@ recall@K measured separately as the hard ceiling on end-to-end quality.
 3. **RRF fusion (k=60) of anchored + char-ngram + dense BGE** channel,
    cross-encoder rerank on the pooled 50–200 only. Hybrid union
    evidence: recall@16 0.717 lexical / 0.779 dense → 0.930 hybrid.
-4. **Scheme-stratified quotas** for the top-12 — structurally prevents
-   a 440k-row thesaurus from crowding out a 900-row regulatory scheme;
-   no score calibration reliably fixes this.
+4. **Source-vocabulary-stratified quotas** for the top-12 — structurally
+   prevents a 440k-row thesaurus from crowding out a 900-row authority
+   vocabulary; semantic facets remain a separate profile-policy gate. No
+   score calibration reliably fixes vocabulary-size imbalance.
 5. Generate-then-map (LLM keywords → embed → map) as a later channel.
 - **Defer XMC** (Omikuji/PECOS): needs tens of thousands of labeled
   documents and never reaches unseen labels. Harvest accepted

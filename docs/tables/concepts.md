@@ -10,7 +10,9 @@ SKOS-style retrieval concept registry. The v1 `subject` facet is seeded from Fed
 | Column | Type | Description |
 | --- | --- | --- |
 | `concept_id` | `VARCHAR` | Stable opaque concept id. Primary key. |
-| `scheme` | `VARCHAR` | Facet: `subject` or `regulated_entity` in v1. |
+| `facet` | `VARCHAR` | Semantic tag-policy facet: `subject` or `regulated_entity`. |
+| `source_vocabulary` | `VARCHAR` | Authority vocabulary used for concept identity, provenance, quotas, and Rulespec `inScheme`. |
+| `scheme` | `VARCHAR` | Deprecated compatibility mirror of `facet`; new rows must keep the two values equal. |
 | `pref_label` | `VARCHAR` | Preferred human-readable label. |
 | `alt_labels_json` | `VARCHAR` | JSON array of synonyms and labels absorbed by merges. |
 | `definition` | `VARCHAR` | One-sentence scope note. |

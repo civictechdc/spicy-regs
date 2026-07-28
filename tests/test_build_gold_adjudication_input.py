@@ -46,6 +46,8 @@ def builder():
 def _registry_row(concept_id: str, pref_label: str, alt: list[str], definition: str) -> dict:
     return {
         "concept_id": concept_id,
+        "facet": "subject",
+        "source_vocabulary": "spicy-regs-local",
         "scheme": "subject",
         "pref_label": pref_label,
         "alt_labels_json": json.dumps(alt),
@@ -175,6 +177,8 @@ def test_registry_attestation_columns_do_not_leak_into_candidates(builder, answe
     candidate = document["items"][0]["candidates"][0]
     assert set(candidate) == {
         "concept_id",
+        "facet",
+        "source_vocabulary",
         "scheme",
         "pref_label",
         "alt_labels",

@@ -1,30 +1,32 @@
-"""Fuse several public controlled vocabularies into one multi-scheme registry.
+"""Fuse public controlled vocabularies without confusing source with facet.
 
-The registry this builds is consumed unchanged by
-``spicy_regs.ontology.concepts.select_candidate_concepts_for_text``, so it is
-written on the production ``CONCEPT_COLUMNS`` schema and nothing else. Source
-facts that do not fit that schema (retrieval time, licence, upstream record id,
-labels that would otherwise rewrite a frozen row) live in a sidecar table keyed
-by ``concept_id``.
+Every registry row carries a semantic ``facet`` used by tag policy and a
+``source_vocabulary`` used for identity, provenance, shortlist quotas, and
+Rulespec ``inScheme``. The legacy ``scheme`` column remains a compatibility
+mirror of ``facet``; it never carries an external vocabulary in newly written
+rows. Retrieval time, licence, and upstream record identity live in a sidecar.
 
 Two rules govern the fusion and both are load-bearing:
 
-* **Schemes stay distinct.** Terms are never compared, merged, or deduplicated
-  across schemes. "Trademarks" appearing in three sources is three concepts in
-  three schemes. Cross-scheme unification is a later, labelled mapping step and
-  is deliberately not performed here.
-* **The prior registry is frozen.** Every row of the existing gold-free
-  registry is copied through byte-for-byte — same ``concept_id``, same
-  ``pref_label``, same attestation columns — so measurements taken against it
-  stay comparable. A source term whose normalized label already exists *within
-  the same scheme* is enrichment: its extra labels are recorded in the sidecar
-  and no registry row is rewritten or added.
+* **Authority identities stay distinct.** "Trademarks" appearing in three
+  vocabularies remains three concepts. Exact same-label copies receive an
+  explicit unreviewed mapping artifact for later review. The selector does not
+  collapse them: every authority id remains separately selectable, and no
+  ``skos:exactMatch`` is asserted.
+* **The prior registry's identity and content are frozen.** Every existing
+  ``concept_id``, label, definition, hierarchy link, and attestation survives.
+  The v2 schema adds explicit dimensions and migrates an external-valued
+  compatibility ``scheme`` to its semantic facet. A source term whose
+  normalized label already exists within the same source vocabulary is
+  enrichment: its extra labels are recorded in the sidecar and no second
+  authority concept is minted.
 
 Concept ids are minted with the repository idiom
-``stable_id("concept", scheme, normalize_label(pref_label))``, which is exactly
-how the prior Federal Register rows were minted. Re-running the Federal Register
-thesaurus through that idiom therefore *lands on* the existing ids rather than
-colliding with them, which is what makes the enrichment path safe.
+``stable_id("concept", source_vocabulary, normalize_label(pref_label))``. The
+existing Federal Register ids predate that rule and remain stable through the
+frozen-row compatibility path. Re-running the Federal Register thesaurus finds
+those rows by inferred source vocabulary plus normalized label, so enrichment
+retains their ids rather than trying to mint replacements.
 
 Every parser takes already-decoded text or an iterable of lines, so the test
 suite exercises each one on tiny synthetic fixtures with no network and no
@@ -59,21 +61,34 @@ from spicy_regs.ontology.common import (  # noqa: E402
     stable_id,
     write_parquet_rows,
 )
+from spicy_regs.ontology.concept_dimensions import (  # noqa: E402
+    FEDERAL_REGISTER_SOURCE_VOCABULARY,
+    concept_facet,
+    concept_source_vocabulary,
+    with_concept_dimensions,
+)
 from spicy_regs.ontology.concepts import CONCEPT_COLUMNS, normalize_label  # noqa: E402
 
-SCHEMA_VERSION = "fused-concept-registry-v1"
+SCHEMA_VERSION = "fused-concept-registry-v2"
 
-# The scheme the prior Federal Register topics were seeded under. Reusing it is
-# what turns an exact label match into enrichment instead of a duplicate.
-FR_SCHEME = "subject"
-CRS_SUBJECT_SCHEME = "crs-subjects"
-CRS_POLICY_SCHEME = "crs-policy-areas"
-TSCA_SCHEME = "epa-tsca"
-FAST_SCHEME = "fast-topical"
+# Source vocabularies. ``FR_SCHEME`` remains as a test/import compatibility
+# alias; new code uses the explicit name.
+FR_SOURCE_VOCABULARY = FEDERAL_REGISTER_SOURCE_VOCABULARY
+FR_SCHEME = FR_SOURCE_VOCABULARY
+CRS_SUBJECT_SOURCE_VOCABULARY = "crs-subjects"
+CRS_POLICY_SOURCE_VOCABULARY = "crs-policy-areas"
+TSCA_SOURCE_VOCABULARY = "epa-tsca"
+FAST_SOURCE_VOCABULARY = "fast-topical"
+# Import compatibility for tests and callers written against v1.
+CRS_SUBJECT_SCHEME = CRS_SUBJECT_SOURCE_VOCABULARY
+CRS_POLICY_SCHEME = CRS_POLICY_SOURCE_VOCABULARY
+TSCA_SCHEME = TSCA_SOURCE_VOCABULARY
+FAST_SCHEME = FAST_SOURCE_VOCABULARY
 
 SIDECAR_COLUMNS: tuple[str, ...] = (
     "concept_id",
-    "scheme",
+    "facet",
+    "source_vocabulary",
     "source",
     "source_url",
     "source_id",
@@ -86,6 +101,18 @@ SIDECAR_COLUMNS: tuple[str, ...] = (
     "note",
 )
 
+MAPPING_COLUMNS: tuple[str, ...] = (
+    "mapping_id",
+    "subject_concept_id",
+    "object_concept_id",
+    "facet",
+    "subject_source_vocabulary",
+    "object_source_vocabulary",
+    "relation",
+    "basis",
+    "status",
+)
+
 # ``relation`` values on a sidecar row.
 RELATION_MINTED = "minted"
 RELATION_ENRICHMENT = "enriches-frozen-row"
@@ -96,7 +123,8 @@ class SourceSpec:
     """Where one vocabulary came from and under what terms it may be used."""
 
     key: str
-    scheme: str
+    facet: str
+    source_vocabulary: str
     title: str
     url: str
     license: str
@@ -104,11 +132,17 @@ class SourceSpec:
     actor_id: str
     notice: str
 
+    @property
+    def scheme(self) -> str:
+        """Compatibility alias for callers written before the seam fix."""
+        return self.source_vocabulary
+
 
 SOURCES: dict[str, SourceSpec] = {
     "fr-thesaurus": SourceSpec(
         key="fr-thesaurus",
-        scheme=FR_SCHEME,
+        facet="subject",
+        source_vocabulary=FR_SOURCE_VOCABULARY,
         title="Federal Register Thesaurus of Indexing Terms",
         url="https://www.archives.gov/files/federal-register/cfr/thesaurus-alpha.txt",
         license="public domain (US Government work, 17 U.S.C. 105)",
@@ -118,7 +152,8 @@ SOURCES: dict[str, SourceSpec] = {
     ),
     "crs-subjects": SourceSpec(
         key="crs-subjects",
-        scheme=CRS_SUBJECT_SCHEME,
+        facet="subject",
+        source_vocabulary=CRS_SUBJECT_SCHEME,
         title="CRS Legislative Subject Terms",
         url="https://www.govinfo.gov/bulkdata/BILLSTATUS",
         license="public domain (US Government work, 17 U.S.C. 105)",
@@ -128,7 +163,8 @@ SOURCES: dict[str, SourceSpec] = {
     ),
     "crs-policy-areas": SourceSpec(
         key="crs-policy-areas",
-        scheme=CRS_POLICY_SCHEME,
+        facet="subject",
+        source_vocabulary=CRS_POLICY_SCHEME,
         title="CRS Policy Area Terms",
         url="https://www.govinfo.gov/bulkdata/BILLSTATUS",
         license="public domain (US Government work, 17 U.S.C. 105)",
@@ -138,7 +174,8 @@ SOURCES: dict[str, SourceSpec] = {
     ),
     "epa-tsca": SourceSpec(
         key="epa-tsca",
-        scheme=TSCA_SCHEME,
+        facet="regulated_entity",
+        source_vocabulary=TSCA_SCHEME,
         title="EPA non-confidential TSCA Chemical Substance Inventory",
         url="https://www.epa.gov/tsca-inventory/how-access-tsca-inventory",
         license="public domain (US Government work, 17 U.S.C. 105)",
@@ -148,7 +185,8 @@ SOURCES: dict[str, SourceSpec] = {
     ),
     "fast-topical": SourceSpec(
         key="fast-topical",
-        scheme=FAST_SCHEME,
+        facet="subject",
+        source_vocabulary=FAST_SCHEME,
         title="FAST (Faceted Application of Subject Terminology), Topical facet",
         url="https://www.oclc.org/research/areas/data-science/fast/download.html",
         license="ODC-By 1.0 (Open Data Commons Attribution License)",
@@ -207,10 +245,10 @@ def retain_alt_label(alt: str) -> bool:
 
 
 def _merge_terms(terms: Iterable[SourceTerm]) -> list[SourceTerm]:
-    """Collapse repeats of one normalized label **within a single scheme**.
+    """Collapse repeats of one label within a single source vocabulary.
 
-    This is intra-scheme only and is never reached with terms from two sources;
-    each source is folded on its own before any of them meet a registry row.
+    This function never receives terms from two authorities; each vocabulary
+    is folded on its own before any terms meet a registry row.
     """
     merged: dict[str, SourceTerm] = {}
     for term in terms:
@@ -235,7 +273,9 @@ def _merge_terms(terms: Iterable[SourceTerm]) -> list[SourceTerm]:
         existing.source_status = existing.source_status or term.source_status
     for term in merged.values():
         own = term.normalized()
-        candidates = {alt for alt in (_clean(value) for value in term.alt_labels) if alt and normalize_label(alt) != own}
+        candidates = {
+            alt for alt in (_clean(value) for value in term.alt_labels) if alt and normalize_label(alt) != own
+        }
         term.alt_labels = sorted((alt for alt in candidates if retain_alt_label(alt)), key=normalize_label)
         term.dropped_alt_labels = sorted(alt for alt in candidates if not retain_alt_label(alt))
     return sorted(merged.values(), key=lambda term: (term.normalized(), term.pref_label))
@@ -364,9 +404,7 @@ def parse_billstatus_terms(xml_text: str) -> tuple[list[str], list[str]]:
     except ElementTree.ParseError:
         return ([], [])
     policy = [
-        _clean(element.findtext("name"))
-        for element in root.iter("policyArea")
-        if _clean(element.findtext("name"))
+        _clean(element.findtext("name")) for element in root.iter("policyArea") if _clean(element.findtext("name"))
     ]
     subjects = [
         _clean(item.findtext("name"))
@@ -533,9 +571,9 @@ def read_fast_archive(path: Path) -> list[SourceTerm]:
 # --------------------------------------------------------------------------
 
 
-def mint_concept_id(scheme: str, pref_label: str) -> str:
-    """Mint the id the repository would have minted for this label and scheme."""
-    return stable_id("concept", scheme, normalize_label(pref_label))
+def mint_concept_id(source_vocabulary: str, pref_label: str) -> str:
+    """Mint an authority-scoped concept id."""
+    return stable_id("concept", source_vocabulary, normalize_label(pref_label))
 
 
 def _definition(spec: SourceSpec, term: SourceTerm) -> str:
@@ -552,7 +590,9 @@ def _external_ids(spec: SourceSpec, term: SourceTerm) -> str:
     if spec.key == "epa-tsca" and term.source_id:
         payload.append({"scheme": "cas", "value": term.source_id})
     if spec.key == "fast-topical" and term.source_id:
-        payload.append({"scheme": "fast", "value": term.source_id, "iri": f"http://id.worldcat.org/fast/{term.source_id}"})
+        payload.append(
+            {"scheme": "fast", "value": term.source_id, "iri": f"http://id.worldcat.org/fast/{term.source_id}"}
+        )
     return canonical_json(sorted(payload, key=canonical_json))
 
 
@@ -563,24 +603,28 @@ def fuse(
     context: RunContext,
     retrieved_at: Mapping[str, str],
 ) -> tuple[list[dict], list[dict], dict[str, dict[str, int]]]:
-    """Return ``(registry rows, sidecar rows, per-scheme counts)``.
+    """Return ``(registry rows, sidecar rows, per-vocabulary counts)``.
 
-    Frozen rows come first and untouched. A source term is compared only with
-    rows already carrying **its own scheme**; a label shared with another
-    scheme mints an independent concept, by design.
+    Frozen identities come first. A source term is compared only with rows
+    carrying its own source vocabulary; a label shared with another authority
+    mints an independent concept.
     """
-    registry: list[dict] = [{column: row.get(column) for column in CONCEPT_COLUMNS} for row in existing]
+    registry: list[dict] = []
+    for row in existing:
+        explicit = with_concept_dimensions(row)
+        explicit["scheme"] = explicit["facet"]
+        registry.append({column: explicit.get(column) for column in CONCEPT_COLUMNS})
     sidecar: list[dict] = []
     counts: dict[str, dict[str, int]] = {}
 
     frozen_ids = {str(row["concept_id"]) for row in registry}
-    by_scheme: dict[str, dict[str, str]] = {}
+    by_vocabulary: dict[str, dict[str, str]] = {}
     for row in registry:
-        scheme = str(row.get("scheme") or "")
-        by_scheme.setdefault(scheme, {})[normalize_label(row.get("pref_label"))] = str(row["concept_id"])
+        vocabulary = concept_source_vocabulary(row)
+        by_vocabulary.setdefault(vocabulary, {})[normalize_label(row.get("pref_label"))] = str(row["concept_id"])
 
     for spec, terms in contributions:
-        seen = by_scheme.setdefault(spec.scheme, {})
+        seen = by_vocabulary.setdefault(spec.source_vocabulary, {})
         minted = 0
         enriched = 0
         dropped_aliases = 0
@@ -591,7 +635,8 @@ def fuse(
                 continue
             existing_id = seen.get(key)
             base = {
-                "scheme": spec.scheme,
+                "facet": spec.facet,
+                "source_vocabulary": spec.source_vocabulary,
                 "source": spec.key,
                 "source_url": spec.url,
                 "source_id": term.source_id,
@@ -601,7 +646,8 @@ def fuse(
                 "license_url": spec.license_url,
             }
             if existing_id is not None:
-                # Same scheme, same normalized label: enrichment. The frozen row
+                # Same authority vocabulary and normalized label: enrichment.
+                # The frozen row
                 # keeps its id, label, definition, and attestation; anything new
                 # this source knows is recorded beside it.
                 extra = [alt for alt in term.alt_labels if normalize_label(alt) != key]
@@ -612,23 +658,23 @@ def fuse(
                         "relation": RELATION_ENRICHMENT,
                         "enrichment_alt_labels_json": canonical_json(extra),
                         "note": (
-                            "exact normalized-label match within the same scheme; "
-                            "the registry row is left byte-identical"
+                            "exact normalized-label match within the same source vocabulary; "
+                            "the authority concept id and frozen fields are retained"
                         ),
                     }
                 )
                 enriched += 1
                 continue
-            concept_id = mint_concept_id(spec.scheme, term.pref_label)
+            concept_id = mint_concept_id(spec.source_vocabulary, term.pref_label)
             if concept_id in frozen_ids:
-                raise FusionError(
-                    f"minted id {concept_id} for {term.pref_label!r} collides with a frozen row"
-                )
+                raise FusionError(f"minted id {concept_id} for {term.pref_label!r} collides with a frozen row")
             seen[key] = concept_id
             registry.append(
                 {
                     "concept_id": concept_id,
-                    "scheme": spec.scheme,
+                    "facet": spec.facet,
+                    "source_vocabulary": spec.source_vocabulary,
+                    "scheme": spec.facet,
                     "pref_label": term.pref_label,
                     "alt_labels_json": canonical_json(term.alt_labels),
                     "definition": _definition(spec, term),
@@ -659,16 +705,87 @@ def fuse(
 
 
 def assert_frozen_rows_survive(prior: Sequence[Mapping[str, Any]], fused: Sequence[Mapping[str, Any]]) -> None:
-    """Fail loudly unless every prior row is present and byte-identical."""
+    """Fail unless prior identities and frozen content survive the v2 migration."""
     fused_by_id = {str(row.get("concept_id")): row for row in fused}
     for row in prior:
         concept_id = str(row.get("concept_id"))
         current = fused_by_id.get(concept_id)
         if current is None:
             raise FusionError(f"frozen concept {concept_id} disappeared from the fused registry")
-        changed = [column for column in CONCEPT_COLUMNS if row.get(column) != current.get(column)]
+        changed = [
+            column
+            for column in row
+            if column not in {"facet", "source_vocabulary"}
+            and not (
+                column == "scheme"
+                and str(row.get("scheme") or "") not in {"subject", "regulated_entity"}
+                and current.get("scheme") == concept_facet(row)
+            )
+            and row.get(column) != current.get(column)
+        ]
         if changed:
             raise FusionError(f"frozen concept {concept_id} was rewritten in columns {changed}")
+
+
+def _identity_anchors(row: Mapping[str, Any]) -> frozenset[tuple[str, str]]:
+    try:
+        values = json.loads(str(row.get("external_ids_json") or "[]"))
+    except json.JSONDecodeError:
+        return frozenset()
+    if not isinstance(values, list):
+        return frozenset()
+    return frozenset(
+        (
+            str(item.get("scheme") or "").strip().casefold(),
+            str(item.get("value") or "").strip().casefold(),
+        )
+        for item in values
+        if isinstance(item, dict)
+        and str(item.get("scheme") or "").strip().casefold() in {"cas", "naics"}
+        and str(item.get("value") or "").strip()
+    )
+
+
+def presentation_mappings(registry: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Record same-label display groups without asserting semantic equivalence."""
+    grouped: dict[tuple[object, ...], list[Mapping[str, Any]]] = {}
+    for row in registry:
+        facet = concept_facet(row)
+        label = normalize_label(row.get("pref_label"))
+        if not label:
+            continue
+        anchors = _identity_anchors(row)
+        key: tuple[object, ...] = (facet, label, anchors) if facet == "regulated_entity" and anchors else (facet, label)
+        grouped.setdefault(key, []).append(row)
+
+    mappings: list[dict[str, Any]] = []
+    for rows in grouped.values():
+        ordered = sorted(rows, key=lambda row: str(row.get("concept_id") or ""))
+        if len({concept_source_vocabulary(row) for row in ordered}) < 2:
+            continue
+        representative = ordered[0]
+        for other in ordered[1:]:
+            subject_id = str(representative["concept_id"])
+            object_id = str(other["concept_id"])
+            mappings.append(
+                {
+                    "mapping_id": stable_id(
+                        "concept_presentation_mapping",
+                        subject_id,
+                        object_id,
+                        length=24,
+                    ),
+                    "subject_concept_id": subject_id,
+                    "object_concept_id": object_id,
+                    "facet": concept_facet(representative),
+                    "subject_source_vocabulary": concept_source_vocabulary(representative),
+                    "object_source_vocabulary": concept_source_vocabulary(other),
+                    "relation": "same-normalized-label-for-presentation",
+                    "basis": "exact-normalized-preferred-label",
+                    "status": "unreviewed-presentation-only",
+                }
+            )
+    return mappings
 
 
 def sha256_path(path: Path) -> str:
@@ -766,13 +883,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         retrieved_at=retrieved_at,
     )
     assert_frozen_rows_survive(existing, registry)
+    mappings = presentation_mappings(registry)
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     registry_path = output_dir / "registry.parquet"
     sidecar_path = output_dir / "provenance.parquet"
+    mappings_path = output_dir / "presentation-mappings.parquet"
     write_parquet_rows(registry_path, columns=CONCEPT_COLUMNS, rows=registry)
     write_parquet_rows(sidecar_path, columns=SIDECAR_COLUMNS, rows=sidecar)
+    write_parquet_rows(mappings_path, columns=MAPPING_COLUMNS, rows=mappings)
 
     raw_files = {
         name: {"path": str(Path(value)), "sha256": sha256_path(Path(value)), "bytes": Path(value).stat().st_size}
@@ -792,10 +912,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "bytes": path.stat().st_size,
             }
 
-    per_scheme: dict[str, int] = {}
+    per_facet: dict[str, int] = {}
+    per_vocabulary: dict[str, int] = {}
     for row in registry:
-        scheme = str(row.get("scheme") or "")
-        per_scheme[scheme] = per_scheme.get(scheme, 0) + 1
+        facet = concept_facet(row)
+        vocabulary = concept_source_vocabulary(row)
+        per_facet[facet] = per_facet.get(facet, 0) + 1
+        per_vocabulary[vocabulary] = per_vocabulary.get(vocabulary, 0) + 1
 
     manifest = {
         "schema_version": SCHEMA_VERSION,
@@ -806,19 +929,32 @@ def main(argv: Sequence[str] | None = None) -> int:
         "registry_sha256": sha256_path(registry_path),
         "provenance_path": str(sidecar_path),
         "provenance_sha256": sha256_path(sidecar_path),
+        "presentation_mappings_path": str(mappings_path),
+        "presentation_mappings_sha256": sha256_path(mappings_path),
+        "presentation_mapping_count": len(mappings),
+        "presentation_mapping_semantics": (
+            "same-normalized-label-for-presentation is an unreviewed display grouping only; "
+            "it is not semantic equivalence, skos:exactMatch, merge authority, or identity."
+        ),
         "existing_registry": {
             "path": str(existing_path),
             "sha256": sha256_path(existing_path),
             "rows": len(existing),
-            "frozen_rows_byte_stable": True,
+            "frozen_identity_and_content_stable": True,
+            "schema_migration": (
+                "fused-registry-v1 external-valued scheme is moved to source_vocabulary; "
+                "facet is canonical and compatibility scheme mirrors facet"
+            ),
         },
         "total_rows": len(registry),
-        "rows_per_scheme": dict(sorted(per_scheme.items())),
+        "rows_per_facet": dict(sorted(per_facet.items())),
+        "rows_per_source_vocabulary": dict(sorted(per_vocabulary.items())),
         "source_counts": counts,
         "skipped_sources": skipped,
         "sources": {
             spec.key: {
-                "scheme": spec.scheme,
+                "facet": spec.facet,
+                "source_vocabulary": spec.source_vocabulary,
                 "title": spec.title,
                 "url": spec.url,
                 "license": spec.license,
@@ -829,10 +965,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         },
         "raw_files": raw_files,
         "notice": [SOURCES[spec.key].notice for spec, _ in contributions],
-        "scheme_policy": (
-            "Schemes are distinct. No term was compared, merged, or deduplicated across schemes; "
-            "one label appearing in several sources is several concepts. Cross-scheme unification "
-            "is a later labelled-mapping step and was not performed."
+        "vocabulary_policy": (
+            "Authority vocabularies stay distinct. No concept identity was merged across sources; "
+            "one label appearing in several sources remains several concepts. Same-label mappings "
+            "are presentation-only and are not semantic equivalence."
         ),
     }
     manifest_path = output_dir / "manifest.json"
@@ -840,8 +976,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     print(f"fused registry: {registry_path}")
     print(f"total rows: {len(registry):,}")
-    for scheme, count in sorted(per_scheme.items()):
-        print(f"  {scheme:<20} {count:>9,}")
+    for vocabulary, count in sorted(per_vocabulary.items()):
+        print(f"  {vocabulary:<30} {count:>9,}")
     print("source contributions:")
     for key, values in sorted(counts.items()):
         print(
@@ -851,6 +987,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     for line in skipped:
         print(f"skipped: {line}")
     print(f"manifest: {manifest_path}")
+    print(f"presentation mappings: {mappings_path}")
     return 0
 
 

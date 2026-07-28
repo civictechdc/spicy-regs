@@ -27,6 +27,7 @@ from spicy_regs.ontology.concepts import (
     rescore_candidates,
     seed_concept,
 )
+from spicy_regs.ontology.concept_dimensions import concept_facet, concept_source_vocabulary
 from spicy_regs.ontology.invariants import assert_concept_graphs
 from spicy_regs.ontology.llm import (
     OntologyModel,
@@ -157,9 +158,7 @@ def build_concepts(
                         {
                             "subject_type": subject.subject_type,
                             "subject_id": subject.subject_id,
-                            "artifact_digest": (
-                                subject.version_digest
-                            ),
+                            "artifact_digest": (subject.version_digest),
                             "segment_id": subject.segment_id,
                             "subject_profile": subject.profile_id,
                             "source_table": subject.source_table,
@@ -172,7 +171,14 @@ def build_concepts(
     concepts, merge_events, review = merge_pass(concepts, current_assignments, context=context)
     concepts, rescore_events = rescore_candidates(concepts, current_assignments, context=context)
     assert_concept_graphs(concepts)
-    concepts.sort(key=lambda row: (row.get("scheme") or "", row.get("pref_label") or "", row["concept_id"]))
+    concepts.sort(
+        key=lambda row: (
+            concept_facet(row),
+            concept_source_vocabulary(row),
+            row.get("pref_label") or "",
+            row["concept_id"],
+        )
+    )
 
     out_file = write_parquet_rows(output_dir / OUTPUT, columns=CONCEPT_COLUMNS, rows=concepts)
     if merge_events or rescore_events:

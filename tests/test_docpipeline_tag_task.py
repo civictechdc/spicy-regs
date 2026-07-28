@@ -63,10 +63,12 @@ def _concept(
     concept_id: str = "concept:water",
     *,
     scheme: str = "subject",
+    facet: str | None = None,
+    source_vocabulary: str | None = None,
     label: str = "water policy",
     alt_labels: tuple[str, ...] = (),
 ) -> dict[str, Any]:
-    return {
+    row = {
         "concept_id": concept_id,
         "scheme": scheme,
         "pref_label": label,
@@ -74,6 +76,11 @@ def _concept(
         "definition": f"Rules concerning {label}.",
         "status": "active",
     }
+    if facet is not None:
+        row["facet"] = facet
+    if source_vocabulary is not None:
+        row["source_vocabulary"] = source_vocabulary
+    return row
 
 
 def _unit(text: str, *, heading: str = "Water policy") -> tuple[Any, Any, Any]:
@@ -158,6 +165,58 @@ def test_tag_task_uses_the_canonical_prompt_schema_and_a_gold_free_payload() -> 
     assert not (_nested_keys(payload) & TASK.forbidden_payload_keys)
     assert "gold" in canonical_json(payload), "ordinary quoted source text is not mistaken for an answer key"
     assert TASK.review_gate([], {}, protocol_sha256="")["eligible"] is False
+
+
+def test_tag_payload_keeps_facet_separate_from_source_vocabulary() -> None:
+    artifact, segment, _ = _unit("Water policy governs discharge permits.")
+    unit = tag_unit(
+        artifact,
+        segment,
+        [
+            _concept(
+                scheme="subject",
+                facet="subject",
+                source_vocabulary="fast-topical",
+            )
+        ],
+    )
+    offered = unit.input["available_concepts"][0]
+
+    assert offered["facet"] == "subject"
+    assert offered["source_vocabulary"] == "fast-topical"
+    assert "scheme" not in offered
+
+    payload = TASK.build_payload(unit.input)
+    field_key, text = _field(payload)
+    response = {"tags": [_tag(field_key, "Water policy", text.index("Water policy"))]}
+    candidate = TASK.build_candidates(response, payload)["candidates"][0]
+    assert candidate["facet"] == "subject"
+    assert candidate["source_vocabulary"] == "fast-topical"
+    assert candidate["scheme"] == candidate["facet"]
+
+
+def test_v1_external_scheme_is_a_read_only_migration_shim() -> None:
+    artifact, segment, _ = _unit("Water policy governs discharge permits.")
+    unit = tag_unit(
+        artifact,
+        segment,
+        [_concept(scheme="fast-topical")],
+    )
+
+    offered = unit.input["available_concepts"][0]
+    assert offered["facet"] == "subject"
+    assert offered["source_vocabulary"] == "fast-topical"
+
+
+def test_conflicting_facet_and_compatibility_scheme_are_rejected() -> None:
+    artifact, segment, _ = _unit("Water policy governs discharge permits.")
+
+    with pytest.raises(ValueError, match="disagrees on facet"):
+        tag_unit(
+            artifact,
+            segment,
+            [_concept(scheme="regulated_entity", facet="subject")],
+        )
 
 
 @pytest.mark.parametrize(
@@ -321,9 +380,7 @@ def test_null_concept_id_rejects_an_ambiguous_offered_alias() -> None:
     normalized = TASK.build_candidates(response, payload)
 
     assert normalized["candidates"] == []
-    assert [row["reason"] for row in normalized["rejections"]] == [
-        "ambiguous_concept_alias"
-    ]
+    assert [row["reason"] for row in normalized["rejections"]] == ["ambiguous_concept_alias"]
 
 
 def test_existing_concept_rejects_a_response_scheme_mismatch() -> None:
@@ -345,9 +402,7 @@ def test_existing_concept_rejects_a_response_scheme_mismatch() -> None:
     normalized = TASK.build_candidates(response, payload)
 
     assert normalized["candidates"] == []
-    assert [row["reason"] for row in normalized["rejections"]] == [
-        "concept_scheme_mismatch"
-    ]
+    assert [row["reason"] for row in normalized["rejections"]] == ["concept_scheme_mismatch"]
 
 
 def test_tag_rows_translate_local_offsets_and_retain_source_slice_grades() -> None:
@@ -363,9 +418,10 @@ def test_tag_rows_translate_local_offsets_and_retain_source_slice_grades() -> No
     binding = payload["processing_segment"]["source_spans"][field_key]
 
     assert candidate["source_start_char"] == binding["start_char"] + local_start
-    assert artifact.raw_fields[candidate["source_field"]][
-        candidate["source_start_char"] : candidate["source_end_char"]
-    ] == "water policy"
+    assert (
+        artifact.raw_fields[candidate["source_field"]][candidate["source_start_char"] : candidate["source_end_char"]]
+        == "water policy"
+    )
     assert candidate["source_start_char"] != local_start
     assert candidate["evidence_grade"] == binding["evidence_grade"]
     assert candidate["content_layer"] == binding["content_layer"]
@@ -381,9 +437,7 @@ def test_durable_heading_slice_is_citable_for_a_topical_tag() -> None:
     payload = TASK.build_payload(unit.input)
     fields = payload["untrusted_evidence_fields"]["fields"]
     field_key = next(
-        key
-        for key, binding in payload["processing_segment"]["source_spans"].items()
-        if binding["context_only"] is True
+        key for key, binding in payload["processing_segment"]["source_spans"].items() if binding["context_only"] is True
     )
     evidence = "Hazard communication"
     response = {
@@ -399,9 +453,10 @@ def test_durable_heading_slice_is_citable_for_a_topical_tag() -> None:
     candidate = TASK.build_candidates(response, payload)["candidates"][0]
 
     assert candidate["context_only"] is True
-    assert artifact.raw_fields[candidate["source_field"]][
-        candidate["source_start_char"] : candidate["source_end_char"]
-    ] == evidence
+    assert (
+        artifact.raw_fields[candidate["source_field"]][candidate["source_start_char"] : candidate["source_end_char"]]
+        == evidence
+    )
     assert any(source_slice.region_kind == "heading" for source_slice in segment.slices)
 
 
@@ -446,27 +501,21 @@ def test_scoring_reports_exact_overall_profile_and_error_metrics() -> None:
                 "subject_type": "document",
                 "subject_id": "a",
                 "artifact_digest": "a1",
-                "expected_tags": [
-                    {"gold_id": "g1", "scheme": "subject", "label": "one", "concept_id": "c1"}
-                ],
+                "expected_tags": [{"gold_id": "g1", "scheme": "subject", "label": "one", "concept_id": "c1"}],
             },
             {
                 "profile_id": "p1",
                 "subject_type": "document",
                 "subject_id": "b",
                 "artifact_digest": "b1",
-                "expected_tags": [
-                    {"gold_id": "g2", "scheme": "subject", "label": "two", "concept_id": "c2"}
-                ],
+                "expected_tags": [{"gold_id": "g2", "scheme": "subject", "label": "two", "concept_id": "c2"}],
             },
             {
                 "profile_id": "p2",
                 "subject_type": "document",
                 "subject_id": "c",
                 "artifact_digest": "c1",
-                "expected_tags": [
-                    {"gold_id": "g3", "scheme": "subject", "label": "three", "concept_id": None}
-                ],
+                "expected_tags": [{"gold_id": "g3", "scheme": "subject", "label": "three", "concept_id": None}],
             },
         ],
         "segments": [
@@ -561,9 +610,7 @@ def test_scoring_partitions_predictions_by_assignment_role() -> None:
     assert [row["role"] for row in metrics["per_role"]] == list(ASSIGNMENT_ROLES)
     assert {row["scope"] for row in metrics["per_role"]} == {"role"}
     # Roles partition the scored prediction set exactly once.
-    assert sum(row["predicted_positive_count"] for row in metrics["per_role"]) == (
-        metrics["predicted_positive_count"]
-    )
+    assert sum(row["predicted_positive_count"] for row in metrics["per_role"]) == (metrics["predicted_positive_count"])
     assert (by_role["primary"]["true_positive_count"], by_role["primary"]["false_positive_count"]) == (2, 0)
     assert by_role["primary"]["micro_precision"] == 1.0
     assert by_role["mention"]["true_positive_count"] == 0

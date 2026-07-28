@@ -51,6 +51,7 @@ from spicy_regs.ontology.concepts import (
     select_candidate_concepts,
     supersede_assignment_with_validation,
 )
+from spicy_regs.ontology.concept_dimensions import concept_facet
 from spicy_regs.ontology.invariants import assert_concept_graphs
 from spicy_regs.ontology.llm import (
     EVIDENCE_ALIGNMENT_PROVIDED,
@@ -775,7 +776,7 @@ def _gold_registry(
         key=lambda row: str(row.get("concept_id") or ""),
     ):
         key = (
-            str(concept.get("scheme") or ""),
+            concept_facet(concept),
             normalize_label(concept.get("pref_label")),
         )
         by_alias.setdefault(key, str(concept["concept_id"]))
@@ -787,7 +788,7 @@ def _gold_registry(
             for alias in aliases:
                 by_alias.setdefault(
                     (
-                        str(concept.get("scheme") or ""),
+                        concept_facet(concept),
                         normalize_label(alias),
                     ),
                     str(concept["concept_id"]),

@@ -24,11 +24,12 @@ from spicy_regs.docpipeline.extraction import ExtractionUnit
 from spicy_regs.ontology.candidate_channels import build_dense_concept_index
 from spicy_regs.ontology.concepts import (
     ANCHOR_QUOTA_TOTAL,
-    ANCHOR_SCHEME_QUOTAS,
+    ANCHOR_SOURCE_VOCABULARY_QUOTAS,
     _condition_registry,
     clear_anchored_conditioning_cache,
     select_candidate_concepts_anchored_v2,
 )
+from spicy_regs.ontology.concept_dimensions import concept_facet
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HARNESS_PATH = REPO_ROOT / "tools" / "ablate_candidate_selectors.py"
@@ -67,10 +68,21 @@ def _clear_cache():
 # --------------------------------------------------------------------------
 
 
-def _concept(concept_id: str, scheme: str, pref: str, alt: list[str] | None = None) -> dict:
+def _concept(
+    concept_id: str,
+    source_vocabulary: str,
+    pref: str,
+    alt: list[str] | None = None,
+    *,
+    facet: str | None = None,
+) -> dict:
+    resolved_facet = facet or ("regulated_entity" if source_vocabulary == "epa-tsca" else "subject")
     return {
         "concept_id": concept_id,
-        "scheme": scheme,
+        "facet": resolved_facet,
+        "source_vocabulary": source_vocabulary,
+        # New rows keep the compatibility field equal to the semantic facet.
+        "scheme": resolved_facet,
         "pref_label": pref,
         "alt_labels_json": json.dumps(alt or []),
         "definition": f"Concept covering {pref}.",
@@ -89,11 +101,11 @@ def _concept(concept_id: str, scheme: str, pref: str, alt: list[str] | None = No
 def registry_rows() -> list[dict]:
     """A registry covering every quota scheme, so the quota rule engages."""
     rows = [
-        _concept("concept_mining", "subject", "Surface mining"),
-        _concept("concept_runoff", "subject", "Surface runoff"),
-        _concept("concept_reclaim", "subject", "Mine reclamation"),
-        _concept("concept_water", "subject", "Water quality"),
-        _concept("concept_fish", "subject", "Fishery management", ["Fisheries management"]),
+        _concept("concept_mining", "federal-register-thesaurus", "Surface mining"),
+        _concept("concept_runoff", "federal-register-thesaurus", "Surface runoff"),
+        _concept("concept_reclaim", "federal-register-thesaurus", "Mine reclamation"),
+        _concept("concept_water", "spicy-regs-local", "Water quality"),
+        _concept("concept_fish", "spicy-regs-local", "Fishery management", ["Fisheries management"]),
         _concept("concept_coal", "crs-subjects", "Coal mining"),
         _concept("concept_permits", "crs-subjects", "Mining permits"),
         _concept("concept_streams", "crs-subjects", "Stream protection"),
@@ -300,13 +312,18 @@ def test_gold_items_are_ordered_by_item_id(harness, answers, units_by_id, regist
 
 def test_v2_configuration_reproduces_the_public_v2_selector(harness, registry_rows, units_by_id):
     assert LIMIT >= ANCHOR_QUOTA_TOTAL
-    assert set(ANCHOR_SCHEME_QUOTAS) <= {str(row["scheme"]) for row in registry_rows}
+    assert set(ANCHOR_SOURCE_VOCABULARY_QUOTAS) <= {str(row["source_vocabulary"]) for row in registry_rows}
     conditioning, channels = _channels(harness, units_by_id=units_by_id, registry_rows=registry_rows, wanted=("A", "B"))
     for segment_id, unit in units_by_id.items():
         text = harness._segment_text(unit)
         expected = [
             str(concept["concept_id"])
-            for concept in select_candidate_concepts_anchored_v2(text, registry_rows, limit=LIMIT)
+            for concept in select_candidate_concepts_anchored_v2(
+                text,
+                registry_rows,
+                limit=LIMIT,
+                allowed_facets=unit.input["subject"]["allowed_schemes"],
+            )
         ]
         selected, _ = harness.configuration_ranking(
             harness.CONFIGURATIONS_BY_NAME["v2"], channels[segment_id], conditioning, limit=LIMIT
@@ -346,13 +363,13 @@ def test_v1_configuration_uses_the_production_selector(harness, registry_rows, u
     assert selected == expected
 
 
-def test_v1_only_ever_returns_the_gated_scheme(harness, registry_rows, units_by_id):
+def test_v1_only_ever_returns_the_gated_facet(harness, registry_rows, units_by_id):
     conditioning, channels = _channels(harness, units_by_id=units_by_id, registry_rows=registry_rows, wanted=("A", "B"))
     selected, _ = harness.configuration_ranking(
         harness.CONFIGURATIONS_BY_NAME["v1"], channels[SEGMENT_ONE], conditioning, limit=LIMIT
     )
-    schemes = {str(row["scheme"]) for row in registry_rows if str(row["concept_id"]) in set(selected)}
-    assert schemes == {"subject"}
+    facets = {concept_facet(row) for row in registry_rows if str(row["concept_id"]) in set(selected)}
+    assert facets == {"subject"}
 
 
 # --------------------------------------------------------------------------
@@ -465,15 +482,15 @@ def test_measurement_counts_targets_ranks_and_scheme_mix(harness, registry_rows,
         aliases=harness.alias_index(registry_rows),
         adequate=harness.adequate_concepts(resolved),
     )
-    scheme_by_id = {
-        concept_id: conditioning.schemes[index] for index, concept_id in enumerate(conditioning.concept_ids)
+    source_vocabulary_by_id = {
+        concept_id: conditioning.source_vocabularies[index] for index, concept_id in enumerate(conditioning.concept_ids)
     }
     result = harness.measure_configuration(
         harness.CONFIGURATIONS_BY_NAME["v2"],
         items=items,
         channels_by_segment=channels,
         conditioning=conditioning,
-        scheme_by_id=scheme_by_id,
+        source_vocabulary_by_id=source_vocabulary_by_id,
         limit=LIMIT,
     )
     assert result["item_count"] == 3
@@ -484,8 +501,8 @@ def test_measurement_counts_targets_ranks_and_scheme_mix(harness, registry_rows,
     assert result["adequate_target_count"] == 1
     assert result["adequate_kept"] == 1
     assert result["surfaced_rank_median"] is not None
-    assert sum(result["scheme_mix"].values()) == result["candidate_slots"]
-    assert set(result["scheme_mix"]) <= set(str(row["scheme"]) for row in registry_rows)
+    assert sum(result["source_vocabulary_mix"].values()) == result["candidate_slots"]
+    assert set(result["source_vocabulary_mix"]) <= {str(row["source_vocabulary"]) for row in registry_rows}
 
 
 def test_measurement_reports_a_target_that_never_surfaces(harness, registry_rows, units_by_id, answers, resolved):
@@ -503,7 +520,7 @@ def test_measurement_reports_a_target_that_never_surfaces(harness, registry_rows
         items=items,
         channels_by_segment=channels,
         conditioning=conditioning,
-        scheme_by_id={},
+        source_vocabulary_by_id={},
         limit=LIMIT,
     )
     assert result["exact_alias_surfaced"] == 0
@@ -524,7 +541,7 @@ def test_markdown_table_names_every_configuration(harness):
             "surfaced_rank_mean": 4.5,
             "surfaced_rank_median": 4,
             "candidate_slots": 420,
-            "scheme_mix": {"fast-topical": 210, "subject": 210},
+            "source_vocabulary_mix": {"fast-topical": 210, "spicy-regs-local": 210},
             "exact_alias_surfaced_labels": ["medicaid"],
             "exact_alias_missed_labels": ["free speech"],
         }

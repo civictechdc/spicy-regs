@@ -1,8 +1,9 @@
 # Rulespec MVP path
 
-- **Date:** 2026-07-27, revision 2 — incorporates three independent plan
+- **Date:** 2026-07-27, revision 3 — incorporates three independent plan
   reviews (feasibility-vs-code, measurement, scope; all
-  SOUND-WITH-CORRECTIONS, reports in session record). Decisions live in
+  SOUND-WITH-CORRECTIONS, reports in session record) plus the registry-dimension
+  and evaluation-boundary corrections. Decisions live in
   [`decisions.md`](decisions.md); execution history in
   [`evidence/testbed-execution-2026-07-26.md`](evidence/testbed-execution-2026-07-26.md).
 - **Goal:** the smallest end-to-end Rulespec implementation over real Spicy
@@ -39,6 +40,11 @@ that future is gated in `decisions.md` and none of it is in the MVP.
   iteration-2 "improvement" is statistically indistinguishable from noise
   (McNemar p≈0.06 under the most favorable pairing); no tuning claim stands
   until phase 1 re-baselines.
+- The original 35 are now manifest-pinned and permanently
+  **train/development-only**. They were inspected and used to tune the prompt,
+  registry, and selector, so neither freezing nor new adjudication can turn
+  them back into holdout. No untouched cross-family-adjudicated holdout
+  currently exists; adoption/accuracy readiness must fail.
 - L0 mapping audit: 0/1, sole cause the stale pin digest (verified: bumping
   it yields 1/1, 34 mappings). The deeper `rulespec_release.py` algorithm
   drift (40-file set vs rulespec's 50) matters only for MVP-public upload.
@@ -77,46 +83,55 @@ small edits (constants become parameters; `split` column on
 `gold_spans.parquet`; one more scope dimension in
 `TagExtractionTask.score`) — no new corpus machinery.
 
-1. ~~Adjudicate the 35 gold assignments~~ — done 2026-07-27, blind
+1. ~~Adjudicate the 35 gold assignments for development diagnosis~~ — done 2026-07-27, blind
    dual-judge (claude-fable-5) + third-judge tiebreak:
    `docs/evidence/gold-adjudication-2026-07-27/`. Grade agreement 34/35,
    adequacy agreement 35/35. Resolved: 1 exact, 4 close, 20 broader,
    1 narrower, 8 related, 1 wrong; **adequate target 5/35 (14.3%),
-   frozen**. The old exact-label baseline measured registry coverage, not
-   model quality.
+   frozen as development evidence**. All three judges came from one model
+   family, so this is not cross-family holdout adjudication. The old
+   exact-label baseline measured registry coverage, not model quality.
 2. ~~Add Rulespec assignment roles to `TAG_SCHEMA`~~ — done (`df2b177`;
    reader parameterization + split column `54d02de`). The single intended
    re-keying: TAG_SCHEMA and TAG_INSTRUCTIONS digests both moved.
-   **Rerun prerequisite:** the +69-token prompt growth pushes one frozen
-   segment to 8213 against the 8192 budget — bundle the budget/margin
-   decision into the rerun (work identity re-keys anyway); preflight
-   fails loudly, so run `--preflight-only` first.
-3. Expand gold to **~80 artifact assignments** (35 adjudicated + ~45 new) —
-   sized for the MVP, not for accuracy claims. Generation protocol: gold
-   drafted by a *different model family* than the tagger, blind to tagger
-   output; the held-out slice gets **dual-model adjudication** (two judge
-   families, agreement rate published; disagreements resolved by a third
-   family or excluded, never silently kept); every gold row is labeled
-   machine-adjudicated. Freeze `gold_sha256` before any tuning.
-4. Split by **gold concept** (not artifact — alias edits leak across
-   artifacts through the lexical selector). Pin `registry_sha256` per
-   iteration; add a regression test asserting no new alias normalizes to a
-   held-out gold label.
-5. Metric names carry their selector and depth
+   **Budget correction implemented:** preflight now builds the exact payload
+   and response schema and removes only the lowest-ranked candidate until the
+   prompt fits. The current 109-segment development preflight passes at a
+   maximum 8,147/8,192 tokens. Both the production selector and
+   `anchored-hybrid-v2` use this same path.
+3. Draw a **new** gold dataset for validation/holdout; do not append the 35
+   into a mixed file and call part of that file held out. Gold drafting stays
+   blind to tagger output. Before any labels are exposed, freeze membership,
+   source/selection digests, candidate-selector configuration, and the
+   intended role of each partition. Holdout adjudication requires at least
+   two independent model families (or humans), published agreement, and a
+   third family or exclusion for disagreements. No such holdout exists today;
+   provider credentials were unavailable, so no labels were fabricated.
+4. Separate by **gold concept and every registered alias**, not merely by
+   artifact. Pin `registry_sha256`; reject shared concept ids, normalized
+   aliases, or artifact digests across train and holdout. A registry alias
+   learned from training must never reveal a holdout target.
+5. ~~Install the executable boundary~~ — done locally:
+   `evaluation-boundary.json` pins the original files and forces all 35 to
+   train; `rulespec_testbed --require-adoption-ready` refuses a verdict without
+   an untouched holdout, complete cross-family adjudication, and frozen-before-
+   labels controls. Metric output carries its eligibility and blockers.
+6. Metric names carry their selector and depth
    (`recall@12/lexical-overlap-v1`); items without an adequate registered
    target score abstention and local-concept creation; concepts created
    during tuning never leave the abstention branch.
 
-Exit: metrics recomputed under adjudicated gold; the bar formula below is
-instantiated with real numbers **in `decisions.md`, in a commit preceding
-the re-baseline run**.
+Exit: development metrics are recomputed under adjudicated gold, and the
+tracked gate still refuses adoption. A final evaluation exit requires the
+new holdout and an eligible boundary record.
 
 ## Phase 2 — Accuracy loop (exploratory, honestly)
 
-This loop is **exploratory**: at ~80 gold, the held-out slice vetoes
-regressions; it cannot certify gains (MDE at this size is larger than any
-effect yet observed — the sizing math is in the measurement review).
-Accuracy *claims* require the expanded set in `decisions.md`.
+This loop is **exploratory** and uses train/development data only. The
+original 35 may guide changes because they are explicitly labeled as such.
+A repeatedly consulted “holdout” is a development set, not a holdout; do not
+use final holdout results to select the next prompt, threshold, registry, or
+selector. Accuracy *claims* require the powered set in `decisions.md`.
 
 One change per iteration — prompt, profile fields, segment context,
 local-concept edit, or (only when real-world meaning cannot be represented)
@@ -124,12 +139,12 @@ a Rulespec term. Registry edits bump the metric version. Rerun the frozen
 sample; stored provider output is reusable only for byte-identical requests.
 Report by relation grade, role, and profile.
 
-Exit bar, pre-committed as a formula: bar = max(trivial baselines computed
-on the same held-out set — always-abstain, lexical top-1 — , baseline +
-2×bootstrap SE), tested one-sided at α=0.05; held-out numbers are reported
-only when they beat the prior best by more than one MDE, otherwise "no
-change." Two "no change" iterations in a row → stop tuning and re-examine
-the instrument.
+Before exposing final holdout labels, freeze one candidate configuration and
+instantiate the exit bar with development-only estimates. Then evaluate the
+holdout once: bar = max(trivial baselines computed on that same set —
+always-abstain, lexical top-1 — , baseline + 2×bootstrap SE), tested
+one-sided at α=0.05. A failed result is recorded as a failed adoption attempt;
+its labels move to development before another configuration is designed.
 
 ## Attestation capacity (no standing human review)
 
@@ -139,8 +154,10 @@ metadata, **honestly graded**: every adjudication and attestation records
 its machine attestor, and no output is ever presented as human-verified.
 The protections against the repo's two prior oracle failures move from
 human sittings to structure: different-family judge models, blind
-protocols (a judge never sees tagger output), dual-model adjudication with
-published agreement rates, frozen digests. Human validation arrives later
+protocols (a judge never sees tagger output), cross-family adjudication with
+published agreement rates, and frozen digests. The current same-family
+adjudication of 35 development items does not satisfy that gate.
+Human validation arrives later
 through a **wiki-style interface for validating and discussing records**
 (recorded in `decisions.md`); its judgments supersede machine attestations
 through the same attestation table, so nothing built now is discarded. The
@@ -255,5 +272,8 @@ provider-free recreation of old experiments are permanently non-goals.
 - If the tag task cannot directly import existing prompt/schema/offset
   behavior, stop and identify the coupling; do not copy frameworks.
 - If a rerun is less accurate, keep the result and use its errors.
-- Two consecutive held-out "no change" results → stop tuning; re-examine
-  gold quality, scoring, and registry before the next change.
+- Two consecutive development-set "no change" results → stop tuning;
+  re-examine gold quality, scoring, and registry before the next change.
+- Once final holdout labels are exposed, move that set to development before
+  designing another configuration; never tune against it while retaining the
+  holdout label.

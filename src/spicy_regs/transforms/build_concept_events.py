@@ -10,6 +10,7 @@ from loguru import logger
 
 from spicy_regs.ontology.common import RunContext, read_parquet_rows, write_parquet_rows
 from spicy_regs.ontology.concepts import EVENT_COLUMNS, make_event
+from spicy_regs.ontology.concept_dimensions import concept_facet, concept_source_vocabulary
 from spicy_regs.ontology.invariants import assert_append_only, assert_attestation_complete
 
 OUTPUT = "concept_events.parquet"
@@ -78,7 +79,10 @@ def build_concept_events(
                     {
                         "concept_id": concept_id,
                         "label": concept.get("pref_label"),
-                        "scheme": concept.get("scheme"),
+                        "facet": concept_facet(concept),
+                        "source_vocabulary": concept_source_vocabulary(concept),
+                        # Compatibility for existing event readers.
+                        "scheme": concept_facet(concept),
                         "source": source,
                     },
                     context=context,

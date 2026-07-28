@@ -698,9 +698,15 @@ than inventing its own.
 
 ## Local descriptive-tag terms
 
-`concepts.scheme`, `status`, and `replaced_by`, along with event payloads, are
-retrieval-grade Spicy Regs carrier mechanics. They intentionally do not claim
-decision-grade Rulespec concept-registry semantics. Promotion to a
+`concepts.facet`, `source_vocabulary`, `status`, and `replaced_by`, along with
+event payloads, are retrieval-grade Spicy Regs carrier mechanics. `facet`
+controls profile tag policy; `source_vocabulary` records authority identity
+and is the only candidate for Rulespec `inScheme`. The deprecated `scheme`
+column mirrors `facet` on canonical v2 and newly written rows. Immutable
+`fused-concept-registry-v1` rows are the read-only exception: the compatibility
+reader interprets their external-valued `scheme` as `source_vocabulary` and
+infers `facet`. These fields intentionally do not claim decision-grade
+Rulespec concept-registry semantics. Promotion to a
 `rkaf:LocalConcept` or `rkaf:RegisteredConcept` remains a separate,
 human-reviewed, attested event.
 

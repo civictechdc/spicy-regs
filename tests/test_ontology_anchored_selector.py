@@ -4,8 +4,9 @@ Every fixture here is synthetic and tiny: the properties under test are
 structural (anchoring, suppression, fusion arithmetic, quota arithmetic), and a
 structural property that only holds on a 513k-row registry is not a property.
 
-The v1 selector is deliberately untouched by this module — the two selectors
-exist side by side so the fused-registry rounds stay comparable.
+The v1 ranking behavior and public signature remain available beside v2. Both
+selectors now read explicit concept dimensions through the same compatibility
+helper.
 """
 
 from __future__ import annotations
@@ -39,9 +40,13 @@ def _clean_conditioning_cache():
 
 
 def concept(concept_id: str, pref_label: str, *, scheme: str = "subject", alt: list[str] | None = None) -> dict:
+    facet = "regulated_entity" if scheme == "epa-tsca" else "subject"
+    source_vocabulary = "federal-register-thesaurus" if scheme == "subject" else scheme
     return {
         "concept_id": concept_id,
-        "scheme": scheme,
+        "facet": facet,
+        "source_vocabulary": source_vocabulary,
+        "scheme": facet,
         "pref_label": pref_label,
         "alt_labels_json": json.dumps(alt or []),
         "definition": f"Definition of {pref_label}.",
@@ -201,7 +206,8 @@ def test_scheme_quotas_bound_a_dominant_scheme():
     assert len(selected) == 12
     counts: dict[str, int] = {}
     for row in selected:
-        counts[row["scheme"]] = counts.get(row["scheme"], 0) + 1
+        vocabulary = row["source_vocabulary"]
+        counts[vocabulary] = counts.get(vocabulary, 0) + 1
     for scheme, quota in ANCHOR_SCHEME_QUOTAS.items():
         # Quota plus, at most, the wildcard slots a scheme can also win.
         assert quota <= counts.get(scheme, 0) <= quota + ANCHOR_WILDCARD_SLOTS
@@ -212,12 +218,12 @@ def test_a_scheme_with_no_candidates_cedes_its_slots_to_the_wildcard_pool():
     registry = _quota_registry()
     # epa-tsca is present in the registry (so the quota table still applies)
     # but nothing in it can match the probe text.
-    registry = [row for row in registry if row["scheme"] != "epa-tsca"]
+    registry = [row for row in registry if row["source_vocabulary"] != "epa-tsca"]
     registry += [concept(f"concept_epa_{index}", f"Xylene isomer {index}", scheme="epa-tsca") for index in range(3)]
 
     selected = select_candidate_concepts_anchored_v2("Beryllium exposure control limits.", registry, limit=12)
     assert len(selected) == 12
-    schemes = [row["scheme"] for row in selected]
+    schemes = [row["source_vocabulary"] for row in selected]
     assert "epa-tsca" not in schemes
     # The ceded slot went to the wildcard pool, not to a shorter list.
     assert sum(1 for scheme in schemes if scheme == "fast-topical") >= ANCHOR_SCHEME_QUOTAS["fast-topical"]
@@ -228,7 +234,7 @@ def test_registry_without_the_quota_schemes_falls_back_to_fused_ranking():
     registry = _quota_registry(per_scheme=20, schemes=("subject",))
     selected = select_candidate_concepts_anchored_v2("Beryllium exposure control limits.", registry, limit=12)
     assert len(selected) == 12
-    assert {row["scheme"] for row in selected} == {"subject"}
+    assert {row["facet"] for row in selected} == {"subject"}
 
 
 def test_limit_below_the_quota_total_falls_back_to_fused_ranking():
@@ -261,6 +267,58 @@ def test_each_candidate_carries_the_selector_version():
     assert {row["selector_version"] for row in selected} == {ANCHORED_SELECTOR_VERSION}
 
 
+def test_same_label_authority_concepts_remain_separately_selectable() -> None:
+    registry = [
+        concept(
+            "concept_fast_rights",
+            "Civil rights",
+            scheme="fast-topical",
+        ),
+        concept(
+            "concept_crs_rights",
+            "Civil rights",
+            scheme="crs-subjects",
+        ),
+        concept(
+            "concept_water",
+            "Water quality",
+            scheme="crs-subjects",
+        ),
+    ]
+    selected = select_candidate_concepts_anchored_v2(
+        "Civil rights and water quality.",
+        registry,
+        allowed_facets=("subject",),
+        limit=3,
+    )
+    assert [row["pref_label"] for row in selected].count("Civil rights") == 2
+    assert {row["concept_id"] for row in selected if row["pref_label"] == "Civil rights"} == {
+        "concept_fast_rights",
+        "concept_crs_rights",
+    }
+    assert {row["source_vocabulary"] for row in selected if row["pref_label"] == "Civil rights"} == {
+        "fast-topical",
+        "crs-subjects",
+    }
+
+
+def test_regulated_entity_homonyms_with_different_cas_ids_stay_distinct() -> None:
+    first = concept("concept_chemical_a", "Example substance", scheme="epa-tsca")
+    second = concept("concept_chemical_b", "Example substance", scheme="epa-tsca")
+    first["external_ids_json"] = '[{"scheme":"cas","value":"71-43-2"}]'
+    second["external_ids_json"] = '[{"scheme":"cas","value":"50-00-0"}]'
+    selected = select_candidate_concepts_anchored_v2(
+        "Example substance exposure.",
+        [first, second],
+        allowed_facets=("regulated_entity",),
+        limit=2,
+    )
+    assert {row["concept_id"] for row in selected} == {
+        "concept_chemical_a",
+        "concept_chemical_b",
+    }
+
+
 def test_deprecated_concepts_are_never_selected():
     registry = [
         concept("concept_live", "Beryllium exposure"),
@@ -272,7 +330,15 @@ def test_deprecated_concepts_are_never_selected():
 
 def test_v1_selector_is_untouched_by_v2():
     """v2 is additive: v1 keeps its signature and its scheme gate."""
-    registry = [concept("concept_a", "Beryllium exposure"), concept("concept_b", "Grain storage", scheme="other")]
+    registry = [
+        concept("concept_a", "Beryllium exposure"),
+        {
+            **concept("concept_b", "Grain storage"),
+            "facet": None,
+            "source_vocabulary": None,
+            "scheme": "other",
+        },
+    ]
     selected = ontology_concepts.select_candidate_concepts_for_text("Beryllium exposure.", ["subject"], registry)
     assert [row["concept_id"] for row in selected] == ["concept_a"]
     assert all("selector_version" not in row for row in selected)
@@ -305,8 +371,30 @@ def adjudication_inputs():
     unit = ExtractionUnit(
         unit_id="processing_segment_synthetic",
         input={
-            "subject": {"allowed_schemes": ["subject"], "id": "SYNTHETIC-1"},
-            "processing_segment": {"segment_id": "processing_segment_synthetic", "ordinal": 0, "segment_count": 1},
+            "subject": {
+                "type": "cfr_section",
+                "id": "SYNTHETIC-1",
+                "profile": "cfr-section-v1",
+                "source_table": "cfr_sections",
+                "allowed_schemes": ["subject"],
+                "artifact_digest": "digest-one",
+            },
+            "processing_segment": {
+                "segment_id": "processing_segment_synthetic",
+                "ordinal": 0,
+                "segment_count": 1,
+                "policy": "test-v1",
+                "tokenizer": "test",
+                "tokenizer_version": "1",
+                "token_count": 5,
+                "source_spans": {
+                    "evidence_0": {
+                        "source_field": "cfr_sections.xml_text",
+                        "start_char": 0,
+                        "end_char": 34,
+                    }
+                },
+            },
             "non_evidentiary_context": {"artifact_context": {"artifact_title": "T"}, "headings": []},
             "untrusted_evidence_fields": {"fields": {"evidence_0": "Beryllium exposure control limits."}},
             "available_concepts": [],
@@ -377,9 +465,9 @@ def test_builder_records_the_v2_selector_choice(builder, adjudication_inputs):
 
     candidates = document["items"][0]["candidates"]
     assert {row["selector_version"] for row in candidates} == {"anchored-hybrid-v2"}
-    # v2 ignores the profile's allowed_schemes gate: that gate is what hid the
-    # non-``subject`` schemes of the fused registry from v1.
-    assert {row["scheme"] for row in candidates} > {"subject"}
+    # The semantic facet stays ``subject`` while authority vocabularies vary.
+    assert {row["scheme"] for row in candidates} == {"subject"}
+    assert {row["source_vocabulary"] for row in candidates} > {"federal-register-thesaurus"}
 
 
 def test_builder_binds_both_selectors_by_identity(builder):

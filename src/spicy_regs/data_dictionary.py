@@ -361,6 +361,8 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
     ],
     "concepts": [
         ("concept_id", "VARCHAR"),
+        ("facet", "VARCHAR"),
+        ("source_vocabulary", "VARCHAR"),
         ("scheme", "VARCHAR"),
         ("pref_label", "VARCHAR"),
         ("alt_labels_json", "VARCHAR"),

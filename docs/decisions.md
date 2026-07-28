@@ -137,15 +137,24 @@ so explicitly. Plans cite this file; this file cites evidence.
 
 ## 2026-07-27 — Gold and held-out protocol
 
-- **Decision:** MVP gold is ~80 artifact assignments (35 adjudicated + ~45
-  new), split by **gold concept** (artifact-level splitting leaks through
-  alias edits and the lexical selector). Gold is drafted by a different
-  model family than the tagger, blind to tagger output; the held-out slice
-  is 100% human-adjudicated; `gold_sha256` and per-item
-  adequate-target-vs-abstention branch assignments freeze before tuning;
-  `registry_sha256` is pinned per iteration and a regression test asserts
-  no new alias normalizes to a held-out gold label. At this size the
-  held-out slice **vetoes regressions only** — it cannot certify gains.
+- **Decision:** the adjudicated 35 are permanently train/development data.
+  They have been inspected and used to change the prompt, registry, and
+  selector; freezing them now cannot restore holdout status. A new evaluation
+  dataset must be drawn without tagger output and frozen before labels are
+  exposed.
+- **Separation:** split by **gold concept and every registered alias**, not
+  artifact alone. Reject shared concept ids, normalized aliases, and artifact
+  digests across train and holdout. Pin source, selection, gold, registry, and
+  configuration digests.
+- **Adjudication:** final holdout labels require at least two independent
+  model families (or humans), blind to tagger output, with agreement published
+  and disagreements resolved by a third family or excluded. The existing
+  three Claude sessions count as one family and do not satisfy this rule.
+- **Use:** development data drives iteration. Final holdout is one-shot:
+  configuration freezes before labels; `tuning_access` remains false. Once
+  its labels inform another design decision, that set becomes development.
+  The tracked `evaluation-boundary.json` and
+  `--require-adoption-ready` command enforce these structural conditions.
 - **Accuracy-claim tier (separate, post-MVP-local):** claims of improvement
   require the powered set (~780 assignments at a 30% held-out and ~0.3
   adequate-target branch rate for a 15-point MDE; sizing math in the
@@ -332,24 +341,32 @@ so explicitly. Plans cite this file; this file cites evidence.
 
 ## 2026-07-27 — Registry fusion: measured, not yet adopted
 
-- **Built:** `fused-concept-registry-v1` (513,236 rows; FR Thesaurus
-  full enrichment, CRS legislative subjects + policy areas via GPO
-  BILLSTATUS carrier, EPA TSCA inventory, FAST topical facet under
-  ODC-By with per-row attribution; schemes distinct, no cross-scheme
-  merging; frozen 901 ids byte-stable; tool `ce0a2e7`). EuroVoc and
-  Wikidata excluded by maintainer direction.
-- **Measured (evidence: gold-adjudication README round 2):** registry
-  exact-alias coverage of gold intents 1/35 → 8/35; surfaced adequacy
-  under the frozen lexical selector unchanged at 5/35 (identical
-  items); 4 related→broader improvements. The selector, not the
-  registry, is now the binding constraint (unanchored substring
-  scoring floods top-12 with short-label noise at this scale).
-- **Disposition:** the fused registry is an evaluation artifact, not
-  yet the production candidate registry. Adoption trigger: a selector
-  change (anchored lexical matching and/or the existing
-  sentence-transformers embedding baseline, one change, same
-  protocol) that converts present-but-not-surfaced items — expected
-  adequacy in the low 20s/35. If that holds, the fused registry +
-  new selector become the phase-2 baseline together, metric version
-  bumped.
-- **Revisit trigger:** the selector iteration's re-measurement.
+- **Historical v1 artifact:** `fused-concept-registry-v1` has 513,236
+  rows (FR Thesaurus, CRS subjects and policy areas, EPA TSCA, and FAST).
+  It preserved the original 901 ids, but it overloaded `scheme`: original
+  rows used `subject` as a semantic facet while imported rows used source
+  vocabulary names. That shape made the profile's legitimate `subject`
+  facet gate reject imported subject concepts. The resulting 936/513,236
+  reachability was a schema defect, not evidence that facet gates should be
+  removed.
+- **Corrected model:** `facet` now carries tag policy
+  (`subject|regulated_entity`); `source_vocabulary` carries authority
+  identity and retrieval quotas. New rows keep the deprecated `scheme`
+  compatibility field equal to `facet`. Exact same-label collisions across
+  vocabularies produce an unreviewed mapping artifact, but the selector keeps
+  every authority id separately selectable. Convergence cannot merge them and
+  no `skos:exactMatch` is inferred. The v1 external-valued `scheme` reader is a
+  migration shim with the removal boundary recorded in the ontology design.
+- **Historical measurement, development only:** the repeatedly inspected
+  35-item set showed exact-alias coverage 1/35 → 8/35 and unchanged surfaced
+  adequacy of 5/35 under the old selector. Those observations helped locate
+  the seam; they cannot authorize an accuracy or adoption verdict. Earlier
+  anchored-selector numbers on the same 35 are likewise tuning evidence.
+- **Disposition:** no fused registry or selector is adopted. The current
+  implementation can execute `anchored-hybrid-v2` through the same payload,
+  strict schema, facet policy, and token budget as the production tag path.
+  Adoption still requires a newly drawn, digest-pinned, concept/alias-separated
+  holdout, configuration frozen before labels, and completed blind
+  adjudication by at least two independent model families (or humans).
+- **Revisit trigger:** an untouched holdout satisfies the tracked evaluation
+  boundary and the adoption-ready command passes.

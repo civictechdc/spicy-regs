@@ -14,6 +14,10 @@ from typing import Any, Protocol, Sequence, cast
 from loguru import logger
 
 from spicy_regs.ontology.common import canonical_json
+from spicy_regs.ontology.concept_dimensions import (
+    concept_facet,
+    concept_source_vocabulary,
+)
 from spicy_regs.ontology.segmentation import TiktokenCounter
 from spicy_regs.ontology.subjects import Subject
 
@@ -42,7 +46,8 @@ TAG_INSTRUCTIONS = (
     "secondary examples, passing mentions, citations, dates, contacts, "
     "document furniture, procedures, or generic terms. Use context to identify "
     "the whole record's topic, but cite only untrusted_evidence_fields. Use "
-    "only allowed_schemes. Choose an available concept only if semantically "
+    "the response field scheme as the semantic facet, not the concept's source "
+    "vocabulary; use only allowed_schemes. Choose an available concept only if semantically "
     "equivalent, never merely related. Otherwise set concept_id to null and "
     "propose one concise central label, one-sentence definition, and "
     "justification. Use subject for policy topics and regulated_entity for "
@@ -259,9 +264,11 @@ _VALIDATION_SCHEMA = {
 
 def ontology_concept_payload(concept: dict) -> dict[str, object]:
     """Project one registry row to the fields sent to the model."""
+    facet = concept_facet(concept)
     return {
         "concept_id": concept.get("concept_id"),
-        "scheme": concept.get("scheme"),
+        "facet": facet,
+        "source_vocabulary": concept_source_vocabulary(concept),
         "pref_label": concept.get("pref_label"),
         "alt_labels_json": concept.get("alt_labels_json"),
         "definition": concept.get("definition"),
@@ -716,9 +723,7 @@ class OpenAIOntologyModel:
                     "tag_output_item_count": len(items),
                     "tag_accepted_item_count": len(proposals),
                     "tag_rejection_count": len(self.last_tag_rejections),
-                    "evidence_offset_repair_count": (
-                        evidence_offset_repair_count
-                    ),
+                    "evidence_offset_repair_count": (evidence_offset_repair_count),
                 }
             )
         return proposals
@@ -764,7 +769,9 @@ class OpenAIOntologyModel:
                 },
                 "concept": {
                     "concept_id": concept.get("concept_id"),
-                    "scheme": concept.get("scheme"),
+                    "scheme": concept_facet(concept),
+                    "facet": concept_facet(concept),
+                    "source_vocabulary": concept_source_vocabulary(concept),
                     "pref_label": concept.get("pref_label"),
                     "definition": concept.get("definition"),
                 },

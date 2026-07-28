@@ -419,7 +419,9 @@ tables:
       place.
     columns:
       concept_id: "Stable opaque concept id. Primary key."
-      scheme: "Facet: `subject` or `regulated_entity` in v1."
+      facet: "Semantic tag-policy facet: `subject` or `regulated_entity`."
+      source_vocabulary: "Authority vocabulary used for concept identity, provenance, quotas, and Rulespec `inScheme`."
+      scheme: "Deprecated compatibility mirror of `facet`; new rows must keep the two values equal."
       pref_label: "Preferred human-readable label."
       alt_labels_json: "JSON array of synonyms and labels absorbed by merges."
       definition: "One-sentence scope note."

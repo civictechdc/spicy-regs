@@ -35,10 +35,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from spicy_regs.docpipeline.adapters.openai import PROMPT_INPUT_TOKEN_BUDGET
+from spicy_regs.docpipeline.adapters.openai import (
+    PROMPT_INPUT_TOKEN_BUDGET,
+    PROMPT_SAFETY_MARGIN_TOKENS,
+    TiktokenCounter,
+)
 from spicy_regs.docpipeline.extraction import ExtractionUnit
+from spicy_regs.docpipeline.tag_task import TagExtractionTask
 from spicy_regs.docpipeline.runtime import sha256_file
-from spicy_regs.ontology.common import read_parquet_rows
+from spicy_regs.evaluation_boundary import (
+    DEFAULT_BOUNDARY_MANIFEST,
+    DEVELOPMENT_DATASET_ID,
+)
+from spicy_regs.ontology.common import canonical_json, read_parquet_rows
+from spicy_regs.ontology.concept_dimensions import concept_facet, concept_source_vocabulary
+from spicy_regs.ontology.llm import ontology_concept_payload
 from spicy_regs.ontology.concepts import (
     ANCHORED_SELECTOR_VERSION,
     select_candidate_concepts_anchored_v2,
@@ -75,14 +86,6 @@ DEFAULT_DATASET_DIR = REPO_ROOT / "output" / "segmented-real-data-evaluation-v2"
 SELECTION_FILE_NAME = "tagging_segments.parquet"
 REGISTRY_FILE_NAME = "tagging_input_registry.parquet"
 
-# ``load_testbed_inputs`` refuses to return when any tag prompt exceeds the
-# provider input budget. That gate protects a provider call; this builder makes
-# none, and a prompt that no longer fits is a tagger-side fact that must not be
-# allowed to withhold the judges' input. So the budget is raised out of the way
-# here and the observed maximum is *recorded* against the production budget in
-# the emitted metadata instead of silently enforced.
-UNENFORCED_PROMPT_TOKEN_BUDGET = 1_000_000_000
-
 
 class GoldAdjudicationError(RuntimeError):
     """The stored inputs cannot produce a usable adjudication file."""
@@ -112,7 +115,9 @@ def candidate_record(concept: Mapping[str, Any]) -> dict[str, Any]:
     """
     record = {
         "concept_id": str(concept.get("concept_id") or ""),
-        "scheme": str(concept.get("scheme") or ""),
+        "facet": concept_facet(concept),
+        "source_vocabulary": concept_source_vocabulary(concept),
+        "scheme": concept_facet(concept),
         "pref_label": _text_or_none(concept.get("pref_label")),
         "alt_labels": _json_list(concept.get("alt_labels_json")),
         "definition": _text_or_none(concept.get("definition")),
@@ -146,10 +151,41 @@ def segment_candidates(
     unit_input = unit.input
     fields = unit_input.get("untrusted_evidence_fields", {}).get("fields", {})
     segment_text = "\n".join(str(value) for value in fields.values())
-    if selector == SELECTOR_V2:
-        selected = SELECT_CANDIDATES_V2(segment_text, registry_rows, limit=limit)
-        return [candidate_record(concept) for concept in selected], None
     allowed_schemes = [str(scheme) for scheme in unit_input.get("subject", {}).get("allowed_schemes", ())]
+    if selector == SELECTOR_V2:
+        selected = list(
+            SELECT_CANDIDATES_V2(
+                segment_text,
+                registry_rows,
+                allowed_facets=allowed_schemes,
+                limit=limit,
+            )
+        )
+        # Exercise the same payload validation and complete prompt-budget path
+        # used before a provider call. The experimental ranking is stable, so
+        # fitting removes only the lowest-ranked tail.
+        task = TagExtractionTask()
+        counter = TiktokenCounter()
+        while True:
+            candidate_input = {
+                **unit_input,
+                "available_concepts": [ontology_concept_payload(dict(concept)) for concept in selected],
+            }
+            payload = task.build_payload(candidate_input)
+            prompt_total = (
+                counter.count(task.instructions + "\n" + canonical_json(payload))
+                + counter.count(canonical_json(task.build_schema(payload)))
+                + PROMPT_SAFETY_MARGIN_TOKENS
+            )
+            if prompt_total <= PROMPT_INPUT_TOKEN_BUDGET:
+                break
+            if not selected:
+                raise GoldAdjudicationError(
+                    "candidate experiment exceeds the real prompt budget with "
+                    f"no candidates: {prompt_total} > {PROMPT_INPUT_TOKEN_BUDGET}"
+                )
+            selected.pop()
+        return [candidate_record(concept) for concept in selected], None
     selected = SELECT_CANDIDATES(segment_text, allowed_schemes, registry_rows, limit=limit)
     selected_ids = [str(concept.get("concept_id") or "") for concept in selected]
     payload_ids = [str(concept.get("concept_id") or "") for concept in unit_input.get("available_concepts", ())]
@@ -345,7 +381,9 @@ def build_from_stored_inputs(
         dataset_dir,
         selection_file,
         registry_file,
-        prompt_input_token_budget=UNENFORCED_PROMPT_TOKEN_BUDGET,
+        evaluation_manifest=DEFAULT_BOUNDARY_MANIFEST,
+        evaluation_dataset_id=DEVELOPMENT_DATASET_ID,
+        candidate_selector=selector,
     )
     registry_rows = read_parquet_rows(registry_file)
     gold_file = dataset_dir / GOLD_FILE

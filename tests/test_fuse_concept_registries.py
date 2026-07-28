@@ -158,9 +158,7 @@ def test_billstatus_survives_a_malformed_record(tool):
 
 
 def test_billstatus_folds_many_records_into_two_vocabularies(tool):
-    second = BILLSTATUS_FIXTURE.replace("Air quality", "Air quality").replace(
-        "Environmental Protection", "Health"
-    )
+    second = BILLSTATUS_FIXTURE.replace("Air quality", "Air quality").replace("Environmental Protection", "Health")
     policy, subjects = tool.collect_billstatus_terms([BILLSTATUS_FIXTURE, second])
     assert [term.pref_label for term in policy] == ["Environmental Protection", "Health"]
     # A term named by both records appears once *within its scheme*.
@@ -288,6 +286,8 @@ def test_dropped_aliases_are_counted_not_silently_discarded(tool):
 def _frozen_row(pref_label: str, *, scheme: str = "subject") -> dict:
     return {
         "concept_id": stable_id("concept", scheme, normalize_label(pref_label)),
+        "facet": scheme,
+        "source_vocabulary": "federal-register-thesaurus",
         "scheme": scheme,
         "pref_label": pref_label,
         "alt_labels_json": "[]",
@@ -304,16 +304,27 @@ def _frozen_row(pref_label: str, *, scheme: str = "subject") -> dict:
     }
 
 
-def test_minted_ids_match_the_repository_idiom(tool):
-    """The tool must mint the id ``spicy_regs.ontology`` would have minted."""
-    assert tool.mint_concept_id("subject", "Air quality") == stable_id("concept", "subject", "air quality")
-    # Which is exactly why re-parsing the Federal Register lands on a frozen row
-    # instead of beside it.
+def test_minted_ids_are_scoped_to_the_authority_vocabulary(tool):
+    assert tool.mint_concept_id(
+        "federal-register-thesaurus",
+        "Air quality",
+    ) == stable_id(
+        "concept",
+        "federal-register-thesaurus",
+        "air quality",
+    )
+    # Pre-v2 Federal Register ids remain stable through the enrichment path.
     frozen = _frozen_row("Air quality")
-    assert tool.mint_concept_id("subject", "Air quality") == frozen["concept_id"]
+    assert (
+        tool.mint_concept_id(
+            "federal-register-thesaurus",
+            "Air quality",
+        )
+        != frozen["concept_id"]
+    )
 
 
-def test_schemes_stay_distinct_one_label_becomes_one_concept_per_scheme(tool, context):
+def test_vocabularies_stay_distinct_one_label_becomes_one_concept_per_authority(tool, context):
     label = "Trademarks"
     contributions = [
         (tool.SOURCES["crs-subjects"], [tool.SourceTerm(pref_label=label)]),
@@ -328,9 +339,20 @@ def test_schemes_stay_distinct_one_label_becomes_one_concept_per_scheme(tool, co
     )
     rows = [row for row in registry if row["pref_label"] == label]
     assert len(rows) == 3, "one label in three sources must stay three concepts"
-    assert {row["scheme"] for row in rows} == {"crs-subjects", "fast-topical", "subject"}
+    assert {row["facet"] for row in rows} == {"subject"}
+    assert {row["scheme"] for row in rows} == {"subject"}
+    assert {row["source_vocabulary"] for row in rows} == {
+        "crs-subjects",
+        "fast-topical",
+        "federal-register-thesaurus",
+    }
     assert len({row["concept_id"] for row in rows}) == 3
     assert all(values["minted"] == 1 for values in counts.values())
+    mappings = tool.presentation_mappings(registry)
+    assert len(mappings) == 2
+    assert {row["relation"] for row in mappings} == {"same-normalized-label-for-presentation"}
+    assert {row["status"] for row in mappings} == {"unreviewed-presentation-only"}
+    assert all("exactMatch" not in row["relation"] for row in mappings)
 
 
 def test_exact_label_match_inside_one_scheme_enriches_and_never_rewrites(tool, context):
@@ -343,7 +365,7 @@ def test_exact_label_match_inside_one_scheme_enriches_and_never_rewrites(tool, c
         retrieved_at={"fr-thesaurus": "2026-07-27T00:00:00Z"},
     )
     assert len(registry) == 1, "an exact same-scheme match must not add a row"
-    assert registry[0] == {column: frozen[column] for column in CONCEPT_COLUMNS}
+    assert registry[0] == {column: frozen.get(column) for column in CONCEPT_COLUMNS}
     assert counts["fr-thesaurus"] == {
         "terms": 1,
         "minted": 0,
@@ -388,7 +410,10 @@ def test_fused_rows_carry_the_selector_schema_and_hold_the_graph_invariants(tool
     registry, sidecar, _ = tool.fuse(
         existing=[_frozen_row("Accounting")],
         contributions=[
-            (tool.SOURCES["epa-tsca"], [tool.SourceTerm(pref_label="Benzene", source_id="71-43-2", source_status="ACTIVE")]),
+            (
+                tool.SOURCES["epa-tsca"],
+                [tool.SourceTerm(pref_label="Benzene", source_id="71-43-2", source_status="ACTIVE")],
+            ),
             (tool.SOURCES["fast-topical"], [tool.SourceTerm(pref_label="Air quality--Standards", source_id="1000")]),
         ],
         context=context,
@@ -417,7 +442,7 @@ def test_the_production_selector_reads_the_fused_registry(tool, context):
     )
     selected = select_candidate_concepts_for_text(
         "A rule on benzene emissions and air quality.",
-        ["subject", "crs-subjects", "epa-tsca"],
+        ["subject", "regulated_entity"],
         registry,
         limit=12,
     )
@@ -478,9 +503,22 @@ def test_end_to_end_writes_a_registry_a_sidecar_and_a_manifest(tool, tmp_path):
         [_frozen_row("Accounting"), _frozen_row("Safety")],
         registry,
     )
-    schemes = {row["scheme"] for row in registry}
-    assert schemes == {"subject", "crs-subjects", "crs-policy-areas", "epa-tsca", "fast-topical"}
-    assert manifest["rows_per_scheme"]["crs-policy-areas"] == 1
+    assert {row["scheme"] for row in registry} == {
+        "subject",
+        "regulated_entity",
+    }
+    assert {row["source_vocabulary"] for row in registry} == {
+        "federal-register-thesaurus",
+        "crs-subjects",
+        "crs-policy-areas",
+        "epa-tsca",
+        "fast-topical",
+    }
+    assert manifest["rows_per_source_vocabulary"]["crs-policy-areas"] == 1
+    assert manifest["rows_per_facet"] == {
+        "regulated_entity": 3,
+        "subject": 10,
+    }
     assert manifest["existing_registry"]["rows"] == 2
     assert manifest["total_rows"] == len(registry)
     assert {row["concept_id"] for row in sidecar} <= {row["concept_id"] for row in registry}
@@ -490,10 +528,10 @@ def test_end_to_end_writes_a_registry_a_sidecar_and_a_manifest(tool, tmp_path):
     assert manifest["raw_files"]["fast-topical"]["sha256"]
     assert any("ODC-By" in notice for notice in manifest["notice"])
     assert any("OCLC" in notice for notice in manifest["notice"])
-    fast_rows = [row for row in sidecar if row["scheme"] == "fast-topical"]
+    fast_rows = [row for row in sidecar if row["source_vocabulary"] == "fast-topical"]
     assert fast_rows and all(row["license"].startswith("ODC-By") for row in fast_rows)
     assert all(row["retrieved_at"] == "2026-07-27T00:00:00Z" for row in sidecar)
-    tsca_rows = [row for row in sidecar if row["scheme"] == "epa-tsca"]
+    tsca_rows = [row for row in sidecar if row["source_vocabulary"] == "epa-tsca"]
     assert {row["source_id"] for row in tsca_rows} >= {"50-00-0", "71-43-2"}
     assert {row["source_status"] for row in tsca_rows} == {"ACTIVE", "INACTIVE"}
 
@@ -507,12 +545,10 @@ def test_a_source_left_off_the_command_line_is_reported_not_guessed(tool, tmp_pa
     fr_path.write_text(FR_FIXTURE, encoding="utf-8")
     out = tmp_path / "out"
     assert (
-        tool.main(
-            ["--existing-registry", str(existing_path), "--fr-thesaurus", str(fr_path), "--output-dir", str(out)]
-        )
+        tool.main(["--existing-registry", str(existing_path), "--fr-thesaurus", str(fr_path), "--output-dir", str(out)])
         == 0
     )
     manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
     assert len(manifest["skipped_sources"]) == 3
     assert any(entry.startswith("fast-topical") for entry in manifest["skipped_sources"])
-    assert "fast-topical" not in manifest["rows_per_scheme"]
+    assert "fast-topical" not in manifest["rows_per_source_vocabulary"]

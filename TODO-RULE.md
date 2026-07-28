@@ -39,7 +39,9 @@ needs coordination.
   proved durable `RegulatoryAgendaItem` identity without reusing a RIN for a
   document or `Proceeding`.
 - **Verified accuracy loop, dated 2026-07-26:** the new pipeline processed 44
-  selected artifacts and 109 segments with 35 separately held gold labels.
+  selected artifacts and 109 segments with 35 gold labels kept out of the
+  provider payload. Those labels were later inspected and used for tuning, so
+  they are permanently train/development data, not an untouched holdout.
   One prompt-only refinement reduced accepted candidates from 351 to 76 and
   counted false positives from 260 to 55 while keeping evidence grounding at
   `1.0`. Both diagnostics passed integrity and provider-free recomputation.
@@ -57,10 +59,9 @@ needs coordination.
   retrieval, approval, publication, complete historical comparison, frozen
   mixed-data release gate, and old-runner removal. Do not resume these merely
   because their older checklist items remain unchecked.
-- **Open evaluation:** adjudicate exact, close, broader, narrower, related, and
-  wrong concept results; carry Rulespec's existing assignment roles into the
-  local tag output; correct gold excerpts that identify documents without
-  supporting their expected topics.
+- **Open evaluation:** draw and independently adjudicate a new untouched
+  concept/alias-separated holdout; correct gold excerpts that identify
+  documents without supporting their expected topics.
 - **Human gate:** a non-originating consumer must review Rulespec; two distinct
   humans must seal the oracle; a maintainer must authorize any Git tag,
   release, push, upload, publication, concept promotion, or legal-effect
@@ -117,10 +118,20 @@ documentation, full-suite, clean-checkout, release, or publication gates.
 - [x] Apply one focused prompt correction and rerun the same 109 segments.
 - [x] Record Rulespec, Spicy Regs, prompt, source, and gold findings in
       `RULESPEC_FEEDBACK_ITERATION_2.md`.
-- [ ] Adjudicate the 35 iteration-2 results by concept relation and assignment
-      role.
-- [ ] Add Rulespec's existing `assignmentRole` values to the local tag output
+- [x] Adjudicate the 35 iteration-2 results by concept relation. Evidence:
+      [`gold-adjudication-2026-07-27`](docs/evidence/gold-adjudication-2026-07-27/README.md).
+      These results are development-only because the same items informed
+      subsequent registry and selector changes.
+- [x] Add Rulespec's existing `assignmentRole` values to the local tag output
       and score primary topics separately from substantive and mention tags.
+      Evidence: schema support in `df2b177`, reader/split support in `54d02de`,
+      and role-partitioned scoring in `TagExtractionTask.score`.
+- [ ] Draw and freeze a new untouched holdout. Before revealing labels, pin
+      membership, source/selection/gold/registry/configuration digests; keep
+      concept ids, registered aliases, and artifact digests disjoint from
+      train; adjudicate with at least two independent model families or
+      humans. `rulespec_testbed --require-adoption-ready` must remain red until
+      this is complete.
 
 ## Deferred long-term program
 

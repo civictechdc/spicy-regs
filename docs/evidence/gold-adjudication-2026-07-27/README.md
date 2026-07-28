@@ -3,6 +3,14 @@
 Blind machine adjudication of the 35 stored gold artifact assignments
 against the gold-free 901-concept registry (MVP plan phase 1.1).
 
+> **Evaluation boundary:** all 35 items are permanently
+> **train/development-only**. They have been inspected, adjudicated, and used
+> to diagnose and tune registry/selector behavior. “Frozen” below means the
+> recorded files are immutable; it does not mean untouched holdout. The
+> tracked gate is `evaluation-boundary.json`, and it refuses an accuracy or
+> adoption verdict until a separate untouched, cross-family-adjudicated
+> holdout exists.
+
 ## Attestation facts
 
 - **Judges:** three independent `claude-fable-5` subagent sessions (A, B,
@@ -105,17 +113,25 @@ Verdicts: `judge-a2-fused.json`, `judge-b2-fused.json`,
 
 ### Round-2 root-cause correction (2026-07-27, selector-v2 build)
 
-The round-2 finding attributed non-surfacing to substring noise. Building
-v2 revealed the larger cause: v1's `allowed_schemes` gate restricted
-candidates to the `subject` scheme (936 of 513,236 rows; 420/420 of
-round-2's candidate slots), making 7 of the 8 exact-alias targets
-structurally unreachable regardless of scoring. Substring noise was real
-but secondary. v2 (`anchored-hybrid-v2`, commit `2b91622`) removes the
-scheme gate (scheme balance via quotas instead), anchors matches at word
-boundaries, and fuses an anchored-lexical channel with a char-3-gram
-channel (RRF k=60): exact-alias targets surfaced 1/8 → **4/8** (5/8
-without quotas — the quota trades `judicial power` at fused rank 9 for
-scheme diversity). Remaining misses are channel-shaped: `immigration
-law` and `fisheries management` have only non-adjacent alt-label
-aliases (no lexical channel can reach them); `free speech` sits at
-fused rank 91. Mean v1∩v2 overlap: 1.83/12 candidates.
+The round-2 finding attributed non-surfacing to substring noise. Building v2
+exposed a more basic defect: `fused-concept-registry-v1` used `scheme` for
+two different dimensions. The original 901 rows stored the semantic
+`subject` facet, while imported rows stored vocabulary names such as
+`crs-subjects` and `fast-topical`. The profile's valid `subject` facet gate
+therefore admitted only 936 of 513,236 rows. Removing the gate would hide the
+schema error and could offer regulated entities to subject-only profiles.
+
+The corrected shape keeps the gate and separates the dimensions:
+`facet=subject|regulated_entity` controls tag policy;
+`source_vocabulary` controls authority identity, provenance, and quotas; the
+deprecated compatibility `scheme` mirrors `facet` on new rows.
+`anchored-hybrid-v2` now runs through the real tag payload, strict response
+schema, facet gate, and 8,192-token input budget. Same-label concepts from
+different vocabularies remain separately selectable. The fusion may record an
+unreviewed mapping for later review, but it never chooses a representative or
+implies `skos:exactMatch`.
+
+The earlier 1/8 → 4/8 (5/8 without quotas) result remains a useful
+development observation about the old artifact. It is not a current
+accuracy result and cannot trigger adoption because this entire 35-item set
+was already used to design the selector.

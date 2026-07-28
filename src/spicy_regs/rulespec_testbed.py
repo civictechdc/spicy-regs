@@ -45,15 +45,28 @@ from spicy_regs.docpipeline.source import (
     iter_source_records,
 )
 from spicy_regs.docpipeline.tag_task import (
-    DEFAULT_GOLD_SPLIT,
-    GOLD_SPLITS,
     TagExtractionTask,
     tag_unit,
 )
+from spicy_regs.evaluation_boundary import (
+    DEFAULT_BOUNDARY_MANIFEST,
+    DEVELOPMENT_DATASET_ID,
+    EvaluationBoundaryError,
+    EvaluationDataset,
+    adoption_gate_facts,
+    gold_split,
+    load_evaluation_dataset,
+    partition_leakage_facts,
+    require_adoption_ready,
+    validate_frozen_dataset,
+)
 from spicy_regs.ontology.common import canonical_json, read_parquet_rows
+from spicy_regs.ontology.concept_dimensions import concept_facet
 from spicy_regs.ontology.concepts import (
+    ANCHORED_SELECTOR_VERSION,
     concept_aliases,
     normalize_label,
+    select_candidate_concepts_anchored_v2,
     select_candidate_concepts_for_text,
 )
 from spicy_regs.ontology.llm import resolve_exact_evidence_offsets
@@ -65,6 +78,8 @@ GOLD_FILE = "gold_spans.parquet"
 EXPECTED_GOLD_ARTIFACTS = 35
 EXPECTED_SELECTED_SEGMENTS = 109
 PROMPT_CONCEPT_LIMIT = 12
+PRODUCTION_SELECTOR = "lexical-overlap-v1"
+CANDIDATE_SELECTORS = (PRODUCTION_SELECTOR, ANCHORED_SELECTOR_VERSION)
 
 
 class DiagnosticInputError(RuntimeError):
@@ -81,6 +96,7 @@ class TestbedInputs:
     segmentation_facts: dict[str, Any]
     vocabulary_facts: dict[str, Any]
     profile_facts: dict[str, Any]
+    evaluation_facts: dict[str, Any]
 
     @property
     def selected_segment_count(self) -> int:
@@ -201,16 +217,15 @@ def _registry_aliases(
     candidates: dict[tuple[str, str], set[str]] = defaultdict(set)
     for concept in concepts:
         concept_id = str(concept.get("concept_id") or "")
-        scheme = str(concept.get("scheme") or "")
-        if not concept_id or not scheme or concept.get("status") == "deprecated":
+        try:
+            facet = concept_facet(concept)
+        except ValueError:
+            continue
+        if not concept_id or concept.get("status") == "deprecated":
             continue
         for alias in concept_aliases(dict(concept)):
-            candidates[(scheme, alias)].add(concept_id)
-    return {
-        key: next(iter(concept_ids))
-        for key, concept_ids in candidates.items()
-        if len(concept_ids) == 1
-    }
+            candidates[(facet, alias)].add(concept_id)
+    return {key: next(iter(concept_ids)) for key, concept_ids in candidates.items() if len(concept_ids) == 1}
 
 
 def _containing_segments(
@@ -234,15 +249,16 @@ def _containing_segments(
     )
 
 
-def _gold_split(row: Mapping[str, Any]) -> str:
-    """Read one gold row's evaluation partition; an absent column means train."""
-    split = str(row.get("split") or "").strip() or DEFAULT_GOLD_SPLIT
-    if split not in GOLD_SPLITS:
-        raise DiagnosticInputError(
-            f"gold row {row.get('gold_id')} declares unknown split {split!r}; "
-            f"expected one of {list(GOLD_SPLITS)}"
-        )
-    return split
+def _gold_split(
+    row: Mapping[str, Any],
+    *,
+    forced_split: str | None,
+) -> str:
+    """Read a strict split, with one manifest-pinned development exception."""
+    try:
+        return gold_split(row, forced_split=forced_split)
+    except EvaluationBoundaryError as exc:
+        raise DiagnosticInputError(str(exc)) from exc
 
 
 def _answers(
@@ -251,6 +267,8 @@ def _answers(
     selected: Mapping[tuple[str, str, str, str, int], ProcessingSegment],
     selected_rows: Sequence[Mapping[str, Any]],
     concepts: Sequence[Mapping[str, Any]],
+    *,
+    forced_split: str | None = None,
 ) -> dict[str, Any]:
     aliases = _registry_aliases(concepts)
     split_by_artifact: dict[tuple[str, str, str, str], str] = {}
@@ -268,15 +286,11 @@ def _answers(
         )
         artifact = artifacts.get(key)
         if artifact is None:
-            raise DiagnosticInputError(
-                f"gold row {raw.get('gold_id')} names an artifact outside the selected sample"
-            )
+            raise DiagnosticInputError(f"gold row {raw.get('gold_id')} names an artifact outside the selected sample")
         source_field = str(raw.get("source_field") or "")
         field_text = artifact.raw_fields.get(source_field)
         if field_text is None:
-            raise DiagnosticInputError(
-                f"gold row {raw.get('gold_id')} names missing source field {source_field!r}"
-            )
+            raise DiagnosticInputError(f"gold row {raw.get('gold_id')} names missing source field {source_field!r}")
         try:
             start = int(str(raw["start_char"]))
             end = int(str(raw["end_char"]))
@@ -286,14 +300,10 @@ def _answers(
         recorded_text_digest = str(raw.get("exact_text_sha256") or "")
         actual_text_digest = hashlib.sha256(exact_text.encode()).hexdigest()
         if recorded_text_digest != actual_text_digest:
-            raise DiagnosticInputError(
-                f"gold row {raw.get('gold_id')} has an invalid exact-text digest"
-            )
+            raise DiagnosticInputError(f"gold row {raw.get('gold_id')} has an invalid exact-text digest")
         resolution = resolve_exact_evidence_offsets(field_text, exact_text, start, end)
         if resolution is None:
-            raise DiagnosticInputError(
-                f"gold row {raw.get('gold_id')} is absent or ambiguous in {source_field!r}"
-            )
+            raise DiagnosticInputError(f"gold row {raw.get('gold_id')} is absent or ambiguous in {source_field!r}")
         containing = _containing_segments(
             selected_by_artifact.get(key, []),
             source_field=source_field,
@@ -306,7 +316,7 @@ def _answers(
             )
         scheme = str(raw.get("concept_scheme") or "")
         label = str(raw.get("concept_label") or "")
-        split = _gold_split(raw)
+        split = _gold_split(raw, forced_split=forced_split)
         # One artifact carries one partition: a mixed artifact would attribute
         # the same false positives to both sides of the split.
         prior_split = split_by_artifact.setdefault(key, split)
@@ -402,6 +412,10 @@ def load_testbed_inputs(
     gold_file: str | Path = GOLD_FILE,
     prompt_input_token_budget: int = PROMPT_INPUT_TOKEN_BUDGET,
     prompt_safety_margin_tokens: int = PROMPT_SAFETY_MARGIN_TOKENS,
+    evaluation_manifest: Path | None = None,
+    evaluation_dataset_id: str | None = None,
+    require_adoption_verdict: bool = False,
+    candidate_selector: str = PRODUCTION_SELECTOR,
 ) -> TestbedInputs:
     """Translate one declared sample into current source, segment, and tag inputs.
 
@@ -418,6 +432,8 @@ def load_testbed_inputs(
         raise ValueError("prompt_input_token_budget must be positive")
     if prompt_safety_margin_tokens < 0:
         raise ValueError("prompt_safety_margin_tokens must be nonnegative")
+    if candidate_selector not in CANDIDATE_SELECTORS:
+        raise ValueError(f"candidate_selector must be one of {list(CANDIDATE_SELECTORS)}")
     dataset_dir = Path(dataset_dir)
     selection_file = Path(selection_file)
     registry_file = Path(registry_file)
@@ -429,6 +445,17 @@ def load_testbed_inputs(
     selected_rows = read_parquet_rows(selection_file)
     gold_rows = read_parquet_rows(gold_path)
     concepts = read_parquet_rows(registry_file)
+    evaluation_dataset: EvaluationDataset | None = None
+    if evaluation_manifest is not None:
+        if not evaluation_dataset_id:
+            raise ValueError("evaluation_dataset_id is required with evaluation_manifest")
+        try:
+            evaluation_dataset = load_evaluation_dataset(
+                evaluation_manifest,
+                evaluation_dataset_id,
+            )
+        except EvaluationBoundaryError as exc:
+            raise DiagnosticInputError(str(exc)) from exc
     if len(selected_rows) != expected_selected_segments:
         raise DiagnosticInputError(
             f"the selected sample has {len(selected_rows)} segments, expected {expected_selected_segments}"
@@ -463,49 +490,100 @@ def load_testbed_inputs(
         selected,
         selected_rows,
         concepts,
+        forced_split=(evaluation_dataset.forced_split if evaluation_dataset is not None else None),
     )
     units: list[ExtractionUnit] = []
+    prompt_totals: list[tuple[int, str]] = []
+    prompt_candidate_counts: list[tuple[int, int, str]] = []
+    task = TagExtractionTask()
     for row in selected_rows:
         key = _selection_key(row)
         artifact = artifacts[key[:4]]
         segment = selected[key]
-        prompt_concepts = select_candidate_concepts_for_text(
-            segment.text,
-            artifact.allowed_schemes,
-            concepts,
-            limit=PROMPT_CONCEPT_LIMIT,
-        )
-        units.append(tag_unit(artifact, segment, prompt_concepts))
-
-    task = TagExtractionTask()
-    prompt_totals = [
-        (
-            counter.count(task.instructions + "\n" + canonical_json(task.build_payload(unit.input)))
-            + counter.count(canonical_json(task.build_schema(task.build_payload(unit.input))))
-            + prompt_safety_margin_tokens,
-            unit.unit_id,
-        )
-        for unit in units
-    ]
-    over_budget = [
-        (total, unit_id)
-        for total, unit_id in prompt_totals
-        if total > prompt_input_token_budget
-    ]
-    if over_budget:
-        total, unit_id = max(over_budget)
-        raise DiagnosticInputError(
-            f"{len(over_budget)} tag prompts exceed the {prompt_input_token_budget}-token "
-            f"input budget; {unit_id} needs {total}"
-        )
+        if candidate_selector == ANCHORED_SELECTOR_VERSION:
+            prompt_concepts = select_candidate_concepts_anchored_v2(
+                segment.text,
+                concepts,
+                allowed_facets=artifact.allowed_schemes,
+                limit=PROMPT_CONCEPT_LIMIT,
+            )
+        else:
+            prompt_concepts = select_candidate_concepts_for_text(
+                segment.text,
+                artifact.allowed_schemes,
+                concepts,
+                limit=PROMPT_CONCEPT_LIMIT,
+            )
+        ranked_count = len(prompt_concepts)
+        while True:
+            unit = tag_unit(artifact, segment, prompt_concepts)
+            payload = task.build_payload(unit.input)
+            total = (
+                counter.count(task.instructions + "\n" + canonical_json(payload))
+                + counter.count(canonical_json(task.build_schema(payload)))
+                + prompt_safety_margin_tokens
+            )
+            if total <= prompt_input_token_budget:
+                units.append(unit)
+                prompt_totals.append((total, unit.unit_id))
+                prompt_candidate_counts.append((ranked_count, len(prompt_concepts), unit.unit_id))
+                break
+            if not prompt_concepts:
+                raise DiagnosticInputError(
+                    f"tag prompt {unit.unit_id} needs {total} tokens with no concepts, "
+                    f"over the {prompt_input_token_budget}-token input budget"
+                )
+            # Drop the lowest-ranked concept and rebuild the exact payload. This
+            # is the same deterministic preflight used for every selector.
+            prompt_concepts.pop()
 
     active_tables = _active_source_tables({key[0] for key in selected_artifact_keys})
+    source_file_facts = _source_file_facts(dataset_dir, active_tables)
+    if evaluation_dataset is not None:
+        try:
+            validate_frozen_dataset(
+                evaluation_dataset,
+                gold_path=gold_path,
+                selection_path=selection_file,
+                source_files=source_file_facts,
+                gold_row_count=len(gold_rows),
+                gold_artifact_count=len(gold_artifact_keys),
+            )
+        except EvaluationBoundaryError as exc:
+            raise DiagnosticInputError(str(exc)) from exc
+    try:
+        leakage = partition_leakage_facts(answers, concepts)
+    except EvaluationBoundaryError as exc:
+        raise DiagnosticInputError(str(exc)) from exc
+    configuration = {
+        "candidate_selector": candidate_selector,
+        "prompt_concept_limit": PROMPT_CONCEPT_LIMIT,
+        "registry_sha256": sha256_file(registry_file),
+        "tag_instructions_sha256": hashlib.sha256(task.instructions.encode("utf-8")).hexdigest(),
+        "tag_schema_sha256": hashlib.sha256(
+            canonical_json(task.build_schema(units[0].input)).encode("utf-8")
+        ).hexdigest(),
+        "prompt_input_token_budget": prompt_input_token_budget,
+        "prompt_safety_margin_tokens": prompt_safety_margin_tokens,
+    }
+    gate = adoption_gate_facts(
+        evaluation_dataset,
+        answers,
+        leakage,
+        configuration=configuration,
+    )
+    answers["evaluation_boundary"] = gate
+    if require_adoption_verdict:
+        try:
+            require_adoption_ready(gate)
+        except EvaluationBoundaryError as exc:
+            raise DiagnosticInputError(str(exc)) from exc
     profile_counts = Counter(key[0] for key in gold_artifact_keys)
     return TestbedInputs(
         units=tuple(units),
         answers=answers,
         source_facts={
-            "dataset_files": _source_file_facts(dataset_dir, active_tables),
+            "dataset_files": source_file_facts,
             "selection_sha256": sha256_file(selection_file),
             "gold_file": gold_path.name,
             "gold_sha256": sha256_file(gold_path),
@@ -536,11 +614,27 @@ def load_testbed_inputs(
         vocabulary_facts={
             "registry_sha256": sha256_file(registry_file),
             "registry_concept_count": len(concepts),
-            "selection_method": f"lexical-overlap-v1-limit-{PROMPT_CONCEPT_LIMIT}",
+            "selection_method": (f"{candidate_selector}-limit-{PROMPT_CONCEPT_LIMIT}"),
+            "prompt_candidate_limit": PROMPT_CONCEPT_LIMIT,
+            "prompt_budget_trimmed_segment_count": sum(
+                ranked != fitted for ranked, fitted, _ in prompt_candidate_counts
+            ),
+            "prompt_candidate_count_min": min(
+                (fitted for _, fitted, _ in prompt_candidate_counts),
+                default=0,
+            ),
         },
         profile_facts={
             "gold_profile_count": len(profile_counts),
             "gold_artifacts_by_profile": dict(sorted(profile_counts.items())),
+        },
+        evaluation_facts={
+            **gate,
+            "partition_leakage": leakage,
+            "manifest_path": (str(evaluation_dataset.manifest_path) if evaluation_dataset is not None else None),
+            "permanently_development": (
+                evaluation_dataset.permanently_development if evaluation_dataset is not None else False
+            ),
         },
     )
 
@@ -585,7 +679,10 @@ def run_testbed(
         run_id=run_id or Path(output_dir).name,
         mode="diagnostic",
         steps=("extract",),
-        source_snapshot=inputs.source_facts,
+        source_snapshot={
+            **inputs.source_facts,
+            "evaluation_boundary": inputs.evaluation_facts,
+        },
         profiles=inputs.profile_facts,
         vocabulary=inputs.vocabulary_facts,
         segmentation=inputs.segmentation_facts,
@@ -595,9 +692,7 @@ def run_testbed(
             answers=inputs.answers,
         ),
         provider=(
-            dict(provider)
-            if isinstance(provider, Mapping)
-            else {"model_id": str(getattr(model, "model_id", ""))}
+            dict(provider) if isinstance(provider, Mapping) else {"model_id": str(getattr(model, "model_id", ""))}
         ),
         code_commit=_git_commit(),
         required_work=tuple(item.work_id for item in items),
@@ -621,15 +716,12 @@ def _preflight_summary(inputs: TestbedInputs) -> dict[str, Any]:
         "gold_artifacts_by_split": inputs.source_facts["gold_artifacts_by_split"],
         "gold_span_count": inputs.segmentation_facts["gold_span_count"],
         "gold_profile_count": inputs.profile_facts["gold_profile_count"],
-        "gold_coordinate_resolution_counts": inputs.segmentation_facts[
-            "gold_coordinate_resolution_counts"
-        ],
+        "gold_coordinate_resolution_counts": inputs.segmentation_facts["gold_coordinate_resolution_counts"],
         "prompt_input_token_max": inputs.segmentation_facts["prompt_input_token_max"],
-        "prompt_input_token_budget": inputs.segmentation_facts[
-            "prompt_input_token_budget"
-        ],
+        "prompt_input_token_budget": inputs.segmentation_facts["prompt_input_token_budget"],
         "segmentation_settings_sha256": inputs.segmentation_facts["settings_sha256"],
         "registry_sha256": inputs.vocabulary_facts["registry_sha256"],
+        "evaluation_boundary": inputs.evaluation_facts,
     }
 
 
@@ -664,6 +756,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="Validate all source, segment, gold, and registry mappings without calling a model.",
     )
+    parser.add_argument(
+        "--evaluation-boundary",
+        type=Path,
+        default=DEFAULT_BOUNDARY_MANIFEST,
+        help="Tracked manifest that freezes split roles and input digests.",
+    )
+    parser.add_argument(
+        "--evaluation-dataset-id",
+        default=DEVELOPMENT_DATASET_ID,
+        help="Dataset declaration to load from --evaluation-boundary.",
+    )
+    parser.add_argument(
+        "--require-adoption-ready",
+        action="store_true",
+        help="Refuse unless a frozen, alias-separated, independently adjudicated holdout is present.",
+    )
+    parser.add_argument(
+        "--candidate-selector",
+        choices=CANDIDATE_SELECTORS,
+        default=PRODUCTION_SELECTOR,
+        help="Candidate selector to execute through validation and the real prompt budget.",
+    )
     args = parser.parse_args(argv)
     model: OpenAIStructuredTextModel | None = None
     prompt_input_token_budget = PROMPT_INPUT_TOKEN_BUDGET
@@ -685,6 +799,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         gold_file=args.gold_file,
         prompt_input_token_budget=prompt_input_token_budget,
         prompt_safety_margin_tokens=prompt_safety_margin_tokens,
+        evaluation_manifest=args.evaluation_boundary,
+        evaluation_dataset_id=args.evaluation_dataset_id,
+        require_adoption_verdict=args.require_adoption_ready,
+        candidate_selector=args.candidate_selector,
     )
     if args.preflight_only:
         print(json.dumps(_preflight_summary(inputs), indent=2, sort_keys=True))

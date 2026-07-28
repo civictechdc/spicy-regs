@@ -11,6 +11,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from spicy_regs.ontology.common import RunContext, canonical_json, write_parquet_rows
+from spicy_regs.ontology.concept_dimensions import concept_source_vocabulary
 from spicy_regs.ontology.concepts import (
     ASSIGNMENT_COLUMNS,
     CANDIDATE_REGISTRY_MAX_TOKENS,
@@ -18,7 +19,9 @@ from spicy_regs.ontology.concepts import (
     candidate_concept,
     generate_for_subject,
     latest_assignments,
+    match_existing_concept,
     merge_pass,
+    merge_seed_registry,
     rescore_candidates,
     seed_concept,
     select_candidate_concepts,
@@ -242,6 +245,160 @@ def test_generate_merge_and_rescore_converges_without_deleting_history():
     assert [event["event_type"] for event in rescore_events] == ["promote"]
 
 
+def test_merge_seed_registry_hydrates_legacy_concept_dimensions():
+    legacy = {
+        "concept_id": "concept_fast_surface_mining",
+        "scheme": "fast-topical",
+        "pref_label": "Surface mining",
+        "alt_labels_json": "[]",
+        "definition": "FAST term.",
+        "broader_id": None,
+        "status": "active",
+        "replaced_by": None,
+        "external_ids_json": "[]",
+        "method": "deterministic",
+        "actor_id": "fixture",
+        "run_id": "fixture",
+        "asserted_at": "2026-07-27T00:00:00Z",
+        "supersedes_id": None,
+    }
+
+    [hydrated] = merge_seed_registry([legacy], [])
+
+    assert hydrated["concept_id"] == legacy["concept_id"]
+    assert hydrated["facet"] == "subject"
+    assert hydrated["source_vocabulary"] == "fast-topical"
+    assert hydrated["scheme"] == "fast-topical"
+    assert {key: hydrated[key] for key in legacy} == legacy
+
+
+def test_merge_seed_registry_preserves_same_label_across_vocabularies() -> None:
+    federal_register = seed_concept({"name": "Air quality"}, _CONTEXT)
+    assert federal_register is not None
+    local = {
+        **federal_register,
+        "concept_id": "concept_local_air_quality",
+        "source_vocabulary": "spicy-regs-local",
+        "external_ids_json": "[]",
+    }
+
+    merged = merge_seed_registry([local], [federal_register])
+
+    assert {row["concept_id"] for row in merged} == {
+        "concept_local_air_quality",
+        federal_register["concept_id"],
+    }
+    assert {
+        concept_source_vocabulary(row)
+        for row in merged
+        if row["pref_label"] == "Air quality"
+    } == {
+        "federal-register-thesaurus",
+        "spicy-regs-local",
+    }
+
+
+@pytest.mark.parametrize(
+    "external_scheme",
+    ["federal_register_thesaurus", "fr-thesaurus"],
+)
+def test_both_federal_register_legacy_markers_infer_the_same_vocabulary(
+    external_scheme: str,
+) -> None:
+    row = {
+        "concept_id": "legacy-fr-concept",
+        "scheme": "subject",
+        "external_ids_json": canonical_json(
+            [{"scheme": external_scheme, "value": "Air quality"}]
+        ),
+    }
+
+    assert concept_source_vocabulary(row) == "federal-register-thesaurus"
+
+
+def test_fused_v1_marker_mix_infers_935_federal_register_and_one_local() -> None:
+    rows = [
+        {
+            "concept_id": f"base-{index}",
+            "scheme": "subject",
+            "external_ids_json": canonical_json(
+                [
+                    {
+                        "scheme": "federal_register_thesaurus",
+                        "value": f"Base {index}",
+                    }
+                ]
+            ),
+        }
+        for index in range(900)
+    ]
+    rows.extend(
+        {
+            "concept_id": f"enrichment-{index}",
+            "scheme": "subject",
+            "external_ids_json": canonical_json(
+                [{"scheme": "fr-thesaurus", "value": f"Enrichment {index}"}]
+            ),
+        }
+        for index in range(35)
+    )
+    rows.append(
+        {
+            "concept_id": "native-american-programs",
+            "scheme": "subject",
+            "external_ids_json": "[]",
+        }
+    )
+
+    vocabularies = [concept_source_vocabulary(row) for row in rows]
+    assert vocabularies.count("federal-register-thesaurus") == 935
+    assert vocabularies.count("spicy-regs-local") == 1
+
+
+def test_label_only_match_refuses_ambiguous_authority_concepts():
+    federal_register = seed_concept({"name": "PFAS"}, _CONTEXT)
+    assert federal_register is not None
+    fast = {
+        **federal_register,
+        "concept_id": "concept_fast_pfas",
+        "source_vocabulary": "fast-topical",
+    }
+
+    assert (
+        match_existing_concept(
+            _proposal(label="PFAS"),
+            [federal_register, fast],
+        )
+        is None
+    )
+
+
+def test_ambiguous_authority_label_materializes_a_distinct_local_candidate():
+    federal_register = seed_concept({"name": "PFAS"}, _CONTEXT)
+    assert federal_register is not None
+    fast = {
+        **federal_register,
+        "concept_id": "concept_fast_pfas",
+        "source_vocabulary": "fast-topical",
+    }
+
+    new_concepts, assignments, events = generate_for_subject(
+        subject=_subject(),
+        concepts=[federal_register, fast],
+        model=_FakeModel(),
+        context=_CONTEXT,
+    )
+
+    assert len(new_concepts) == len(assignments) == len(events) == 1
+    [local] = new_concepts
+    assert local["source_vocabulary"] == "spicy-regs-local"
+    assert local["concept_id"] not in {
+        federal_register["concept_id"],
+        fast["concept_id"],
+    }
+    assert assignments[0]["concept_id"] == local["concept_id"]
+
+
 def test_merge_pass_routes_high_usage_ambiguous_pairs_to_human_review():
     left = seed_concept({"name": "Climate change"}, _CONTEXT)
     right = seed_concept({"name": "Climate changes"}, _CONTEXT)
@@ -273,6 +430,29 @@ def test_merge_pass_routes_high_usage_ambiguous_pairs_to_human_review():
     assert review[0]["usage"] == 1
 
 
+def test_merge_pass_never_converges_concepts_across_source_vocabularies():
+    left = seed_concept({"name": "Surface mining"}, _CONTEXT)
+    assert left is not None
+    right = {
+        **left,
+        "concept_id": "concept_fast_surface_mining",
+        "source_vocabulary": "fast-topical",
+        "scheme": "subject",
+    }
+
+    updated, events, review = merge_pass(
+        [left, right],
+        [],
+        context=_CONTEXT,
+        auto_threshold=0.0,
+        review_threshold=0.0,
+    )
+
+    assert updated == [left, right]
+    assert events == []
+    assert review == []
+
+
 def test_regulated_entity_candidate_preserves_resolved_cas_anchor():
     proposal = replace(
         _proposal(),
@@ -286,7 +466,32 @@ def test_regulated_entity_candidate_preserves_resolved_cas_anchor():
         actor_id="test-model:v1",
     )
     assert concept["scheme"] == "regulated_entity"
+    subject_seed = seed_concept({"name": "Perfluorooctanoic acid"}, _CONTEXT)
+    assert subject_seed is not None
+    assert concept["concept_id"] != subject_seed["concept_id"]
+    assert concept["source_vocabulary"] == "spicy-regs-local"
     assert json.loads(concept["external_ids_json"]) == [{"scheme": "cas", "value": "335-67-1"}]
+
+
+def test_local_candidate_identity_includes_its_semantic_facet():
+    subject = candidate_concept(
+        _proposal(label="PFAS"),
+        _CONTEXT,
+        actor_id="test-model:v1",
+    )
+    regulated_entity = candidate_concept(
+        replace(
+            _proposal(label="PFAS"),
+            scheme="regulated_entity",
+        ),
+        _CONTEXT,
+        actor_id="test-model:v1",
+    )
+
+    assert subject["source_vocabulary"] == regulated_entity["source_vocabulary"]
+    assert subject["facet"] == "subject"
+    assert regulated_entity["facet"] == "regulated_entity"
+    assert subject["concept_id"] != regulated_entity["concept_id"]
 
 
 def test_openai_provider_uses_strict_responses_schema_and_grounded_evidence():
@@ -345,9 +550,7 @@ def test_openai_provider_uses_strict_responses_schema_and_grounded_evidence():
     assert model.last_call_metadata["tag_accepted_item_count"] == 1
     assert model.last_call_metadata["tag_rejection_count"] == 0
     assert model.last_call_metadata["evidence_offset_repair_count"] == 0
-    assert proposals[0].evidence_alignment_method == (
-        EVIDENCE_ALIGNMENT_PROVIDED
-    )
+    assert proposals[0].evidence_alignment_method == (EVIDENCE_ALIGNMENT_PROVIDED)
     assert (
         model.last_call_metadata["prompt_token_estimate"] + model.last_call_metadata["prompt_safety_margin_tokens"]
         <= model.last_call_metadata["prompt_input_token_budget"]
@@ -441,9 +644,7 @@ def test_openai_provider_repairs_only_unique_verbatim_evidence_offsets() -> None
     assert len(proposals) == 1
     assert proposals[0].evidence_start == 0
     assert proposals[0].evidence_end == 4
-    assert proposals[0].evidence_alignment_method == (
-        EVIDENCE_ALIGNMENT_UNIQUE_EXACT
-    )
+    assert proposals[0].evidence_alignment_method == (EVIDENCE_ALIGNMENT_UNIQUE_EXACT)
     assert model.last_call_metadata is not None
     assert model.last_call_metadata["evidence_offset_repair_count"] == 1
     assert model.last_call_metadata["tag_accepted_item_count"] == 1

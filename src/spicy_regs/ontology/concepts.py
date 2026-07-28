@@ -20,6 +20,14 @@ from spicy_regs.ontology.common import (
     stable_id,
     text_digest,
 )
+from spicy_regs.ontology.concept_dimensions import (
+    FACETS,
+    FEDERAL_REGISTER_SOURCE_VOCABULARY,
+    LOCAL_SOURCE_VOCABULARY,
+    concept_facet,
+    concept_source_vocabulary,
+    with_concept_dimensions,
+)
 from spicy_regs.ontology.invariants import (
     assert_append_only,
     assert_attestation_complete,
@@ -39,6 +47,8 @@ from spicy_regs.ontology.subjects import Subject
 
 CONCEPT_COLUMNS = (
     "concept_id",
+    "facet",
+    "source_vocabulary",
     "scheme",
     "pref_label",
     "alt_labels_json",
@@ -67,7 +77,10 @@ EVENT_COLUMNS = (
     *ATTESTATION_COLUMNS,
 )
 
-SCHEMES = frozenset({"subject", "regulated_entity"})
+# ``scheme`` was the original name for the semantic facet.  Keep the public
+# constant and column while old materializations and response payloads exist,
+# but never use it to identify an external controlled vocabulary.
+SCHEMES = FACETS
 CONCEPT_STATUSES = frozenset({"active", "deprecated", "candidate"})
 EVENT_TYPES = frozenset({"merge", "split", "rename", "deprecate", "promote", "seed"})
 
@@ -108,6 +121,8 @@ def seed_concept(topic: object, context: RunContext) -> dict | None:
         external[0]["iri"] = f"https://www.federalregister.gov/topics/{slug}"
     return {
         "concept_id": stable_id("concept", "subject", normalized),
+        "facet": "subject",
+        "source_vocabulary": FEDERAL_REGISTER_SOURCE_VOCABULARY,
         "scheme": "subject",
         "pref_label": label,
         "alt_labels_json": "[]",
@@ -123,10 +138,17 @@ def seed_concept(topic: object, context: RunContext) -> dict | None:
 def candidate_concept(proposal: TagProposal, context: RunContext, *, actor_id: str) -> dict:
     label = str(proposal.proposed_label or "").strip()
     normalized = normalize_label(label)
-    scheme = proposal.scheme if proposal.scheme in SCHEMES else "subject"
+    facet = proposal.scheme if proposal.scheme in FACETS else "subject"
     return {
-        "concept_id": stable_id("concept", scheme, normalized),
-        "scheme": scheme,
+        "concept_id": stable_id(
+            "concept",
+            LOCAL_SOURCE_VOCABULARY,
+            facet,
+            normalized,
+        ),
+        "facet": facet,
+        "source_vocabulary": LOCAL_SOURCE_VOCABULARY,
+        "scheme": facet,
         "pref_label": label,
         "alt_labels_json": "[]",
         "definition": proposal.definition,
@@ -151,17 +173,27 @@ def concept_aliases(concept: dict) -> set[str]:
 
 def merge_seed_registry(prior: Sequence[dict], seeds: Iterable[dict]) -> list[dict]:
     """Add new seeds without deleting or renaming prior registry entries."""
-    concepts = [dict(row) for row in prior]
-    aliases_by_scheme: dict[str, set[str]] = defaultdict(set)
+    # Schema-v1 rows may carry only ``scheme``. Hydrate the canonical
+    # dimensions at the merge boundary so every normal writer gets non-null
+    # facet/source-vocabulary values without rewriting legacy ids or content.
+    concepts = [with_concept_dimensions(row) for row in prior]
+    aliases_by_identity: dict[tuple[str, str], set[str]] = defaultdict(set)
     for concept in concepts:
-        aliases_by_scheme[str(concept.get("scheme"))].update(concept_aliases(concept))
+        identity = (
+            concept_facet(concept),
+            concept_source_vocabulary(concept),
+        )
+        aliases_by_identity[identity].update(concept_aliases(concept))
     for seed in seeds:
-        scheme = str(seed.get("scheme"))
+        identity = (
+            concept_facet(seed),
+            concept_source_vocabulary(seed),
+        )
         normalized = normalize_label(seed.get("pref_label"))
-        if not normalized or normalized in aliases_by_scheme[scheme]:
+        if not normalized or normalized in aliases_by_identity[identity]:
             continue
         concepts.append(dict(seed))
-        aliases_by_scheme[scheme].add(normalized)
+        aliases_by_identity[identity].add(normalized)
     assert_append_only(prior, concepts, id_column="concept_id")
     assert_concept_graphs(concepts)
     return concepts
@@ -182,7 +214,13 @@ def select_candidate_concepts_for_text(
     for concept in concepts:
         if concept.get("status") == "deprecated":
             continue
-        if concept.get("scheme") not in allowed:
+        try:
+            facet = concept_facet(concept)
+        except ValueError:
+            # Historical callers could include rows from unrelated schemes.
+            # They remain ineligible rather than changing v1 into a hard fail.
+            continue
+        if facet not in allowed:
             continue
         aliases = concept_aliases(concept)
         label_tokens = set().union(*(alias.split() for alias in aliases)) if aliases else set()
@@ -210,9 +248,9 @@ def select_candidate_concepts_for_text(
             ):
                 selected.append(concept)
     for scheme in allowed:
-        if not any(concept.get("scheme") == scheme for concept in selected):
+        if not any(concept_facet(concept) == scheme for concept in selected):
             fallback = next(
-                (concept for _, _, concept in scored if concept.get("scheme") == scheme),
+                (concept for _, _, concept in scored if concept_facet(concept) == scheme),
                 None,
             )
             if fallback is not None and (
@@ -237,12 +275,13 @@ def select_candidate_concepts(subject: Subject, concepts: Sequence[dict], *, lim
 # Anchored hybrid candidate selector (v2)
 #
 # ``select_candidate_concepts_for_text`` above scores every concept by
-# unanchored substring containment inside one flat scheme gate. At 901 rows
-# that is adequate; at the 513,236-row fused registry it fails twice over —
-# short labels match inside longer words ("Ants" inside "pollutants") and the
-# ``allowed_schemes`` gate hides every scheme a subject profile does not name,
-# which is where 7 of the 8 exact-alias gold targets live
-# (docs/evidence/gold-adjudication-2026-07-27/README.md, round 2).
+# unanchored substring containment inside one flat facet gate. At 901 rows that
+# is adequate; at the 513,236-row fused-registry-v1 artifact it fails twice
+# over — short labels match inside longer words ("Ants" inside "pollutants")
+# and that artifact overloaded ``scheme`` with source-vocabulary names. The
+# latter made valid subject concepts look like disallowed facets. New registry
+# rows carry ``facet`` and ``source_vocabulary`` separately; the compatibility
+# helpers above can also read the old artifact without weakening the facet gate.
 #
 # v2 is additive and independent: v1 is untouched so the two remain
 # comparable on the same inputs. The design follows recommendations 1-4 of
@@ -255,12 +294,11 @@ def select_candidate_concepts(subject: Subject, concepts: Sequence[dict], *, lim
 #      combination of MLLM-style deterministic features;
 #   3. channel B, character 3-gram TF-IDF over each concept's label string
 #      (the scispaCy candidate-generator recipe);
-#   4. RRF fusion at k=60, then scheme-stratified quotas for the final list.
+#   4. RRF fusion at k=60, then source-vocabulary quotas for the final list.
 #
-# Two deliberate differences from v1, both required by the finding above:
-# there is no ``allowed_schemes`` gate (scheme balance is enforced by quota,
-# not by exclusion), and there is no prompt-token trim — v2 currently feeds
-# adjudication input, not a provider call, so it selects by rank alone.
+# The semantic facet gate and prompt-token trim are load-bearing production
+# rules. v2 applies both; source-vocabulary quotas add diversity without
+# confusing source identity with tag policy.
 # --------------------------------------------------------------------------
 
 ANCHORED_SELECTOR_VERSION = "anchored-hybrid-v2"
@@ -304,17 +342,19 @@ ANCHOR_CHANNEL_DEPTH = 50
 # Matches ``spicy_regs.docpipeline.retrieval.RETRIEVAL_RRF_K``; kept as a local
 # constant so the ontology package does not import the pipeline.
 ANCHOR_RRF_K = 60
-# Structural protection for small schemes: without it the 440,599-row
-# fast-topical scheme crowds out the 33-row policy-area scheme on score alone.
-ANCHOR_SCHEME_QUOTAS: dict[str, int] = {
-    "subject": 3,
+# Structural protection for small vocabularies: without it the 440,599-row
+# FAST vocabulary crowds out the 33-row CRS policy-area vocabulary on score.
+ANCHOR_SOURCE_VOCABULARY_QUOTAS: dict[str, int] = {
+    FEDERAL_REGISTER_SOURCE_VOCABULARY: 3,
     "crs-subjects": 3,
     "crs-policy-areas": 1,
     "epa-tsca": 1,
     "fast-topical": 2,
 }
+# Compatibility name for experiment code written against fused-registry v1.
+ANCHOR_SCHEME_QUOTAS = ANCHOR_SOURCE_VOCABULARY_QUOTAS
 ANCHOR_WILDCARD_SLOTS = 2
-ANCHOR_QUOTA_TOTAL = sum(ANCHOR_SCHEME_QUOTAS.values()) + ANCHOR_WILDCARD_SLOTS
+ANCHOR_QUOTA_TOTAL = sum(ANCHOR_SOURCE_VOCABULARY_QUOTAS.values()) + ANCHOR_WILDCARD_SLOTS
 
 ANCHOR_CONDITIONING_CACHE_SIZE = 4
 
@@ -325,8 +365,9 @@ class _RegistryConditioning:
 
     concepts: tuple[dict, ...]
     concept_ids: tuple[str, ...]
-    schemes: tuple[str, ...]
-    scheme_set: frozenset[str]
+    facets: tuple[str, ...]
+    source_vocabularies: tuple[str, ...]
+    source_vocabulary_set: frozenset[str]
     # normalized alias -> ((concept index, alias is the pref label), ...)
     alias_postings: dict[str, tuple[tuple[int, bool], ...]]
     # normalized alias -> number of distinct concepts sharing it
@@ -337,6 +378,16 @@ class _RegistryConditioning:
     max_alias_tokens: int
     vectorizer: Any
     label_matrix: Any
+
+    @property
+    def schemes(self) -> tuple[str, ...]:
+        """Compatibility alias for pre-seam experiment code."""
+        return self.source_vocabularies
+
+    @property
+    def scheme_set(self) -> frozenset[str]:
+        """Compatibility alias for pre-seam experiment code."""
+        return self.source_vocabulary_set
 
 
 # Keyed by ``id(concepts)``; the entry holds the sequence itself, so the id
@@ -404,8 +455,9 @@ def _condition_registry(concepts: Sequence[dict]) -> _RegistryConditioning:
     conditioning = _RegistryConditioning(
         concepts=tuple(eligible),
         concept_ids=tuple(str(concept.get("concept_id") or "") for concept in eligible),
-        schemes=tuple(str(concept.get("scheme") or "") for concept in eligible),
-        scheme_set=frozenset(str(concept.get("scheme") or "") for concept in eligible),
+        facets=tuple(concept_facet(concept) for concept in eligible),
+        source_vocabularies=tuple(concept_source_vocabulary(concept) for concept in eligible),
+        source_vocabulary_set=frozenset(concept_source_vocabulary(concept) for concept in eligible),
         alias_postings={alias: tuple(entries) for alias, entries in postings.items()},
         alias_ambiguity={alias: len({index for index, _ in entries}) for alias, entries in postings.items()},
         token_idf=token_idf,
@@ -532,31 +584,33 @@ def _fuse_reciprocal_rank(channels: Sequence[Sequence[int]]) -> dict[int, float]
     return dict(fused)
 
 
-def _apply_scheme_quotas(
+def _apply_source_vocabulary_quotas(
     ranked: Sequence[int],
     conditioning: _RegistryConditioning,
     *,
     limit: int,
 ) -> list[int]:
-    """Fill the shortlist by scheme quota, ceding empty schemes to wildcards."""
-    quota_applies = limit >= ANCHOR_QUOTA_TOTAL and set(ANCHOR_SCHEME_QUOTAS) <= conditioning.scheme_set
+    """Fill by source-vocabulary quota, ceding empty sources to wildcards."""
+    quota_applies = (
+        limit >= ANCHOR_QUOTA_TOTAL and set(ANCHOR_SOURCE_VOCABULARY_QUOTAS) <= conditioning.source_vocabulary_set
+    )
     if not quota_applies:
         return list(ranked[:limit])
     chosen: list[int] = []
     taken: set[int] = set()
-    for scheme in sorted(ANCHOR_SCHEME_QUOTAS):
-        quota = ANCHOR_SCHEME_QUOTAS[scheme]
+    for vocabulary in sorted(ANCHOR_SOURCE_VOCABULARY_QUOTAS):
+        quota = ANCHOR_SOURCE_VOCABULARY_QUOTAS[vocabulary]
         for index in ranked:
             if len(chosen) >= limit:
                 break
-            if conditioning.schemes[index] != scheme or index in taken:
+            if conditioning.source_vocabularies[index] != vocabulary or index in taken:
                 continue
             chosen.append(index)
             taken.add(index)
             quota -= 1
             if quota <= 0:
                 break
-    # Wildcard pool: the reserved slots plus every slot a scheme could not fill.
+    # Wildcard pool: reserved slots plus every slot a vocabulary could not fill.
     for index in ranked:
         if len(chosen) >= limit:
             break
@@ -568,20 +622,37 @@ def _apply_scheme_quotas(
     return sorted(chosen, key=lambda index: order[index])
 
 
+# Compatibility alias for experiment code written against fused-registry v1.
+_apply_scheme_quotas = _apply_source_vocabulary_quotas
+
+
+def _allowed_facet_ranking(
+    ranked: Sequence[int],
+    conditioning: _RegistryConditioning,
+    allowed_facets: Sequence[str],
+) -> list[int]:
+    allowed = {str(value) for value in allowed_facets}
+    unknown = sorted(allowed - FACETS)
+    if unknown:
+        raise ValueError(f"unknown allowed facets: {unknown}")
+    return [index for index in ranked if conditioning.facets[index] in allowed]
+
+
 def select_candidate_concepts_anchored_v2(
     text: str,
     concepts: Sequence[dict],
     *,
+    allowed_facets: Sequence[str] = tuple(sorted(FACETS)),
     limit: int = ANCHOR_QUOTA_TOTAL,
 ) -> list[dict]:
     """Select candidates by anchored lexical + char-ngram retrieval, fused.
 
     Two independent deterministic channels each retrieve their top
-    ``ANCHOR_CHANNEL_DEPTH``; RRF at k=60 fuses them; scheme quotas cut the
-    result to ``limit``. A registry whose schemes do not cover
-    ``ANCHOR_SCHEME_QUOTAS`` (or a ``limit`` below the quota total) takes the
-    fused ranking unmodified, so the selector still works on the 901-row
-    single-scheme registry.
+    ``ANCHOR_CHANNEL_DEPTH``; RRF at k=60 fuses them. The subject profile's
+    semantic facet gate runs before source-vocabulary quotas cut the result to
+    ``limit``. Unreviewed same-label copies remain separately selectable:
+    collapsing them to one representative could create a false authority
+    assignment when definitions differ.
 
     Registry conditioning is cached in-process on the identity of ``concepts``:
     the first call over a large registry pays for the alias table and the
@@ -603,8 +674,30 @@ def select_candidate_concepts_anchored_v2(
     ]
     fused = _fuse_reciprocal_rank(channels)
     ranked = sorted(fused.items(), key=lambda item: (-item[1], conditioning.concept_ids[item[0]]))
-    selected = _apply_scheme_quotas([index for index, _ in ranked], conditioning, limit=limit)
-    return [{**conditioning.concepts[index], "selector_version": ANCHORED_SELECTOR_VERSION} for index in selected]
+    allowed = _allowed_facet_ranking(
+        [index for index, _ in ranked],
+        conditioning,
+        allowed_facets,
+    )
+    selected = _apply_source_vocabulary_quotas(
+        allowed,
+        conditioning,
+        limit=limit,
+    )
+    candidates = [
+        {
+            **with_concept_dimensions(conditioning.concepts[index]),
+            "selector_version": ANCHORED_SELECTOR_VERSION,
+        }
+        for index in selected
+    ]
+    counter = TiktokenCounter()
+    while candidates and (
+        counter.count(canonical_json([ontology_concept_payload(concept) for concept in candidates]))
+        > CANDIDATE_REGISTRY_MAX_TOKENS
+    ):
+        candidates.pop()
+    return candidates
 
 
 def match_existing_concept(proposal: TagProposal, concepts: Sequence[dict]) -> str | None:
@@ -612,10 +705,14 @@ def match_existing_concept(proposal: TagProposal, concepts: Sequence[dict]) -> s
     if proposal.concept_id:
         return proposal.concept_id
     normalized = normalize_label(proposal.proposed_label)
-    for concept in concepts:
-        if concept.get("scheme") == proposal.scheme and normalized in concept_aliases(concept):
-            return str(concept["concept_id"])
-    return None
+    matches = {
+        str(concept["concept_id"])
+        for concept in concepts
+        if concept_facet(concept) == proposal.scheme and normalized in concept_aliases(concept)
+    }
+    # A repeated label across authority vocabularies is not equivalence. Only
+    # one unambiguous registry identity can absorb a label-only proposal.
+    return next(iter(matches)) if len(matches) == 1 else None
 
 
 def make_assignment(
@@ -932,7 +1029,8 @@ def generate_for_subject(
                 (
                     concept
                     for concept in concepts + new_concepts
-                    if concept.get("scheme") == candidate.get("scheme")
+                    if concept_facet(concept) == concept_facet(candidate)
+                    and concept_source_vocabulary(concept) == concept_source_vocabulary(candidate)
                     and normalize_label(concept.get("pref_label")) == normalize_label(candidate.get("pref_label"))
                 ),
                 None,
@@ -947,7 +1045,9 @@ def generate_for_subject(
                         {
                             "concept_id": concept_id,
                             "label": candidate["pref_label"],
-                            "scheme": candidate["scheme"],
+                            "facet": concept_facet(candidate),
+                            "source_vocabulary": concept_source_vocabulary(candidate),
+                            "scheme": concept_facet(candidate),
                             "source": "llm_candidate",
                             "justification": proposal.justification,
                         },
@@ -1052,7 +1152,12 @@ def merge_pass(
     pairs: list[tuple[float, float, str, str]] = []
     for index, left in enumerate(active):
         for right in active[index + 1 :]:
-            if left.get("scheme") != right.get("scheme"):
+            # A shared facet or label does not assert that two authorities mean
+            # the same thing. Convergence remains inside one source vocabulary;
+            # cross-vocabulary collisions are presentation mappings only.
+            if concept_facet(left) != concept_facet(right) or concept_source_vocabulary(
+                left
+            ) != concept_source_vocabulary(right):
                 continue
             left_id, right_id = str(left["concept_id"]), str(right["concept_id"])
             label_score = concept_similarity(left, right)

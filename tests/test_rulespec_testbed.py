@@ -69,7 +69,7 @@ def _gold(
     start: int,
     gold_id: str = "gold-1",
     concept_label: str | None = None,
-    split: str | None = None,
+    split: str | None = "train",
 ) -> dict[str, Any]:
     row = {
         "gold_id": gold_id,
@@ -236,7 +236,7 @@ def test_gold_mapping_refuses_bad_digests_and_uncontained_spans() -> None:
         )
 
 
-def test_gold_split_defaults_to_train_and_travels_with_every_answer() -> None:
+def test_gold_requires_an_explicit_split_unless_manifest_forces_development() -> None:
     artifact, segment = _artifact_and_segment(
         heading="Aviation cybersecurity",
         text="The report discusses implementation details.",
@@ -263,9 +263,20 @@ def test_gold_split_defaults_to_train_and_travels_with_every_answer() -> None:
             [_concept("Aviation cybersecurity")],
         )
 
-    absent = answers_for(gold)
-    assert absent["artifacts"][0]["split"] == "train"
-    assert absent["artifacts"][0]["expected_tags"][0]["split"] == "train"
+    missing = {key: value for key, value in gold.items() if key != "split"}
+    with pytest.raises(DiagnosticInputError, match="has no explicit split"):
+        answers_for(missing)
+
+    forced = _answers(
+        [missing],
+        {key: artifact},
+        {(*key, segment.ordinal): segment},
+        [_selection(artifact, segment)],
+        [_concept("Aviation cybersecurity")],
+        forced_split="train",
+    )
+    assert forced["artifacts"][0]["split"] == "train"
+    assert forced["artifacts"][0]["expected_tags"][0]["split"] == "train"
 
     holdout = answers_for({**gold, "split": "holdout"})
     assert holdout["artifacts"][0]["split"] == "holdout"
@@ -358,9 +369,7 @@ def _mini_dataset(root: Path) -> tuple[Path, Path, Path, list[Any], int]:
     artifacts: list[Any] = []
     selection_rows: list[dict[str, Any]] = []
     for row in _MINI_ROWS:
-        outcome = build_source_artifact(
-            SourceRecord(profile=profile_for_table("cfr_sections"), row=dict(row))
-        )
+        outcome = build_source_artifact(SourceRecord(profile=profile_for_table("cfr_sections"), row=dict(row)))
         assert outcome.state == "completed" and outcome.artifact is not None
         artifact = outcome.artifact
         artifacts.append(artifact)
@@ -476,9 +485,7 @@ def test_gold_never_reaches_a_prompt_payload_or_the_prompt_registry(tmp_path: Pa
 
     # Nothing that reaches a model may move when only gold moves.
     assert [unit.unit_id for unit in first.units] == [unit.unit_id for unit in second.units]
-    assert canonical_json([unit.input for unit in first.units]) == canonical_json(
-        [unit.input for unit in second.units]
-    )
+    assert canonical_json([unit.input for unit in first.units]) == canonical_json([unit.input for unit in second.units])
     assert first.source_facts["gold_sha256"] != second.source_facts["gold_sha256"]
 
     prompts = canonical_json([unit.input for unit in first.units])
@@ -489,17 +496,11 @@ def test_gold_never_reaches_a_prompt_payload_or_the_prompt_registry(tmp_path: Pa
     assert "holdout" in canonical_json(first.answers)
 
     registry_ids = {str(row["concept_id"]) for row in pq.read_table(registry_file).to_pylist()}
-    offered = {
-        str(concept["concept_id"])
-        for unit in first.units
-        for concept in unit.input["available_concepts"]
-    }
+    offered = {str(concept["concept_id"]) for unit in first.units for concept in unit.input["available_concepts"]}
     assert offered and offered <= registry_ids
     # Gold cannot register a concept either: the registry the run reports is
     # still the file the caller supplied.
-    assert first.vocabulary_facts["registry_sha256"] == hashlib.sha256(
-        registry_file.read_bytes()
-    ).hexdigest()
+    assert first.vocabulary_facts["registry_sha256"] == hashlib.sha256(registry_file.read_bytes()).hexdigest()
     assert first.vocabulary_facts == second.vocabulary_facts
 
 
@@ -521,6 +522,4 @@ def test_canonical_sample_preflight_maps_every_gold_span_without_a_model() -> No
     assert inputs.selected_segment_count == 109
     assert inputs.source_facts["selected_artifact_count"] == 44
     assert inputs.segmentation_facts["gold_span_count"] == 35
-    assert inputs.segmentation_facts["gold_coordinate_resolution_counts"] == {
-        "provided-offsets": 35
-    }
+    assert inputs.segmentation_facts["gold_coordinate_resolution_counts"] == {"provided-offsets": 35}

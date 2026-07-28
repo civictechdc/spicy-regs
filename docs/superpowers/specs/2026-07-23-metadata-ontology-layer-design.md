@@ -163,7 +163,9 @@ One row per concept. Never hard-deleted, never renamed in place.
 | Column | Description |
 | --- | --- |
 | `concept_id` | Stable opaque id. |
-| `scheme` | Facet: v1 ships `subject` and `regulated_entity` only. |
+| `facet` | Semantic tag-policy facet. v1 ships `subject` and `regulated_entity` only. Profiles use this field to decide which kinds of tags are allowed. |
+| `source_vocabulary` | Authority vocabulary used for concept identity, provenance, retrieval quotas, and Rulespec `inScheme` (for example, `federal-register-thesaurus`, `crs-subjects`, or `fast-topical`). |
+| `scheme` | Deprecated compatibility mirror of `facet`. New rows must keep `scheme == facet`; no new code may use it as vocabulary identity. |
 | `pref_label` | Preferred label. |
 | `alt_labels_json` | JSON array of synonyms (grows on merge). |
 | `definition` | One-sentence scope note. |
@@ -173,9 +175,16 @@ One row per concept. Never hard-deleted, never renamed in place.
 | `external_ids_json` | Anchors: FR Thesaurus term, CAS number, NAICS code, `skos:exactMatch` IRIs. |
 | + attestation columns | See provenance model below. |
 
-**Seeding (v1, before any LLM runs):** the `subject` scheme seeds from the Federal Register Thesaurus of Indexing Terms; `regulated_entity` starts empty and grows from extraction, anchored to CAS numbers where resolvable. The tagger extends a real taxonomy rather than inventing one.
+**Seeding (v1, before any LLM runs):** the `subject` facet seeds from the Federal Register Thesaurus of Indexing Terms; `regulated_entity` starts empty and grows from extraction, anchored to CAS numbers where resolvable. The tagger extends a real taxonomy rather than inventing one.
 
-**Facet decision:** `affected_party`, `policy_instrument`, and `program` are deferred until the merge/validation loop proves itself on two facets. The `scheme` column makes adding them additive.
+**Facet decision:** `affected_party`, `policy_instrument`, and `program` are deferred until the merge/validation loop proves itself on two facets. The `facet` column makes adding them additive. A shared normalized label across two source vocabularies creates an unreviewed mapping record only; the selector keeps both ids selectable, and the record does not authorize a concept merge or `skos:exactMatch`.
+
+**Compatibility boundary:** `fused-concept-registry-v1` overloaded `scheme`
+with five source-vocabulary names. Readers may infer `facet` and
+`source_vocabulary` for that immutable artifact only. New fusion writes the
+v2 shape and keeps `scheme` equal to `facet`. Remove the inference shim when
+`fused-concept-registry-v1` is no longer an accepted testbed/CLI input; rebuild
+v2 from authoritative sources rather than rewriting v1 in place.
 
 ### 4. `concept_assignments` — the tag edges
 

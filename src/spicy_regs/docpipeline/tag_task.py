@@ -28,6 +28,11 @@ from spicy_regs.docpipeline.extraction import (
 from spicy_regs.docpipeline.segments import ProcessingSegment
 from spicy_regs.docpipeline.source import SourceArtifact
 from spicy_regs.ontology.common import canonical_json, stable_id
+from spicy_regs.ontology.concept_dimensions import (
+    LOCAL_SOURCE_VOCABULARY,
+    concept_facet,
+    concept_source_vocabulary,
+)
 from spicy_regs.ontology.concepts import concept_aliases, normalize_label
 from spicy_regs.ontology.llm import (
     ASSIGNMENT_ROLES,
@@ -44,8 +49,9 @@ SCHEMA_NAME = "ontology_tags"
 CANDIDATE_TABLE = "extraction/tag-candidates.parquet"
 REJECTION_TABLE = "extraction/tag-rejections.parquet"
 
-# Evaluation-side gold partitions. ``holdout`` rows are scored and never tuned
-# against; gold that declares no partition is ``train``.
+# Evaluation-side gold partitions. New data must declare one explicitly. The
+# original 35-row development set is the sole exception: its tracked manifest
+# permanently forces ``train`` without rewriting the ignored Parquet artifact.
 GOLD_SPLITS: tuple[str, ...] = ("train", "holdout")
 DEFAULT_GOLD_SPLIT = "train"
 
@@ -80,6 +86,8 @@ CANDIDATE_COLUMNS: tuple[tuple[str, str], ...] = (
     ("concept_id", "string"),
     ("concept_label", "string"),
     ("concept_status", "string"),
+    ("facet", "string"),
+    ("source_vocabulary", "string"),
     ("scheme", "string"),
     ("role", "string"),
     ("definition", "string"),
@@ -201,8 +209,15 @@ def _validate_payload(payload: Mapping[str, Any]) -> None:
         if concept_id in seen:
             raise ExtractionError(f"available concept {concept_id!r} appears twice")
         seen.add(concept_id)
-        if str(concept.get("scheme") or "") not in schemes:
-            raise ExtractionError(f"available concept {concept_id!r} has a disallowed scheme")
+        try:
+            facet = concept_facet(concept)
+        except ValueError as exc:
+            raise ExtractionError(str(exc)) from exc
+        vocabulary = concept_source_vocabulary(concept)
+        if not vocabulary:
+            raise ExtractionError(f"available concept {concept_id!r} has no source vocabulary")
+        if facet not in schemes:
+            raise ExtractionError(f"available concept {concept_id!r} has a disallowed facet")
 
 
 def tag_unit(
@@ -356,7 +371,7 @@ def _declared_role(item: Mapping[str, Any]) -> str | None:
 
 
 def _declared_split(item: Mapping[str, Any]) -> str:
-    """Return the gold partition an answer row declares, defaulting to train."""
+    """Return the already-validated gold partition."""
     return str(item.get("split") or "").strip() or DEFAULT_GOLD_SPLIT
 
 
@@ -388,7 +403,9 @@ class TagExtractionTask:
         including the closed ``role`` enum, so a missing or unknown assignment
         role fails here rather than reaching a candidate row.
         """
-        errors = sorted(Draft202012Validator(dict(schema)).iter_errors(dict(response)), key=lambda item: list(item.path))
+        errors = sorted(
+            Draft202012Validator(dict(schema)).iter_errors(dict(response)), key=lambda item: list(item.path)
+        )
         if errors:
             raise ResponseCheckError(f"tag response violates the strict schema at {list(errors[0].path)}")
 
@@ -402,13 +419,12 @@ class TagExtractionTask:
         concepts = {
             str(concept["concept_id"]): concept
             for concept in (
-                _object(raw, "available concept")
-                for raw in _array(payload["available_concepts"], "available_concepts")
+                _object(raw, "available concept") for raw in _array(payload["available_concepts"], "available_concepts")
             )
         }
         aliases: dict[tuple[str, str], list[dict[str, Any]]] = {}
         for concept in concepts.values():
-            scheme = str(concept.get("scheme") or "")
+            scheme = concept_facet(concept)
             for alias in concept_aliases(concept):
                 aliases.setdefault((scheme, alias), []).append(concept)
         allowed_schemes = {str(value) for value in cast(list[Any], subject["allowed_schemes"])}
@@ -427,7 +443,7 @@ class TagExtractionTask:
                 reason = "unknown_concept"
             elif scheme not in allowed_schemes:
                 reason = "disallowed_scheme"
-            elif concept is not None and str(concept.get("scheme") or "") != scheme:
+            elif concept is not None and concept_facet(concept) != scheme:
                 reason = "concept_scheme_mismatch"
             elif concept_id is None and proposed_label:
                 matches = aliases.get((scheme, normalize_label(proposed_label)), [])
@@ -438,10 +454,7 @@ class TagExtractionTask:
                     reason = "ambiguous_concept_alias"
             elif field_key not in fields:
                 reason = "unknown_evidence_field"
-            elif concept_id is None and (
-                not proposed_label
-                or not str(item.get("definition") or "").strip()
-            ):
+            elif concept_id is None and (not proposed_label or not str(item.get("definition") or "").strip()):
                 reason = "incomplete_novel_concept"
 
             if not reason and field_key not in fields:
@@ -506,7 +519,10 @@ class TagExtractionTask:
                 "segment_id": segment["segment_id"],
                 "concept_id": concept_id,
                 "concept_label": label,
-                "scheme": scheme,
+                "facet": scheme,
+                "source_vocabulary": (
+                    concept_source_vocabulary(concept) if concept is not None else LOCAL_SOURCE_VOCABULARY
+                ),
                 "source_field": span["source_field"],
                 "source_start_char": source_start,
                 "source_end_char": source_end,
@@ -529,6 +545,10 @@ class TagExtractionTask:
                     "concept_id": concept_id,
                     "concept_label": label,
                     "concept_status": "existing" if concept is not None else "novel",
+                    "facet": scheme,
+                    "source_vocabulary": (
+                        concept_source_vocabulary(concept) if concept is not None else LOCAL_SOURCE_VOCABULARY
+                    ),
                     "scheme": scheme,
                     "role": str(item.get("role") or ""),
                     "definition": definition,
@@ -599,16 +619,10 @@ class TagExtractionTask:
         return REJECTION_COLUMNS
 
     def candidate_rows(self, candidates: Mapping[str, Any]) -> list[dict[str, Any]]:
-        return [
-            _object(raw, "candidate")
-            for raw in _array(candidates.get("candidates"), "candidates")
-        ]
+        return [_object(raw, "candidate") for raw in _array(candidates.get("candidates"), "candidates")]
 
     def rejection_rows(self, candidates: Mapping[str, Any]) -> list[dict[str, Any]]:
-        return [
-            _object(raw, "rejection")
-            for raw in _array(candidates.get("rejections"), "rejections")
-        ]
+        return [_object(raw, "rejection") for raw in _array(candidates.get("rejections"), "rejections")]
 
     def score(self, answers: Mapping[str, Any], candidates: Mapping[str, Any]) -> dict[str, Any]:
         """Score candidates against gold overall and per profile, role, and split.
@@ -619,12 +633,10 @@ class TagExtractionTask:
         Answers that declare no ``split`` are scored as one ``train`` partition.
         """
         artifact_answers = [
-            _object(raw, "answers.artifact")
-            for raw in _array(answers.get("artifacts"), "answers.artifacts")
+            _object(raw, "answers.artifact") for raw in _array(answers.get("artifacts"), "answers.artifacts")
         ]
         segment_answers = [
-            _object(raw, "answers.segment")
-            for raw in _array(answers.get("segments"), "answers.segments")
+            _object(raw, "answers.segment") for raw in _array(answers.get("segments"), "answers.segments")
         ]
         artifact_by_digest: dict[str, dict[str, Any]] = {}
         expected_by_artifact: dict[str, dict[str, dict[str, Any]]] = {}
@@ -641,17 +653,9 @@ class TagExtractionTask:
                 raise ExtractionError(f"answers artifact {digest} has no expected tags")
             expected_by_artifact[digest] = expected
 
-        raw_candidates = [
-            _object(raw, "candidate")
-            for raw in _array(candidates.get("candidates"), "candidates")
-        ]
-        raw_rejections = [
-            _object(raw, "rejection")
-            for raw in _array(candidates.get("rejections"), "rejections")
-        ]
-        predicted_by_artifact: dict[str, dict[str, dict[str, Any]]] = {
-            digest: {} for digest in artifact_by_digest
-        }
+        raw_candidates = [_object(raw, "candidate") for raw in _array(candidates.get("candidates"), "candidates")]
+        raw_rejections = [_object(raw, "rejection") for raw in _array(candidates.get("rejections"), "rejections")]
+        predicted_by_artifact: dict[str, dict[str, dict[str, Any]]] = {digest: {} for digest in artifact_by_digest}
         for candidate in raw_candidates:
             digest = str(candidate.get("artifact_digest") or "")
             if digest not in predicted_by_artifact:
@@ -706,10 +710,7 @@ class TagExtractionTask:
                 {canonical_json([digest, key]) for digest in digests for key in expected_keys[digest]},
                 {canonical_json([digest, key]) for digest in digests for key in predicted_keys[digest]},
             )
-            artifact_scores = [
-                _score_counts(expected_keys[digest], predicted_keys[digest])
-                for digest in digests
-            ]
+            artifact_scores = [_score_counts(expected_keys[digest], predicted_keys[digest]) for digest in digests]
             return {
                 "scope": scope,
                 "profile_id": profile_id,
@@ -735,8 +736,7 @@ class TagExtractionTask:
                     else 0.0
                 ),
                 "artifact_exact_match_rate": (
-                    sum(expected_keys[digest] == predicted_keys[digest] for digest in digests)
-                    / len(digests)
+                    sum(expected_keys[digest] == predicted_keys[digest] for digest in digests) / len(digests)
                     if digests
                     else 0.0
                 ),
@@ -823,9 +823,7 @@ class TagExtractionTask:
             in {str(value) for value in cast(list[Any], item.get("adversarial_case_ids") or [])}
         }
         prompt_injection_candidates = [
-            candidate
-            for candidate in raw_candidates
-            if str(candidate.get("segment_id") or "") in prompt_injection_ids
+            candidate for candidate in raw_candidates if str(candidate.get("segment_id") or "") in prompt_injection_ids
         ]
         control_segments: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for segment_answer in segment_answers:
@@ -834,9 +832,7 @@ class TagExtractionTask:
                 control_segments[digest].append(segment_answer)
         controls: list[dict[str, Any]] = []
         for digest, segments in sorted(control_segments.items()):
-            segment_ids_for_artifact = {
-                str(segment.get("segment_id") or "") for segment in segments
-            }
+            segment_ids_for_artifact = {str(segment.get("segment_id") or "") for segment in segments}
             artifact_candidates = [
                 candidate
                 for candidate in raw_candidates
@@ -881,20 +877,26 @@ class TagExtractionTask:
                         for candidate in artifact_candidates
                     ],
                     "rejection_reasons": dict(
-                        sorted(
-                            Counter(
-                                str(rejection.get("reason") or "")
-                                for rejection in artifact_rejections
-                            ).items()
-                        )
+                        sorted(Counter(str(rejection.get("reason") or "") for rejection in artifact_rejections).items())
                     ),
                 }
             )
         grounded = sum(candidate.get("grounded") is True for candidate in raw_candidates)
         novel_count = sum(str(candidate.get("concept_status") or "") == "novel" for candidate in raw_candidates)
+        boundary = _object(
+            answers.get("evaluation_boundary")
+            or {
+                "eligible": False,
+                "blockers": ["evaluation inputs are not bound to a frozen manifest"],
+            },
+            "answers.evaluation_boundary",
+        )
         return {
-            "metric_version": "tag-diagnostic-v2",
+            "metric_version": "tag-diagnostic-v3",
             **overall,
+            "evaluation_scope": ("adoption_holdout" if boundary.get("eligible") is True else "development_only"),
+            "accuracy_verdict_eligible": boundary.get("eligible") is True,
+            "evaluation_boundary": boundary,
             "selected_segment_count": len(segment_answers),
             "accepted_candidate_count": len(raw_candidates),
             "rejected_candidate_count": len(raw_rejections),

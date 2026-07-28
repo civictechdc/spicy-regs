@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from spicy_regs.ontology.common import JsonReadStats, iter_parquet_rows, parse_json_list, read_parquet_rows
+from spicy_regs.ontology.concept_dimensions import concept_facet
 from spicy_regs.ontology.concepts import latest_assignments, normalize_label, resolved_assignment_concept
 
 
@@ -85,7 +86,7 @@ def evaluate_tag_quality(
             continue
         resolved = resolved_assignment_concept(assignment, concepts)
         concept = concept_by_id.get(resolved)
-        if concept is None or concept.get("scheme") != "subject":
+        if concept is None or concept_facet(concept) != "subject":
             continue
         predicted_by_document.setdefault(document_id, set()).add(normalize_label(concept.get("pref_label")))
 
