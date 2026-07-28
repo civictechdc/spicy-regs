@@ -8,23 +8,28 @@ and measures how much of it the registry's own text construction causes.
 
 Four statistics, each chosen because it fails in a distinguishable way:
 
-* **random-pair cosine** — the noise floor. If two concepts drawn at random are
-  already very similar, no retriever can separate them.
+* **concept-pair cosine** (within-type) — inflated by shared boilerplate, so it
+  detects templated label text. It is *not* a retrieval noise floor.
+* **query-to-random-concept cosine** (cross-type) — the actual retrieval null,
+  measured on the same kind of comparison as the top-1 it is subtracted from.
 * **centroid norm** — how far the cloud sits from the origin. Unit vectors
   scattered isotropically average to ~0; vectors crammed into a narrow cone
   average to ~1. This is the single clearest collapse signal.
 * **effective dimensionality** (participation ratio of the centred singular
   spectrum) — how many of the 768 dimensions carry variance. A space using 40
   of 768 has thrown away most of its capacity.
-* **top-1 margin over the noise floor** — the one that decides whether
-  retrieval can work at all: how much more similar the *best* concept is to a
-  real query than two random concepts are to each other. A margin near zero
-  means the top match is barely distinguishable from an arbitrary one.
+* **top-1 margin over that null** — how much closer the *best* concept is to a
+  real query than an arbitrary concept is. Comparing the top-1 against the
+  *concept-pair* figure instead is a category error that understates the margin
+  severalfold; see the correction in
+  ``docs/evidence/usearch-ann-benchmark-2026-07-28.md``.
 
 It compares two ways of building a concept's embedding input:
 
 * ``current`` — exactly ``candidate_channels.concept_embedding_text``: preferred
-  label, alt labels, then the ``definition`` field.
+  label, alt labels, then the ``definition`` field. That function is the v1
+  rule and is deliberately frozen, so this arm keeps measuring what it measured
+  when the finding was first recorded.
 * ``labels-only`` — the same without the definition, which is what
   ``concept_bm25_tokens`` already does for the sparse channel ("Definitions are
   intentionally excluded").
@@ -32,7 +37,16 @@ It compares two ways of building a concept's embedding input:
 Run::
 
     uv run --extra embed python tools/audit_concept_embedding_space.py \
-        --sample 20000 --report <path.json>
+        --setup-cache <setup-cache.json> --sample 20000 --report <path.json>
+
+Once a rule has actually been built into an index, the honest thing to measure
+is the shipped artifact rather than a re-embedded sample. ``--index`` does
+that: it reports the same statistics for one or more stored dense index
+``.npz`` files, needs no encoder, and re-embeds nothing::
+
+    uv run python tools/audit_concept_embedding_space.py \
+        --setup-cache <setup-cache.json> \
+        --index <before.npz> --index <after.npz> --report <path.json>
 
 Development-only diagnostics. This proposes nothing and adopts nothing; it
 measures a property of the registry so a maintainer can decide whether the
@@ -129,21 +143,112 @@ def geometry(vectors: Any, queries: Any, *, depth: int = 50) -> dict[str, Any]:
         ordered = numpy.sort(similarity[:, column])[::-1][:depth]
         tops.append(float(ordered[0]))
         spreads.append(float(ordered[0] - ordered[-1]))
-    noise_floor = float(pairs.mean())
+    # The null for "is the best concept meaningfully closer than an arbitrary
+    # one" must be measured on the SAME kind of comparison as the thing it is
+    # compared against. ``pairs`` is concept-to-concept (within-type); the top-1
+    # is segment-to-concept (cross-type). Short label strings sit high against
+    # each other and low against prose for reasons that carry no information
+    # about relevance, so subtracting one from the other is meaningless. An
+    # earlier revision of this file did exactly that and reported a margin of
+    # 0.029 where the correct figure is 0.217; see the correction in
+    # docs/evidence/usearch-ann-benchmark-2026-07-28.md.
+    concept_to_concept = float(pairs.mean())
+    query_to_random_concept = float(similarity.mean())
     top_one = float(numpy.mean(tops)) if tops else 0.0
     return {
         "concept_count": int(matrix.shape[0]),
         "query_count": int(similarity.shape[1]),
         "depth": int(depth),
-        "random_pair_cosine_mean": round(noise_floor, 6),
-        "random_pair_cosine_p95": round(float(numpy.percentile(pairs, 95)), 6),
+        # Within-type: concept vs concept. Useful for detecting shared
+        # boilerplate, which inflates it. NOT a retrieval noise floor.
+        "concept_pair_cosine_mean": round(concept_to_concept, 6),
+        "concept_pair_cosine_p95": round(float(numpy.percentile(pairs, 95)), 6),
+        # Cross-type: query vs an arbitrary concept. THIS is the retrieval null.
+        "query_to_random_concept_mean": round(query_to_random_concept, 6),
         "centroid_norm": round(float(numpy.linalg.norm(centroid)), 6),
         "effective_dimensions": round(float(1.0 / (energy**2).sum()), 3),
         "dimensions": int(matrix.shape[1]),
         "variance_in_top_10_dims": round(float(energy[:10].sum()), 6),
         "query_top1_cosine_mean": round(top_one, 6),
         "query_top1_to_topk_spread_mean": round(float(numpy.mean(spreads)), 6) if spreads else None,
-        "top1_margin_over_noise_floor": round(top_one - noise_floor, 6),
+        "top1_margin_over_random_concept": round(top_one - query_to_random_concept, 6),
+    }
+
+
+def index_geometry(
+    matrix: Any,
+    queries: Any,
+    *,
+    sample: int,
+    seed: int,
+    depth: int = 50,
+) -> dict[str, Any]:
+    """The four statistics for a stored index, sampled *and* whole.
+
+    The sampled figures use the same protocol as the re-embedding arms above —
+    same generator, same seed, same draw, and deliberately **not** sorted,
+    because :func:`geometry` pairs the sample's two halves and a sorted draw
+    would pair one region of a scheme-clustered registry against another rather
+    than pairing at random. Run against an index built from an unchanged
+    registry, this reproduces that arm's numbers, which is the control.
+
+    The ``full_`` figures take the top-1 over every concept in the index, which
+    is what the channel actually searches — a margin measured over a
+    20,000-row sample is a different, easier question than the one retrieval
+    asks.
+    """
+    import numpy
+
+    generator = numpy.random.default_rng(seed)
+    rows = int(matrix.shape[0])
+    chosen = generator.choice(rows, min(sample, rows), replace=False)
+    stats = geometry(matrix[chosen], queries, depth=depth)
+    with numpy.errstate(divide="ignore", over="ignore", invalid="ignore"):
+        similarity = numpy.asarray(matrix, dtype=numpy.float32) @ numpy.asarray(queries, dtype=numpy.float32).T
+    ordered = numpy.sort(similarity, axis=0)[::-1][:depth]
+    top_one = float(ordered[0].mean())
+    stats["sampled_concept_count"] = int(len(chosen))
+    stats["full_concept_count"] = rows
+    stats["full_query_top1_cosine_mean"] = round(top_one, 6)
+    stats["full_query_top1_to_topk_spread_mean"] = round(float((ordered[0] - ordered[-1]).mean()), 6)
+    # Whole-index null, same cross-type comparison as the top-1 above.
+    stats["full_query_to_random_concept_mean"] = round(float(similarity.mean()), 6)
+    stats["full_top1_margin_over_random_concept"] = round(top_one - float(similarity.mean()), 6)
+    return stats
+
+
+def audit_stored_indexes(
+    *,
+    index_files: Sequence[Path],
+    query_vectors: Any,
+    sample: int,
+    seed: int,
+    depth: int = 50,
+) -> dict[str, Any]:
+    """Measure one or more already-built dense indexes, one at a time.
+
+    Each index is released before the next is read: two 1.6 GB matrices held at
+    once is a needless requirement for a diagnostic.
+    """
+    from spicy_regs.ontology.candidate_channels import load_dense_concept_index
+
+    arms: dict[str, Any] = {}
+    inputs: list[dict[str, Any]] = []
+    for index_file in index_files:
+        index = load_dense_concept_index(Path(index_file))
+        name = index.embedding_text_version
+        if name in arms:
+            raise ValueError(f"two indexes claim the same embedding text version {name!r}")
+        arms[name] = index_geometry(index.matrix, query_vectors, sample=sample, seed=seed, depth=depth)
+        inputs.append({"index_file": str(index_file), **index.facts()})
+        del index
+    return {
+        "schema_version": AUDIT_SCHEMA_VERSION,
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "evaluation_scope": "development_only",
+        "accuracy_verdict_eligible": False,
+        "inputs": {"indexes": inputs, "sample": sample, "seed": seed},
+        "arms": arms,
     }
 
 
@@ -224,18 +329,30 @@ def run_audit(
 
 
 def markdown_table(document: Mapping[str, Any]) -> str:
+    """One row per statistic, one column per arm, in the order the arms were measured."""
     rows = [
-        ("random concept-pair cosine (noise floor)", "random_pair_cosine_mean"),
+        ("concept-pair cosine (within-type; boilerplate detector)", "concept_pair_cosine_mean"),
         ("centroid norm (0 isotropic, 1 collapsed)", "centroid_norm"),
         ("effective dimensions (of 768)", "effective_dimensions"),
         ("query top-1 cosine", "query_top1_cosine_mean"),
         ("query top-1 → top-50 spread", "query_top1_to_topk_spread_mean"),
-        ("top-1 margin over noise floor", "top1_margin_over_noise_floor"),
+        ("query vs random concept (retrieval null)", "query_to_random_concept_mean"),
+        ("top-1 margin over that null", "top1_margin_over_random_concept"),
+        ("query top-1 cosine, whole index", "full_query_top1_cosine_mean"),
+        ("query vs random concept, whole index", "full_query_to_random_concept_mean"),
+        ("top-1 margin over that null, whole index", "full_top1_margin_over_random_concept"),
     ]
     arms = document["arms"]
-    lines = ["| Measure | current (pref; alts; definition) | labels-only (pref; alts) |", "| --- | ---: | ---: |"]
+    names = list(arms)
+    lines = [
+        "| Measure | " + " | ".join(names) + " |",
+        "| --- |" + " ---: |" * len(names),
+    ]
     for title, key in rows:
-        lines.append(f"| {title} | {arms['current'][key]} | {arms['labels-only'][key]} |")
+        if not any(key in arms[name] for name in names):
+            continue
+        cells = " | ".join(str(arms[name].get(key, "—")) for name in names)
+        lines.append(f"| {title} | {cells} |")
     return "\n".join(lines)
 
 
@@ -250,6 +367,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         type=Path,
         required=True,
         help="Benchmark setup cache holding the 35 development query vectors.",
+    )
+    parser.add_argument(
+        "--index",
+        type=Path,
+        action="append",
+        default=None,
+        dest="indexes",
+        help="Measure this stored dense index instead of re-embedding. Repeatable.",
     )
     parser.add_argument("--report", type=Path, default=None)
     args = parser.parse_args(argv)
@@ -266,23 +391,33 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     queries /= numpy.linalg.norm(queries, axis=1, keepdims=True)
 
-    document = run_audit(
-        registry_file=args.registry,
-        query_vectors=queries,
-        sample=args.sample,
-        seed=args.seed,
-        depth=args.depth,
-    )
+    if args.indexes:
+        document = audit_stored_indexes(
+            index_files=args.indexes,
+            query_vectors=queries,
+            sample=args.sample,
+            seed=args.seed,
+            depth=args.depth,
+        )
+    else:
+        document = run_audit(
+            registry_file=args.registry,
+            query_vectors=queries,
+            sample=args.sample,
+            seed=args.seed,
+            depth=args.depth,
+        )
     if args.report:
         Path(args.report).parent.mkdir(parents=True, exist_ok=True)
         Path(args.report).write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
-    composition = document["composition"]
-    print(f"schemes: {composition['schemes']}")
-    print(
-        f"definition templates: {composition['distinct_definition_templates']} distinct; "
-        f"{composition['share_sharing_a_definition_template']:.1%} of concepts share one"
-    )
-    print()
+    composition = document.get("composition")
+    if composition:
+        print(f"schemes: {composition['schemes']}")
+        print(
+            f"definition templates: {composition['distinct_definition_templates']} distinct; "
+            f"{composition['share_sharing_a_definition_template']:.1%} of concepts share one"
+        )
+        print()
     print(markdown_table(document))
     return 0
 

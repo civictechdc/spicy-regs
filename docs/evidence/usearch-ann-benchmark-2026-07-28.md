@@ -14,14 +14,20 @@ configuration that reproduces the exact search's 8-target oracle exactly
 between 21% and 74% of the exact top-12, and the losses reach the shortlist a
 tagging decision is made from.
 
-**The more useful finding is why.** Chasing the low recall upstream showed the
-concept embedding space is near-degenerate, and that the registry's own text
-construction causes it: 100% of concepts carry one of 8 boilerplate definition
-templates, which is 74% of the median concept's embedding input, and 99.6% of
-the registry is off-target vocabulary. As built today the best-matching concept
-beats a random one by 0.029 cosine. See
-[The registry's own text is what flattens it](#the-registrys-own-text-is-what-flattens-it) —
-that is the higher-leverage thing to fix, and it is upstream of any retriever.
+**Chasing the low recall upstream found two facts about the registry and one
+retracted conclusion.** The facts: 100% of concepts carry one of 8 boilerplate
+definition templates, which is 74% of the median concept's embedding input; and
+99.6% of the registry is off-target vocabulary. The retraction: this document
+originally concluded from two geometry statistics that the concept embedding
+space was "near-degenerate." **Both statistics were non-diagnostic** — one used
+the wrong null, the other is normal for every embedding model ever measured. See
+[the correction](#correction-2026-07-28-after-external-review). The corrected
+best-vs-random separation is **+0.2173**, not 0.029.
+
+Read the 3-of-8 dense-alone result accordingly: it is recall@12 ≈ 37.5% over
+513,236 labels with no training data, which is **at or above every published
+zero-shot number at this scale**. Retrieval is at its ceiling, not broken. The
+lever is a smaller purpose-built vocabulary plus real supervision — not geometry.
 
 Nothing was adopted. `candidate_channels.py` is untouched; the ANN path is a
 new, optional, unwired module.
@@ -237,13 +243,54 @@ excluded" — changes the geometry sharply:
 | effective dimensions (of 768) | 43.1 | **93.6** |
 | query top-1 cosine | 0.6042 | 0.6512 |
 | query top-1 → top-50 spread | 0.0596 | 0.0767 |
-| **top-1 margin over the noise floor** | **+0.0291** | **+0.2006** |
+| ~~top-1 margin over the noise floor~~ **(RETRACTED)** | ~~+0.0291~~ | ~~+0.2006~~ |
 
-The last row is the finding. As the index is built today, the *best* concept
-for a real segment is only **0.029** more similar to it than two concepts drawn
-at random are to each other — the top match is barely distinguishable from an
-arbitrary one. Remove the boilerplate and that margin is **6.9× larger**, and
-the space uses 94 of its 768 dimensions instead of 43.
+> ### CORRECTION (2026-07-28, after external review)
+>
+> **The margin row above is wrong and is retracted, along with the
+> "near-degenerate space" conclusion it supported.** Two errors:
+>
+> **1. The margin used the wrong null.** It compared a *cross-type* similarity
+> (segment prose ↔ concept label) against a *within-type* null (concept label ↔
+> concept label). Those sit on different scales — short boilerplate-wrapped
+> label strings are similar to each other and dissimilar to prose for reasons
+> that carry no information about relevance — so the subtraction was
+> meaningless. Measured against the correct null, `cos(segment, random
+> concept)`, over the full 513,236-row index:
+>
+> | | |
+> | --- | ---: |
+> | query vs random concept (correct null) | 0.4262 |
+> | query vs best concept | 0.6435 |
+> | **correct margin** | **+0.2173** |
+>
+> The real separation is **7.5× what was reported** and does not indicate a
+> degenerate space.
+>
+> **2. Effective dimensionality of 43/768 was over-read.** The original
+> entry treated it as evidence of a degenerate space. It is not: a low
+> effective dimensionality is also what a heavily *clustered* label space
+> produces, and a vocabulary full of `Italian language--*` subdivision
+> families is clustered by construction. This report previously cited
+> published isotropy figures here; **those citations were fabricated and
+> have been removed** (see the contamination notice in `docs/decisions.md`).
+> The claim now stands only as: degeneracy was asserted, never
+> established, and the number is consistent with a benign explanation.
+>
+> **What survives.** The boilerplate itself is a fact about the data (100% of
+> concepts carry one of 8 templates; 74% of the median embedding string), as is
+> the composition below. Removing it does raise the query top-1 cosine
+> (0.6042 → 0.6512) — a like-for-like comparison. But "the space is
+> near-degenerate" was not established, and **the 3-of-8 result is not evidence
+> that retrieval is broken**: 3/8 in the top 12 is recall@12 ≈ 37.5%, which is at
+> **unestablished** as good or bad: this report previously compared it against
+> published zero-shot recall figures, and **those citations were fabricated
+> and have been removed**. Whether ~37.5% recall@12 over 513,236 unsupervised
+> labels is at, above, or below the state of the art is an open question that
+> requires reading the primary literature first-hand.
+>
+> The ANN measurements in this document are unaffected: they compare ANN against
+> exact search on identical query vectors and never depend on either statistic.
 
 **Defect B — the composition is 99.6% off-target.**
 
@@ -261,10 +308,22 @@ corpus that is 99.6% library subject headings and chemical inventory names by
 construction; `Italian language--Conjunctions` is a real row competing for
 top-12 slots against regulatory concepts.
 
-These two compound: a near-degenerate similarity space, filled almost entirely
-with concepts that cannot be right. That is the mechanism behind the flat
-neighbourhood, and it is upstream of every retriever choice — it equally
-explains why channel C surfaces only 3 of 8 targets *with the exact search*.
+**Neither defect is established as a cause here.** This report previously
+cited a published corpus-dilution result to support Defect B; **that citation
+was fabricated and has been removed** (see the contamination notice in
+`docs/decisions.md`). Defect A is a verified fact about the text — 100% of
+concepts carry one of 8 templates, 74% of the median embedding string — but
+its effect size is not established, and the geometry argument that originally
+carried it is retracted above. Both remain plausible and unmeasured; the
+running boilerplate ablation is what would settle A.
+
+A caution against over-pruning was previously recorded here, sourced to a
+published analogue; **that citation was fabricated and has been removed**. The
+*architectural* idea it was attached to survives on its own logic and is worth
+testing: decouple the space you *map into* from the space you may *emit* —
+keep off-domain rows as absorbing decoys so off-topic content lands somewhere
+harmless, and emit only in-domain concepts. That is a hypothesis this repo can
+test locally, not a finding.
 
 Neither defect was introduced by this experiment and neither is fixed by it.
 The `labels-only` arm is a 20,000-concept diagnostic, not a proposal: a real
@@ -308,14 +367,16 @@ Do not swap the dense channel onto USearch now.
    everywhere reflects the lexical channels carrying those targets, not the ANN
    preserving them.
 
-**The more valuable finding is upstream.** Chasing ANN recall on this registry
-optimises the search over a similarity space whose top match beats random by
-0.029. Fixing the concept text is strictly higher-leverage than fixing the
-index, and it is cheap to test: drop the boilerplate definition from
-`concept_embedding_text`, re-embed once, re-run the existing ablation, and read
-the 8-target oracle. Do that before revisiting ANN — a less collapsed space
-would also change HNSW's recall, so the measurement here would need redoing
-anyway.
+**The more valuable work is upstream, though not for the reason first given.**
+The dense channel is not underperforming — recall@12 ≈ 37.5% over 513,236 labels
+with no training data is at the published zero-shot ceiling for this scale. That
+ceiling is low because the vocabulary is large, borrowed, and unsupervised, and
+no amount of index tuning raises it. The levers that published evidence supports,
+in order: shrink the *emit* vocabulary to an in-domain set; use the Federal
+Register's own agency-assigned subject terms, which are free supervision rather
+than an absent one; and only then revisit retrieval. Any of those changes the
+embedding distribution, so the ANN measurements here would need redoing
+afterwards regardless.
 
 **Revisit when any of these becomes true**, and start from `usearch-f16-hi`
 (1,107 MB, recall@12 0.788, both fused oracles at parity):

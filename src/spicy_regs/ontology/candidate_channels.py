@@ -18,7 +18,8 @@ This module keeps independently measurable channels beside v2:
   ``prefLabel + altLabels (+ definition)`` string with the repo's pinned BGE
   embedder; a segment retrieves its nearest concepts by cosine. Semantic
   neighbourhood, not string overlap, so an alias that never appears verbatim is
-  still reachable.
+  still reachable. Boilerplate definitions are excluded from that string — see
+  :class:`ConceptEmbeddingTextRule`.
 * **Channel D, free-keyword generate-then-map.** The DNB/LLMs4Subjects recipe:
   an LLM free-generates short descriptor keywords for the segment, each keyword
   is mapped into the registry through the same embedding index, and the
@@ -43,6 +44,7 @@ import hashlib
 import json
 import re
 import time
+from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -72,6 +74,19 @@ BM25_B = 0.75
 # per-call overhead small without holding more than a few hundred MB of
 # intermediate Python floats at once.
 DENSE_INDEX_CHUNK_SIZE = 8_192
+
+# How a concept's embedding input is built. v1 appended every ``definition``;
+# v2 excludes the boilerplate ones (see ``ConceptEmbeddingTextRule``). v1 is
+# kept, not deleted, so the published pre-fix numbers stay reproducible by
+# passing ``concept_embedding_rule(rows, version=CONCEPT_EMBEDDING_TEXT_V1)``.
+CONCEPT_EMBEDDING_TEXT_V1 = "concept-embedding-text-v1-all-definitions"
+CONCEPT_EMBEDDING_TEXT_V2 = "concept-embedding-text-v2-boilerplate-free"
+CONCEPT_EMBEDDING_TEXT_VERSION = CONCEPT_EMBEDDING_TEXT_V2
+# A definition template shared by this many concepts or more is boilerplate.
+# Two is the least assuming threshold that is still a rule: a sentence written
+# for one concept but reused verbatim for another is, by construction, not
+# about either of them.
+BOILERPLATE_DEFINITION_MIN_CONCEPTS = 2
 
 KEYWORD_MIN_COUNT = 5
 KEYWORD_MAX_COUNT = 10
@@ -168,8 +183,13 @@ def _alt_labels(concept: Mapping[str, Any]) -> list[str]:
     return [str(value) for value in values if value]
 
 
-def concept_embedding_text(concept: Mapping[str, Any]) -> str:
-    """Build one concept's embedding input: pref label, alt labels, definition.
+def eligible_concepts(concepts: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    """Drop deprecated rows, matching what v2's conditioning indexes."""
+    return [concept for concept in concepts if concept.get("status") != "deprecated"]
+
+
+def _surface_forms(concept: Mapping[str, Any]) -> list[str]:
+    """Preferred label then alt labels, verbatim, with repeats dropped.
 
     Surface forms are kept verbatim rather than normalized — casing and
     punctuation are signal to a sentence embedder, unlike the lexical channels
@@ -184,15 +204,193 @@ def concept_embedding_text(concept: Mapping[str, Any]) -> str:
             continue
         seen.add(text.casefold())
         parts.append(text)
+    return parts
+
+
+def concept_embedding_text(concept: Mapping[str, Any]) -> str:
+    """One concept's v1 embedding input: pref label, alt labels, definition.
+
+    This is the pre-2026-07-28 rule, kept verbatim so the published numbers it
+    produced stay reproducible and so a per-concept caller with no registry in
+    hand gets the historical answer rather than a silently different one.
+    Detecting boilerplate needs the whole registry, so the current rule is
+    :class:`ConceptEmbeddingTextRule`, built by :func:`concept_embedding_rule`.
+    """
+    parts = _surface_forms(concept)
     definition = str(concept.get("definition") or "").strip()
     if definition:
         parts.append(definition)
     return "; ".join(parts)
 
 
-def eligible_concepts(concepts: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
-    """Drop deprecated rows, matching what v2's conditioning indexes."""
-    return [concept for concept in concepts if concept.get("status") != "deprecated"]
+def definition_template(concept: Mapping[str, Any]) -> str:
+    """The concept's definition with its own preferred label blanked out.
+
+    Two definitions collapse to the same template exactly when they say the
+    same thing about different concepts — which is how boilerplate is detected
+    structurally, without naming the templates in advance.
+
+    The label is matched only where it is not embedded in a longer word, so a
+    short label cannot corrupt the template it appears inside: a concept named
+    ``A`` must not turn ``FAST term: A.`` into ``F{LABEL}ST term: {LABEL}.``
+    and thereby split one template into many. Lookarounds rather than ``\\b``
+    because a label may legitimately end in punctuation (``U.S.``), where
+    ``\\b`` fails.
+
+    This is the rule ``tools/audit_concept_embedding_space.py`` measured with,
+    so the counts it reports and the exclusions made here are the same fact.
+    """
+    definition = " ".join(str(concept.get("definition") or "").split())
+    label = str(concept.get("pref_label") or "").strip()
+    if not label:
+        return definition
+    return re.sub(rf"(?<!\w){re.escape(label)}(?!\w)", "{LABEL}", definition)
+
+
+def _template_is_only_the_label(template: str) -> bool:
+    """True when a definition restates its own label and adds no other word."""
+    return not re.search(r"\w", template.replace("{LABEL}", " "))
+
+
+def boilerplate_definition_templates(
+    concepts: Sequence[Mapping[str, Any]],
+    *,
+    min_concepts: int = BOILERPLATE_DEFINITION_MIN_CONCEPTS,
+) -> frozenset[str]:
+    """Templates carried by ``min_concepts`` concepts or more, over eligible rows."""
+    if min_concepts < 2:
+        raise ValueError("min_concepts must be at least 2 for a template to be shared")
+    counts: Counter[str] = Counter()
+    for concept in eligible_concepts(concepts):
+        if str(concept.get("definition") or "").strip():
+            counts[definition_template(concept)] += 1
+    return frozenset(template for template, count in counts.items() if count >= min_concepts)
+
+
+@dataclass(frozen=True)
+class ConceptEmbeddingTextRule:
+    """Which parts of a concept the dense channel embeds, as a named version.
+
+    The sparse channel already refuses definitions (``concept_bm25_tokens``,
+    "Definitions are intentionally excluded"); the dense channel used to accept
+    all of them. On the fused registry that inconsistency dominated the input:
+    every one of the 513,236 concepts carries a templated definition, 74% of
+    the median embedding string is that template, and the best-matching concept
+    for a real segment beat a random one by 0.029 cosine
+    (``docs/evidence/usearch-ann-benchmark-2026-07-28.md``).
+
+    v2 excludes a definition when either clause holds. Both are structural, so
+    no template is named in code and a registry with genuine definitions keeps
+    them:
+
+    * **shared template** — the definition, with the concept's own preferred
+      label blanked out, is carried by ``min_concepts`` concepts or more. A
+      sentence reused verbatim across concepts cannot be distinguishing them.
+    * **label restatement** — the definition says nothing beyond the label it
+      is already next to (``Fisheries management.`` under *Fisheries
+      management*), so embedding it only doubles a string already present.
+
+    A definition unique to its concept and carrying its own words survives.
+    """
+
+    version: str = CONCEPT_EMBEDDING_TEXT_VERSION
+    min_concepts: int = BOILERPLATE_DEFINITION_MIN_CONCEPTS
+    boilerplate_templates: frozenset[str] = frozenset()
+
+    def keeps_definition(self, concept: Mapping[str, Any]) -> bool:
+        """Whether this concept's definition reaches the embedder."""
+        if not str(concept.get("definition") or "").strip():
+            return False
+        if self.version == CONCEPT_EMBEDDING_TEXT_V1:
+            return True
+        template = definition_template(concept)
+        return template not in self.boilerplate_templates and not _template_is_only_the_label(template)
+
+    def text(self, concept: Mapping[str, Any]) -> str:
+        """One concept's embedding input under this rule."""
+        parts = _surface_forms(concept)
+        if self.keeps_definition(concept):
+            parts.append(str(concept.get("definition") or "").strip())
+        return "; ".join(parts)
+
+    @property
+    def digest_tag(self) -> str:
+        """What this rule contributes to the dense index cache key.
+
+        v1 contributes nothing, so the digest of an unchanged registry is
+        byte-identical to the one the already-built index was stored under and
+        that index stays loadable. Every later version stamps its own name, so
+        an index built under a different rule can never be silently reused even
+        for a registry whose texts happened to come out the same.
+        """
+        return "" if self.version == CONCEPT_EMBEDDING_TEXT_V1 else self.version
+
+    def facts(self) -> dict[str, Any]:
+        """Secret-free identity of the rule, for a run record."""
+        return {
+            "embedding_text_version": self.version,
+            "boilerplate_definition_min_concepts": self.min_concepts,
+            "boilerplate_definition_template_count": len(self.boilerplate_templates),
+        }
+
+
+def concept_embedding_rule(
+    concepts: Sequence[Mapping[str, Any]],
+    *,
+    version: str = CONCEPT_EMBEDDING_TEXT_VERSION,
+    min_concepts: int = BOILERPLATE_DEFINITION_MIN_CONCEPTS,
+) -> ConceptEmbeddingTextRule:
+    """Fit the embedding-text rule to one registry.
+
+    Boilerplate is a property of the registry, not of a row, so the rule is
+    fitted once over every eligible concept and then applied per concept.
+    """
+    if version == CONCEPT_EMBEDDING_TEXT_V1:
+        return ConceptEmbeddingTextRule(version=version, min_concepts=min_concepts)
+    if version != CONCEPT_EMBEDDING_TEXT_V2:
+        raise ValueError(f"unknown concept embedding text version {version!r}")
+    return ConceptEmbeddingTextRule(
+        version=version,
+        min_concepts=min_concepts,
+        boilerplate_templates=boilerplate_definition_templates(concepts, min_concepts=min_concepts),
+    )
+
+
+def definition_exclusion_summary(
+    concepts: Sequence[Mapping[str, Any]],
+    *,
+    rule: ConceptEmbeddingTextRule | None = None,
+) -> dict[str, Any]:
+    """Which schemes lose their definitions under a rule, and how many concepts.
+
+    Reported rather than assumed: a rule that silently emptied a scheme the
+    gold labels come from would be a regression, and this is what makes that
+    visible in a run record.
+    """
+    rule = rule if rule is not None else concept_embedding_rule(concepts)
+    rows = eligible_concepts(concepts)
+    total_by_scheme: Counter[str] = Counter()
+    excluded_by_scheme: Counter[str] = Counter()
+    for concept in rows:
+        scheme = str(concept.get("scheme") or "")
+        total_by_scheme[scheme] += 1
+        if str(concept.get("definition") or "").strip() and not rule.keeps_definition(concept):
+            excluded_by_scheme[scheme] += 1
+    excluded = sum(excluded_by_scheme.values())
+    return {
+        **rule.facts(),
+        "concept_count": len(rows),
+        "definition_excluded_count": excluded,
+        "definition_excluded_share": round(excluded / len(rows), 6) if rows else None,
+        "definition_kept_count": sum(1 for concept in rows if rule.keeps_definition(concept)),
+        "schemes": {
+            scheme: {
+                "concepts": total_by_scheme[scheme],
+                "definitions_excluded": excluded_by_scheme.get(scheme, 0),
+            }
+            for scheme in sorted(total_by_scheme)
+        },
+    }
 
 
 def concept_bm25_tokens(concept: Mapping[str, Any]) -> tuple[str, ...]:
@@ -221,21 +419,31 @@ def registry_bm25_digest(concepts: Sequence[Mapping[str, Any]]) -> str:
     return hasher.hexdigest()
 
 
-def registry_embedding_digest(concepts: Sequence[Mapping[str, Any]]) -> str:
+def registry_embedding_digest(
+    concepts: Sequence[Mapping[str, Any]],
+    *,
+    rule: ConceptEmbeddingTextRule | None = None,
+) -> str:
     """Digest the exact ``(concept_id, embedding text)`` sequence being indexed.
 
     This is the registry half of the cache key. It is stronger than the
     registry file's sha256 for this purpose: it changes if and only if
     something the index actually depends on changed, and it is computable from
     rows alone, so a synthetic fixture keys the same way a parquet file does.
+
+    The rule's ``digest_tag`` is mixed in as well, so two indexes built from the
+    same registry under different embedding-text rules can never share a cache
+    entry even if the rule change happened to leave every text unchanged.
     """
+    rule = rule if rule is not None else concept_embedding_rule(concepts)
     hasher = hashlib.sha256()
     hasher.update(DENSE_INDEX_SCHEMA_VERSION.encode("utf-8"))
+    hasher.update(rule.digest_tag.encode("utf-8"))
     for concept in eligible_concepts(concepts):
         hasher.update(b"\x1e")
         hasher.update(str(concept.get("concept_id") or "").encode("utf-8"))
         hasher.update(b"\x1f")
-        hasher.update(concept_embedding_text(concept).encode("utf-8"))
+        hasher.update(rule.text(concept).encode("utf-8"))
     return hasher.hexdigest()
 
 
@@ -255,6 +463,10 @@ class DenseConceptIndex:
     concept_ids: tuple[str, ...]
     # numpy.ndarray of shape (len(concept_ids), dimensions), float32, rows L2-normalized.
     matrix: Any
+    # Which embedding-text rule produced the strings behind these vectors.
+    # Defaults to v1 because an index stored before the rule was named carries
+    # no such field and is, by construction, a v1 index.
+    embedding_text_version: str = CONCEPT_EMBEDDING_TEXT_V1
 
     def __post_init__(self) -> None:
         rows = int(getattr(self.matrix, "shape", (0, 0))[0])
@@ -271,6 +483,7 @@ class DenseConceptIndex:
             "model_id": self.model_id,
             "dimensions": self.dimensions,
             "registry_digest": self.registry_digest,
+            "embedding_text_version": self.embedding_text_version,
             "concept_count": len(self.concept_ids),
         }
 
@@ -288,6 +501,7 @@ def build_dense_concept_index(
     concepts: Sequence[Mapping[str, Any]],
     *,
     embedder: DenseEmbedder,
+    rule: ConceptEmbeddingTextRule | None = None,
     chunk_size: int = DENSE_INDEX_CHUNK_SIZE,
     on_progress: Callable[[int, int], None] | None = None,
 ) -> DenseConceptIndex:
@@ -296,9 +510,10 @@ def build_dense_concept_index(
 
     if chunk_size <= 0:
         raise ValueError("chunk_size must be positive")
+    rule = rule if rule is not None else concept_embedding_rule(concepts)
     rows = eligible_concepts(concepts)
     concept_ids = tuple(str(concept.get("concept_id") or "") for concept in rows)
-    texts = [concept_embedding_text(concept) for concept in rows]
+    texts = [rule.text(concept) for concept in rows]
     dimensions = int(embedder.dimensions)
     matrix = numpy.zeros((len(rows), dimensions), dtype=numpy.float32)
     for start in range(0, len(texts), chunk_size):
@@ -313,9 +528,10 @@ def build_dense_concept_index(
         schema_version=DENSE_INDEX_SCHEMA_VERSION,
         model_id=str(embedder.model_id),
         dimensions=dimensions,
-        registry_digest=registry_embedding_digest(concepts),
+        registry_digest=registry_embedding_digest(concepts, rule=rule),
         concept_ids=concept_ids,
         matrix=_normalize_rows(matrix),
+        embedding_text_version=rule.version,
     )
 
 
@@ -363,7 +579,12 @@ def _model_slug(model_id: str) -> str:
 
 
 def dense_index_path(directory: Path, *, registry_digest: str, model_id: str) -> Path:
-    """Cache path keyed by the registry content and the pinned model identity."""
+    """Cache path keyed by the registry content and the pinned model identity.
+
+    The embedding-text version is inside ``registry_digest`` rather than in the
+    file name, so a rule change lands on a new path without renaming — and
+    therefore orphaning — the index an unchanged rule already built.
+    """
     return Path(directory) / f"dense-index-{_model_slug(model_id)}-{registry_digest[:16]}.npz"
 
 
@@ -389,6 +610,7 @@ def load_dense_concept_index(
     *,
     registry_digest: str | None = None,
     model_id: str | None = None,
+    embedding_text_version: str | None = None,
 ) -> DenseConceptIndex:
     """Read a stored index and refuse one built from a different registry or model."""
     import numpy
@@ -399,10 +621,13 @@ def load_dense_concept_index(
         concept_ids = tuple(str(value) for value in stored["concept_ids"])
     if meta.get("schema_version") != DENSE_INDEX_SCHEMA_VERSION:
         raise DenseIndexError(f"stored dense index schema {meta.get('schema_version')!r} is not readable")
+    stored_text_version = str(meta.get("embedding_text_version") or CONCEPT_EMBEDDING_TEXT_V1)
     if registry_digest is not None and meta.get("registry_digest") != registry_digest:
         raise DenseIndexError("stored dense index was built from a different registry")
     if model_id is not None and meta.get("model_id") != model_id:
         raise DenseIndexError("stored dense index was built with a different model")
+    if embedding_text_version is not None and stored_text_version != embedding_text_version:
+        raise DenseIndexError("stored dense index was built from a different embedding text rule")
     return DenseConceptIndex(
         schema_version=str(meta["schema_version"]),
         model_id=str(meta["model_id"]),
@@ -410,6 +635,7 @@ def load_dense_concept_index(
         registry_digest=str(meta["registry_digest"]),
         concept_ids=concept_ids,
         matrix=matrix,
+        embedding_text_version=stored_text_version,
     )
 
 
@@ -418,17 +644,24 @@ def ensure_dense_concept_index(
     *,
     embedder: DenseEmbedder,
     directory: Path,
+    rule: ConceptEmbeddingTextRule | None = None,
     chunk_size: int = DENSE_INDEX_CHUNK_SIZE,
     rebuild: bool = False,
     on_progress: Callable[[int, int], None] | None = None,
 ) -> tuple[DenseConceptIndex, dict[str, Any]]:
-    """Load the cached index for this registry and model, or build and cache it."""
-    digest = registry_embedding_digest(concepts)
+    """Load the cached index for this registry, model and rule, or build and cache it."""
+    rule = rule if rule is not None else concept_embedding_rule(concepts)
+    digest = registry_embedding_digest(concepts, rule=rule)
     model_id = str(embedder.model_id)
     path = dense_index_path(directory, registry_digest=digest, model_id=model_id)
     if path.exists() and not rebuild:
         started = time.monotonic()
-        index = load_dense_concept_index(path, registry_digest=digest, model_id=model_id)
+        index = load_dense_concept_index(
+            path,
+            registry_digest=digest,
+            model_id=model_id,
+            embedding_text_version=rule.version,
+        )
         return index, {
             "source": "cache",
             "path": str(path),
@@ -436,7 +669,9 @@ def ensure_dense_concept_index(
             **index.facts(),
         }
     started = time.monotonic()
-    index = build_dense_concept_index(concepts, embedder=embedder, chunk_size=chunk_size, on_progress=on_progress)
+    index = build_dense_concept_index(
+        concepts, embedder=embedder, rule=rule, chunk_size=chunk_size, on_progress=on_progress
+    )
     build_seconds = time.monotonic() - started
     save_dense_concept_index(index, path)
     return index, {

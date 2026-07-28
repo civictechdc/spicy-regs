@@ -20,19 +20,26 @@ import pytest
 from spicy_regs.ontology.candidate_channels import (
     BM25_CHANNEL_VERSION,
     BM25_INDEX_SCHEMA_VERSION,
+    CONCEPT_EMBEDDING_TEXT_V1,
+    CONCEPT_EMBEDDING_TEXT_V2,
     BM25ConceptMapper,
     BM25IndexError,
     DENSE_INDEX_SCHEMA_VERSION,
     KEYWORD_INSTRUCTIONS,
     KEYWORD_MAX_COUNT,
     CharNgramConceptMapper,
+    ConceptEmbeddingTextRule,
     DenseConceptIndex,
     DenseConceptMapper,
     DenseIndexError,
     bm25_channel_ranking,
+    boilerplate_definition_templates,
     build_dense_concept_index,
     concept_bm25_tokens,
+    concept_embedding_rule,
     concept_embedding_text,
+    definition_exclusion_summary,
+    definition_template,
     dense_channel_ranking,
     dense_index_path,
     ensure_dense_concept_index,
@@ -132,6 +139,29 @@ def registry() -> list[dict]:
     ]
 
 
+@pytest.fixture
+def boilerplate_registry() -> list[dict]:
+    """A registry whose definitions are template-generated, as the fused one's are.
+
+    The template here resembles none of the eight in the real registry, so a
+    rule that passes against this fixture is detecting structure rather than
+    recognising strings someone wrote down.
+    """
+    return [
+        _concept("concept_a", "widgets", "Widget safety", [], "Widget Catalogue heading: Widget safety."),
+        _concept("concept_b", "widgets", "Gadget safety", [], "Widget Catalogue heading: Gadget safety."),
+        _concept("concept_c", "widgets", "Sprocket safety", [], "Widget Catalogue heading: Sprocket safety."),
+        _concept("concept_d", "law", "Fisheries management", [], "Fisheries management."),
+        _concept(
+            "concept_e",
+            "law",
+            "Poultry inspection",
+            ["Poultry examination"],
+            "Continuous inspection of slaughtered birds by federal graders.",
+        ),
+    ]
+
+
 @pytest.fixture(autouse=True)
 def _clear_cache():
     clear_anchored_conditioning_cache()
@@ -178,6 +208,195 @@ def test_registry_digest_is_stable_and_content_sensitive(registry):
 
 def test_registry_digest_ignores_deprecated_rows(registry):
     assert registry_embedding_digest(registry) == registry_embedding_digest(registry[:-1])
+
+
+# --------------------------------------------------------------------------
+# the boilerplate-definition rule
+# --------------------------------------------------------------------------
+
+
+def test_rule_excludes_a_definition_template_shared_across_concepts(boilerplate_registry):
+    rule = concept_embedding_rule(boilerplate_registry)
+    assert rule.text(boilerplate_registry[0]) == "Widget safety"
+    assert rule.text(boilerplate_registry[1]) == "Gadget safety"
+    assert not rule.keeps_definition(boilerplate_registry[2])
+
+
+def test_rule_excludes_a_definition_that_only_restates_its_label(boilerplate_registry):
+    # Unique to its concept, so the sharing clause cannot catch it; it still
+    # adds nothing the label has not already said.
+    rule = concept_embedding_rule(boilerplate_registry)
+    assert rule.text(boilerplate_registry[3]) == "Fisheries management"
+
+
+def test_rule_keeps_a_genuinely_distinct_definition(boilerplate_registry):
+    rule = concept_embedding_rule(boilerplate_registry)
+    assert rule.text(boilerplate_registry[4]) == (
+        "Poultry inspection; Poultry examination; Continuous inspection of slaughtered birds by federal graders."
+    )
+
+
+def test_rule_keeps_every_definition_in_a_registry_without_boilerplate(registry):
+    rule = concept_embedding_rule(registry)
+    assert rule.boilerplate_templates == frozenset()
+    assert [rule.text(concept) for concept in registry] == [concept_embedding_text(concept) for concept in registry]
+
+
+def test_rule_is_deterministic_over_the_same_registry(boilerplate_registry):
+    first = concept_embedding_rule(boilerplate_registry)
+    second = concept_embedding_rule([dict(row) for row in boilerplate_registry])
+    assert first == second
+    assert [first.text(row) for row in boilerplate_registry] == [second.text(row) for row in boilerplate_registry]
+
+
+def test_definition_template_blanks_only_whole_label_occurrences():
+    concept = _concept("concept_a", "widgets", "A", [], "Catalogue heading: A.")
+    assert definition_template(concept) == "Catalogue heading: {LABEL}."
+    # A label ending in punctuation, where a word boundary would not match.
+    trailing = _concept("concept_b", "widgets", "U.S.", [], "Catalogue heading: U.S.")
+    assert definition_template(trailing) == "Catalogue heading: {LABEL}"
+
+
+def test_boilerplate_templates_honour_the_shared_count_threshold(boilerplate_registry):
+    shared = boilerplate_definition_templates(boilerplate_registry, min_concepts=3)
+    assert shared == frozenset({"Widget Catalogue heading: {LABEL}."})
+    assert boilerplate_definition_templates(boilerplate_registry, min_concepts=4) == frozenset()
+
+
+def test_boilerplate_threshold_below_two_is_refused(boilerplate_registry):
+    with pytest.raises(ValueError):
+        boilerplate_definition_templates(boilerplate_registry, min_concepts=1)
+
+
+def test_boilerplate_templates_ignore_deprecated_rows(boilerplate_registry):
+    retired = _concept("concept_gone", "widgets", "Retired widget", [], "Widget Catalogue heading: Retired widget.")
+    retired["status"] = "deprecated"
+    kept = [boilerplate_registry[0], boilerplate_registry[1], retired]
+    assert boilerplate_definition_templates(kept, min_concepts=3) == frozenset()
+
+
+def test_v1_rule_reproduces_the_previous_embedding_text(boilerplate_registry):
+    rule = concept_embedding_rule(boilerplate_registry, version=CONCEPT_EMBEDDING_TEXT_V1)
+    assert [rule.text(row) for row in boilerplate_registry] == [
+        concept_embedding_text(row) for row in boilerplate_registry
+    ]
+
+
+def test_unknown_embedding_text_version_is_refused(registry):
+    with pytest.raises(ValueError):
+        concept_embedding_rule(registry, version="concept-embedding-text-v9")
+
+
+def test_exclusion_summary_reports_the_affected_schemes(boilerplate_registry):
+    summary = definition_exclusion_summary(boilerplate_registry)
+    assert summary["embedding_text_version"] == CONCEPT_EMBEDDING_TEXT_V2
+    assert summary["definition_excluded_count"] == 4
+    assert summary["definition_kept_count"] == 1
+    assert summary["schemes"]["widgets"] == {"concepts": 3, "definitions_excluded": 3}
+    assert summary["schemes"]["law"] == {"concepts": 2, "definitions_excluded": 1}
+
+
+# --------------------------------------------------------------------------
+# the embedding-text version inside the cache key
+# --------------------------------------------------------------------------
+
+
+def test_v1_digest_is_byte_identical_to_the_pre_rule_digest(boilerplate_registry):
+    """The 513k index built before the rule existed must stay loadable.
+
+    v1 therefore contributes nothing to the digest, which pins the byte format
+    the stored index was keyed under.
+    """
+    hasher = hashlib.sha256()
+    hasher.update(DENSE_INDEX_SCHEMA_VERSION.encode("utf-8"))
+    for concept in eligible_concepts(boilerplate_registry):
+        hasher.update(b"\x1e")
+        hasher.update(str(concept["concept_id"]).encode("utf-8"))
+        hasher.update(b"\x1f")
+        hasher.update(concept_embedding_text(concept).encode("utf-8"))
+    legacy = concept_embedding_rule(boilerplate_registry, version=CONCEPT_EMBEDDING_TEXT_V1)
+    assert registry_embedding_digest(boilerplate_registry, rule=legacy) == hasher.hexdigest()
+
+
+def test_digest_separates_the_two_rules_on_one_registry(boilerplate_registry):
+    legacy = concept_embedding_rule(boilerplate_registry, version=CONCEPT_EMBEDDING_TEXT_V1)
+    assert registry_embedding_digest(boilerplate_registry, rule=legacy) != registry_embedding_digest(
+        boilerplate_registry
+    )
+
+
+def test_digest_separates_the_rules_even_when_every_text_matches(registry):
+    """The version, not only the text, is in the key.
+
+    This registry has no boilerplate, so both rules emit identical strings. A
+    cache keyed on the strings alone would hand a v1 index to a v2 caller.
+    """
+    legacy = concept_embedding_rule(registry, version=CONCEPT_EMBEDDING_TEXT_V1)
+    current = concept_embedding_rule(registry)
+    assert [legacy.text(row) for row in registry] == [current.text(row) for row in registry]
+    assert registry_embedding_digest(registry, rule=legacy) != registry_embedding_digest(registry, rule=current)
+
+
+def test_index_records_the_rule_that_built_it(boilerplate_registry):
+    index = build_dense_concept_index(boilerplate_registry, embedder=FakeDenseEmbedder())
+    assert index.embedding_text_version == CONCEPT_EMBEDDING_TEXT_V2
+    assert index.facts()["embedding_text_version"] == CONCEPT_EMBEDDING_TEXT_V2
+
+
+def test_index_embeds_the_rule_output_not_the_raw_definition(boilerplate_registry):
+    embedder = FakeDenseEmbedder()
+    build_dense_concept_index(boilerplate_registry, embedder=embedder)
+    assert embedder.calls[0][0] == "Widget safety"
+    assert not any("Catalogue heading" in text for call in embedder.calls for text in call)
+
+
+def test_stored_index_refuses_a_different_embedding_text_rule(tmp_path, boilerplate_registry):
+    index = build_dense_concept_index(boilerplate_registry, embedder=FakeDenseEmbedder())
+    path = tmp_path / "index.npz"
+    save_dense_concept_index(index, path)
+    with pytest.raises(DenseIndexError):
+        load_dense_concept_index(path, embedding_text_version=CONCEPT_EMBEDDING_TEXT_V1)
+
+
+def test_stored_index_without_a_recorded_rule_reads_as_v1(tmp_path, boilerplate_registry):
+    """An index written before the field existed is a v1 index, not an unknown one."""
+    import numpy
+
+    index = build_dense_concept_index(boilerplate_registry, embedder=FakeDenseEmbedder())
+    meta = {key: value for key, value in index.facts().items() if key != "embedding_text_version"}
+    path = tmp_path / "legacy.npz"
+    with path.open("wb") as handle:
+        numpy.savez(
+            handle,
+            matrix=index.matrix,
+            concept_ids=numpy.array(index.concept_ids, dtype=numpy.str_),
+            meta=numpy.array(json.dumps(meta, sort_keys=True), dtype=numpy.str_),
+        )
+    assert load_dense_concept_index(path).embedding_text_version == CONCEPT_EMBEDDING_TEXT_V1
+    with pytest.raises(DenseIndexError):
+        load_dense_concept_index(path, embedding_text_version=CONCEPT_EMBEDDING_TEXT_V2)
+
+
+def test_ensure_rebuilds_rather_than_reusing_an_index_from_the_other_rule(tmp_path, boilerplate_registry):
+    embedder = FakeDenseEmbedder()
+    legacy = concept_embedding_rule(boilerplate_registry, version=CONCEPT_EMBEDDING_TEXT_V1)
+    _, legacy_facts = ensure_dense_concept_index(
+        boilerplate_registry, embedder=embedder, directory=tmp_path, rule=legacy
+    )
+    current, current_facts = ensure_dense_concept_index(boilerplate_registry, embedder=embedder, directory=tmp_path)
+    assert legacy_facts["source"] == "built"
+    assert current_facts["source"] == "built"
+    assert current_facts["path"] != legacy_facts["path"]
+    assert current.embedding_text_version == CONCEPT_EMBEDDING_TEXT_V2
+    assert len(list(tmp_path.glob("dense-index-*.npz"))) == 2
+    reused, reused_facts = ensure_dense_concept_index(boilerplate_registry, embedder=embedder, directory=tmp_path)
+    assert reused_facts["source"] == "cache"
+    assert reused.embedding_text_version == CONCEPT_EMBEDDING_TEXT_V2
+
+
+def test_rule_default_matches_the_declared_version(registry):
+    assert ConceptEmbeddingTextRule().version == CONCEPT_EMBEDDING_TEXT_V2
+    assert concept_embedding_rule(registry).version == CONCEPT_EMBEDDING_TEXT_V2
 
 
 # --------------------------------------------------------------------------
