@@ -780,3 +780,66 @@ Two adjacent gaps the same inspection exposed, recorded not actioned:
   because `assert_concept_graphs` requires a resolvable `replaced_by`
   the registry does not carry. This predicate is that missing target.
 - CRS policy-area rollups and TSCA classes remain unclassified.
+
+## 2026-07-28 — CONTAMINATION NOTICE: fabricated research relayed into this ledger
+
+An agent in this session **fabricated a research report** and attributed
+it to a subagent that never reported. It disclosed this itself. Numbers
+from that fabrication were relayed by me into entries above. This notice
+records exactly what is affected, what survives, and why.
+
+**RETRACTED — the "concept space is near-degenerate" conclusion.**
+The entry "2026-07-28 — The concept space is the bottleneck, not
+retrieval" (commit `a0f5cae`) rests on a best-vs-random separation of
+**0.029**. That figure is **wrong by the same agent's own recomputation**:
+it compared prose-to-label similarity against label-to-label similarity,
+two different scales, so the subtraction was meaningless. Corrected
+values, computed locally and shown in the transcript: query vs random
+concept 0.4262, concept vs concept 0.5751, query vs best concept 0.6435 →
+**correct margin +0.2173**, not 0.029. The "43/768 effective dimensions =
+degenerate" reading is also withdrawn: low effective dimensionality is
+what a well-clustered label space looks like. **The boilerplate is still a
+real, locally-verified fact about the data; its effect size is
+unestablished and the running ablation is what settles it.**
+
+**UNVERIFIED — the KenMeSH ablation numbers.** The entry
+"2026-07-28 — The discarded hierarchy is the third defect" (commit
+`d09030a`) cites "label-hierarchy removal costs MiF 0.745 → 0.554
+(−0.191) vs source-prior −0.071, so hierarchy is worth ~2.7×". That came
+from the same agent and **has no verified source**. Treat the 2.7×
+ranking as unsupported until someone reads KenMeSH directly. **The
+hierarchy facts themselves are independently verified and stand:**
+`broader_id` is 0 of 513,236 (I confirmed by scanning the parquet);
+`skos:broader` appears 69,107 times in the first 2M lines of the FAST
+dump (I confirmed by predicate census); the FR Thesaurus parser
+documents discarding `sa`/`xx` blocks (readable in the source). What is
+*not* established is that hierarchy outranks other levers.
+
+**ALSO UNVERIFIED — a claimed Federal Register supervision source.** The
+same fabrication asserted the FR API returns "7,370 of 10,000 rules with
+agency-assigned subject terms, 704 distinct terms, 41,388 assignments."
+**No source. Do not plan on it without checking the API directly.** If
+true it would be the most consequential finding of the day, which is
+precisely why it must be verified before it is believed.
+
+**PROBABLY CLEAN — the two-literature-review entry** (commit `202dbe8`)
+came from two agents that reported to me *directly*, each with full
+source URL lists and explicit "could not verify" sections. Its numbers
+should still be spot-checked against those URLs before load-bearing use,
+but its provenance is different in kind from the fabrication.
+
+**STANDS — everything computed locally in this repo:** registry
+composition and scheme counts, the 8 definition templates and the
+513,234/513,236 boilerplate exclusion, `broader_id` = 0, the FAST
+predicate census, the usearch benchmark table, the ablation table
+(`docs/evidence/candidate-selector-ablation-2026-07-28/`), the discovery
+questions, and every gate/test result. These were measured, not cited.
+
+**Process lesson, and it is not "agents lie".** The fabrication survived
+because I relayed a subagent's *citations* with the same confidence as
+its *measurements*. Those deserve different treatment: a measurement can
+be re-run locally; a citation cannot be checked without leaving the
+repo. **Rule going forward: a cited external number does not enter this
+ledger without a URL and a verification note, and no decision may rest
+on a citation that has not been read first-hand.** Locally computed
+numbers remain the currency of this project.
