@@ -68,15 +68,559 @@
     }
   ],
   "pending_holdout": {
-    "status": "not_created",
-    "reason": "No independently adjudicated cross-family holdout exists. Provider credentials were unavailable on 2026-07-27, so no labels were fabricated.",
+    "status": "drawn_unadjudicated",
+    "reason": "A holdout has been drawn and pinned, and no label exists for it. It is not adjudicated, no configuration is frozen, and it can authorize nothing. Configuration pins freeze at label-exposure time, not at draw time, because the exit bar's trivial baselines are computed on this same set.",
+    "steps_completed": [
+      "Draw new artifacts from authoritative corpus data without consulting tagger output.",
+      "Freeze membership and source, selection, and gold digests before scoring. (Membership, source, and selection digests are pinned; gold does not exist yet.)"
+    ],
     "required_before_adoption": [
       "Draw new artifacts from authoritative corpus data without consulting tagger output.",
       "Freeze membership and source, selection, and gold digests before scoring.",
       "Keep target concepts and every registered alias disjoint from train.",
       "Complete blind adjudication with at least two independent model families or humans; publish agreement and resolve or exclude every disagreement.",
       "Freeze and pin the selector, registry, prompt, schema, and token-budget configuration before revealing holdout labels."
-    ]
+    ],
+    "draw": {
+      "dataset_id": "rulespec-holdout-28-v1",
+      "draw_schema_version": "rulespec-holdout-draw-v1",
+      "drawn_at": "2026-07-28T12:02:31+00:00",
+      "drawn_by": "tools/draw_holdout.py",
+      "selection_procedure": "holdout-seeded-stratified-v1",
+      "selection_seed": "rulespec-holdout-draw-2026-07-28",
+      "selection_sha256": "a179d23545e8feb2aa5fb9b810bd4179dd907afcf7139499424ba05a080a817a",
+      "membership_sha256": "cf477e5b85d8d908d122b1357a5da7c65dc453e00a85436d550fa7ca914b642e",
+      "artifact_count": 28,
+      "artifacts_by_profile": {
+        "congress-bill-v1": 5,
+        "court-docket-v1": 4,
+        "federal-register-document-v1": 6,
+        "gao-report-v1": 4,
+        "lobbying-filing-v1": 4,
+        "unified-agenda-observation-v1": 5
+      },
+      "profile_strata": [
+        {
+          "profile_id": "federal-register-document-v1",
+          "source_table": "federal_register",
+          "quota": 6,
+          "min_text_chars": 600,
+          "max_rows_scanned": 4000,
+          "drawn": 6,
+          "rows_available": 80000,
+          "rows_visited": 18,
+          "rejected": {
+            "below_min_text_chars": 12
+          }
+        },
+        {
+          "profile_id": "congress-bill-v1",
+          "source_table": "congress_bills",
+          "quota": 5,
+          "min_text_chars": 300,
+          "max_rows_scanned": 4000,
+          "drawn": 5,
+          "rows_available": 40000,
+          "rows_visited": 34,
+          "rejected": {
+            "below_min_text_chars": 29
+          }
+        },
+        {
+          "profile_id": "unified-agenda-observation-v1",
+          "source_table": "unified_agenda",
+          "quota": 5,
+          "min_text_chars": 600,
+          "max_rows_scanned": 4000,
+          "drawn": 5,
+          "rows_available": 3954,
+          "rows_visited": 5,
+          "rejected": {}
+        },
+        {
+          "profile_id": "gao-report-v1",
+          "source_table": "gao_reports",
+          "quota": 4,
+          "min_text_chars": 1000,
+          "max_rows_scanned": 4000,
+          "drawn": 4,
+          "rows_available": 47,
+          "rows_visited": 7,
+          "rejected": {
+            "excluded_by_subject_identity": 3
+          }
+        },
+        {
+          "profile_id": "lobbying-filing-v1",
+          "source_table": "lobbying_filings",
+          "quota": 4,
+          "min_text_chars": 600,
+          "max_rows_scanned": 4000,
+          "drawn": 4,
+          "rows_available": 40000,
+          "rows_visited": 6,
+          "rejected": {
+            "below_min_text_chars": 2
+          }
+        },
+        {
+          "profile_id": "court-docket-v1",
+          "source_table": "court_dockets",
+          "quota": 4,
+          "min_text_chars": 150,
+          "max_rows_scanned": 4000,
+          "drawn": 4,
+          "rows_available": 7623,
+          "rows_visited": 6,
+          "rejected": {
+            "below_min_text_chars": 2
+          }
+        }
+      ],
+      "profile_stratum_notes": [
+        {
+          "profile_id": "court-docket-v1",
+          "note": "The judicial family. court_opinions is absent from the corpus snapshot: the only ten local opinions are all development artifacts, so no disjoint opinion exists. court_dockets carries case name, nature of suit, and cause at metadata depth."
+        }
+      ],
+      "segmentation": {
+        "policy": "structure-overlap",
+        "policy_version": "structure-overlap-v1",
+        "max_tokens": 1800,
+        "min_tokens": 720,
+        "overlap_tokens": 80,
+        "tokenizer": "o200k_base",
+        "tokenizer_version": "0.13.0",
+        "boundary_method": "source-native-oversized-overlap",
+        "settings_sha256": "124992b3913364436e7187f6a192f608e234c6554e75e619d94ce373310c7b4a"
+      },
+      "corpus": {
+        "corpus_dir": "output/mixed-real-data-corpus-v2",
+        "corpus_dataset_id": "mixed_snapshot_c9c7dbdf2ddf6d2527d810d5",
+        "corpus_manifest_sha256": "cd8b6a91f58a73c50a310ca2a609bd51d7a63cdcb88449fa47e103f38e094adf",
+        "source_files": {
+          "federal_register.parquet": "6f00be8bf7db27aa7d2720b3d43a3414d2c3ce65016dfe3576c3ea07b09bf115",
+          "congress_bills.parquet": "6eebbbe6697cb2548e5b9bb3c764fab85cd86389a711270b34cbfbef7db55453",
+          "unified_agenda.parquet": "af9f79f69c54bd80aa6a9b600c72b00ff3471d5aeda3604857d683c1775a190f",
+          "gao_reports.parquet": "b0389ce6831ba24e8ed2600099f3439ee4a42ac533dac04f403ec3ce2fb23d70",
+          "lobbying_filings.parquet": "a6312c5bddd2d649a3aeae443dee12c7338cc5092ac65f552d844db7e46bfd71",
+          "court_dockets.parquet": "12962666c939048529a0e3c6e6c21d66f00b36ca03c34aaada05a4a41350b70f"
+        }
+      },
+      "membership": [
+        {
+          "profile_id": "federal-register-document-v1",
+          "source_table": "federal_register",
+          "subject_type": "federal_register_document",
+          "subject_id": "2012-29635",
+          "artifact_id": "artifact_b56d92fc2c2fbbe3e0492f4a",
+          "artifact_digest": "711034c82f51b95303803bfda9ec077ca1bbe0038e841149e488f4f37e47f296",
+          "extracted_text_sha256": "5a20856e675a027dfd86ee0f87528b5a48bc08811f53e8051849e1e2b858e775",
+          "extracted_text_chars": 789,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "federal-register-document-v1",
+          "source_table": "federal_register",
+          "subject_type": "federal_register_document",
+          "subject_id": "2011-26179",
+          "artifact_id": "artifact_6ac2561815152c62d8f20a4d",
+          "artifact_digest": "d620cef4b59c5a1896c9c358c28a63c52a293d3a53a1af9f6cc1a8ad7f224402",
+          "extracted_text_sha256": "e4261f0109e99ba80a702030a3ec1e33cc8852e0ddd11ae00bf04973f78acea1",
+          "extracted_text_chars": 637,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "federal-register-document-v1",
+          "source_table": "federal_register",
+          "subject_type": "federal_register_document",
+          "subject_id": "96-18181",
+          "artifact_id": "artifact_3d0febcc3d043f2fa3886b4a",
+          "artifact_digest": "54a663d85e84af3010b0ff4c4c4ed5efd271e34d30dc922387d34432668d5356",
+          "extracted_text_sha256": "b532017f2237b836fbc6a285e419b99bf26016df33549b3f757f89f1e1565559",
+          "extracted_text_chars": 1894,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "federal-register-document-v1",
+          "source_table": "federal_register",
+          "subject_type": "federal_register_document",
+          "subject_id": "2010-11767",
+          "artifact_id": "artifact_f494c7804b81b60aac4e9cfd",
+          "artifact_digest": "a192ee3188dda7f13a51e49dfa337c7e9920e51c1d216b205159382f2a483d4b",
+          "extracted_text_sha256": "89dacb164b9dd076653e9d79b8bf67ee835409e114d6705417511518287ccb67",
+          "extracted_text_chars": 649,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "federal-register-document-v1",
+          "source_table": "federal_register",
+          "subject_type": "federal_register_document",
+          "subject_id": "E8-15807",
+          "artifact_id": "artifact_5aeac86c3ab4e66f4d202280",
+          "artifact_digest": "6d803b5fe056152c85c416b4593636e684a25d671d6f927d011fa139ab9076b7",
+          "extracted_text_sha256": "588037eac6c878bf65ef15b5f333dbb93103260508731d76198902cca12b3299",
+          "extracted_text_chars": 639,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "federal-register-document-v1",
+          "source_table": "federal_register",
+          "subject_type": "federal_register_document",
+          "subject_id": "2023-09697",
+          "artifact_id": "artifact_cfb82fabd7bffc739c1ea0a0",
+          "artifact_digest": "b54d84fc2e58c204b9c6a99f807d48393092721d234cb2dfa2b0b1112feaf744",
+          "extracted_text_sha256": "a926d88941497ef8904c44c783b89582f54a05f33136092e2f1469a0ccffc0f9",
+          "extracted_text_chars": 1378,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "congress-bill-v1",
+          "source_table": "congress_bills",
+          "subject_type": "congress_bill",
+          "subject_id": "98-hr-2334",
+          "artifact_id": "artifact_f2b888b690baa577f136ddad",
+          "artifact_digest": "6c43732ad4f76b830786ed7b4aa1dde64eab04d0c68114027b94b5bb5ca1723a",
+          "extracted_text_sha256": "4c9edd564855957b5269ec0b4fd6f007b36ff408259946134c3582eb67f85c3d",
+          "extracted_text_chars": 306,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "congress-bill-v1",
+          "source_table": "congress_bills",
+          "subject_type": "congress_bill",
+          "subject_id": "95-hr-6283",
+          "artifact_id": "artifact_55bff17f3ce4d6cf2d9c370a",
+          "artifact_digest": "b6fcc9752572f8a0d67065a06b452bacd5289dbea77bc7d35312ae32f56315c0",
+          "extracted_text_sha256": "337199b413a2fd9b449d764ba402c9fa92698164ca7625cdaa9f23884805bc73",
+          "extracted_text_chars": 335,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "congress-bill-v1",
+          "source_table": "congress_bills",
+          "subject_type": "congress_bill",
+          "subject_id": "39-sjres-59",
+          "artifact_id": "artifact_cc2ef92bd2f4a13c9ac3ed21",
+          "artifact_digest": "1ff454010eaf2e27993e9ce0c9ec414b1c2710b28032036317efc668083bde7d",
+          "extracted_text_sha256": "1e89ddf14dd547034414357d3319adfc0cc9a1e82dca70aeaa4b600666dc03fb",
+          "extracted_text_chars": 334,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "congress-bill-v1",
+          "source_table": "congress_bills",
+          "subject_type": "congress_bill",
+          "subject_id": "108-hconres-240",
+          "artifact_id": "artifact_e5a0c21db2d7d919d60eba94",
+          "artifact_digest": "1708083bbe996c96e2439584fd60ff34b375312571703719929e9070ad77304c",
+          "extracted_text_sha256": "d5488923273e43fb85075c3e053fba473f938f472276a5affafe9825ecfdec33",
+          "extracted_text_chars": 380,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "congress-bill-v1",
+          "source_table": "congress_bills",
+          "subject_type": "congress_bill",
+          "subject_id": "42-hr-3773",
+          "artifact_id": "artifact_2c5e68e81892d43c4eba4371",
+          "artifact_digest": "d12ee11d1a442d8b5527043b73a33b6c86a14a1dc32f6f76989535941282ff41",
+          "extracted_text_sha256": "24b5afdfa9b7a643efdadae0f330a48518f4add91e71ccdfc7b52dfef68fb081",
+          "extracted_text_chars": 350,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "unified-agenda-observation-v1",
+          "source_table": "unified_agenda",
+          "subject_type": "regulatory_agenda_observation",
+          "subject_id": "{\"agenda_edition\":\"202510\",\"rin\":\"0648-BN68\"}",
+          "artifact_id": "artifact_590b2592b6cc4376c523f5fe",
+          "artifact_digest": "693543d481f8afd7a9edf2caf8f1001fae895a36740ce7c9e88badd812c5cb65",
+          "extracted_text_sha256": "c20b1adb14c6c28967784ad6e96310efcd3dc5e19fbad508be3a3bc78f8d9759",
+          "extracted_text_chars": 1503,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "unified-agenda-observation-v1",
+          "source_table": "unified_agenda",
+          "subject_type": "regulatory_agenda_observation",
+          "subject_id": "{\"agenda_edition\":\"202510\",\"rin\":\"1018-BI33\"}",
+          "artifact_id": "artifact_b8ce2968bc7555c0acb2166b",
+          "artifact_digest": "7e3d494b0dc8cad40db9e87e41e16ec3db58653e566ec8d0d5c68b91785765dc",
+          "extracted_text_sha256": "3c60daf1200c1df30b6391f9f891344d8023898e014e838859873d065fa017d4",
+          "extracted_text_chars": 722,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "unified-agenda-observation-v1",
+          "source_table": "unified_agenda",
+          "subject_type": "regulatory_agenda_observation",
+          "subject_id": "{\"agenda_edition\":\"202510\",\"rin\":\"1685-AA35\"}",
+          "artifact_id": "artifact_5d0e4a66da8c037f76108886",
+          "artifact_digest": "79ba9ccbd3d3cd6da4df8502e7b455dc333ed7bdc25bc86aac36e3d1a9ebc902",
+          "extracted_text_sha256": "db74538e19d70dcf7612bfd21b0e7e666c0323c27bce98167a8a1d45019036f9",
+          "extracted_text_chars": 889,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "unified-agenda-observation-v1",
+          "source_table": "unified_agenda",
+          "subject_type": "regulatory_agenda_observation",
+          "subject_id": "{\"agenda_edition\":\"202510\",\"rin\":\"1902-AG30\"}",
+          "artifact_id": "artifact_da37573523f97f1e7ef25ab8",
+          "artifact_digest": "6c8d7befd81c4c0c0b8a5f5ed99a9ac16c0db9a13e184f754062ca6b5c69c117",
+          "extracted_text_sha256": "536fa2f414bc011ff80ce11f348ef78d877652033500d7b53ef6ddef9f3e4693",
+          "extracted_text_chars": 939,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "unified-agenda-observation-v1",
+          "source_table": "unified_agenda",
+          "subject_type": "regulatory_agenda_observation",
+          "subject_id": "{\"agenda_edition\":\"202510\",\"rin\":\"1545-BR97\"}",
+          "artifact_id": "artifact_5654f10af6f4fcd430f7cce1",
+          "artifact_digest": "32d757b4475514cc2737f19dca8807d16669c9f62dd04242f0507debb6663cb9",
+          "extracted_text_sha256": "bb6363a96229148957e0e2e2fd0ebdefcc8eef5d0ca10e357acb80bb8bd5f0e2",
+          "extracted_text_chars": 865,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "gao-report-v1",
+          "source_table": "gao_reports",
+          "subject_type": "gao_report",
+          "subject_id": "gao-26-109000",
+          "artifact_id": "artifact_05bab9cf62a13230804d086c",
+          "artifact_digest": "3c73a8c2d2e673ec3b9bfb4c5e75fc6c043b481c9bc48edaebfb592d53f3f5aa",
+          "extracted_text_sha256": "a3648fded47fc9bacdeca296fa69687cfe5edb76570e877e3c5f28a9db12bc8d",
+          "extracted_text_chars": 1762,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "gao-report-v1",
+          "source_table": "gao_reports",
+          "subject_type": "gao_report",
+          "subject_id": "gao-26-107954",
+          "artifact_id": "artifact_108a2a5d29f2b248a8b95b99",
+          "artifact_digest": "86afef974a809cfa9734fb0379249347fc3e2050ed94c09061f5f37fbe4b0cd6",
+          "extracted_text_sha256": "9309aca0e43d44c08f18ba927c756c13df2ea34a716343f5be51d150a846effa",
+          "extracted_text_chars": 4033,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "gao-report-v1",
+          "source_table": "gao_reports",
+          "subject_type": "gao_report",
+          "subject_id": "gao-26-107737",
+          "artifact_id": "artifact_df58f2338a411472d44a2749",
+          "artifact_digest": "e964123b00414427e52cd74b9cd2f22c278d412577fc88bb45c41c4056ed19ff",
+          "extracted_text_sha256": "eb61c368bc1c2a895cb4c214d7055a66b08975aa8d11374c2bd78840c285a0ad",
+          "extracted_text_chars": 4042,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "gao-report-v1",
+          "source_table": "gao_reports",
+          "subject_type": "gao_report",
+          "subject_id": "gao-26-108687",
+          "artifact_id": "artifact_a5ed68f19c3fc43d670ac59b",
+          "artifact_digest": "c3d874f5e7b3caea04709f3d3c4fa7a298be052a3e5b80fa2267db7158559b03",
+          "extracted_text_sha256": "5dba9f5a80bf162c68a9557bbb70727044fd0d632f563b82e398762de046c011",
+          "extracted_text_chars": 9151,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "lobbying-filing-v1",
+          "source_table": "lobbying_filings",
+          "subject_type": "lobbying_filing",
+          "subject_id": "6869560b-cf00-483d-aca8-42e23c18812f",
+          "artifact_id": "artifact_1366cc33521d7afce7c92d37",
+          "artifact_digest": "6bc1c231b8ecf84fca1596573ed757c4fc08479d4d26d3101a9e7cc4295a420b",
+          "extracted_text_sha256": "dc8560e673b3595cd7d51c49ec667e76f39d4ad3f53d898cfad2fecf4ea15e76",
+          "extracted_text_chars": 793,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "lobbying-filing-v1",
+          "source_table": "lobbying_filings",
+          "subject_type": "lobbying_filing",
+          "subject_id": "efaa0e77-eeec-45e5-a48b-21f3082e4c34",
+          "artifact_id": "artifact_cb6b94a94f304589f8ca9c31",
+          "artifact_digest": "7087930051b055a14102c8c1a7314fda57d0d39a32148ff7837c671b13a307a4",
+          "extracted_text_sha256": "4dba78ba99eff937ab5027ecb82b0d115059624368a550eb7d8cccb1f509732d",
+          "extracted_text_chars": 690,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "lobbying-filing-v1",
+          "source_table": "lobbying_filings",
+          "subject_type": "lobbying_filing",
+          "subject_id": "f9fb464d-d004-42a9-a8d6-d04e0078e914",
+          "artifact_id": "artifact_11647fab0dcb4d3236c35668",
+          "artifact_digest": "c25d20a36807f29e90572a194effc9e34047a710e4331864638f218e89513258",
+          "extracted_text_sha256": "9c7197d315722f386a0cbaaa8db6c1e5beafb6b54a4fb67dc58688a4b0a3bce2",
+          "extracted_text_chars": 1170,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "lobbying-filing-v1",
+          "source_table": "lobbying_filings",
+          "subject_type": "lobbying_filing",
+          "subject_id": "5c7b2a25-733a-49d5-a5b2-ed6edebd857c",
+          "artifact_id": "artifact_64c51745af338c37fa793343",
+          "artifact_digest": "4ae658ee7b70505ccc4ba0cb21eff824b3f9a85dac6405dde17d24a85c40eb96",
+          "extracted_text_sha256": "2b967606a302d7654299a17932952e9e8659f0ec765dd66aa67729807a10e5cf",
+          "extracted_text_chars": 3187,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "court-docket-v1",
+          "source_table": "court_dockets",
+          "subject_type": "court_docket",
+          "subject_id": "5955723",
+          "artifact_id": "artifact_f10cb0b589649b92f35e5d1f",
+          "artifact_digest": "5319ff4dad9dded95d088e656128ee90d1e3d1d9e7b01d06e1396534fbc06f54",
+          "extracted_text_sha256": "f3436c5635831461a153d4c5641059934826d5291152a5fa6b05ec61ed4d9fa4",
+          "extracted_text_chars": 208,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "court-docket-v1",
+          "source_table": "court_dockets",
+          "subject_type": "court_docket",
+          "subject_id": "72200898",
+          "artifact_id": "artifact_ef55124b11234611973d0eea",
+          "artifact_digest": "71c923da7e679d010f498a1fb403ce8cecf96d9b199c35c046a5674320c4fdff",
+          "extracted_text_sha256": "38ea6129f1d2c45b2c863de7d2d4f4d4f04928f3ac4e48fa527c5782dec395f0",
+          "extracted_text_chars": 152,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "court-docket-v1",
+          "source_table": "court_dockets",
+          "subject_type": "court_docket",
+          "subject_id": "69074992",
+          "artifact_id": "artifact_0861704fab0ef3da0d782f48",
+          "artifact_digest": "1cd9892cc9366f71692882bd42c001a9ce1873eac9b093e7ac9a836285da8a70",
+          "extracted_text_sha256": "dd581dbc45bf47117a5855423dd1901db13371fe65ee6663e131da5b48ffb0fe",
+          "extracted_text_chars": 191,
+          "segment_count": 1
+        },
+        {
+          "profile_id": "court-docket-v1",
+          "source_table": "court_dockets",
+          "subject_type": "court_docket",
+          "subject_id": "4407023",
+          "artifact_id": "artifact_bd4b6a4e0ecca700ba06460e",
+          "artifact_digest": "e773744a3c452984a21dc6ff3ea2d0d9fc5bc97108bf0d944feaf8014d95af9b",
+          "extracted_text_sha256": "4647b26ef1cdbb2b373e988a5c04b58a3e98d52c11f43be702b9c1a841c449a0",
+          "extracted_text_chars": 179,
+          "segment_count": 1
+        }
+      ],
+      "disjointness": {
+        "development_dataset_id": "rulespec-development-35-v1",
+        "artifact_count": 28,
+        "profile_count": 6,
+        "profiles": [
+          "congress-bill-v1",
+          "court-docket-v1",
+          "federal-register-document-v1",
+          "gao-report-v1",
+          "lobbying-filing-v1",
+          "unified-agenda-observation-v1"
+        ],
+        "artifacts_by_profile": {
+          "congress-bill-v1": 5,
+          "court-docket-v1": 4,
+          "federal-register-document-v1": 6,
+          "gao-report-v1": 4,
+          "lobbying-filing-v1": 4,
+          "unified-agenda-observation-v1": 5
+        },
+        "compared_on": [
+          "subject_identity",
+          "artifact_digest",
+          "extracted_text_sha256"
+        ],
+        "shared_subject_identities": [],
+        "shared_artifact_digests": [],
+        "shared_extracted_text_sha256": [],
+        "duplicate_artifact_digests": [],
+        "understaffed_strata": [],
+        "minimum_profiles": 4,
+        "exclusion_counts": {
+          "development_artifacts": 44,
+          "evaluation_dataset_artifacts": 227,
+          "excluded_artifact_digests": 227,
+          "excluded_extracted_text_digests": 226,
+          "excluded_subject_identities": 227,
+          "gold_artifacts": 35
+        },
+        "passed": true
+      },
+      "drafting_input": {
+        "path": "/private/tmp/claude-501/-Users-mikewolfd-Work-spicy-regs/51b1c53b-0ba8-4f5c-be93-0172189bfbb8/scratchpad/holdout_drafting_input.json",
+        "sha256": "ae20dd28eb61a385bb45fa97c861bb1067997057796f2e4c4828ae3564293721",
+        "schema_version": "rulespec-holdout-drafting-input-v1",
+        "blind": true,
+        "blindness_checks": {
+          "banned_key_substrings": [
+            "alias",
+            "assignment",
+            "candidate",
+            "concept",
+            "confidence",
+            "expected_tag",
+            "gold",
+            "label",
+            "predict",
+            "registry",
+            "score",
+            "selector",
+            "tagger",
+            "taxonomy",
+            "vocabulary"
+          ],
+          "forbidden_value_count": 406,
+          "string_values_checked": 1044,
+          "passed": true
+        },
+        "tracked": false,
+        "note": "Held outside the repository: it carries the holdout's full source text."
+      }
+    },
+    "labels": {
+      "status": "not_drafted",
+      "gold_file": null,
+      "gold_sha256": null,
+      "gold_row_count": null,
+      "note": "No label exists. Nothing in this record may be scored."
+    },
+    "frozen_configuration": {
+      "status": "RESERVED",
+      "freeze_point": "before holdout label exposure",
+      "candidate_selector": "RESERVED",
+      "prompt_concept_limit": "RESERVED",
+      "registry_sha256": "RESERVED",
+      "tag_instructions_sha256": "RESERVED",
+      "tag_schema_sha256": "RESERVED",
+      "prompt_input_token_budget": "RESERVED",
+      "prompt_safety_margin_tokens": "RESERVED"
+    },
+    "holdout_controls": {
+      "status": "RESERVED",
+      "configuration_frozen_before_labels": false,
+      "tuning_access": false
+    },
+    "adjudication": {
+      "status": "not_started",
+      "scope": "holdout",
+      "blind_to_tagger_output": true,
+      "agreement_published": false,
+      "disagreement_resolution_status": "not_started",
+      "reviewers": [],
+      "cross_family": false
+    }
   },
   "adoption_policy": {
     "minimum_holdout_artifacts": 1,
