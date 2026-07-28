@@ -1,11 +1,55 @@
 # Rulespec MVP path
 
-- **Date:** 2026-07-27, revision 3 — incorporates three independent plan
-  reviews (feasibility-vs-code, measurement, scope; all
-  SOUND-WITH-CORRECTIONS, reports in session record) plus the registry-dimension
-  and evaluation-boundary corrections. Decisions live in
+- **Date:** 2026-07-28, revision 4 — adds the current execution order
+  (three tracks) after the selector ablation, evaluation boundary, and
+  experiment-strategy validation. Revision 3 (2026-07-27) incorporated
+  three independent plan reviews plus the registry-dimension and
+  evaluation-boundary corrections. Decisions live in
   [`decisions.md`](decisions.md); execution history in
   [`evidence/testbed-execution-2026-07-26.md`](evidence/testbed-execution-2026-07-26.md).
+
+## Current execution order (2026-07-28)
+
+**Track A — the holdout (critical path; nothing accuracy-shaped moves
+without it).** In order: (1) draw candidate artifacts from several source
+families, disjoint from the 35 and the dev corpus by artifact digest,
+concept id, and normalized alias; pin membership and digests at draw
+time in the boundary record. (2) Build blind drafting inputs (no tagger
+output). (3) Gold drafted by a non-tagger family (claude-fable-5),
+multi-label with roles and frames, including hard negatives, explicit
+denials, and forbidden results (manual checks — the gate does not yet
+enforce composition). (4) Freeze the evaluated configuration —
+`registry_sha256` (fused), selector version, prompt, schema, token
+budget — and instantiate the exit-bar formula in `decisions.md`,
+BEFORE any label exposure. (5) Cross-family adjudication (GPT judge via
+the existing adapter + independent Fable judge; disagreements to a
+third family or excluded; agreement published). (6) Gate green →
+certify selector adoption on holdout candidate recall, rerun the roles
+schema on dev, then the one-shot holdout evaluation; used items move to
+development. Target ~80 assignments (MVP tier per the ledger).
+
+**Track B — deterministic discovery questions (parallel; product-level;
+zero model dependency).** Activated by the maintainer's adoption of this
+revision (satisfying the experiment-strategy subordination rule): (1)
+record the "active rulemaking" definition in the ledger — no such
+definition exists in any schema. (2) Freeze the `40 CFR 60` question:
+snapshot, expected and forbidden identifiers, counts, evidence, and the
+declared agenda-only recall boundary. (3) Run and score it on identity,
+link, filter, and aggregate measures. (4) Repeat for `42 U.S.C. 7401`
+via the corrected join (`authority_edges` → `agenda_item_proceedings` →
+`proceedings`). Failures feed phase-3-style fixes.
+
+**Track C — attestations table (parallel; no gold contact).** Build the
+contract-shaped attestations carrier (phase 4.1, normative pattern
+rulespec `b613ba3`) now: the holdout adjudication itself should be
+stored as attestation rows, so track A becomes its first consumer
+rather than a JSON side channel.
+
+**Parked, unchanged:** round-3 judging of the 35 (dev-only, superseded);
+the hyperbolic subsumption scorer (awaiting maintainer call — requires
+training an encoder); retrieval; the wiki interface. **Maintainer-only
+items:** the Rulespec non-originating-consumer review request (phase
+0.4, still unrequested) and the spend nod for track A's judge calls.
 - **Goal:** the smallest end-to-end Rulespec implementation over real Spicy
   Regs data: source → segments → concept assignments with Rulespec roles and
   exact evidence → attested review (machine-graded until the wiki
