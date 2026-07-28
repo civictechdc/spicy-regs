@@ -437,3 +437,38 @@ so explicitly. Plans cite this file; this file cites evidence.
 - **Revisit trigger:** a recall@k retrieval test over the 513k registry
   (the lineage's actual claim), or a directionally balanced graded-pair
   set of meaningful size.
+
+## 2026-07-28 — Two silent-failure classes in contract validation
+
+- **A minted `requestContractDigest` is undetectable.** Core §2.4 (rulespec
+  `e8794ba`) says a digest over an envelope invented to satisfy the field is
+  non-conforming, but the fifth negative control proves no gate catches it:
+  L1/L2/L3 all pass. Every compiled surface checks only
+  `^sha256:[0-9a-f]{64}$`, and the conditional guard fires on
+  `modelExtraction` to require *presence*, never on other methods to
+  interrogate provenance. Verifying it would need the preimage of a digest
+  the kernel treats as opaque by design. **Disposition:** accept as a
+  producer obligation, not a checkable constraint; do not add a shape that
+  pretends otherwise. Consumers must not read digest presence as evidence
+  of an audited run.
+- **A stale vendored context makes gates report green on unchecked edges.**
+  Under the pre-`361348c` context copy, `rkaf:publishedInDocket` had no term
+  definition, so it expanded as a string literal, `sh:class rkaf:Docket`
+  never fired, and L3 would have reported 0 violations on an edge it never
+  examined. Same mechanism for the ten untyped timestamp terms.
+  **Disposition:** any projection or validation gate must pin the context to
+  the same contract revision as the shapes, and treat "vendored artifacts
+  age silently" as a first-class precondition. Recorded in the phase-4 gate
+  preconditions.
+- **Two corrections to the first projection pass, both recorded in its
+  README:** offset drift is caught by the compiled `sh:class` on
+  `assignmentEvidence`, not by `CarrierLocalFragmentUrnSourceAgreementShape`
+  (which compares only the URN's artifact component against `oa:hasSource`);
+  and rebuilding `compiled/` needs no `cue` toolchain —
+  `tools/compile_all.sh` drives a pure-Python compiler, so gate freshness is
+  cheaper than first reported.
+- **Evidence:** `evidence/single-document-rulespec-projection-2026-07-28/`
+  (commit `0d548d9`); five negative controls in `validation/`.
+- **Revisit trigger:** a contract change that makes provenance verifiable
+  (e.g. a published request-envelope schema), or a gate harness that pins
+  context and shapes together automatically.
