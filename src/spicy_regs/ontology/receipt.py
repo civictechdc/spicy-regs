@@ -1067,6 +1067,15 @@ def _validate_authorities(path: Path, failures: FailureCollector) -> dict[str, i
                 metrics["usc_identifiers"] += 1
             except ValueError as exc:
                 failures.add("authority_edges", row_id, "usc_transform", str(exc))
+        # A range's far endpoint is a section the source text names, so it has
+        # to be expressible as one. Interior members are never rows and so are
+        # never checked — there are none to check.
+        if row.get("usc_section_end"):
+            try:
+                canonical_usc_iri(row.get("usc_title"), row.get("usc_section_end"))
+                metrics["usc_section_ranges"] += 1
+            except ValueError as exc:
+                failures.add("authority_edges", row_id, "usc_range_transform", str(exc))
         if row.get("pl_number"):
             try:
                 canonical_pl_iri(row["pl_number"])

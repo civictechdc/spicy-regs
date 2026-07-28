@@ -118,6 +118,52 @@ def test_genuinely_identical_citations_still_collapse(tmp_path):
     }
 
 
+def test_cited_range_is_published_as_endpoints_and_answers_a_7401_filter(tmp_path):
+    """The regression behind discovery question 2's recall of 0.8125.
+
+    All five missing RINs stated authority as ``42 U.S.C. 7401-7671q.``; the
+    hyphenated tail was published as one opaque section, invisible to an exact
+    filter. Both spellings of the range now answer ``usc_section = '7401'``,
+    and both carry the far endpoint instead of discarding it.
+    """
+    rows = _edges(tmp_path, ["42 U.S.C. 7401-7671q.", "42 U.S.C. 7401 to 7671q."])
+
+    assert [(row["usc_section"], row["usc_section_end"]) for row in rows] == [("7401", "7671q")] * 2
+    matched = [row for row in rows if (row["usc_title"], row["usc_section"]) == ("42", "7401")]
+    assert len(matched) == 2
+    # Two raw spellings, two rows: the range is not multiplied into members.
+    assert sorted(row["authority_raw"] for row in rows) == [
+        "42 U.S.C. 7401 to 7671q.",
+        "42 U.S.C. 7401-7671q.",
+    ]
+
+
+def test_no_section_reaches_the_table_that_its_source_string_does_not_name(tmp_path):
+    """Ranges are never expanded into members, real or invented.
+
+    ``7401-7671q`` is the whole Clean Air Act. Its sections are sparse and
+    lettered, so materializing the interval would publish sections that may not
+    exist — false positives in place of the false negatives, on a filter whose
+    precision is 1.000.
+    """
+    raws = [
+        "42 U.S.C. 7401-7671q.",
+        "42 U.S.C. 7401 to 7671q.",
+        "42 U.S.C. 1395-1397",
+        "42 U.S.C. 7401, 7412, and 7413 et seq.",
+        "12 U.S.C. 1831p-1",
+    ]
+    rows = _edges(tmp_path, raws)
+
+    for row in rows:
+        for value in (row["usc_section"], row["usc_section_end"]):
+            if value is not None:
+                assert value in row["authority_raw"].lower(), row
+    # 1396 lies inside a cited range and is named by nothing; it must be absent.
+    assert "1396" not in {row["usc_section"] for row in rows}
+    assert len(rows) == len(raws) + 2  # the three-section list adds two members
+
+
 def test_every_emitted_citation_column_discriminates_rows(tmp_path):
     """No published parse field may sit outside the dedup key.
 

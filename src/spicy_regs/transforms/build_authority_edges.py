@@ -1,4 +1,14 @@
-"""Transform: parse Unified Agenda legal-authority strings into quarantined edges."""
+"""Transform: parse Unified Agenda legal-authority strings into quarantined edges.
+
+A U.S.C. range is published as its two endpoints — ``usc_section`` holds the
+first, ``usc_section_end`` the last — and never as its members. U.S. Code
+ranges are sparse and lettered: ``42 U.S.C. 7401-7671q`` is the whole Clean Air
+Act, whose sections do not enumerate to a dense integer sequence. Materializing
+the interval would mint sections that may not exist, trading this table's
+false negatives for false positives, which is the worse trade for a discovery
+filter. So the row stays one row, and containment is a query-time predicate
+(:func:`spicy_regs.ontology.citations.usc_section_covers`).
+"""
 
 from __future__ import annotations
 
@@ -26,6 +36,7 @@ COLUMNS = (
     "authority_raw",
     "usc_title",
     "usc_section",
+    "usc_section_end",
     "pl_number",
     "statute_at_large",
     "executive_order",
@@ -79,6 +90,7 @@ def build_authority_edges(
                         "authority_raw": raw,
                         "usc_title": parsed.usc_title,
                         "usc_section": parsed.usc_section,
+                        "usc_section_end": parsed.usc_section_end,
                         "pl_number": parsed.pl_number,
                         "statute_at_large": parsed.statute_at_large,
                         "executive_order": parsed.executive_order,

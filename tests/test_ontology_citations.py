@@ -23,6 +23,7 @@ from spicy_regs.ontology.citations import (
     normalize_regsgov_identifier,
     parse_authority_citation,
     parse_cfr_citation,
+    usc_section_covers,
 )
 from spicy_regs.ontology.llm import validated_external_ids
 
@@ -114,8 +115,11 @@ def test_usc_section_lists_yield_one_citation_per_section(raw, expected):
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
-        # Ranges stay one citation — the hyphen is part of the section grammar.
-        ("42 U.S.C. 1395-1397", [AuthorityCitation("usc", "ok", usc_title="42", usc_section="1395-1397")]),
+        # A range stays one citation and publishes its two endpoints.
+        (
+            "42 U.S.C. 1395-1397",
+            [AuthorityCitation("usc", "ok", usc_title="42", usc_section="1395", usc_section_end="1397")],
+        ),
         # A number leading a different citation form is not a section.
         (
             "42 U.S.C. 7401, 117 Stat. 429",
@@ -139,6 +143,109 @@ def test_usc_section_lists_yield_one_citation_per_section(raw, expected):
 )
 def test_usc_list_expansion_stays_fail_closed(raw, expected):
     assert parse_authority_citation(raw) == expected
+
+
+# The five RINs that "every active rulemaking depending on 42 U.S.C. 7401"
+# missed (recall 0.8125) all carry this exact string, and the `to` spelling
+# below reached the right answer only because the old expression stopped at
+# 7401 and ignored the tail. Both are now read as the same range.
+# docs/evidence/discovery-slice-2026-07-28.md
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "42 U.S.C. 7401-7671q.",  # 2060-AS32, -AU01, -AV95, -AW70, -AW96
+        "42 U.S.C. 7401 to 7671q.",
+        "42 U.S.C. 7401–7671q.",  # en dash
+        "42 U.S.C. 7401 through 7671q.",
+    ],
+)
+def test_clean_air_act_range_publishes_both_endpoints(raw):
+    assert parse_authority_citation(raw) == [
+        AuthorityCitation("usc", "ok", usc_title="42", usc_section="7401", usc_section_end="7671q")
+    ]
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # A hyphen that names one section is not a range: the suffix is an
+        # ordinal below the stem, never a later section.
+        ("42 U.S.C. 1395w-4", ("1395w-4", None)),
+        ("12 U.S.C. 1831p-1", ("1831p-1", None)),
+        ("42 U.S.C. 300j-9", ("300j-9", None)),
+        ("26 U.S.C. 1400Z-2", ("1400z-2", None)),
+        # Equal endpoints are not a range either.
+        ("42 U.S.C. 2000d-2000d", ("2000d-2000d", None)),
+        # A lettered endpoint under the same stem is.
+        ("15 U.S.C. 717-717w", ("717", "717w")),
+        ("16 U.S.C. 620-620j", ("620", "620j")),
+        # Abbreviated ranges name no second section, so nothing is invented:
+        # "1484-86" is neither 1484-to-86 nor, without guessing, 1484-to-1486.
+        ("42 U.S.C. 1484-86", ("1484-86", None)),
+        ("5 U.S.C. 571 to 83", ("571", None)),
+        # A transposed source range stays one opaque token rather than an
+        # empty interval.
+        ("50 U.S.C. 4801 to 4582", ("4801", None)),
+        # A compound start with a range tail: the start is not a single
+        # section token, so the pair is not readable as an interval.
+        ("47 U.S.C. 615a-1 through 615b", ("615a-1", None)),
+    ],
+)
+def test_usc_hyphen_is_a_range_only_when_the_endpoints_are_ordered(raw, expected):
+    parsed = parse_authority_citation(raw)
+    assert [(item.usc_section, item.usc_section_end) for item in parsed] == [expected]
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["12 U.S.C. 1831p–1", "42 U.S.C. 1395w–3", "15 U.S.C. 1261 to 62"],
+)
+def test_declined_range_tail_is_not_reported_as_covered(raw):
+    """A tail the ordering rule refuses is uncovered text, so the parse is partial."""
+    (parsed,) = parse_authority_citation(raw)
+    assert parsed.parse_status == "partial"
+    assert parsed.usc_section_end is None
+
+
+def test_listed_range_member_is_split_like_a_leading_one():
+    assert parse_authority_citation("42 U.S.C. 7401, 7671a-7671q") == [
+        AuthorityCitation("usc", "partial", usc_title="42", usc_section="7401"),
+        AuthorityCitation("usc", "partial", usc_title="42", usc_section="7671a", usc_section_end="7671q"),
+    ]
+
+
+def test_range_row_expands_to_its_first_named_section_and_no_other():
+    """The published identifier is a section the source text names."""
+    (parsed,) = parse_authority_citation("42 U.S.C. 7401-7671q.")
+    assert parsed.canonical_iri == "urn:rkaf:us:usc:42:7401"
+    assert canonical_usc_iri(parsed.usc_title, parsed.usc_section_end) == "urn:rkaf:us:usc:42:7671q"
+
+
+@pytest.mark.parametrize(
+    ("section", "covered"),
+    [
+        ("7401", True),  # start
+        ("7671q", True),  # end, lettered suffix
+        ("7412", True),  # inside
+        ("7671", True),  # inside, bare stem sorts before its lettered members
+        ("7671a", True),  # inside, lettered
+        ("7400", False),  # below
+        ("7672", False),  # above
+        ("7671r", False),  # above, lettered
+        ("", False),
+        ("seven", False),
+    ],
+)
+def test_usc_section_covers_reads_a_range_as_a_closed_interval(section, covered):
+    assert usc_section_covers(section, start="7401", end="7671q") is covered
+
+
+@pytest.mark.parametrize(
+    ("section", "covered"),
+    [("7401", True), ("7401(a)", True), ("7412", False), ("7671q", False)],
+)
+def test_usc_section_covers_without_an_end_is_exact(section, covered):
+    assert usc_section_covers(section, start="7401", end=None) is covered
 
 
 def test_parse_multiple_authorities_returns_one_partial_edge_each():

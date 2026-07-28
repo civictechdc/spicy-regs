@@ -4,6 +4,8 @@
 
 Parsed Unified Agenda statutory-authority citations. One row per distinct citation parsed from an authority string, so a string naming several authorities yields several rows. Failed parses are deliberately retained with their raw text so parser coverage can improve without hiding evidence. All columns are VARCHAR.
 
+A cited U.S.C. *range* is one row carrying its two endpoints, never its members: `usc_section` holds the first section, `usc_section_end` the last, and the row denotes the closed interval between them. Members are not materialized because U.S. Code ranges are sparse and lettered — `42 U.S.C. 7401-7671q` is the whole Clean Air Act, whose sections do not enumerate to a dense integer sequence — so inventing the interior would publish sections that may not exist. Filter accordingly: `usc_section = '7401'` returns single-section rows and ranges that *start* at 7401; a section strictly inside a range is found only by the interval predicate `usc_section_end IS NOT NULL AND usc_section <= ? AND ? <= usc_section_end` compared on `(numeric stem, letter suffix)`, which `spicy_regs.ontology.citations.usc_section_covers` implements.
+
 - **Parquet file:** `materialized/ontology/latest.json` (atomic snapshot manifest)
 - **Supported by MCP `query_sql` after first publication:** Yes
 
@@ -12,7 +14,8 @@ Parsed Unified Agenda statutory-authority citations. One row per distinct citati
 | `rin` | `VARCHAR` | RIN whose agenda entry cited the authority. |
 | `authority_raw` | `VARCHAR` | Original authority string, always retained. |
 | `usc_title` | `VARCHAR` | Parsed U.S. Code title, when present. |
-| `usc_section` | `VARCHAR` | Parsed U.S. Code section with subsection parentheses omitted. |
+| `usc_section` | `VARCHAR` | Parsed U.S. Code section with subsection parentheses omitted; the first endpoint when `usc_section_end` is set. |
+| `usc_section_end` | `VARCHAR` | Last section of a cited range (e.g. `7671q` for `42 U.S.C. 7401-7671q`), else null. A hyphen that names one section (`1395w-4`, `1831p-1`) stays inside `usc_section`: a range is recognized only when the second endpoint sorts strictly after the first. |
 | `pl_number` | `VARCHAR` | Parsed Public Law number `<congress>-<law-number>`; joins to `congress_bills.pl_number`. |
 | `statute_at_large` | `VARCHAR` | Parsed Statutes at Large citation as `<volume>-<page>` (e.g. `117-429` for `117 Stat. 429`), when present. |
 | `executive_order` | `VARCHAR` | Parsed Executive Order number without leading zeros (e.g. `13985`), when present. Distinct orders cited in one authority string are separate rows. |

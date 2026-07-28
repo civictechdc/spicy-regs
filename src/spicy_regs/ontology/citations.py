@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import cast
 from urllib.parse import quote
 
@@ -27,7 +27,13 @@ _CFR_TITLE_PART = re.compile(
 _USC_STANDARD = re.compile(
     r"(?P<title>[1-9]\d*)\s*U\.?\s*S\.?\s*C\.?"
     r"(?:\s*(?:§{1,2}|sections?|secs?\.?))?\s*"
-    r"(?P<section>\d+[A-Za-z]?(?:-\d+[A-Za-z]?)?)",
+    r"(?P<section>\d+[A-Za-z]?(?:-\d+[A-Za-z]?)?)"
+    # A spelled range tail. The hyphenated spelling is already inside
+    # ``section`` (the hyphen is also part of the section grammar, so it has to
+    # be); this covers ``7401 to 7671q`` and the dash characters the section
+    # token cannot hold. Whether either spelling is really a range is decided
+    # by :func:`_usc_section_range`, never by the shape of the separator.
+    r"(?:(?:\s+(?:to|through)\s+|\s*[–—]\s*)(?P<range_end>\d+[A-Za-z]?))?",
     re.IGNORECASE,
 )
 _USC_LIST_TAIL = re.compile(
@@ -83,6 +89,76 @@ def _cfr_section(value: object) -> str | None:
     return text if re.fullmatch(r"\d+[a-z]{0,3}(?:-[0-9a-z]+)*", text) else None
 
 
+_USC_SECTION_ATOM = re.compile(r"(?P<number>\d+)(?P<suffix>[a-z]*)")
+
+
+def _usc_section_key(section: str | None) -> tuple[int, str] | None:
+    """Order a U.S.C. section by numeric stem, then letter suffix.
+
+    ``7671`` < ``7671a`` < ``7671q`` < ``7672``. Returns ``None`` for anything
+    that is not a single well-formed section token, so a caller can never
+    compare two values it does not understand.
+    """
+    if not section:
+        return None
+    match = _USC_SECTION_ATOM.fullmatch(section)
+    return (int(match["number"]), match["suffix"]) if match else None
+
+
+def _usc_section_range(section: str | None, range_end: str | None = None) -> tuple[str | None, str | None]:
+    """Split a U.S.C. section token into ``(section, range_end)``.
+
+    A hyphen means two different things in the U.S. Code. In ``1395w-4``,
+    ``1831p-1`` and ``300j-9`` it is part of one section's name; in
+    ``7401-7671q`` and ``1702-1715z`` it separates the endpoints of a range.
+    Nothing in the character sequence distinguishes them, so the ordering does:
+    a range is a pair whose second endpoint sorts strictly after its first.
+    Compound section names never satisfy that, because their suffix is a small
+    ordinal (``1831p-1``: 1831 > 1) rather than a later section.
+
+    Fail-closed by construction. An unordered or unparsable pair keeps the
+    original token whole rather than guessing, which is why ``42 U.S.C. 1484-86``
+    (an abbreviated range) stays a single opaque section: reading it as
+    1484-to-86 would be wrong, and reading it as 1484-to-1486 would be an
+    invention.
+    """
+    if not section:
+        return (section, None)
+    if range_end is not None:
+        start, end = section, range_end
+    elif section.count("-") == 1:
+        start, end = section.split("-")
+    else:
+        return (section, None)
+    low, high = _usc_section_key(start), _usc_section_key(end)
+    if low is None or high is None or low >= high:
+        return (section, None)
+    return (start, end)
+
+
+def usc_section_covers(section: object, *, start: object, end: object = None) -> bool:
+    """Whether an ``authority_edges`` row's section covers ``section``.
+
+    A row whose ``usc_section_end`` is null denotes the single section in
+    ``usc_section``. A row that carries one denotes the **closed interval**
+    ``[usc_section, usc_section_end]`` — the endpoints are the two sections the
+    source text actually names, and the members between them are deliberately
+    never materialized, because U.S. Code ranges are sparse and lettered
+    (``42 U.S.C. 7401-7671q`` spans the Clean Air Act, whose sections do not
+    enumerate to a dense integer sequence).
+
+    So ``usc_section = '7401'`` finds a range's first section and nothing
+    inside it; this predicate is the documented way to ask the containment
+    question without inventing rows.
+    """
+    target = _usc_section_key(_section(section))
+    low = _usc_section_key(_section(start))
+    if target is None or low is None:
+        return False
+    high = _usc_section_key(_section(end))
+    return target == low if high is None else low <= target <= high
+
+
 @dataclass(frozen=True)
 class CfrCitation:
     title: str
@@ -105,6 +181,7 @@ class AuthorityCitation:
     parse_status: str
     usc_title: str | None = None
     usc_section: str | None = None
+    usc_section_end: str | None = None
     pl_number: str | None = None
     statute_at_large: str | None = None
     executive_order: str | None = None
@@ -251,7 +328,7 @@ def parse_cfr_citation(value: object) -> list[CfrCitation]:
     return found
 
 
-def _usc_list_expansion(text: str) -> list[tuple[str, str]]:
+def _usc_list_expansion(text: str) -> list[tuple[str, str, str | None]]:
     """Expand a U.S.C. section list under the title that introduces it.
 
     Common UA form: "42 U.S.C. 1395, 1396, 1397". The primary expression
@@ -260,23 +337,32 @@ def _usc_list_expansion(text: str) -> list[tuple[str, str]]:
     tail expansion in :func:`parse_cfr_citation`. Each expansion stops at the
     next explicit U.S.C. citation so a later title is never mis-attributed, and
     a number that leads another citation form ("117 Stat. 429") is not taken.
+
+    A listed member may itself be a range ("42 U.S.C. 7401, 7671a-7671q"), so
+    each one is split by the same rule the leading citation uses.
     """
     matches = list(_USC_STANDARD.finditer(text))
-    expanded: list[tuple[str, str]] = []
+    expanded: list[tuple[str, str, str | None]] = []
     for index, match in enumerate(matches):
         title = _digits(match.group("title"))
         if not title:
             continue
         stop = matches[index + 1].start() if index + 1 < len(matches) else len(text)
         for tail in _USC_LIST_TAIL.finditer(text[match.end() : stop]):
-            section = _section(tail.group("section"))
+            section, section_end = _usc_section_range(_section(tail.group("section")))
             if section is not None:
-                expanded.append((title, section))
+                expanded.append((title, section, section_end))
     return expanded
 
 
-def _status_for_match(text: str, match: re.Match[str]) -> str:
-    remainder = f"{text[: match.start()]} {text[match.end() :]}"
+def _status_for_span(text: str, start: int, end: int) -> str:
+    """Status for a citation that covers ``text[start:end]`` and nothing else.
+
+    The span is passed rather than taken from the match because a U.S.C. match
+    may consume a range tail it then declines to read as a range; the declined
+    characters are not covered, so they must still count against ``ok``.
+    """
+    remainder = f"{text[:start]} {text[end:]}"
     return "ok" if _IGNORABLE_TAIL.fullmatch(remainder) else "partial"
 
 
@@ -301,15 +387,31 @@ def parse_authority_citation(value: object) -> list[AuthorityCitation]:
     )
     for pattern, authority_type in patterns:
         for match in pattern.finditer(text):
-            status = _status_for_match(text, match)
             if authority_type == "usc":
+                usc_section, usc_section_end = _usc_section_range(
+                    _section(match.group("section")),
+                    _section(match.groupdict().get("range_end")),
+                )
+                # A range tail the ordering rule declined stays uncovered text,
+                # so ``12 U.S.C. 1831p–1`` is still a partial parse of 1831p
+                # rather than an ``ok`` one that quietly dropped the suffix.
+                covered_end = (
+                    match.end("section")
+                    if match.groupdict().get("range_end") is not None and usc_section_end is None
+                    else match.end()
+                )
                 citation = AuthorityCitation(
                     authority_type="usc",
-                    parse_status=status,
+                    parse_status=_status_for_span(text, match.start(), covered_end),
                     usc_title=_digits(match.group("title")),
-                    usc_section=_section(match.group("section")),
+                    usc_section=usc_section,
+                    usc_section_end=usc_section_end,
                 )
-            elif authority_type == "public_law":
+                if citation not in citations:
+                    citations.append(citation)
+                continue
+            status = _status_for_span(text, match.start(), match.end())
+            if authority_type == "public_law":
                 citation = AuthorityCitation(
                     authority_type="public_law",
                     parse_status=status,
@@ -333,12 +435,13 @@ def parse_authority_citation(value: object) -> list[AuthorityCitation]:
     # A section list is never covered by a single citation, so every member is
     # ``partial`` — the same status the multi-citation normalization below
     # would assign anyway.
-    for usc_title, usc_section in _usc_list_expansion(text):
+    for usc_title, usc_section, usc_section_end in _usc_list_expansion(text):
         listed = AuthorityCitation(
             authority_type="usc",
             parse_status="partial",
             usc_title=usc_title,
             usc_section=usc_section,
+            usc_section_end=usc_section_end,
         )
         if listed not in citations:
             citations.append(listed)
@@ -346,16 +449,7 @@ def parse_authority_citation(value: object) -> list[AuthorityCitation]:
     if not citations:
         return [AuthorityCitation(authority_type="other", parse_status="failed")]
     if len(citations) > 1:
-        citations = [
-            AuthorityCitation(
-                authority_type=item.authority_type,
-                parse_status="partial",
-                usc_title=item.usc_title,
-                usc_section=item.usc_section,
-                pl_number=item.pl_number,
-                statute_at_large=item.statute_at_large,
-                executive_order=item.executive_order,
-            )
-            for item in citations
-        ]
+        # ``replace`` rather than a restated field list: a hand-copied one is
+        # how the citation columns fell out of the dedup key in 91db195.
+        citations = [replace(item, parse_status="partial") for item in citations]
     return citations

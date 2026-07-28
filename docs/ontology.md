@@ -538,6 +538,13 @@ declared RDF semantics without inventing information:
   `rkaf:LocalConcept` nodes. Their labels, hierarchy, confidence, and evidence
   remain local until a separate human-reviewed promotion creates a Rulespec
   concept IRI and an explicit `skos:exactMatch` link.
+- `authority_edges.usc_section_end` closes a cited section *range*
+  (`42 U.S.C. 7401-7671q`). The mapped pair `usc_title`/`usc_section` projects
+  such a row to its first section — a section the source text names, so the
+  IRI is honest — and the interval is not projected: Rulespec has no range
+  term, and expanding one would mint `us-usc` IRIs for sections that may not
+  exist. Both endpoints stay readable in the carrier; a consumer that needs
+  containment applies the interval predicate documented on the table.
 
 The inverse direction on `fr_document_numbers_json` is intentional: each
 Federal Register `rkaf:Artifact` points through

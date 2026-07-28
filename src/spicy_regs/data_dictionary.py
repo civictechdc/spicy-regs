@@ -280,6 +280,7 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("authority_raw", "VARCHAR"),
         ("usc_title", "VARCHAR"),
         ("usc_section", "VARCHAR"),
+        ("usc_section_end", "VARCHAR"),
         ("pl_number", "VARCHAR"),
         ("statute_at_large", "VARCHAR"),
         ("executive_order", "VARCHAR"),
