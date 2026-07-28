@@ -59,12 +59,11 @@ Rulespec CI validation gate
   shapes:  compiled/shacl/profiles/us-rulemaking/us-regulatory-artifact.ttl
 
 [2/3] Per-fixture validation
-  [PASS] fsis-2026-03227.rulespec: 0 violations, 196 triples
+  [PASS] _consumer-projection/fsis-2026-03227: 0 violations, 193 triples
 
 [3/3] Summary
   Shapes:     54 files
   Fixtures:   1
-  Triples:    196
+  Triples:    193
   Violations: 0
   Result:     PASS
-exit=0

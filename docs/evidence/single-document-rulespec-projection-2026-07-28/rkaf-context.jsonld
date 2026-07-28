@@ -42,6 +42,10 @@
       "@type": "@id",
       "@container": "@set"
     },
+    "rkaf:publishedInDocket": {
+      "@type": "@id",
+      "@container": "@set"
+    },
     "dcterms:hasFormat": {
       "@type": "@id",
       "@container": "@set"
@@ -474,6 +478,12 @@
     "rkaf:closesRevalidation": {
       "@type": "@id"
     },
+    "rkaf:openedAt": {
+      "@type": "xsd:dateTime"
+    },
+    "rkaf:closedAt": {
+      "@type": "xsd:dateTime"
+    },
     "rkaf:closureDecision": {
       "@type": "@vocab"
     },
@@ -494,6 +504,9 @@
     },
     "rkaf:declaredScope": {
       "@type": "@id"
+    },
+    "rkaf:declaredAt": {
+      "@type": "xsd:dateTime"
     },
     "rkaf:BridgeIssueAttestationContract": {
       "@type": "@id"
@@ -519,6 +532,9 @@
     "rkaf:adoptionScope": {
       "@type": "xsd:string"
     },
+    "rkaf:adoptedAt": {
+      "@type": "xsd:dateTime"
+    },
     "rkaf:attestationScope": {
       "@type": "xsd:string"
     },
@@ -527,6 +543,15 @@
     },
     "rkaf:targets": {
       "@type": "@id"
+    },
+    "rkaf:attestedAt": {
+      "@type": "xsd:dateTime"
+    },
+    "rkaf:revokedAt": {
+      "@type": "xsd:dateTime"
+    },
+    "rkaf:rationale": {
+      "@type": "xsd:string"
     },
     "rkaf:lifecycleEventKind": {
       "@type": "@vocab"
@@ -550,6 +575,18 @@
       "@type": "xsd:dateTime"
     },
     "rkaf:effectivePeriodEnd": {
+      "@type": "xsd:dateTime"
+    },
+    "rkaf:retroactiveFrom": {
+      "@type": "xsd:dateTime"
+    },
+    "rkaf:sunsetAt": {
+      "@type": "xsd:dateTime"
+    },
+    "rkaf:resolvedAt": {
+      "@type": "xsd:dateTime"
+    },
+    "rkaf:validatedAt": {
       "@type": "xsd:dateTime"
     },
     "rkaf:anchoredBy": {
@@ -1507,7 +1544,8 @@
       "Reintroduced dcat: for the Experimental rulemaking module's named Spicy Regs carrier: dcat:qualifiedRelation, dcat:Relationship, and dcat:hadRole now have executable corpus and fixture coverage.",
       "Dropped remaining Cohort D dead-weight prefix declarations: nano: (pattern citation, not predicate import) and schemaorg: (no SEO projector). Re-declare when the dependent layer ships.",
       "Retained the legacy hasProceedingEvidenceIdentifier context aliases for Experimental pre-release decoding; they no longer occur in the current Proceeding shape.",
-      "Completeness sweep: every class a CUE shape binds now carries a term definition here. The reshape added rkaf:ValueAssertion, rkaf:SourceClaimant, rkaf:ExtractionActivity, oa:TextQuoteSelector, and oa:TextPositionSelector as compiled, schema-bound classes without one; rkaf:Assertion and rkaf:RelationshipAssertion had never had one. tools/test_semantic_carriers.py::CompositionCarrierTests fails the build if a bound class term goes missing again."
+      "Completeness sweep: every class a CUE shape binds now carries a term definition here. The reshape added rkaf:ValueAssertion, rkaf:SourceClaimant, rkaf:ExtractionActivity, oa:TextQuoteSelector, and oa:TextPositionSelector as compiled, schema-bound classes without one; rkaf:Assertion and rkaf:RelationshipAssertion had never had one. tools/test_semantic_carriers.py::CompositionCarrierTests fails the build if a bound class term goes missing again.",
+      "Timestamp sweep: every property the CUE annotates with an XSD datatype now carries that datatype here. Ten temporal terms did not — rkaf:attestedAt, rkaf:revokedAt, rkaf:adoptedAt, rkaf:openedAt, rkaf:closedAt, rkaf:declaredAt, rkaf:resolvedAt, rkaf:validatedAt, rkaf:retroactiveFrom, rkaf:sunsetAt — so an attestation time expanded to a plain string while rkaf:assertedAt expanded to xsd:dateTime. rkaf:rationale joins them as xsd:string. tools/test_semantic_carriers.py::TypedValueCarrierTests fails the build if an annotated term loses its coercion again."
     ],
     "note": "_meta is JSON-LD-safe: keys not in @context are ignored by JSON-LD processors."
   }

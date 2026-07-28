@@ -1,16 +1,21 @@
 Rulespec conformance gates — single-document projection
 =======================================================
-Contract under test : rulespec branch us-regulatory-identifiers @ f2a939d
-                      (tree exported read-only via `git archive`; compiled/
-                      JSON-Schema + SHACL outputs from the working checkout,
-                      proven consistent by an all-green run of the branch's
-                      own 426-fixture corpus, L4 binary excepted)
+Contract under test : rulespec branch us-regulatory-identifiers @ 062fa79
+                      (read-only detached git worktree of the user's
+                      checkout; compiled/ JSON-Schema + SHACL rebuilt in
+                      that worktree with `make compile`, which reports
+                      all L0 pins current at the pinned contract digest
+                      sha256:7d45dcd2f5ff6391b185fd98099740b34d3b6cac8ed
+                      66c99196e6ac368806553 — the digest spicy-regs pins)
 Gate machinery      : tools/conformance_report.py evaluate() —
                       L1 parse, L2 compiled JSON Schema per typed node
-                      (+ x-rkaf-order), L3 pyshacl over 54 shape files
+                      (+ x-rkaf-order), L3 pyshacl over the shape suite.
+                      conformance_report.py exposes no --level flag; the
+                      per-level verdicts below come from its own evaluate()
+                      entry point, which is what `--json` reports.
 Document under test : docs/evidence/single-document-rulespec-projection-
                       2026-07-28/fsis-2026-03227.rulespec.jsonld
-                      (@context rewritten to ../context/rkaf-context.jsonld
+                      (@context rewritten to ../../context/rkaf-context.jsonld
                       for the in-tree run; content otherwise identical)
 
 VERDICT  L1=pass  L2=pass  L3=pass  (expected positive; diverged=False)
@@ -35,11 +40,34 @@ L2 dispatch coverage (every typed node -> compiled schema):
 Negative controls (mutations of this document; prove the gates bite):
   declare rkaf:published-fragment while citing urn:rkaf:fragment: URNs
     -> L1=pass L2=pass L3=fail   (expected: L3 fail — ConceptAssignmentCarrierLocalEvidenceDeclaredShape)
+       L3 shape: rkaf:ConceptAssignmentCarrierLocalEvidenceDeclaredShape
   drift one URN offset (2307 -> 2308) so the cited fragment is never materialized
-    -> L1=pass L2=pass L3=fail   (expected: L3 fail — CarrierLocalFragmentUrnSourceAgreementShape)
+    -> L1=pass L2=pass L3=fail   (expected: L3 fail — compiled sh:class rkaf:SourceFragment on rkaf:assignmentEvidence (concept-assignment.ttl))
+       L3 shape: ClassConstraintComponent — Value does not have class rkaf:SourceFragment
   uppercase the URN digest (violates the carrier-local grammar)
     -> L1=pass L2=fail L3=fail   (expected: L2 fail — compiled carrier-local pattern in concept-assignment.schema.json)
        L2: rkaf:ConceptAssignment: ['urn:rkaf:fragment:HTTPS%3A%2F%2FWWW.FEDERALREGISTER.GOV%2FD%2F2026-03227:2282:2307:SHA256-835E00F8FCC5CCDA804ABC09B0C5F2535FCE530C4ACD7090A51BD3B765B29125'] is not valid under any of the given schemas
+       L3 shape: ClassConstraintComponent — Value does not have class rkaf:SourceFragment
+       L3 shape: rkaf:ConceptAssignmentShape
   invert oa:start/oa:end on the F1 TextPositionSelector
     -> L1=pass L2=fail L3=fail   (expected: L2 fail — x-rkaf-order on TextPositionSelector)
        L2: oa:TextPositionSelector: oa:start must be less than or equal to oa:end
+       L3 shape: LessThanOrEqualsConstraintComponent — Value of <urn:rkaf:partner:spicy-regs:selector:f1-gold-poultry-inspection-system>->oa:end < Literal("2307", datatype=xsd:integer)
+  add a minted rkaf:requestContractDigest to a rkaf:deterministicParse activity
+    -> L1=pass L2=pass L3=pass   (expected: NO GATE — Core §2.4 calls a minted digest non-conforming, but every compiled surface checks only the lexical sha256:<64 hex> form)
+       L3 shape: none — SHACL conforms
+
+Control 5 finding (new, 2026-07-28): a minted rkaf:requestContractDigest on
+a non-model rkaf:ExtractionActivity is NOT caught by any gate. Core §2.4
+is explicit — "A digest over an envelope minted to satisfy the field is
+non-conforming" — but every compiled surface checks only the lexical form
+^sha256:[0-9a-f]{64}$ (compiled/json-schema/core/extraction-activity
+.schema.json, compiled/shacl/core/extraction-activity.ttl), and the
+conditional guard that fires on rkaf:modelExtraction requires presence, not
+absence, under the other four methods. Verifying the claim would need the
+preimage of a digest the kernel treats as opaque by design, so no shape can
+express it. This is a producer obligation in the same class as Core §4.7.3
+rule 3 and the §2.1 projected-edge rules: real, normative, unmechanized.
+The four controls above are what the gates DO catch; this fifth one marks
+the boundary.
+

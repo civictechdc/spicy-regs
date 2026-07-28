@@ -222,6 +222,17 @@ def main() -> int:
     check("document lists docket FSIS-2025-0012",
           json.loads(row["docket_ids_json"]) == ["Docket No. FSIS-2025-0012"]
           or "FSIS-2025-0012" in row["docket_ids_json"])
+    # rkaf:publishedInDocket (rulespec 3644803) is the Artifact -> Docket edge.
+    # Its object is derived from the two published tables, not asserted here:
+    # the FR row above names the docket, and dockets.parquet independently
+    # carries that docket_id, so the urn:rkaf:us:regsgov: IRI names a Docket
+    # node with its own identity rather than one minted from the document.
+    check("dockets table independently carries FSIS-2025-0012",
+          dk["docket_id"] == "FSIS-2025-0012", canonical_json(
+              {"docket_id": dk["docket_id"], "agency_code": dk["agency_code"],
+               "docket_type": dk["docket_type"]}))
+    check("document docket id agrees with the dockets-table row",
+          f"Docket No. {dk['docket_id']}" in row["docket_ids_json"])
 
     topics = json.loads(row["topics_json"])
     check("document official FR topics", topics == ["Meat inspection",
@@ -246,49 +257,38 @@ def main() -> int:
               and c["pref_label"] == expect_label,
               c["external_ids_json"] if c is not None else "missing")
 
-    # --------------------------------------- request-contract / input digests
-    # rulespec Core §2.4 requires rkaf:requestContractDigest on every
-    # ExtractionActivity. For deterministic table extractions there is no
-    # provider request object; the digested contract is the documented
-    # canonical-json envelope below (extractor identity + run + input row),
-    # which is reproducible from the published tables. See README finding F3.
-    def contract_digest(instructions: str, actor_id: str, run_id: str,
-                        input_row: dict) -> tuple[str, str]:
+    # -------------------------------------------------------- input digests
+    # rulespec Core §2.4 (commit e8794ba) makes rkaf:requestContractDigest
+    # CONDITIONAL on rkaf:modelExtraction: none of the four activities below is
+    # a model call, so none carries the field, and a digest over an envelope
+    # minted to satisfy it would be non-conforming. What a deterministic run
+    # DID consume is recorded by rkaf:inputDigest together with
+    # rkaf:extractedBy / rkaf:extractorVersion — the reproduction handles the
+    # spec names for a non-model method. See README resolution R4.
+    def input_digest(input_row: dict) -> str:
         clean = {k: (None if v is None else str(v)) for k, v in input_row.items()}
-        contract = {"instructions": instructions, "actor_id": actor_id,
-                    "run_id": run_id, "input_row": clean}
-        return sha256_text(canonical_json(contract)), sha256_text(canonical_json(clean))
+        return sha256_text(canonical_json(clean))
 
-    ea1_digest, ea1_input = contract_digest(
-        "spicy-regs deterministic rule-targets extraction over docket documents "
-        "and FR metadata (rule_targets.parquet row)",
-        rt["actor_id"], rt["run_id"], rt)
-    ea2_digest, ea2_input = contract_digest(
-        "spicy-regs deterministic Unified Agenda authority-citation parse "
-        "(authority_edges.parquet row)",
-        ae["actor_id"], ae["run_id"], ae)
-    ea3_digest, ea3_input = contract_digest(
-        "spicy-regs deterministic proceeding assembly "
-        "(proceedings.parquet row)",
-        pr["actor_id"], pr["run_id"], pr)
+    ea1_input = input_digest(rt)
+    ea2_input = input_digest(ae)
+    ea3_input = input_digest(pr)
     topics_row = {"document_number": DOCNO,
                   "source_field": "federal_register.topics_json",
                   "value": row["topics_json"]}
-    ea4_digest, ea4_input = contract_digest(
-        "federal register API topics_json import for the "
-        "federal-register-document-v1 profile",
-        "spicy-regs:corpus-lock:segmented-real-data-evaluation-v2",
-        "segmented-real-data-evaluation-v2", topics_row)
+    ea4_input = input_digest(topics_row)
 
     note()
-    note("== Request-contract digests (recipe: sha256 over canonical-json "
-         "{instructions, actor_id, run_id, input_row}) ==")
-    for label, d, i in (("EA1 rule-targets", ea1_digest, ea1_input),
-                        ("EA2 authority-parser", ea2_digest, ea2_input),
-                        ("EA3 proceedings", ea3_digest, ea3_input),
-                        ("EA4 fr-topics import", ea4_digest, ea4_input)):
-        note(f"  {label}: contract sha256:{d}")
-        note(f"     input row  sha256:{i}")
+    note("== Input digests (recipe: sha256 over canonical-json of the "
+         "stringified input row) ==")
+    note("   No rkaf:requestContractDigest is emitted: Core §2.4 requires it "
+         "only for")
+    note("   rkaf:modelExtraction, and none of these four runs issued a "
+         "request contract.")
+    for label, i in (("EA1 rule-targets", ea1_input),
+                     ("EA2 authority-parser", ea2_input),
+                     ("EA3 proceedings", ea3_input),
+                     ("EA4 fr-topics import", ea4_input)):
+        note(f"  {label}: input row sha256:{i}")
 
     # ------------------------------------------------------------- graph ids
     proceeding_iri = f"{P}:proceeding:{pr['proceeding_id']}"
@@ -350,6 +350,12 @@ def main() -> int:
             "rkaf:hasRegulatoryIdentifier": f"urn:rkaf:us:frdoc:{DOCNO}",
             "rkaf:regulatoryIdentifierScheme": "rkaf:us-frdoc",
             "rkaf:publishedInProceeding": [proceeding_iri],
+            # Source-native FR metadata fact: federal_register.docket_ids_json
+            # is ["Docket No. FSIS-2025-0012"] for this document, and
+            # dockets.parquet carries the matching FSIS-2025-0012 row. Before
+            # rulespec commit 3644803 the profile had no Artifact -> Docket
+            # edge and this had to route through the Proceeding (README R2).
+            "rkaf:publishedInDocket": docket_iri,
         },
         # ------------------------------------- rulemaking-profile graph objects
         {
@@ -446,7 +452,7 @@ def main() -> int:
             "rkaf:assertsPredicate": "rkaf:proceedingAffectsCitation",
             "rkaf:assertsObject": cfr_iri,
             "rkaf:assertionPolarity": "rkaf:affirmed",
-            "rkaf:assertionOrigin": "rkaf:imported",
+            "rkaf:assertionOrigin": "rkaf:deterministicExtraction",
             "rkaf:assertedAt": RUN_ASSERTED_AT,
             "rkaf:usageEligibility": "rkaf:localOperationalUse",
             "rkaf:hasSourceClaimant": f"{P}:claimant:ra1-issuer",
@@ -462,7 +468,7 @@ def main() -> int:
             "rkaf:assertsPredicate": "rkaf:agendaAuthorityCitation",
             "rkaf:assertsObject": usc_iri,
             "rkaf:assertionPolarity": "rkaf:affirmed",
-            "rkaf:assertionOrigin": "rkaf:imported",
+            "rkaf:assertionOrigin": "rkaf:deterministicExtraction",
             "rkaf:assertedAt": RUN_ASSERTED_AT,
             "rkaf:usageEligibility": "rkaf:localOperationalUse",
             "rkaf:hasSourceClaimant": f"{P}:claimant:ra2-issuer",
@@ -478,7 +484,7 @@ def main() -> int:
             "rkaf:assertsPredicate": "rkaf:hasDocket",
             "rkaf:assertsObject": docket_iri,
             "rkaf:assertionPolarity": "rkaf:affirmed",
-            "rkaf:assertionOrigin": "rkaf:imported",
+            "rkaf:assertionOrigin": "rkaf:deterministicExtraction",
             "rkaf:assertedAt": RUN_ASSERTED_AT,
             "rkaf:usageEligibility": "rkaf:localOperationalUse",
             "rkaf:hasSourceClaimant": f"{P}:claimant:ra3-issuer",
@@ -542,7 +548,6 @@ def main() -> int:
             "rkaf:extractionRun": f"{P}:run:{rt['run_id']}",
             "rkaf:extractedBy": f"{P}:actor:rule-targets:v1",
             "rkaf:extractorVersion": "v1",
-            "rkaf:requestContractDigest": f"sha256:{ea1_digest}",
             "rkaf:inputDigest": [f"sha256:{ea1_input}"],
         },
         {
@@ -552,7 +557,6 @@ def main() -> int:
             "rkaf:extractionRun": f"{P}:run:{ae['run_id']}",
             "rkaf:extractedBy": f"{P}:actor:authority-parser:v1",
             "rkaf:extractorVersion": "v1",
-            "rkaf:requestContractDigest": f"sha256:{ea2_digest}",
             "rkaf:inputDigest": [f"sha256:{ea2_input}"],
         },
         {
@@ -562,7 +566,6 @@ def main() -> int:
             "rkaf:extractionRun": f"{P}:run:{pr['run_id']}",
             "rkaf:extractedBy": f"{P}:actor:proceedings:v1",
             "rkaf:extractorVersion": "v1",
-            "rkaf:requestContractDigest": f"sha256:{ea3_digest}",
             "rkaf:inputDigest": [f"sha256:{ea3_input}"],
         },
         {
@@ -572,7 +575,6 @@ def main() -> int:
             "rkaf:extractionRun": f"{P}:run:segmented-real-data-evaluation-v2",
             "rkaf:extractedBy": f"{P}:actor:corpus-lock",
             "rkaf:extractorVersion": "segmented-real-data-evaluation-v2",
-            "rkaf:requestContractDigest": f"sha256:{ea4_digest}",
             "rkaf:inputDigest": [f"sha256:{ea4_input}"],
         },
         # --------------------------------------------- provenance record nodes

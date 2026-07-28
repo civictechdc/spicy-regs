@@ -11,7 +11,8 @@
       "rkaf:regulatoryIdentifierScheme": "rkaf:us-frdoc",
       "rkaf:publishedInProceeding": [
         "urn:rkaf:partner:spicy-regs:proceeding:proceeding_ec5ca2f16f0fde022cdf0bd1"
-      ]
+      ],
+      "rkaf:publishedInDocket": "urn:rkaf:us:regsgov:FSIS-2025-0012"
     },
     {
       "@id": "urn:rkaf:partner:spicy-regs:proceeding:proceeding_ec5ca2f16f0fde022cdf0bd1",
@@ -165,7 +166,7 @@
       "rkaf:assertsPredicate": "rkaf:proceedingAffectsCitation",
       "rkaf:assertsObject": "urn:rkaf:us:cfr:9:381",
       "rkaf:assertionPolarity": "rkaf:affirmed",
-      "rkaf:assertionOrigin": "rkaf:imported",
+      "rkaf:assertionOrigin": "rkaf:deterministicExtraction",
       "rkaf:assertedAt": "2026-07-24T06:57:16Z",
       "rkaf:usageEligibility": "rkaf:localOperationalUse",
       "rkaf:hasSourceClaimant": "urn:rkaf:partner:spicy-regs:claimant:ra1-issuer",
@@ -181,7 +182,7 @@
       "rkaf:assertsPredicate": "rkaf:agendaAuthorityCitation",
       "rkaf:assertsObject": "urn:rkaf:us:usc:21:451",
       "rkaf:assertionPolarity": "rkaf:affirmed",
-      "rkaf:assertionOrigin": "rkaf:imported",
+      "rkaf:assertionOrigin": "rkaf:deterministicExtraction",
       "rkaf:assertedAt": "2026-07-24T06:57:16Z",
       "rkaf:usageEligibility": "rkaf:localOperationalUse",
       "rkaf:hasSourceClaimant": "urn:rkaf:partner:spicy-regs:claimant:ra2-issuer",
@@ -197,7 +198,7 @@
       "rkaf:assertsPredicate": "rkaf:hasDocket",
       "rkaf:assertsObject": "urn:rkaf:us:regsgov:FSIS-2025-0012",
       "rkaf:assertionPolarity": "rkaf:affirmed",
-      "rkaf:assertionOrigin": "rkaf:imported",
+      "rkaf:assertionOrigin": "rkaf:deterministicExtraction",
       "rkaf:assertedAt": "2026-07-24T06:57:16Z",
       "rkaf:usageEligibility": "rkaf:localOperationalUse",
       "rkaf:hasSourceClaimant": "urn:rkaf:partner:spicy-regs:claimant:ra3-issuer",
@@ -267,7 +268,6 @@
       "rkaf:extractionRun": "urn:rkaf:partner:spicy-regs:run:ontology-20260724T065716Z",
       "rkaf:extractedBy": "urn:rkaf:partner:spicy-regs:actor:rule-targets:v1",
       "rkaf:extractorVersion": "v1",
-      "rkaf:requestContractDigest": "sha256:f399dbeddbb5f964a974d1470a6c4474b41967f254ba66b92e2b3d4e64577221",
       "rkaf:inputDigest": [
         "sha256:f6b3ff769e9e9de359676980db6e6b1f9c9c4d179be1b3833add741acba55ba1"
       ]
@@ -279,7 +279,6 @@
       "rkaf:extractionRun": "urn:rkaf:partner:spicy-regs:run:ontology-20260724T065716Z",
       "rkaf:extractedBy": "urn:rkaf:partner:spicy-regs:actor:authority-parser:v1",
       "rkaf:extractorVersion": "v1",
-      "rkaf:requestContractDigest": "sha256:7a74d125809fa2148581d873ec166263a522a2372bad4fc59af6aadedd04b1bc",
       "rkaf:inputDigest": [
         "sha256:d1238db7b9e14561b429f0056690e9a3b62c1f943e2db7198688cbf3e59de6f2"
       ]
@@ -291,7 +290,6 @@
       "rkaf:extractionRun": "urn:rkaf:partner:spicy-regs:run:ontology-20260724T065716Z",
       "rkaf:extractedBy": "urn:rkaf:partner:spicy-regs:actor:proceedings:v1",
       "rkaf:extractorVersion": "v1",
-      "rkaf:requestContractDigest": "sha256:7aaa2ebb691d6dbdb0f2d3ef91ff622e94481ec259d3fd9e9ceb8bbd6dd8d285",
       "rkaf:inputDigest": [
         "sha256:c1788c9c24c6b51583cc77d77c2ae5606447ef04dee414424d9752d7a9da5034"
       ]
@@ -303,7 +301,6 @@
       "rkaf:extractionRun": "urn:rkaf:partner:spicy-regs:run:segmented-real-data-evaluation-v2",
       "rkaf:extractedBy": "urn:rkaf:partner:spicy-regs:actor:corpus-lock",
       "rkaf:extractorVersion": "segmented-real-data-evaluation-v2",
-      "rkaf:requestContractDigest": "sha256:dc2d0657a7a970fa89032aaaf52f8f49eb0c532ae839c10e89aec19c4be844fc",
       "rkaf:inputDigest": [
         "sha256:69fee1acb7d5297c2937ce1e573040e44220370dbbf9a7952a6572d73fd70740"
       ]

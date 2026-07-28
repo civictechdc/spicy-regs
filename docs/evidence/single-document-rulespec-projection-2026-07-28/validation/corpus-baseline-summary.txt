@@ -1,13 +1,32 @@
 Validator-environment consistency baseline
 ==========================================
 Run: python3 tools/conformance_report.py --json on the rulespec
-us-regulatory-identifiers tree (git archive @ f2a939d) with the
-working checkout's compiled/ outputs, BEFORE adding this projection.
+us-regulatory-identifiers tree @ 062fa79, in a read-only detached git
+worktree, with compiled/ rebuilt IN that worktree by `make compile`
+(tools/compile_all.sh; the compiler is tools/constraints_compile.py, pure
+Python — no `cue` binary is needed). BEFORE adding this projection.
 
-summary: {"total": 426, "diverged": 45, "positive": 99, "negative": 227, "edge": 55, "behavior": 45}
+Compiled-output freshness is by construction this time rather than by
+inference: the outputs were generated from the pinned tree itself, and
+tools/repin_contract_digest.py reported
+
+  [OK] all pins current at
+  sha256:7d45dcd2f5ff6391b185fd98099740b34d3b6cac8ed66c99196e6ac368806553
+
+which is exactly the digest spicy-regs pins (commit 8d08882). The corpus run
+below corroborates that rather than being the freshness argument.
+
+summary: {"total": 431, "diverged": 45, "positive": 102, "negative": 229, "edge": 55, "behavior": 45}
 non-behavior divergences: 0
-behavior divergences: 45 — all and only "L4: rkaf-behavior-validate binary missing"
-(the Rust L4 runtime was not built; L4 does not apply to this projection,
-which is not a behavior fixture). Every one of the 99 positive fixtures
-passes L1+L2+L3 and every one of the 227 negatives fails as designed,
-which is the freshness proof that the compiled outputs match the branch.
+behavior divergences: 45 — all and only "L4: rkaf-behavior-validate binary
+missing" (32 carrying that note alone, 13 also carrying the permitted-and-
+not-gated L3 note on a behavior fixture's input graph). The Rust L4 runtime
+was not built; L4 does not apply to this projection, which is not a behavior
+fixture. Every one of the 102 positive fixtures passes L1+L2+L3 and every one
+of the 229 negatives fails as designed.
+
+Delta from the 2026-07-28 first run against f2a939d (426 / 99 / 227): +5
+fixtures, +3 positives, +2 negatives — exactly the fixtures the resolving
+commits added (relationshipassertion-deterministic-origin-positive,
+extractionactivity-deterministic-no-request-contract-positive,
+artifact-published-in-docket-positive, and the two matching negatives).

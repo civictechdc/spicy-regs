@@ -50,20 +50,20 @@ sha256(UTF-8)   : d67993458a2b330cd9b53af0f0162d21aa78ea30b61b190926c21ea6b91ec9
   [OK ] proceeding docket is FSIS-2025-0012
   [OK ] authority edge is 21 USC 451
   [OK ] document lists docket FSIS-2025-0012
+  [OK ] dockets table independently carries FSIS-2025-0012 — {"agency_code":"FSIS","docket_id":"FSIS-2025-0012","docket_type":"Rulemaking"}
+  [OK ] document docket id agrees with the dockets-table row
   [OK ] document official FR topics — ["Meat inspection","Poultry and poultry products"]
 
 == Fused registry concepts (output/fused-concept-registry-v1) ==
   [OK ] concept_9bb8165887d1cb3edc54277b present, scheme=subject, label='Poultry and poultry products' — [{"scheme":"federal_register_thesaurus","value":"Poultry and poultry products"}]
   [OK ] concept_10c6db73325f36bcc6d8b84a present, scheme=subject, label='Meat inspection' — [{"scheme":"federal_register_thesaurus","value":"Meat inspection"}]
 
-== Request-contract digests (recipe: sha256 over canonical-json {instructions, actor_id, run_id, input_row}) ==
-  EA1 rule-targets: contract sha256:f399dbeddbb5f964a974d1470a6c4474b41967f254ba66b92e2b3d4e64577221
-     input row  sha256:f6b3ff769e9e9de359676980db6e6b1f9c9c4d179be1b3833add741acba55ba1
-  EA2 authority-parser: contract sha256:7a74d125809fa2148581d873ec166263a522a2372bad4fc59af6aadedd04b1bc
-     input row  sha256:d1238db7b9e14561b429f0056690e9a3b62c1f943e2db7198688cbf3e59de6f2
-  EA3 proceedings: contract sha256:7aaa2ebb691d6dbdb0f2d3ef91ff622e94481ec259d3fd9e9ceb8bbd6dd8d285
-     input row  sha256:c1788c9c24c6b51583cc77d77c2ae5606447ef04dee414424d9752d7a9da5034
-  EA4 fr-topics import: contract sha256:dc2d0657a7a970fa89032aaaf52f8f49eb0c532ae839c10e89aec19c4be844fc
-     input row  sha256:69fee1acb7d5297c2937ce1e573040e44220370dbbf9a7952a6572d73fd70740
+== Input digests (recipe: sha256 over canonical-json of the stringified input row) ==
+   No rkaf:requestContractDigest is emitted: Core §2.4 requires it only for
+   rkaf:modelExtraction, and none of these four runs issued a request contract.
+  EA1 rule-targets: input row sha256:f6b3ff769e9e9de359676980db6e6b1f9c9c4d179be1b3833add741acba55ba1
+  EA2 authority-parser: input row sha256:d1238db7b9e14561b429f0056690e9a3b62c1f943e2db7198688cbf3e59de6f2
+  EA3 proceedings: input row sha256:c1788c9c24c6b51583cc77d77c2ae5606447ef04dee414424d9752d7a9da5034
+  EA4 fr-topics import: input row sha256:69fee1acb7d5297c2937ce1e573040e44220370dbbf9a7952a6572d73fd70740
 
 wrote fsis-2026-03227.rulespec.jsonld (34 graph nodes)
