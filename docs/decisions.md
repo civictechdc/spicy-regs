@@ -472,3 +472,21 @@ so explicitly. Plans cite this file; this file cites evidence.
 - **Revisit trigger:** a contract change that makes provenance verifiable
   (e.g. a published request-envelope schema), or a gate harness that pins
   context and shapes together automatically.
+
+## 2026-07-28 — Formspec qualifies as the non-originating consumer
+
+- **Decision (maintainer):** Formspec satisfies the "a non-originating
+  consumer must review Rulespec" gate. Its Needs Specification Appendix C
+  is a consumer review in substance — it exercised the boundary across
+  seven points, recorded a verdict on each, kept four local, and filed
+  three as proposals Formspec could not implement from its own side. The
+  gate is no longer circular and no longer blocks a pre-1.0 release.
+- **Recorded limitation:** Formspec and Rulespec share the Formspec-Labs
+  umbrella, so this is independent-codebase review, not
+  independent-organization review. Publish that distinction wherever the
+  review is cited; do not describe it as third-party.
+- **Consequence:** MVP-public's remaining blockers are the
+  maintainer-authorized release itself and the release-preflight
+  `_CONTRACT_FILES` rule fix (recorded under post-MVP repairs).
+- **Revisit trigger:** a genuinely third-party consumer appears, at which
+  point a real independent review supersedes this one.
