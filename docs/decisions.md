@@ -414,3 +414,26 @@ so explicitly. Plans cite this file; this file cites evidence.
   (making edition presence informative), a stage-evidence path makes `prerule`
   or `longterm` reachable, or a discovery question needs "active" at the
   agenda-item level rather than the proceeding level.
+
+## 2026-07-28 — Hyperbolic subsumption prototype: FAILS for grading
+
+- **Decision:** the HiT-lineage hyperbolic scorer is rejected for
+  relation grading. Zero-shot checkpoints (MiniLM-L12-WordNetNoun,
+  MPNet-WordNetNoun, MiniLM-L12-SnomedCT, revisions pinned in the
+  evidence) all scored below the 31/35 judge-agreement bar AND below a
+  constant "always broader" predictor; fine-tuning was skipped by the
+  pre-registered rule (below-baseline is not "promising").
+- **Evidence:** `evidence/hyperbolic-subsumption-prototype-2026-07-28.md`
+  (commit 61b01da) — measured mechanism: distances transfer, the
+  centripetal depth gap collapses (7.47 → 1.33); encoder healthy on
+  sanity pairs, breaks on OOV acronyms and coordinated compounds. The
+  binding constraint is the eval set: 44/46 directional pairs are
+  `broader` (a constant predictor scores 95.7%), n=69, 2 subsumed-by
+  examples. Judges' cross-round stability on re-graded pairs: 90.3%.
+- **Consequences:** holdout gold composition must include directional
+  diversity (narrower/equivalent/denial pairs) or any future scorer
+  evaluation stays trivially gameable; the evaluated framing (grade a
+  pre-chosen candidate) is not the lineage's claim (retrieve subsumers).
+- **Revisit trigger:** a recall@k retrieval test over the 513k registry
+  (the lineage's actual claim), or a directionally balanced graded-pair
+  set of meaningful size.
