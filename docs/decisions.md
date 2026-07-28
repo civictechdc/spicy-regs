@@ -715,3 +715,28 @@ after both, not before.
   and it ranks above the boilerplate and composition work.
 - **Revisit trigger:** none — this is the trigger. Re-run the ablation
   after populating and read the oracle.
+
+### Correction (same day) — the hierarchy was discarded deliberately, not carelessly
+
+The entry above says "the fusion dropped all of it," implying oversight.
+That is unfair and inaccurate. `tools/fuse_concept_registries.py` writes
+`broader_id: None` unconditionally, and its FR Thesaurus parser carries an
+explicit comment: the `sa` (see-also) and `xx` (broader) blocks are **read
+and discarded** because they relate two *preferred terms* rather than
+naming a label, `broader_id` must resolve inside the table per
+`assert_concept_graphs`, and a relation table was judged out of scope. A
+documented scoped-out decision, not a miss.
+
+What survives of the criticism: the stated blocker is an **ordering
+problem, not a feasibility one** — `xx` relates preferred terms, every
+preferred term is minted, so a second pass after minting resolves label →
+`concept_id`. And the July 24 finding still had no owner and no revisit
+trigger, which is why nobody reconsidered the scope-out when the evidence
+changed. The lesson stands in weaker form: **a documented deferral needs a
+trigger as much as an open question does**, or it silently becomes
+permanent.
+
+Open per-source question the fix must answer: for FAST (86% of the
+registry), CRS policy-area rollups, and TSCA classes — is each (a) parsed
+then discarded, (b) present in source but never parsed, or (c) not stated
+in the source at all? Only the FR Thesaurus path is currently known.
