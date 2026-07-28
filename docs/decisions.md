@@ -740,3 +740,43 @@ Open per-source question the fix must answer: for FAST (86% of the
 registry), CRS policy-area rollups, and TSCA classes — is each (a) parsed
 then discarded, (b) present in source but never parsed, or (c) not stated
 in the source at all? Only the FR Thesaurus path is currently known.
+
+### Resolved (same day) — FAST's hierarchy is present and unread
+
+The open per-source question above is settled for FAST by direct
+inspection of the dump still on disk in the session scratchpad. Predicate
+counts over the first 2,000,000 lines of `FASTTopical.nt`:
+
+| Predicate | Count | Read by the parser? |
+| --- | ---: | --- |
+| `skos:inScheme` | 364,006 | no |
+| `schema:name` | 273,961 | no |
+| `skos:relatedMatch` | 207,888 | no |
+| `rdf:type` | 182,004 | no |
+| `skos:prefLabel` | 182,003 | **yes** |
+| `dcterms:identifier` | 182,003 | **yes** |
+| `rdfs:label` | 168,979 | no |
+| `schema:sameAs` | 109,708 | no |
+| `skos:altLabel` | 91,959 | **yes** |
+| **`skos:broader`** | **69,107** | **no** |
+| `rdfs:seeAlso` | 66,973 | no |
+| `dcterms:isReplacedBy` | 36,163 | no |
+
+So the two sources differ in kind, and only one was a judgement call:
+- **FR Thesaurus** — (a) parsed then deliberately discarded, documented.
+- **FAST** (86% of the registry) — (b) **present in source, never read**.
+  `parse_fast_ntriples` handles four predicates; `skos:broader` is not
+  one of them. 69,107 statements in the first 2M lines alone; the
+  uncompressed dump is ~634 MB, so the true count is materially higher.
+  The objects are FAST URIs resolving to concepts already being minted.
+
+Two adjacent gaps the same inspection exposed, recorded not actioned:
+- `skos:relatedMatch` (207,888) and `schema:sameAs` (109,708) are
+  cross-vocabulary mappings — precisely the registered-mapping seam the
+  north star reserves for later cross-agency linking. They must NOT
+  become `broader_id` values or cross-scheme parents.
+- `dcterms:isReplacedBy` (36,163) is the deprecation target the fusion
+  currently lacks: 46,153 `owl:deprecated` FAST concepts are dropped
+  because `assert_concept_graphs` requires a resolvable `replaced_by`
+  the registry does not carry. This predicate is that missing target.
+- CRS policy-area rollups and TSCA classes remain unclassified.
