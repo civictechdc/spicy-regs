@@ -207,7 +207,14 @@ class FusionError(RuntimeError):
 
 @dataclass
 class SourceTerm:
-    """One vocabulary entry, before it is minted into a registry row."""
+    """One vocabulary entry, before it is minted into a registry row.
+
+    ``broader_labels`` carries the *preferred labels* of the parents the source
+    explicitly states for this term -- never a parent inferred from
+    co-occurrence, a shared string prefix, or label containment. Labels rather
+    than ids, because a parser runs before any row is minted; ``fuse`` resolves
+    them to concept ids in a second pass once every row exists.
+    """
 
     pref_label: str
     alt_labels: list[str] = field(default_factory=list)
@@ -215,6 +222,7 @@ class SourceTerm:
     source_id: str | None = None
     source_status: str | None = None
     dropped_alt_labels: list[str] = field(default_factory=list)
+    broader_labels: list[str] = field(default_factory=list)
 
     def normalized(self) -> str:
         return normalize_label(self.pref_label)
@@ -263,11 +271,17 @@ def _merge_terms(terms: Iterable[SourceTerm]) -> list[SourceTerm]:
                 definition=term.definition,
                 source_id=term.source_id,
                 source_status=term.source_status,
+                broader_labels=list(term.broader_labels),
             )
             continue
         for alt in term.alt_labels:
             if alt not in existing.alt_labels:
                 existing.alt_labels.append(alt)
+        # Two source records collapsing onto one label contribute the union of
+        # the parents each of them stated; none is dropped at merge time.
+        for parent in term.broader_labels:
+            if parent not in existing.broader_labels:
+                existing.broader_labels.append(parent)
         existing.definition = existing.definition or term.definition
         existing.source_id = existing.source_id or term.source_id
         existing.source_status = existing.source_status or term.source_status
@@ -304,9 +318,12 @@ def parse_fr_thesaurus(text: str) -> list[SourceTerm]:
     "cross-reference variants become altLabels" means for this file's notation.
 
     ``sa`` (see-also) and ``xx`` (broader) blocks relate two *preferred* terms
-    rather than naming a label, so they are read and discarded here:
-    ``broader_id`` must resolve inside the table (``assert_concept_graphs``) and
-    a relation table is out of scope.
+    rather than naming a label. ``xx`` names this term's broader term and is
+    kept in ``broader_labels`` for ``fuse`` to resolve once every preferred term
+    has been minted -- the ordering, not the feasibility, was what once made
+    this look out of scope. ``sa`` is a symmetric see-also, not a subsumption,
+    so it stays discarded: writing it into ``broader_id`` would assert a
+    hierarchy the file does not state.
 
     A parenthesised scope note becomes the term's definition. Scope notes wrap
     onto unindented continuation lines, so an unbalanced ``(`` keeps consuming
@@ -364,6 +381,9 @@ def parse_fr_thesaurus(text: str) -> list[SourceTerm]:
                 variants.append((stripped, current_label))
             elif marker == "x" and current is not None:
                 current.alt_labels.append(stripped)
+            elif marker == "xx" and current is not None:
+                # An explicit broader term, named by its own preferred label.
+                current.broader_labels.append(_fr_term_label(stripped))
             continue
         label = _fr_term_label(line)
         if not label or not normalize_label(label):
@@ -416,7 +436,18 @@ def parse_billstatus_terms(xml_text: str) -> tuple[list[str], list[str]]:
 
 
 def collect_billstatus_terms(documents: Iterable[str]) -> tuple[list[SourceTerm], list[SourceTerm]]:
-    """Fold many bill records into the two vocabularies they draw on."""
+    """Fold many bill records into the two vocabularies they draw on.
+
+    **No subject -> policy-area hierarchy is derived, because BILLSTATUS does
+    not state one.** ``<policyArea>`` and ``<subjects>`` are *sibling* children
+    of ``<bill>``: the carrier says "this bill has this policy area" and "this
+    bill has these subjects", never "this subject rolls up to that policy
+    area". Reading a parent out of the two appearing on the same bill would be
+    inference from co-occurrence, which is not hierarchy -- a bill on
+    Environmental Protection also carries ``Congressional oversight``, and that
+    subject is nobody's child of Environmental Protection. Both vocabularies
+    therefore stay flat until an actual CRS roll-up table is obtained.
+    """
     policy: set[str] = set()
     subjects: set[str] = set()
     for text in documents:
@@ -454,6 +485,14 @@ def parse_tsca_inventory(rows: Iterable[Mapping[str, Any]]) -> list[SourceTerm]:
     The ACTIVE/INACTIVE commerce flag is recorded in the sidecar rather than
     mapped onto ``status``: an inactive substance is still a real substance, and
     ``deprecated`` would silently remove it from every candidate list.
+
+    **No chemical-class hierarchy is derived, because the inventory carries
+    none.** Its columns are ``ID, CASRN, casregno, UID, EXP, ChemName, DEF,
+    UVCB, FLAG, ACTIVITY``; there is no class, category, or parent-substance
+    column. ``UVCB`` and ``FLAG`` are per-substance regulatory markers, not
+    parent concepts, and substance names share prefixes for nomenclature
+    reasons that are not subsumption. ``broader_id`` stays null for every TSCA
+    row.
     """
     terms: list[SourceTerm] = []
     for row in rows:
@@ -483,6 +522,12 @@ _FAST_PREF = "http://www.w3.org/2004/02/skos/core#prefLabel"
 _FAST_ALT = "http://www.w3.org/2004/02/skos/core#altLabel"
 _FAST_DEPRECATED = "http://www.w3.org/2002/07/owl#deprecated"
 _FAST_IDENTIFIER = "http://purl.org/dc/terms/identifier"
+_FAST_BROADER = "http://www.w3.org/2004/02/skos/core#broader"
+# ``skos:broaderMatch``, ``skos:relatedMatch`` and ``schema:sameAs`` are
+# *cross-vocabulary* mapping predicates: their objects are LCSH and Wikidata
+# entities, not FAST concepts. Reading any of them into ``broader_id`` would
+# mint the cross-scheme parents the north star defers, so they are deliberately
+# not read here. Their volume is recorded in the evidence file instead.
 _NT_ESCAPES = {"\\": "\\", '"': '"', "n": "\n", "r": "\r", "t": "\t"}
 
 
@@ -521,11 +566,18 @@ def parse_fast_ntriples(lines: Iterable[str]) -> list[SourceTerm]:
     ``status='deprecated'``: the selector skips deprecated rows anyway, and
     publishing them would demand a resolvable ``replaced_by`` graph that the
     registry does not carry.
+
+    ``skos:broader`` relates two FAST IRIs, so a parent is resolved to its own
+    preferred label only after the whole stream has been read -- a broader
+    triple may precede the parent's ``prefLabel``. An edge whose parent is
+    deprecated, unlabelled, or absent resolves to nothing here and is dropped
+    and counted by ``resolve_broader_edges``.
     """
     pref: dict[str, str] = {}
     alts: dict[str, list[str]] = {}
     identifiers: dict[str, str] = {}
     deprecated: set[str] = set()
+    broader: dict[str, list[str]] = {}
     for line in lines:
         match = _NT_TRIPLE.match(line.strip())
         if match is None:
@@ -537,15 +589,27 @@ def parse_fast_ntriples(lines: Iterable[str]) -> list[SourceTerm]:
             pref.setdefault(subject, unescape_ntriples_literal(literal))
         elif predicate == _FAST_ALT and literal is not None:
             alts.setdefault(subject, []).append(unescape_ntriples_literal(literal))
+        elif predicate == _FAST_BROADER and iri_object is not None:
+            broader.setdefault(subject, []).append(iri_object)
         elif predicate == _FAST_IDENTIFIER and literal is not None:
             identifiers.setdefault(subject, unescape_ntriples_literal(literal))
         elif predicate == _FAST_IDENTIFIER and iri_object is not None:
             identifiers.setdefault(subject, iri_object)
+
+    def parent_labels(subject: str) -> list[str]:
+        labels: list[str] = []
+        for parent in broader.get(subject, ()):
+            label = _clean(pref.get(parent, ""))
+            if label and parent not in deprecated and label not in labels:
+                labels.append(label)
+        return labels
+
     terms = [
         SourceTerm(
             pref_label=_clean(label),
             alt_labels=[_clean(value) for value in alts.get(subject, [])],
             source_id=identifiers.get(subject) or subject.rsplit("/", 1)[-1],
+            broader_labels=parent_labels(subject),
         )
         for subject, label in pref.items()
         if subject not in deprecated and _clean(label)
@@ -596,18 +660,223 @@ def _external_ids(spec: SourceSpec, term: SourceTerm) -> str:
     return canonical_json(sorted(payload, key=canonical_json))
 
 
+def _break_cycles(parent_by_id: dict[str, str]) -> list[tuple[str, str]]:
+    """Drop one edge per cycle in place; return the dropped ``(child, parent)``.
+
+    Real thesauri contain cycles -- FAST inherits LCSH's, where two headings can
+    each be recorded as broader than the other. ``broader_id`` is a single-parent
+    column, so the graph is functional and every cycle is a simple loop reached
+    by following unique parents. The edge dropped is the one leaving the
+    lexicographically largest ``concept_id`` in the cycle: an arbitrary but
+    *stable* choice, so the same dump always yields the same registry.
+    """
+    removed: list[tuple[str, str]] = []
+    state: dict[str, int] = {}  # 1 = on the current walk, 2 = settled
+    for start in sorted(parent_by_id):
+        if state.get(start):
+            continue
+        path: list[str] = []
+        position: dict[str, int] = {}
+        node = start
+        while True:
+            seen = state.get(node, 0)
+            if seen == 1:  # walked into the current path: a cycle
+                cycle = path[position[node] :]
+                victim = max(cycle)
+                removed.append((victim, parent_by_id.pop(victim)))
+                break
+            if seen == 2:  # joined an already-settled chain
+                break
+            state[node] = 1
+            position[node] = len(path)
+            path.append(node)
+            parent = parent_by_id.get(node)
+            if parent is None:  # reached a root
+                break
+            node = parent
+        for walked in path:
+            state[walked] = 2
+    return removed
+
+
+def resolve_broader_edges(
+    *,
+    registry: list[dict],
+    contributions: Sequence[tuple[SourceSpec, Sequence[SourceTerm]]],
+    by_vocabulary: Mapping[str, Mapping[str, str]],
+) -> dict[str, Any]:
+    """Populate ``broader_id`` from the parents each source explicitly stated.
+
+    Runs only after every row exists, which is what makes the resolution
+    possible: a source states a parent by *label*, and a label becomes an id
+    only once minting has finished.
+
+    Four rules are enforced here and asserted in the tests:
+
+    * **scheme-internal** -- a parent is looked up in the child's own source
+      vocabulary and nowhere else, so a cross-scheme parent cannot be minted
+      even if two vocabularies share a label;
+    * **stated only** -- the parents come from ``SourceTerm.broader_labels``,
+      which parsers fill from explicit source statements;
+    * **dangling parents are dropped and counted**, never left as a broken
+      reference ``assert_concept_graphs`` would reject;
+    * **acyclic** -- cycles carried by the sources are broken deterministically
+      and reported.
+
+    ``broader_id`` holds one parent, so a concept stating several keeps the
+    lexicographically smallest resolved parent id and the rest are counted as
+    ``extra_parents_dropped``.
+    """
+    stats: dict[str, Any] = {}
+    parent_by_id: dict[str, str] = {}
+    for spec, terms in contributions:
+        labels = by_vocabulary.get(spec.source_vocabulary, {})
+        stated = resolved = dangling = self_referential = extra = 0
+        for term in terms:
+            if not term.broader_labels:
+                continue
+            child_id = labels.get(term.normalized())
+            if child_id is None:
+                continue
+            candidates: set[str] = set()
+            for parent_label in term.broader_labels:
+                stated += 1
+                parent_id = labels.get(normalize_label(parent_label))
+                if parent_id is None:
+                    dangling += 1
+                elif parent_id == child_id:
+                    # The parent's label normalizes onto the child's own, so the
+                    # two source records merged into one concept.
+                    self_referential += 1
+                else:
+                    candidates.add(parent_id)
+            if not candidates:
+                continue
+            parent_by_id[child_id] = min(candidates)
+            resolved += 1
+            extra += len(candidates) - 1
+        stats[spec.key] = {
+            "broader_statements_read": stated,
+            "edges_resolved": resolved,
+            "dangling_parents_dropped": dangling,
+            "self_referential_dropped": self_referential,
+            "extra_parents_dropped_single_parent_column": extra,
+        }
+
+    cycles_removed = _break_cycles(parent_by_id)
+    for row in registry:
+        parent = parent_by_id.get(str(row["concept_id"]))
+        if parent is not None:
+            row["broader_id"] = parent
+
+    by_id = {str(row["concept_id"]): row for row in registry}
+    stats["cycles"] = {
+        "edges_removed_to_break_cycles": len(cycles_removed),
+        "removed_edges": [
+            {
+                "child_id": child,
+                "child_label": str(by_id[child].get("pref_label")) if child in by_id else None,
+                "parent_id": parent,
+                "parent_label": str(by_id[parent].get("pref_label")) if parent in by_id else None,
+            }
+            for child, parent in sorted(cycles_removed)[:50]
+        ],
+    }
+    return stats
+
+
+def hierarchy_metrics(registry: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Depth, root and orphan measurements, per source vocabulary and overall."""
+    parent_by_id = {
+        str(row["concept_id"]): str(row["broader_id"]) for row in registry if row.get("broader_id") is not None
+    }
+    depth: dict[str, int] = {}
+
+    def depth_of(node: str) -> int:
+        chain: list[str] = []
+        current = node
+        while current in parent_by_id and current not in depth:
+            chain.append(current)
+            current = parent_by_id[current]
+        base = depth.get(current, 0)
+        for step, walked in enumerate(reversed(chain), start=1):
+            depth[walked] = base + step
+        return depth.get(node, 0)
+
+    per_vocabulary: dict[str, dict[str, Any]] = {}
+    for row in registry:
+        concept_id = str(row["concept_id"])
+        vocabulary = concept_source_vocabulary(row)
+        bucket = per_vocabulary.setdefault(
+            vocabulary, {"rows": 0, "with_broader_id": 0, "roots": 0, "max_depth": 0, "_depth_sum": 0}
+        )
+        bucket["rows"] += 1
+        level = depth_of(concept_id)
+        if row.get("broader_id") is not None:
+            bucket["with_broader_id"] += 1
+            bucket["_depth_sum"] += level
+            bucket["max_depth"] = max(bucket["max_depth"], level)
+        else:
+            bucket["roots"] += 1
+
+    for bucket in per_vocabulary.values():
+        linked = bucket["with_broader_id"]
+        # Mean depth over the concepts that actually sit in a hierarchy; the
+        # unlinked rows would otherwise drown the number in zeros.
+        bucket["mean_depth_of_linked"] = round(bucket.pop("_depth_sum") / linked, 3) if linked else 0.0
+        bucket["orphan_rate"] = round(bucket["roots"] / bucket["rows"], 4) if bucket["rows"] else 0.0
+
+    total = len(registry)
+    linked_total = len(parent_by_id)
+    return {
+        "total_rows": total,
+        "rows_with_broader_id": linked_total,
+        "edge_rate": round(linked_total / total, 4) if total else 0.0,
+        "roots": total - linked_total,
+        "orphan_rate": round((total - linked_total) / total, 4) if total else 0.0,
+        "max_depth": max(depth.values(), default=0),
+        "per_source_vocabulary": dict(sorted(per_vocabulary.items())),
+    }
+
+
+def assert_scheme_internal_hierarchy(registry: Sequence[Mapping[str, Any]]) -> None:
+    """Fail if any ``broader_id`` leaves its own source vocabulary.
+
+    Cross-scheme parents would be the cross-vocabulary unification the north
+    star defers, so the builder refuses to publish one rather than quietly
+    asserting an equivalence nobody reviewed.
+    """
+    vocabulary_by_id = {str(row["concept_id"]): concept_source_vocabulary(row) for row in registry}
+    for row in registry:
+        parent = row.get("broader_id")
+        if parent is None:
+            continue
+        parent_id = str(parent)
+        if parent_id not in vocabulary_by_id:
+            raise FusionError(f"concept {row['concept_id']} has an unresolvable broader_id {parent_id}")
+        if vocabulary_by_id[parent_id] != concept_source_vocabulary(row):
+            raise FusionError(
+                f"concept {row['concept_id']} ({concept_source_vocabulary(row)}) has a cross-scheme "
+                f"broader_id {parent_id} ({vocabulary_by_id[parent_id]})"
+            )
+
+
 def fuse(
     *,
     existing: Sequence[Mapping[str, Any]],
     contributions: Sequence[tuple[SourceSpec, Sequence[SourceTerm]]],
     context: RunContext,
     retrieved_at: Mapping[str, str],
-) -> tuple[list[dict], list[dict], dict[str, dict[str, int]]]:
-    """Return ``(registry rows, sidecar rows, per-vocabulary counts)``.
+) -> tuple[list[dict], list[dict], dict[str, dict[str, int]], dict[str, Any]]:
+    """Return ``(registry rows, sidecar rows, per-source counts, hierarchy stats)``.
 
     Frozen identities come first. A source term is compared only with rows
     carrying its own source vocabulary; a label shared with another authority
     mints an independent concept.
+
+    Minting and hierarchy resolution are two passes on purpose: a source states
+    a parent by label, and a label only becomes a ``concept_id`` once every row
+    exists, so ``broader_id`` is filled after the last row is minted.
     """
     registry: list[dict] = []
     for row in existing:
@@ -701,11 +970,25 @@ def fuse(
             "enriched_frozen_rows": enriched,
             "alt_labels_dropped_as_degenerate": dropped_aliases,
         }
-    return registry, sidecar, counts
+
+    hierarchy = resolve_broader_edges(
+        registry=registry,
+        contributions=contributions,
+        by_vocabulary=by_vocabulary,
+    )
+    assert_scheme_internal_hierarchy(registry)
+    return registry, sidecar, counts, hierarchy
 
 
 def assert_frozen_rows_survive(prior: Sequence[Mapping[str, Any]], fused: Sequence[Mapping[str, Any]]) -> None:
-    """Fail unless prior identities and frozen content survive the v2 migration."""
+    """Fail unless prior identities and frozen content survive the v2 migration.
+
+    ``broader_id`` is the one column allowed to change, and only in the
+    direction ``null -> populated``: the prior registry recorded no hierarchy at
+    all, so filling one adds a fact rather than rewriting one. A frozen row that
+    already named a parent keeps it, and a populated parent may never be cleared
+    or repointed.
+    """
     fused_by_id = {str(row.get("concept_id")): row for row in fused}
     for row in prior:
         concept_id = str(row.get("concept_id"))
@@ -721,6 +1004,7 @@ def assert_frozen_rows_survive(prior: Sequence[Mapping[str, Any]], fused: Sequen
                 and str(row.get("scheme") or "") not in {"subject", "regulated_entity"}
                 and current.get("scheme") == concept_facet(row)
             )
+            and not (column == "broader_id" and row.get("broader_id") is None)
             and row.get(column) != current.get(column)
         ]
         if changed:
@@ -876,7 +1160,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     contributions, skipped = _load_sources(args)
     retrieved_at = {spec.key: retrieved for spec, _ in contributions}
-    registry, sidecar, counts = fuse(
+    registry, sidecar, counts, hierarchy = fuse(
         existing=existing,
         contributions=contributions,
         context=context,
@@ -936,6 +1220,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "same-normalized-label-for-presentation is an unreviewed display grouping only; "
             "it is not semantic equivalence, skos:exactMatch, merge authority, or identity."
         ),
+        "hierarchy": hierarchy,
         "existing_registry": {
             "path": str(existing_path),
             "sha256": sha256_path(existing_path),

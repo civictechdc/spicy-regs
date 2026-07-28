@@ -331,7 +331,7 @@ def test_vocabularies_stay_distinct_one_label_becomes_one_concept_per_authority(
         (tool.SOURCES["fast-topical"], [tool.SourceTerm(pref_label=label, source_id="1")]),
         (tool.SOURCES["fr-thesaurus"], [tool.SourceTerm(pref_label=label)]),
     ]
-    registry, _, counts = tool.fuse(
+    registry, _, counts, _ = tool.fuse(
         existing=[_frozen_row("Accounting")],
         contributions=contributions,
         context=context,
@@ -358,7 +358,7 @@ def test_vocabularies_stay_distinct_one_label_becomes_one_concept_per_authority(
 def test_exact_label_match_inside_one_scheme_enriches_and_never_rewrites(tool, context):
     frozen = _frozen_row("Accounting")
     term = tool.SourceTerm(pref_label="accounting", alt_labels=["Auditing"], definition="A different definition")
-    registry, sidecar, counts = tool.fuse(
+    registry, sidecar, counts, _ = tool.fuse(
         existing=[frozen],
         contributions=[(tool.SOURCES["fr-thesaurus"], [term])],
         context=context,
@@ -382,7 +382,7 @@ def test_exact_label_match_inside_one_scheme_enriches_and_never_rewrites(tool, c
 
 def test_frozen_rows_survive_byte_for_byte(tool, context):
     existing = [_frozen_row("Accounting"), _frozen_row("Air quality")]
-    registry, _, _ = tool.fuse(
+    registry, _, _, _ = tool.fuse(
         existing=existing,
         contributions=[
             (
@@ -407,7 +407,7 @@ def test_a_rewritten_frozen_row_is_rejected(tool):
 
 
 def test_fused_rows_carry_the_selector_schema_and_hold_the_graph_invariants(tool, context):
-    registry, sidecar, _ = tool.fuse(
+    registry, sidecar, _, _ = tool.fuse(
         existing=[_frozen_row("Accounting")],
         contributions=[
             (
@@ -431,7 +431,7 @@ def test_fused_rows_carry_the_selector_schema_and_hold_the_graph_invariants(tool
 
 
 def test_the_production_selector_reads_the_fused_registry(tool, context):
-    registry, _, _ = tool.fuse(
+    registry, _, _, _ = tool.fuse(
         existing=[_frozen_row("Accounting")],
         contributions=[
             (tool.SOURCES["epa-tsca"], [tool.SourceTerm(pref_label="Benzene", source_id="71-43-2")]),
