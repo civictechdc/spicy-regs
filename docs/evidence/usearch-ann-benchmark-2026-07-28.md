@@ -14,6 +14,15 @@ configuration that reproduces the exact search's 8-target oracle exactly
 between 21% and 74% of the exact top-12, and the losses reach the shortlist a
 tagging decision is made from.
 
+**The more useful finding is why.** Chasing the low recall upstream showed the
+concept embedding space is near-degenerate, and that the registry's own text
+construction causes it: 100% of concepts carry one of 8 boilerplate definition
+templates, which is 74% of the median concept's embedding input, and 99.6% of
+the registry is off-target vocabulary. As built today the best-matching concept
+beats a random one by 0.029 cosine. See
+[The registry's own text is what flattens it](#the-registrys-own-text-is-what-flattens-it) —
+that is the higher-leverage thing to fix, and it is upstream of any retriever.
+
 Nothing was adopted. `candidate_channels.py` is untouched; the ANN path is a
 new, optional, unwired module.
 
@@ -29,9 +38,17 @@ segments once into a setup cache; later runs reuse it and need neither the
 encoder nor the testbed loader. **No re-embedding happens at any point** — every
 configuration is built from the existing cached `.npz`.
 
+The embedding-space audit behind
+[the registry finding](#the-registrys-own-text-is-what-flattens-it):
+
+```
+uv run --extra embed python tools/audit_concept_embedding_space.py \
+    --setup-cache <setup-cache.json> --sample 20000 --seed 0 --report <path.json>
+```
+
 Hermetic tests, no optional dependency required:
-`pytest tests/test_ontology_ann_index.py`. With the extra:
-`pytest tests/test_ontology_ann_index_real.py`.
+`pytest tests/test_ontology_ann_index.py tests/test_audit_concept_embedding_space.py`.
+With the extra: `pytest tests/test_ontology_ann_index_real.py`.
 
 | | |
 | --- | --- |
@@ -181,6 +198,79 @@ ties (0.0192 is about a third of the entire top-1→top-50 spread, and the max
 ANN lands in a genuinely worse part of a neighbourhood where "worse" is
 0.02 cosine. Both halves of that sentence are true.
 
+## The registry's own text is what flattens it
+
+The obvious follow-up — *is the neighbourhood flat because the registry is
+badly built?* — turns out to be yes, and measurably so.
+`tools/audit_concept_embedding_space.py` re-embeds a 20,000-concept sample two
+ways and reports four statistics (`--sample 20000 --seed 0`).
+
+**Defect A — every definition is boilerplate.** All 513,236 concepts have a
+non-empty `definition`, and there are **8 distinct templates among them**:
+
+| Concepts | Definition template |
+| ---: | --- |
+| 440,599 | `FAST (Faceted Application of Subject Terminology), Topical facet term: {LABEL}.` |
+| 70,736 | `EPA non-confidential TSCA Chemical Substance Inventory term: {LABEL}.` |
+| 932 | `CRS Legislative Subject Terms term: {LABEL}.` |
+| 899 | `Federal Register Thesaurus topic covering {LABEL}.` |
+| 35 + 33 + 2 | three further one-line templates |
+
+`concept_embedding_text` appends that definition. The median concept's
+embedding input is **144 characters, of which 106 are a constant string shared
+with up to 440,598 other concepts** — 74% boilerplate. A real example:
+
+```
+current     : Italian language--Conjunctions; FAST (Faceted Application of
+              Subject Terminology), Topical facet term: Italian language--Conjunctions.
+labels-only : Italian language--Conjunctions
+```
+
+Dropping the definition — which is exactly what `concept_bm25_tokens` already
+does for the sparse channel, commented "Definitions are intentionally
+excluded" — changes the geometry sharply:
+
+| Measure | current (pref; alts; definition) | labels-only (pref; alts) |
+| --- | ---: | ---: |
+| random concept-pair cosine (the noise floor) | 0.5751 | 0.4506 |
+| centroid norm (0 = isotropic, 1 = collapsed) | 0.7587 | 0.6717 |
+| effective dimensions (of 768) | 43.1 | **93.6** |
+| query top-1 cosine | 0.6042 | 0.6512 |
+| query top-1 → top-50 spread | 0.0596 | 0.0767 |
+| **top-1 margin over the noise floor** | **+0.0291** | **+0.2006** |
+
+The last row is the finding. As the index is built today, the *best* concept
+for a real segment is only **0.029** more similar to it than two concepts drawn
+at random are to each other — the top match is barely distinguishable from an
+arbitrary one. Remove the boilerplate and that margin is **6.9× larger**, and
+the space uses 94 of its 768 dimensions instead of 43.
+
+**Defect B — the composition is 99.6% off-target.**
+
+| Scheme | Concepts | Share |
+| --- | ---: | ---: |
+| `fast-topical` | 440,599 | 85.8% |
+| `epa-tsca` | 70,736 | 13.8% |
+| `subject` (FR Thesaurus) | 936 | 0.18% |
+| `crs-subjects` | 932 | 0.18% |
+| `crs-policy-areas` | 33 | 0.01% |
+
+The vocabularies the development gold labels are actually drawn from total
+**1,901 concepts — 0.37% of the registry**. Dense retrieval is searching a
+corpus that is 99.6% library subject headings and chemical inventory names by
+construction; `Italian language--Conjunctions` is a real row competing for
+top-12 slots against regulatory concepts.
+
+These two compound: a near-degenerate similarity space, filled almost entirely
+with concepts that cannot be right. That is the mechanism behind the flat
+neighbourhood, and it is upstream of every retriever choice — it equally
+explains why channel C surfaces only 3 of 8 targets *with the exact search*.
+
+Neither defect was introduced by this experiment and neither is fixed by it.
+The `labels-only` arm is a 20,000-concept diagnostic, not a proposal: a real
+change means re-embedding all 513,236 concepts (~50 minutes) and re-running the
+ablation, and it should be measured on the fused shortlist, not on geometry.
+
 ## The honest tradeoff
 
 **What ANN buys, at oracle parity (`usearch-f32-hi`):** 1,697 MB → 1,617 MB
@@ -217,6 +307,15 @@ Do not swap the dense channel onto USearch now.
 3. **The one reassuring number is an artifact.** `v2+C` holding at 4/8
    everywhere reflects the lexical channels carrying those targets, not the ANN
    preserving them.
+
+**The more valuable finding is upstream.** Chasing ANN recall on this registry
+optimises the search over a similarity space whose top match beats random by
+0.029. Fixing the concept text is strictly higher-leverage than fixing the
+index, and it is cheap to test: drop the boilerplate definition from
+`concept_embedding_text`, re-embed once, re-run the existing ablation, and read
+the 8-target oracle. Do that before revisiting ANN — a less collapsed space
+would also change HNSW's recall, so the measurement here would need redoing
+anyway.
 
 **Revisit when any of these becomes true**, and start from `usearch-f16-hi`
 (1,107 MB, recall@12 0.788, both fused oracles at parity):
