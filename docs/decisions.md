@@ -524,3 +524,51 @@ so explicitly. Plans cite this file; this file cites evidence.
 - **Revisit trigger:** the registry outgrows the serving memory budget, or
   concurrent workers make 1.7 GB/worker binding — start from
   `usearch-f16-hi` (1,107 MB, both fused oracles at parity).
+
+## 2026-07-28 — RS-P3 and RS-P6 landed; two open contract items
+
+- **Landed** (rulespec `0817533`..`bb0d560`): `rkaf:formspec-need` in the
+  closed `rkaf:artifactIdentifierScheme` enum (RS-P3) and
+  `rkaf:declared-hypothesis` in `rkaf:noEvidenceReason` (RS-P6). Both are
+  BREAKING under §3's reject-unrecognized-values rule and landed
+  pre-release for that reason. Digest `7d45dcd2…` → **`6e550600…`**;
+  spicy-regs re-pinned, L0 audit 1/1. Gates: 154 Rust, 186 Python, 435
+  fixtures (+4), 0 divergences. RS-P1 (observation-intake companion)
+  remains open by maintainer decision.
+- **RS-P6's eligibility cap is normative prose, not a shape.** Route 2 was
+  chosen (cap on `usageEligibility`, see the pro/con in session record),
+  but the constraint could not be compiled: `usageEligibility` sits on the
+  assertion envelope, `noEvidenceReason` on the binding, and
+  `rkaf:bindsAssertion` is a bare IRI — the repo's conditional idiom
+  requires guard and requirement on one shape, and the compiler flattens
+  rather than traverses. A raw-SHACL sequence path would manufacture a
+  core parity divergence. Acceptance criterion 2 is recorded OPEN with
+  three costed routes rather than papered over. **This is the second
+  normative-but-uncheckable rule today** (the first: a minted
+  `requestContractDigest`) — the pattern is worth watching: prose
+  obligations accumulate faster than shapes can express them.
+- **The `permits-*` safety-label table is incoherent and was not
+  extended.** `#SafetyLabel` carries seven lettered values plus an orphan
+  `rkaf:permits-axiomatic`; adversarial shapes require
+  `rkaf:permits-consensus-without-citation` and `rkaf:permits-all`,
+  neither an enum member; and a positive fixture pairs a lettered label
+  with `rkaf:axiomatic` and passes. §4.3's rule was applied uniformly in
+  prose ("no per-value exceptions") instead of minting a fourth partial
+  member into a v0.1-inherited enum. **Maintainer-confirmed** — the
+  incoherence is filed as its own rulespec TODO.
+- **Drift found in the proposals** (written against v0.2.0-pre.7): RS-P6's
+  correspondence table assumed 3 enum members (it has had 4 since v0.2);
+  RS-P3 assumed a checkable per-scheme grammar, which the kernel's
+  1..*/1..* identifier/scheme pair cannot express positionally; RS-P3's
+  "mutable URL rejected" criterion assumes mutability is detectable, which
+  §4.1's immutable-edition rule has never mechanically been for any
+  scheme.
+- **Pre-existing compiler gap** (not caused by this work): the disjunction
+  emitter carries only `sh:minCount` into each Pattern-C branch, not the
+  branch property's `sh:in`, so the compiled `EvidenceBinding` shape
+  cannot see an unregistered `noEvidenceReason`. Left deliberately unbound
+  in `constraints_parity.py` with a comment; `validate_negatives.py`
+  catches it against the full suite.
+- **Revisit trigger:** RS-P1's decision, or a compiler change that makes
+  cross-node conditionals expressible (which would close RS-P6's
+  criterion 2 and possibly the minted-digest gap).
