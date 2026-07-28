@@ -679,3 +679,39 @@ is a defect in a product whose north star is the join surface.
 the holdout measurement (settles whether tagging quality is the binding
 constraint at all). Vocabulary induction is a real option to cost out
 after both, not before.
+
+## 2026-07-28 — The discarded hierarchy is the third defect, and likely the largest
+
+- **Verified:** `broader_id` is populated for **0 of 513,236** concepts in
+  the fused registry — every scheme, zero. Yet every source vocabulary
+  ships a hierarchy: FAST inherits LCSH broader/narrower, CRS subjects
+  roll up to policy areas, the FR Thesaurus has one, TSCA has chemical
+  classes. **The fusion dropped all of it** (`ce0a2e7`).
+- **Quantified cost:** in KenMeSH's ablation, removing the
+  label-hierarchy module costs MiF 0.745 → 0.554 (**−0.191**); removing
+  the entire source-prior/mask module costs **−0.071**. Hierarchy is
+  worth ~**2.7×** the source prior — the lever we spent research budget
+  investigating instead.
+- **It converts our largest known defect from a scoring workaround into a
+  retrieval operation.** Our own adjudication found `broader` is the
+  biggest grade bucket (20/35), and the failure analysis concluded
+  grade-aware scoring is therefore permanent. *immigration law* →
+  **Immigration** and *fisheries management* → **Fisheries** are exactly
+  the right backoff targets. With `broader_id` populated, backoff is an
+  edge to walk; today there is no edge.
+- **Process failure worth naming:** this was recorded on **2026-07-24** in
+  `docs/corpus-edge-coverage-findings-2026-07-24.md` (item 2, "Concept
+  hierarchy never populated in any generation — confirmed absent; needs a
+  decision") and went unactioned. Four days later the fusion was built by
+  the same operator without carrying hierarchy, and the defect was
+  rediscovered at the cost of a research pass. **A finding filed as
+  "needs a decision" with no owner and no trigger is a finding that will
+  be rediscovered.** Ledger entries get revisit triggers for exactly this
+  reason; that file predates the ledger and was never migrated.
+- **Action:** populate `broader_id` in `tools/fuse_concept_registries.py`
+  from each source's own hierarchy, keeping edges scheme-internal (no
+  cross-scheme parents — that would be the cross-scheme unification the
+  north star defers). This is a data-fusion fix, not a retrieval change,
+  and it ranks above the boilerplate and composition work.
+- **Revisit trigger:** none — this is the trigger. Re-run the ablation
+  after populating and read the oracle.
