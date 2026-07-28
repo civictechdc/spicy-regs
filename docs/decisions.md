@@ -370,3 +370,40 @@ so explicitly. Plans cite this file; this file cites evidence.
   adjudication by at least two independent model families (or humans).
 - **Revisit trigger:** an untouched holdout satisfies the tracked evaluation
   boundary and the adoption-ready command passes.
+
+## 2026-07-28 — Active rulemaking: an evidenced non-terminal proceeding stage
+
+- **Decision:** a rulemaking is **active** when the proceeding's
+  `current_stage` is an evidenced non-terminal stage — `prerule`, `proposed`,
+  `supplemental`, or `longterm`. Write it as that allowlist, never as
+  `NOT IN ('final','withdrawn')`. A null `current_stage` means no determinate
+  stage evidence; it is reported as `stage_unknown` and never counted as
+  active. The definition attaches to the **proceeding**, which is the unit a
+  discovery answer returns; the Unified Agenda's own `rule_stage` describes a
+  plan for a RIN and is never projected onto the proceedings that RIN tracks.
+- **Evidence:** frozen ontology snapshot `snapshot_0e4b4204bdfbd462a9270fcd766fb8dd`,
+  measured in `evidence/discovery-slice-2026-07-28.md`. Of 511,643
+  proceedings: `final` 164,616, `proposed` 115,703, `withdrawn` 12,540,
+  `supplemental` 2,836, null 215,948 (42.2%). `prerule` and `longterm` never
+  occur — `current_stage` derives only from regulations.gov and Federal
+  Register document types — but they stay in the allowlist because the stage
+  vocabulary admits them and a future evidence path may reach them. The
+  allowlist and `NOT IN ('final','withdrawn')` select the same 118,539 rows
+  here, and only because SQL drops NULLs from a `NOT IN`: the predicate's
+  English reading returns 334,487 rows (2.82×) by admitting every
+  stage-unknown proceeding. Same extension today, worse contract.
+- **Alternative rejected — agenda-edition presence:** the snapshot holds
+  exactly one Unified Agenda edition (`202510`, 3,954 RINs) and
+  `authority_edges` exists only for those RINs, so "present in the latest
+  edition" is true of 100% of the candidate universe and discriminates
+  nothing; `regulatory_agenda_items.latest_agenda_edition` is null for 34,051
+  of 38,005 items for the same reason. Agenda stage also disagrees with action
+  evidence: among proceedings tracked by the 42 U.S.C. 7401 RINs,
+  `Completed Actions` RINs track two proceedings at `proposed` and
+  `Proposed Rule Stage` RINs track one at `final`. Projecting a RIN-level
+  plan onto every linked proceeding is the RIN-equality projection the
+  ontology already forbids.
+- **Revisit trigger:** a second Unified Agenda edition enters the snapshot
+  (making edition presence informative), a stage-evidence path makes `prerule`
+  or `longterm` reachable, or a discovery question needs "active" at the
+  agenda-item level rather than the proceeding level.
