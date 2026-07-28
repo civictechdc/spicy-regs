@@ -610,3 +610,72 @@ so explicitly. Plans cite this file; this file cites evidence.
 - **Revisit trigger:** the re-embedded ablation result. A healthier concept
   space also invalidates today's ANN measurements, so the usearch question
   reopens only after this lands.
+
+## 2026-07-28 — Two literature reviews: our numbers are normal, the vocabulary is wrong
+
+Two blind research passes (XMC/zero-shot retrieval; LLM taxonomy induction),
+sources in the session record. They partly **revise** the entry above.
+
+**Our retrieval is not broken.** 3/8 targets at top-12 is ~37.5% recall@12
+with ZERO training data over 513K concepts. Published comparators: best
+zero-shot recall@10 at ~500K labels is **28.5%** (MACLR, corpus-adapted)
+and **20.6%** (off-the-shelf MPNet); Sentence-BERT collapses to **0.30%**.
+Fully *supervised* recall@10 at 670K labels is only ~**50%** (ELIAS).
+SemEval-2025's winner, with 82K in-domain training records and a
+domain-matched 200K vocabulary, reached R@5 0.49 — and **no system exceeded
+F1@5 0.35**. "Catastrophically bad retrieval" is not supported.
+
+**Correction to the previous entry:** the 0.029 best-vs-random margin and
+43/768 effective dimensionality are textbook **anisotropy/hubness**
+(BERT-flow 2020; Radovanovic 2010) — properties of the *encoder*, not of
+the label count. The boilerplate finding stands on its own (74% shared
+text across 440,599 rows is indefensible regardless), but attributing the
+margin primarily to catalog composition was premature. The re-embed
+experiment now running disambiguates: if separation moves sharply,
+boilerplate dominated; if not, anisotropy does.
+
+**The documented failure mode is coverage, not size — and it points away
+from pruning.** DNB-AI hit our exact situation (large vocabulary lacking
+the concepts their documents needed); the measured symptom was generated
+keywords "falsely mapped to unrelated terms" — nearest-neighbour does not
+abstain, it snaps. Their fix was to **grow** the vocabulary 200K -> 309,417.
+Deleting FAST does not create the missing regulatory concepts. This also
+explains our own projector result (8 of 10 judgments were novel-concept
+proposals): the model is reporting a coverage gap.
+
+**An intrinsic ceiling worth internalizing:** LCSHBench (~515K labels)
+found professional catalogers at three elite research libraries agree on
+the *exact heading set* only **39.4%** of the time (93.3% at concept
+level). No tagging system can exceed its vocabulary's annotation ceiling.
+
+**Measured negatives — do NOT do these:**
+- **Generate-then-map for precision.** Measured: recall 43%->63% but
+  **F1 0.135->0.091**; mapping converts hallucinations into plausible wrong
+  answers. What worked instead was constraining **cardinality** (predict
+  how many concepts a document should get): precision 0.26 at 3.14
+  terms/record. **Build the count predictor before any mapper.**
+- **Assume LLM-only wins.** Annif — a pre-LLM XMTC toolkit — won the
+  SemEval quantitative track; LLMs contributed translation and synthetic
+  data worth ~+0.03 nDCG. Once we have any labels, cheap classifiers are
+  serious contenders.
+- **Expect demo-grade separation on government text.** TopicGPT beats LDA
+  0.74 vs 0.64 on Wikipedia but **0.57 vs 0.52 on Congressional bills**,
+  with ARI/NMI *declining* after refinement.
+- **Expect single-label agreement to hold multi-label.** TnT-LLM:
+  GPT-4-vs-human kappa 0.572 on the primary label, **0.271 across all
+  labels**; human-human 0.422. Regulatory tagging is multi-label.
+
+**The supported alternative (deferred, not adopted):** induce a 2-5K
+concept vocabulary from our own corpus. Existence proof at our scale:
+AstroMLab 5 took 408,590 papers -> **9,999 concepts** by extracting
+open-vocabulary concepts, embedding their *descriptions* (not labels),
+K-means at a swept k (3K/10K/30K), and **human-reviewing the entire
+vocabulary**. WiKC cut Wikidata 4.1M -> 17K classes with entity typing
+rising 43% -> 70%. The decisive practical argument: a 2-5K vocabulary is
+auditable by a small team; 513,236 is not, and an unauditable vocabulary
+is a defect in a product whose north star is the join surface.
+
+**Revisit trigger:** the re-embed result (settles encoder-vs-catalog), and
+the holdout measurement (settles whether tagging quality is the binding
+constraint at all). Vocabulary induction is a real option to cost out
+after both, not before.
