@@ -21,7 +21,7 @@ from typing import Any
 import pytest
 
 from spicy_regs.docpipeline.extraction import ExtractionUnit
-from spicy_regs.ontology.candidate_channels import build_dense_concept_index
+from spicy_regs.ontology.candidate_channels import BM25ConceptMapper, build_dense_concept_index
 from spicy_regs.ontology.concepts import (
     ANCHOR_QUOTA_TOTAL,
     ANCHOR_SOURCE_VOCABULARY_QUOTAS,
@@ -236,7 +236,21 @@ def dense_mapper(registry_rows):
     return DenseConceptMapper(index=build_dense_concept_index(registry_rows, embedder=embedder), embedder=embedder)
 
 
-def _channels(harness, *, units_by_id, registry_rows, wanted, dense_mapper=None, keywords=()):
+@pytest.fixture
+def bm25_mapper(registry_rows):
+    return BM25ConceptMapper.build(registry_rows)
+
+
+def _channels(
+    harness,
+    *,
+    units_by_id,
+    registry_rows,
+    wanted,
+    dense_mapper=None,
+    bm25_mapper=None,
+    keywords=(),
+):
     conditioning = _condition_registry(registry_rows)
     index_by_id = {concept_id: index for index, concept_id in enumerate(conditioning.concept_ids)}
     return conditioning, {
@@ -247,6 +261,7 @@ def _channels(harness, *, units_by_id, registry_rows, wanted, dense_mapper=None,
             index_by_id=index_by_id,
             wanted=wanted,
             dense_mapper=dense_mapper,
+            bm25_mapper=bm25_mapper,
             keywords=keywords,
             limit=LIMIT,
         )
@@ -417,6 +432,25 @@ def test_channel_d_uses_the_supplied_keywords(harness, registry_rows, units_by_i
     assert conditioning.concept_ids[ranked[0]] == "concept_fish"
 
 
+def test_channel_e_enters_the_fusion(harness, registry_rows, units_by_id, bm25_mapper):
+    conditioning, channels = _channels(
+        harness,
+        units_by_id=units_by_id,
+        registry_rows=registry_rows,
+        wanted=("B", "E"),
+        bm25_mapper=bm25_mapper,
+    )
+    assert channels[SEGMENT_ONE].rankings["E"]
+    selected, _ = harness.configuration_ranking(
+        harness.CONFIGURATIONS_BY_NAME["BM25+B"],
+        channels[SEGMENT_ONE],
+        conditioning,
+        limit=LIMIT,
+    )
+    assert 0 < len(selected) <= LIMIT
+    assert "concept_mining" in selected
+
+
 def test_channels_requiring_a_mapper_refuse_to_guess(harness, registry_rows, units_by_id):
     conditioning = _condition_registry(registry_rows)
     with pytest.raises(harness.AblationError):
@@ -427,6 +461,19 @@ def test_channels_requiring_a_mapper_refuse_to_guess(harness, registry_rows, uni
             index_by_id={},
             wanted=("C",),
             dense_mapper=None,
+            bm25_mapper=None,
+            keywords=(),
+            limit=LIMIT,
+        )
+    with pytest.raises(harness.AblationError):
+        harness.segment_channels(
+            unit=units_by_id[SEGMENT_ONE],
+            registry_rows=registry_rows,
+            conditioning=conditioning,
+            index_by_id={},
+            wanted=("E",),
+            dense_mapper=None,
+            bm25_mapper=None,
             keywords=(),
             limit=LIMIT,
         )
@@ -440,8 +487,9 @@ def test_an_empty_segment_yields_empty_channels(harness, registry_rows, dense_ma
         registry_rows=registry_rows,
         conditioning=conditioning,
         index_by_id=index_by_id,
-        wanted=("A", "B", "C", "D"),
+        wanted=("A", "B", "C", "D", "E"),
         dense_mapper=dense_mapper,
+        bm25_mapper=BM25ConceptMapper.build(registry_rows),
         keywords=(),
         limit=LIMIT,
     )

@@ -161,6 +161,19 @@ wheels = [
 ]
 
 [[package]]
+name = "bm25s"
+version = "0.3.10"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/34/ab/8fac50e2095d26dd9ccaf3c35bddb96ff45a8cca9fc3ac0e98209971828f/bm25s-0.3.10.tar.gz", hash = "sha256:fafdfc45e6c064fc117b08de8f59b47564a3879d3ca593daa0b2a40b2c05da43", size = 80762 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d4/06/7ec2175c185661a976589fffde16eb7c36d69eaa43eed26fe5ad0ce3cd25/bm25s-0.3.10-py3-none-any.whl", hash = "sha256:d271d4e1ad7ffdacb224f41bc54aba55159438ecf06439ffe929f088efa96858", size = 74687 },
+]
+
+[[package]]
 name = "boto3"
 version = "1.42.33"
 source = { registry = "https://pypi.org/simple" }
@@ -4545,6 +4558,7 @@ source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "beautifulsoup4" },
+    { name = "bm25s" },
     { name = "boto3" },
     { name = "cyclopts" },
     { name = "duckdb" },
@@ -4605,6 +4619,7 @@ docs = [
 requires-dist = [
     { name = "anthropic", specifier = ">=0.120,<1" },
     { name = "beautifulsoup4", specifier = ">=4.13,<5" },
+    { name = "bm25s", specifier = "==0.3.10" },
     { name = "boto3" },
     { name = "cyclopts" },
     { name = "docling", marker = "extra == 'docling'", specifier = "==2.115.0" },

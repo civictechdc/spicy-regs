@@ -17,7 +17,7 @@ stored gold assignments, and scores those lists on facts that need no model:
 * **rank** of the surfaced targets, and the **source-vocabulary mix** of the
   emitted lists, which is what the quota rule exists to control.
 
-Configurations are compositions of five channel sources:
+Configurations are compositions of six channel sources:
 
 * ``v1`` — ``select_candidate_concepts_for_text``, the production selector, run
   whole (it is a selector, not a channel: its own scheme gate and token trim
@@ -25,6 +25,7 @@ Configurations are compositions of five channel sources:
 * ``A`` / ``B`` — v2's anchored-lexical and char-3-gram channels.
 * ``C`` — dense BGE retrieval over the concept index.
 * ``D`` — free-keyword generate-then-map.
+* ``E`` — BM25 over preferred labels and registered aliases.
 
 Every non-``v1`` configuration fuses its channels with the same RRF at k=60 that
 v2 uses, then either applies v2's source-vocabulary quotas or takes the fused ranking
@@ -64,12 +65,15 @@ from spicy_regs.evaluation_boundary import (
     DEVELOPMENT_DATASET_ID,
 )
 from spicy_regs.ontology.candidate_channels import (
+    BM25_CHANNEL_VERSION,
     CHANNEL_DEPTH,
     DENSE_CHANNEL_VERSION,
     KEYWORD_CHANNEL_VERSION,
+    BM25ConceptMapper,
     CharNgramConceptMapper,
     ConceptMapper,
     KeywordGeneration,
+    bm25_channel_ranking,
     dense_channel_ranking,
     generate_segment_keywords,
     keyword_channel_ranking,
@@ -104,6 +108,7 @@ CHANNEL_A = "A"
 CHANNEL_B = "B"
 CHANNEL_C = "C"
 CHANNEL_D = "D"
+CHANNEL_E = "E"
 
 
 @dataclass(frozen=True)
@@ -128,6 +133,14 @@ CONFIGURATIONS: tuple[Configuration, ...] = (
     ),
     Configuration("C-alone", (CHANNEL_C,), False, "dense retrieval only"),
     Configuration("D-alone", (CHANNEL_D,), False, "generate-then-map only"),
+    Configuration("BM25-alone", (CHANNEL_E,), False, "BM25 lexical retrieval only"),
+    Configuration("BM25+B", (CHANNEL_E, CHANNEL_B), True, "BM25 plus char-ngram, source-vocabulary quotas"),
+    Configuration(
+        "BM25+B+C",
+        (CHANNEL_E, CHANNEL_B, CHANNEL_C),
+        True,
+        "BM25 plus char-ngram plus dense retrieval, source-vocabulary quotas",
+    ),
 )
 CONFIGURATIONS_BY_NAME = {configuration.name: configuration for configuration in CONFIGURATIONS}
 
@@ -258,9 +271,11 @@ def segment_channels(
     index_by_id: Mapping[str, int],
     wanted: Sequence[str],
     dense_mapper: ConceptMapper | None,
+    bm25_mapper: ConceptMapper | None,
     keywords: Sequence[str],
     limit: int,
     depth: int = ANCHOR_CHANNEL_DEPTH,
+    include_v1: bool = True,
 ) -> SegmentChannels:
     """Compute one segment's rankings for every requested channel."""
     text = _segment_text(unit)
@@ -287,7 +302,15 @@ def segment_channels(
         rankings[CHANNEL_D] = _ids_to_indices(
             keyword_channel_ranking(keywords, mapper=dense_mapper, depth=depth), index_by_id
         )
-    v1_selected = select_candidate_concepts_for_text(text, _allowed_schemes(unit), registry_rows, limit=limit)
+    if CHANNEL_E in wanted:
+        if bm25_mapper is None:
+            raise AblationError("channel E was requested without a BM25 mapper")
+        rankings[CHANNEL_E] = _ids_to_indices(bm25_channel_ranking(text, mapper=bm25_mapper, depth=depth), index_by_id)
+    v1_selected = (
+        select_candidate_concepts_for_text(text, _allowed_schemes(unit), registry_rows, limit=limit)
+        if include_v1
+        else []
+    )
     return SegmentChannels(
         segment_id=str(unit.unit_id),
         allowed_facets=tuple(_allowed_schemes(unit)),
@@ -321,9 +344,7 @@ def configuration_ranking(
     ranked = fuse([segment.rankings.get(name, ()) for name in configuration.channels], conditioning)
     ranked = _allowed_facet_ranking(ranked, conditioning, segment.allowed_facets)
     selected = (
-        _apply_source_vocabulary_quotas(ranked, conditioning, limit=limit)
-        if configuration.quotas
-        else ranked[:limit]
+        _apply_source_vocabulary_quotas(ranked, conditioning, limit=limit) if configuration.quotas else ranked[:limit]
     )
     return (
         [conditioning.concept_ids[index] for index in selected],
@@ -698,6 +719,16 @@ def run_ablation(
             _query_token_facts(mapper, [_segment_text(units_by_id[segment_id]) for segment_id in segment_ids])
         )
 
+    bm25_mapper: ConceptMapper | None = None
+    bm25_facts: dict[str, Any] = {}
+    if CHANNEL_E in wanted:
+        started = time.monotonic()
+        built_bm25 = BM25ConceptMapper.build(registry_rows)
+        bm25_mapper = built_bm25
+        bm25_facts = built_bm25.facts()
+        bm25_facts["seconds"] = round(time.monotonic() - started, 3)
+        timings["bm25_index"] = bm25_facts["seconds"]
+
     started = time.monotonic()
     channels_by_segment = {
         segment_id: segment_channels(
@@ -707,8 +738,10 @@ def run_ablation(
             index_by_id=index_by_id,
             wanted=wanted,
             dense_mapper=mapper,
+            bm25_mapper=bm25_mapper,
             keywords=keywords_by_segment.get(segment_id, ()),
             limit=limit,
+            include_v1=any(configuration.name == "v1" for configuration in configurations),
         )
         for segment_id in segment_ids
     }
@@ -769,6 +802,7 @@ def run_ablation(
             "rrf_k": ANCHOR_RRF_K,
             "dense_channel_version": DENSE_CHANNEL_VERSION,
             "keyword_channel_version": KEYWORD_CHANNEL_VERSION,
+            "bm25_channel_version": BM25_CHANNEL_VERSION,
         },
         "item_count": len(items),
         "evaluation_boundary": inputs.evaluation_facts,
@@ -784,6 +818,7 @@ def run_ablation(
             if item.adequate_concept_id
         ],
         "concept_mapper": mapper_facts,
+        "bm25": bm25_facts,
         "keywords": {**keyword_facts, "calls": keyword_calls},
         "timings_seconds": timings,
         "results": results,

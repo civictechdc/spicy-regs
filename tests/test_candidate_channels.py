@@ -1,4 +1,4 @@
-"""Hermetic tests for candidate channels C (dense) and D (generate-then-map).
+"""Hermetic tests for candidate channels C (dense), D (keywords), and E (BM25).
 
 No provider, no model weights, no network: the dense embedder and the
 structured-text model are both injected fakes. What is asserted is what a
@@ -18,6 +18,10 @@ from typing import Any
 import pytest
 
 from spicy_regs.ontology.candidate_channels import (
+    BM25_CHANNEL_VERSION,
+    BM25_INDEX_SCHEMA_VERSION,
+    BM25ConceptMapper,
+    BM25IndexError,
     DENSE_INDEX_SCHEMA_VERSION,
     KEYWORD_INSTRUCTIONS,
     KEYWORD_MAX_COUNT,
@@ -25,7 +29,9 @@ from spicy_regs.ontology.candidate_channels import (
     DenseConceptIndex,
     DenseConceptMapper,
     DenseIndexError,
+    bm25_channel_ranking,
     build_dense_concept_index,
+    concept_bm25_tokens,
     concept_embedding_text,
     dense_channel_ranking,
     dense_index_path,
@@ -36,6 +42,7 @@ from spicy_regs.ontology.candidate_channels import (
     keyword_output_schema,
     load_dense_concept_index,
     normalize_keywords,
+    registry_bm25_digest,
     registry_embedding_digest,
     save_dense_concept_index,
 )
@@ -171,6 +178,65 @@ def test_registry_digest_is_stable_and_content_sensitive(registry):
 
 def test_registry_digest_ignores_deprecated_rows(registry):
     assert registry_embedding_digest(registry) == registry_embedding_digest(registry[:-1])
+
+
+# --------------------------------------------------------------------------
+# channel E — BM25 sparse lexical retrieval
+# --------------------------------------------------------------------------
+
+
+def test_bm25_tokens_use_names_but_not_definition(registry):
+    assert concept_bm25_tokens(registry[0]) == (
+        "fishery",
+        "management",
+        "fisheries",
+        "management",
+    )
+    assert "stocks" not in concept_bm25_tokens(registry[0])
+
+
+def test_bm25_digest_is_stable_and_ignores_deprecated_rows(registry):
+    assert registry_bm25_digest(registry) == registry_bm25_digest(list(reversed(registry[:-1])))
+    changed = [dict(row) for row in registry]
+    changed[0]["alt_labels_json"] = '["Marine fisheries"]'
+    assert registry_bm25_digest(changed) != registry_bm25_digest(registry)
+
+
+def test_bm25_mapper_finds_non_adjacent_alias_terms(registry):
+    mapper = BM25ConceptMapper.build(registry)
+    ranked = bm25_channel_ranking(
+        "The agency administers immigration benefits under federal nationality and visa law.",
+        mapper=mapper,
+    )
+    assert ranked[0] == "concept_immi"
+
+
+def test_bm25_mapper_skips_deprecated_and_zero_score_rows(registry):
+    mapper = BM25ConceptMapper.build(registry)
+    assert bm25_channel_ranking("retired concept", mapper=mapper) == []
+    assert bm25_channel_ranking("words absent from every registered name", mapper=mapper) == []
+
+
+def test_bm25_mapper_keeps_blank_queries_aligned_and_respects_depth(registry):
+    mapper = BM25ConceptMapper.build(registry)
+    ranked = mapper.rank(["surface mining", " ", "free speech"], depth=1)
+    assert ranked[0][0][0] == "concept_mine"
+    assert ranked[1] == []
+    assert ranked[2][0][0] == "concept_speech"
+    assert all(len(row) <= 1 for row in ranked)
+
+
+def test_bm25_mapper_is_deterministic_and_reports_identity(registry):
+    mapper = BM25ConceptMapper.build(registry)
+    assert mapper.rank(["immigration law"], depth=4) == mapper.rank(["immigration law"], depth=4)
+    assert mapper.version == BM25_CHANNEL_VERSION
+    assert mapper.facts()["schema_version"] == BM25_INDEX_SCHEMA_VERSION
+    assert mapper.facts()["document_fields"] == ["pref_label", "alt_labels"]
+
+
+def test_bm25_mapper_refuses_duplicate_concept_ids(registry):
+    with pytest.raises(BM25IndexError):
+        BM25ConceptMapper.build([registry[0], dict(registry[0])])
 
 
 # --------------------------------------------------------------------------

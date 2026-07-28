@@ -126,6 +126,10 @@ documentation, full-suite, clean-checkout, release, or publication gates.
       and score primary topics separately from substantive and mention tags.
       Evidence: schema support in `df2b177`, reader/split support in `54d02de`,
       and role-partitioned scoring in `TagExtractionTask.score`.
+- [x] Add and measure a maintained BM25 sparse-search baseline. It built the
+      513,236-concept index in 7.680 seconds but underperformed
+      `anchored-hybrid-v2` on both exact-alias and adequate-target retention.
+      Evidence: `docs/evidence/candidate-selection-research-2026-07-27.md`.
 - [ ] Draw and freeze a new untouched holdout. Before revealing labels, pin
       membership, source/selection/gold/registry/configuration digests; keep
       concept ids, registered aliases, and artifact digests disjoint from

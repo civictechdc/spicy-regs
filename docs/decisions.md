@@ -362,6 +362,13 @@ so explicitly. Plans cite this file; this file cites evidence.
   adequacy of 5/35 under the old selector. Those observations helped locate
   the seam; they cannot authorize an accuracy or adoption verdict. Earlier
   anchored-selector numbers on the same 35 are likewise tuning evidence.
+- **BM25 baseline, development only:** a pinned `bm25s` Lucene index over
+  preferred labels and aliases built in 7.680 seconds but surfaced only 1/8
+  exact-alias targets and retained 1/5 adequate targets. Adding char n-grams
+  stayed at 1/8 and 1/5; adding dense retrieval reached 2/8 and 4/5, still
+  below v2's 4/8 and 4/5. Keep BM25 as a regression baseline, not a production
+  selector. Evidence and limitations are recorded in
+  `evidence/candidate-selection-research-2026-07-27.md`.
 - **Disposition:** no fused registry or selector is adopted. The current
   implementation can execute `anchored-hybrid-v2` through the same payload,
   strict schema, facet policy, and token budget as the production tag path.

@@ -70,6 +70,36 @@ recall@K measured separately as the hard ceiling on end-to-end quality.
   documents and never reaches unseen labels. Harvest accepted
   assignments as silver data; revisit at ~50k labeled segments.
 
+## Local BM25 baseline — development only
+
+The missing sparse-search baseline was added on 2026-07-27 as channel E using
+the pinned `bm25s==0.3.10` Lucene method. It indexes each active concept as its
+preferred label plus registered aliases; definitions are excluded. The run
+used the same 513,236-row registry, 35 development items, top-12 prompt limit,
+facet filter, and real prompt preflight as v2; the fused variants also used
+the same source-vocabulary quotas. It made no provider calls.
+
+| Configuration | Exact-alias surfaced | Adequate target kept |
+| --- | ---: | ---: |
+| `anchored-hybrid-v2` (A+B) | 4/8 | 4/5 |
+| v2 + dense (A+B+C) | 4/8 | 4/5 |
+| BM25 alone (E) | 1/8 | 1/5 |
+| BM25 + char n-gram (E+B) | 1/8 | 1/5 |
+| BM25 + char n-gram + dense (E+B+C) | 2/8 | 4/5 |
+
+BM25 built its full sparse index in 7.680 seconds, and ranking every requested
+channel took 3.696 seconds. Its failure was retrieval quality, not runtime.
+The global ranking was dominated by FAST (`BM25-alone`: 400/419 prompt slots),
+and the source quotas could not recover candidates absent from the channel's
+top 50. A diagnostic search to depth 5,000 found `human rights` at rank 824
+and `free speech` at rank 4,815; five other missed exact targets remained
+absent.
+
+**Disposition:** keep BM25 as a fast regression baseline, but do not replace
+the anchored matcher or promote any BM25 configuration. These are inspected
+development results, not holdout or adoption evidence. Local record SHA-256:
+`67c6565d93739045ad978242d5b7a4e1a595dacc17bfc5c984d53a2d94f08a6d`.
+
 ## Evaluation pitfalls
 
 P@k gameable by head labels (use propensity-scored variants when

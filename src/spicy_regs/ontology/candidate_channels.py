@@ -1,4 +1,4 @@
-"""Two additional candidate-generation channels beside the anchored hybrid (v2).
+"""Additional candidate-generation channels beside the anchored hybrid (v2).
 
 ``spicy_regs.ontology.concepts`` holds two selectors and stays untouched by this
 module: ``select_candidate_concepts_for_text`` (v1, unanchored lexical overlap
@@ -9,13 +9,10 @@ surfaced 4 of 8 exact-alias targets. That result helped diagnose channel shape
 but is not holdout evidence. Its misses are channel-shaped
 (``docs/evidence/gold-adjudication-2026-07-27/README.md``, round-2 correction):
 ``immigration law`` and ``fisheries management`` reach their registry concepts
-only through non-adjacent alt-label aliases, so no lexical channel can see them
-at all, and ``free speech`` sits at fused rank 91.
+only through non-adjacent alt-label aliases, so neither of v2's lexical
+channels can see them, and ``free speech`` sits at fused rank 91.
 
-This module adds the two channels both research passes named as the next ones
-to try (``docs/evidence/candidate-selection-research-2026-07-27.md``
-recommendations 3 and 5; ``docs/evidence/hierarchy-embedding-research-2026-07-27.md``
-disposition 1):
+This module keeps independently measurable channels beside v2:
 
 * **Channel C, dense retrieval.** Every concept is embedded once as its
   ``prefLabel + altLabels (+ definition)`` string with the repo's pinned BGE
@@ -27,13 +24,17 @@ disposition 1):
   is mapped into the registry through the same embedding index, and the
   per-keyword results merge into one ranked list. The vocabulary is never shown
   to the model, so the call cost does not grow with the registry.
+* **Channel E, BM25.** A maintained sparse index ranks each concept's preferred
+  label plus aliases against the full segment. Unlike channel A, important
+  query words need not be adjacent. Definitions stay out of this first
+  baseline so topical prose cannot overpower registered names.
 
-Both channels return a ranked list of ``concept_id`` strings, which is what a
+All channels return a ranked list of ``concept_id`` strings, which is what a
 fusion step needs and all it needs. Nothing here fuses, quotas, or selects: the
 ablation harness (``tools/ablate_candidate_selectors.py``) owns those choices so
 that a channel and a configuration can be measured apart from each other.
 
-Neither channel is wired into production. They exist to be measured.
+None of these channels is wired into production. They exist to be measured.
 """
 
 from __future__ import annotations
@@ -50,6 +51,7 @@ from typing import Any, Protocol
 from spicy_regs.ontology.concepts import (
     ANCHOR_CHANNEL_DEPTH,
     _condition_registry,
+    normalize_label,
 )
 
 # Channel depth matches v2's per-channel depth so a fused configuration draws
@@ -58,9 +60,14 @@ CHANNEL_DEPTH = ANCHOR_CHANNEL_DEPTH
 
 DENSE_CHANNEL_VERSION = "dense-embedding-c1"
 KEYWORD_CHANNEL_VERSION = "generate-then-map-d1"
+BM25_CHANNEL_VERSION = "bm25s-lucene-e1"
 CHAR_NGRAM_MAPPER_VERSION = "char-ngram-fallback-v1"
 
 DENSE_INDEX_SCHEMA_VERSION = "concept-dense-index-v1"
+BM25_INDEX_SCHEMA_VERSION = "concept-bm25-index-v1"
+BM25_METHOD = "lucene"
+BM25_K1 = 1.5
+BM25_B = 0.75
 # Concept strings are short; a large chunk keeps the provider adapter's
 # per-call overhead small without holding more than a few hundred MB of
 # intermediate Python floats at once.
@@ -142,6 +149,10 @@ class DenseIndexError(RuntimeError):
     """A stored dense index does not match the registry or model it is used with."""
 
 
+class BM25IndexError(RuntimeError):
+    """The registry cannot produce a deterministic BM25 concept index."""
+
+
 # --------------------------------------------------------------------------
 # concept embedding inputs
 # --------------------------------------------------------------------------
@@ -182,6 +193,32 @@ def concept_embedding_text(concept: Mapping[str, Any]) -> str:
 def eligible_concepts(concepts: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
     """Drop deprecated rows, matching what v2's conditioning indexes."""
     return [concept for concept in concepts if concept.get("status") != "deprecated"]
+
+
+def concept_bm25_tokens(concept: Mapping[str, Any]) -> tuple[str, ...]:
+    """Preferred-label and alias tokens for one BM25 concept document.
+
+    Repeated terms across registered aliases are retained: BM25 saturates term
+    frequency, while the repetition still records that a term occurs in more
+    than one name for the concept. Definitions are intentionally excluded.
+    """
+    tokens: list[str] = []
+    for value in (concept.get("pref_label"), *_alt_labels(concept)):
+        tokens.extend(normalize_label(value).split())
+    return tuple(tokens)
+
+
+def registry_bm25_digest(concepts: Sequence[Mapping[str, Any]]) -> str:
+    """Digest the ordered concept ids and exact tokens the BM25 index reads."""
+    hasher = hashlib.sha256()
+    hasher.update(BM25_INDEX_SCHEMA_VERSION.encode("utf-8"))
+    hasher.update(BM25_CHANNEL_VERSION.encode("utf-8"))
+    for concept in sorted(eligible_concepts(concepts), key=lambda row: str(row.get("concept_id") or "")):
+        hasher.update(b"\x1e")
+        hasher.update(str(concept.get("concept_id") or "").encode("utf-8"))
+        hasher.update(b"\x1f")
+        hasher.update(" ".join(concept_bm25_tokens(concept)).encode("utf-8"))
+    return hasher.hexdigest()
 
 
 def registry_embedding_digest(concepts: Sequence[Mapping[str, Any]]) -> str:
@@ -458,6 +495,90 @@ class DenseConceptMapper:
 
 
 @dataclass(frozen=True)
+class BM25ConceptMapper:
+    """Sparse lexical retrieval over preferred labels and registered aliases."""
+
+    retriever: Any
+    concept_ids: tuple[str, ...]
+    registry_digest: str
+    package_version: str
+    version: str = BM25_CHANNEL_VERSION
+
+    @classmethod
+    def build(cls, concepts: Sequence[Mapping[str, Any]]) -> BM25ConceptMapper:
+        """Build a BM25S index in deterministic concept-id order."""
+        import importlib.metadata
+
+        import bm25s
+
+        rows = sorted(eligible_concepts(concepts), key=lambda row: str(row.get("concept_id") or ""))
+        concept_ids = tuple(str(concept.get("concept_id") or "") for concept in rows)
+        if any(not concept_id for concept_id in concept_ids):
+            raise BM25IndexError("BM25 concept rows require non-empty concept ids")
+        if len(set(concept_ids)) != len(concept_ids):
+            raise BM25IndexError("BM25 concept rows require unique concept ids")
+        retriever = None
+        if rows:
+            retriever = bm25s.BM25(
+                k1=BM25_K1,
+                b=BM25_B,
+                method=BM25_METHOD,
+                corpus=None,
+            )
+            retriever.index(
+                [list(concept_bm25_tokens(concept)) for concept in rows],
+                show_progress=False,
+            )
+        return cls(
+            retriever=retriever,
+            concept_ids=concept_ids,
+            registry_digest=registry_bm25_digest(concepts),
+            package_version=importlib.metadata.version("bm25s"),
+        )
+
+    def facts(self) -> dict[str, Any]:
+        """Secret-free identity of the BM25 index and its scoring choices."""
+        return {
+            "schema_version": BM25_INDEX_SCHEMA_VERSION,
+            "channel_version": self.version,
+            "package": "bm25s",
+            "package_version": self.package_version,
+            "method": BM25_METHOD,
+            "k1": BM25_K1,
+            "b": BM25_B,
+            "registry_digest": self.registry_digest,
+            "concept_count": len(self.concept_ids),
+            "document_fields": ["pref_label", "alt_labels"],
+            "query_tokenization": "spicy-regs-normalize-label-v1",
+        }
+
+    def rank(self, queries: Sequence[str], *, depth: int = CHANNEL_DEPTH) -> list[list[tuple[str, float]]]:
+        """Rank concepts for each query, excluding arbitrary zero-score fill."""
+        results: list[list[tuple[str, float]]] = [[] for _ in queries]
+        positions = [position for position, query in enumerate(queries) if normalize_label(query)]
+        if not positions or depth <= 0 or not self.concept_ids or self.retriever is None:
+            return results
+        width = min(len(self.concept_ids), max(depth, depth * 4))
+        query_tokens = [normalize_label(queries[position]).split() for position in positions]
+        rows, scores = self.retriever.retrieve(
+            query_tokens,
+            corpus=None,
+            k=width,
+            show_progress=False,
+            n_threads=1,
+        )
+        for batch_index, position in enumerate(positions):
+            candidates = [
+                (self.concept_ids[int(row)], float(score))
+                for row, score in zip(rows[batch_index], scores[batch_index], strict=True)
+                if int(row) >= 0 and float(score) > 0.0
+            ]
+            candidates.sort(key=lambda item: (-item[1], item[0]))
+            results[position] = candidates[:depth]
+        return results
+
+
+@dataclass(frozen=True)
 class CharNgramConceptMapper:
     """Channel D's fallback mapper: cosine in v2's char-3-gram label space.
 
@@ -508,6 +629,18 @@ def dense_channel_ranking(
     depth: int = CHANNEL_DEPTH,
 ) -> list[str]:
     """Channel C: the segment's nearest concepts, best first."""
+    if not str(text or "").strip():
+        return []
+    return [concept_id for concept_id, _ in mapper.rank([text], depth=depth)[0]]
+
+
+def bm25_channel_ranking(
+    text: str,
+    *,
+    mapper: ConceptMapper,
+    depth: int = CHANNEL_DEPTH,
+) -> list[str]:
+    """Channel E: BM25 over preferred labels and registered aliases."""
     if not str(text or "").strip():
         return []
     return [concept_id for concept_id, _ in mapper.rank([text], depth=depth)[0]]
