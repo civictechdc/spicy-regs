@@ -1,0 +1,45 @@
+Rulespec conformance gates — single-document projection
+=======================================================
+Contract under test : rulespec branch us-regulatory-identifiers @ f2a939d
+                      (tree exported read-only via `git archive`; compiled/
+                      JSON-Schema + SHACL outputs from the working checkout,
+                      proven consistent by an all-green run of the branch's
+                      own 426-fixture corpus, L4 binary excepted)
+Gate machinery      : tools/conformance_report.py evaluate() —
+                      L1 parse, L2 compiled JSON Schema per typed node
+                      (+ x-rkaf-order), L3 pyshacl over 54 shape files
+Document under test : docs/evidence/single-document-rulespec-projection-
+                      2026-07-28/fsis-2026-03227.rulespec.jsonld
+                      (@context rewritten to ../context/rkaf-context.jsonld
+                      for the in-tree run; content otherwise identical)
+
+VERDICT  L1=pass  L2=pass  L3=pass  (expected positive; diverged=False)
+
+L2 dispatch coverage (every typed node -> compiled schema):
+   3  oa:TextPositionSelector  ->  validated against source-fragment.schema.json $defs.TextPositionSelector
+   5  prov:Entity  ->  not dispatched (no rkaf:/oa: prefix; prov:Entity records)
+   1  rkaf:Artifact  ->  validated against us-regulatory-artifact.schema.json $defs.USRegulatoryArtifact
+   1  rkaf:Attestation  ->  validated against attestation.schema.json $defs.Attestation
+   2  rkaf:ConceptAssignment  ->  validated against concept-assignment.schema.json $defs.ConceptAssignment
+   1  rkaf:ConceptScheme  ->  validated against concept.schema.json $defs.ConceptScheme
+   1  rkaf:Docket  ->  validated against rulemaking.schema.json $defs.Docket
+   3  rkaf:EvidenceBinding  ->  validated against evidence-binding.schema.json $defs.EvidenceBinding
+   4  rkaf:ExtractionActivity  ->  validated against extraction-activity.schema.json $defs.ExtractionActivity
+   2  rkaf:LocalConcept  ->  validated against concept.schema.json $defs.LocalConcept
+   1  rkaf:Proceeding  ->  validated against rulemaking.schema.json $defs.Proceeding
+   1  rkaf:RegulatoryAgendaItem  ->  validated against rulemaking.schema.json $defs.RegulatoryAgendaItem
+   3  rkaf:RelationshipAssertion  ->  validated against relationship-assertion.schema.json $defs.RelationshipAssertion
+   3  rkaf:SourceClaimant  ->  validated against source-claimant.schema.json $defs.SourceClaimant
+   3  rkaf:SourceFragment  ->  validated against source-fragment.schema.json $defs.SourceFragment
+
+Negative controls (mutations of this document; prove the gates bite):
+  declare rkaf:published-fragment while citing urn:rkaf:fragment: URNs
+    -> L1=pass L2=pass L3=fail   (expected: L3 fail — ConceptAssignmentCarrierLocalEvidenceDeclaredShape)
+  drift one URN offset (2307 -> 2308) so the cited fragment is never materialized
+    -> L1=pass L2=pass L3=fail   (expected: L3 fail — CarrierLocalFragmentUrnSourceAgreementShape)
+  uppercase the URN digest (violates the carrier-local grammar)
+    -> L1=pass L2=fail L3=fail   (expected: L2 fail — compiled carrier-local pattern in concept-assignment.schema.json)
+       L2: rkaf:ConceptAssignment: ['urn:rkaf:fragment:HTTPS%3A%2F%2FWWW.FEDERALREGISTER.GOV%2FD%2F2026-03227:2282:2307:SHA256-835E00F8FCC5CCDA804ABC09B0C5F2535FCE530C4ACD7090A51BD3B765B29125'] is not valid under any of the given schemas
+  invert oa:start/oa:end on the F1 TextPositionSelector
+    -> L1=pass L2=fail L3=fail   (expected: L2 fail — x-rkaf-order on TextPositionSelector)
+       L2: oa:TextPositionSelector: oa:start must be less than or equal to oa:end

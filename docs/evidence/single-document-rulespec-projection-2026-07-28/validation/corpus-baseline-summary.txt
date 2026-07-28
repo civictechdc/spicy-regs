@@ -1,0 +1,13 @@
+Validator-environment consistency baseline
+==========================================
+Run: python3 tools/conformance_report.py --json on the rulespec
+us-regulatory-identifiers tree (git archive @ f2a939d) with the
+working checkout's compiled/ outputs, BEFORE adding this projection.
+
+summary: {"total": 426, "diverged": 45, "positive": 99, "negative": 227, "edge": 55, "behavior": 45}
+non-behavior divergences: 0
+behavior divergences: 45 — all and only "L4: rkaf-behavior-validate binary missing"
+(the Rust L4 runtime was not built; L4 does not apply to this projection,
+which is not a behavior fixture). Every one of the 99 positive fixtures
+passes L1+L2+L3 and every one of the 227 negatives fails as designed,
+which is the freshness proof that the compiled outputs match the branch.

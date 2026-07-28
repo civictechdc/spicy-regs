@@ -1,0 +1,69 @@
+== Source text state ==
+document_number : 2026-03227
+stored field    : federal_register.body_html (output/segmented-real-data-evaluation-v2/federal_register.parquet)
+length          : 267694 Unicode code points
+sha256(UTF-8)   : d67993458a2b330cd9b53af0f0162d21aa78ea30b61b190926c21ea6b91ec921
+
+== Gold anchor (gold_spans.parquet) ==
+  gold_id: gold_46af63a049ee1964b9ae13f4
+  subject_id: 2026-03227
+  source_field: federal_register.body_html
+  start_char: 2282
+  end_char: 2307
+  exact_text: Poultry Inspection System
+  exact_text_sha256: 835e00f8fcc5ccda804abc09b0c5f2535fce530c4acd7090a51bd3b765b29125
+  artifact_digest: 9b3eb7602445ccb21f8ebe2cbe69fb0d7609f0682684b8b605b9679398185972
+  concept_scheme: subject
+  concept_label: poultry inspection
+  curation_status: human-specified
+  [OK ] gold subject is this document
+  [OK ] gold source_field is federal_register.body_html
+  [OK ] producer version digest reproduces gold artifact_digest — 9b3eb7602445ccb21f8ebe2cbe69fb0d7609f0682684b8b605b9679398185972
+
+== SourceFragment offset verification (unicode code points, half-open [start,end) over body_html) ==
+  F1 [2282,2307)
+     slice == expected text: "Poultry Inspection System"
+  [OK ] F1 slice equality
+     sha256(region): 835e00f8fcc5ccda804abc09b0c5f2535fce530c4acd7090a51bd3b765b29125
+     urn: urn:rkaf:fragment:https%3A%2F%2Fwww.federalregister.gov%2Fd%2F2026-03227:2282:2307:sha256-835e00f8fcc5ccda804abc09b0c5f2535fce530c4acd7090a51bd3b765b29125
+  F2 [1578,1629)
+     slice == expected text: "9 CFR Part 381</li>\n<li>[Docket No. FSIS-2025-0012]"
+  [OK ] F2 slice equality
+     sha256(region): 23c0703e06da3f666e5215119d7fa7684f1c4d4307a12aa66718b83ae7b6cb56
+     urn: urn:rkaf:fragment:https%3A%2F%2Fwww.federalregister.gov%2Fd%2F2026-03227:1578:1629:sha256-23c0703e06da3f666e5215119d7fa7684f1c4d4307a12aa66718b83ae7b6cb56
+  F3 [23602,23615)
+     slice == expected text: "21 U.S.C. 451"
+  [OK ] F3 slice equality
+     sha256(region): 8fd1bad8b3ce034ae669d3dc827c86f0f6cdcd0d4089c0195843154d1451dd55
+     urn: urn:rkaf:fragment:https%3A%2F%2Fwww.federalregister.gov%2Fd%2F2026-03227:23602:23615:sha256-8fd1bad8b3ce034ae669d3dc827c86f0f6cdcd0d4089c0195843154d1451dd55
+  [OK ] F1 matches gold exact_text
+  [OK ] F1 digest matches gold exact_text_sha256
+
+== Deterministic relationship rows (output/rulespec-stabilization-candidate-final) ==
+  [OK ] exactly one rule_targets row — {"actor_id":"spicy-regs:rule-targets:v1","cfr_ref":"9-381","docket_id":"FSIS-2025-0012","evidence_id":"FSIS-2025-0012-0003","rin":"0583-AE01","run_id":"ontology-20260724T065716Z","source":"document_fr_doc"}
+  [OK ] exactly one authority_edges row — {"actor_id":"spicy-regs:authority-parser:v1","agenda_edition":"202510","authority_raw":"21 U.S.C. 451, et. seq.","parse_status":"partial","rin":"0583-AE01","run_id":"ontology-20260724T065716Z","usc_section":"451","usc_title":"21"}
+  [OK ] exactly one proceedings row — {"authority_refs_json":"[\"usc:21-451\"]","cfr_target_iris_json":"[\"urn:rkaf:us:cfr:9:381\"]","current_stage":"proposed","docket_ids_json":"[\"FSIS-2025-0012\"]","fr_document_numbers_json":"[\"2026-03227\"]","proceeding_id":"proceeding_ec5ca2f16f0fde022cdf0bd1","rin":"0583-AE01"}
+  [OK ] exactly one dockets row
+  [OK ] rule_targets CFR ref is 9-381
+  [OK ] proceeding carries this FR document
+  [OK ] proceeding CFR target IRI is urn:rkaf:us:cfr:9:381
+  [OK ] proceeding docket is FSIS-2025-0012
+  [OK ] authority edge is 21 USC 451
+  [OK ] document lists docket FSIS-2025-0012
+  [OK ] document official FR topics — ["Meat inspection","Poultry and poultry products"]
+
+== Fused registry concepts (output/fused-concept-registry-v1) ==
+  [OK ] concept_9bb8165887d1cb3edc54277b present, scheme=subject, label='Poultry and poultry products' — [{"scheme":"federal_register_thesaurus","value":"Poultry and poultry products"}]
+  [OK ] concept_10c6db73325f36bcc6d8b84a present, scheme=subject, label='Meat inspection' — [{"scheme":"federal_register_thesaurus","value":"Meat inspection"}]
+
+== Request-contract digests (recipe: sha256 over canonical-json {instructions, actor_id, run_id, input_row}) ==
+  EA1 rule-targets: contract sha256:f399dbeddbb5f964a974d1470a6c4474b41967f254ba66b92e2b3d4e64577221
+     input row  sha256:f6b3ff769e9e9de359676980db6e6b1f9c9c4d179be1b3833add741acba55ba1
+  EA2 authority-parser: contract sha256:7a74d125809fa2148581d873ec166263a522a2372bad4fc59af6aadedd04b1bc
+     input row  sha256:d1238db7b9e14561b429f0056690e9a3b62c1f943e2db7198688cbf3e59de6f2
+  EA3 proceedings: contract sha256:7aaa2ebb691d6dbdb0f2d3ef91ff622e94481ec259d3fd9e9ceb8bbd6dd8d285
+     input row  sha256:c1788c9c24c6b51583cc77d77c2ae5606447ef04dee414424d9752d7a9da5034
+  EA4 fr-topics import: contract sha256:dc2d0657a7a970fa89032aaaf52f8f49eb0c532ae839c10e89aec19c4be844fc
+     input row  sha256:69fee1acb7d5297c2937ce1e573040e44220370dbbf9a7952a6572d73fd70740
+
+wrote fsis-2026-03227.rulespec.jsonld (34 graph nodes)

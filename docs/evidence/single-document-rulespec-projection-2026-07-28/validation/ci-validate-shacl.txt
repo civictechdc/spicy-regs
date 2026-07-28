@@ -1,0 +1,70 @@
+Rulespec CI validation gate
+============================================================
+
+[1/3] Environment check
+  pyshacl 0.31.0 OK
+  shapes:  shapes/rkaf-shapes-accessscope.ttl
+  shapes:  shapes/rkaf-shapes-analysis.ttl
+  shapes:  shapes/rkaf-shapes-conceptregistry.ttl
+  shapes:  shapes/rkaf-shapes-confidence.ttl
+  shapes:  shapes/rkaf-shapes-core.ttl
+  shapes:  shapes/rkaf-shapes-pattern-c.ttl
+  shapes:  shapes/rkaf-shapes-studio-promotions.ttl
+  shapes:  shapes/rkaf-shapes-warrant.ttl
+  shapes:  compiled/shacl/core/access-scope.ttl
+  shapes:  compiled/shacl/core/ai-lineage.ttl
+  shapes:  compiled/shacl/core/applicability-scope.ttl
+  shapes:  compiled/shacl/core/artifact.ttl
+  shapes:  compiled/shacl/core/assertion.ttl
+  shapes:  compiled/shacl/core/attestation.ttl
+  shapes:  compiled/shacl/core/authority.ttl
+  shapes:  compiled/shacl/core/bridge-consumer-registration.ttl
+  shapes:  compiled/shacl/core/bridge-issue-attestation-contract.ttl
+  shapes:  compiled/shacl/core/bridge-validation-result.ttl
+  shapes:  compiled/shacl/core/concept-assignment.ttl
+  shapes:  compiled/shacl/core/concept-mapping.ttl
+  shapes:  compiled/shacl/core/concept-resolution-result.ttl
+  shapes:  compiled/shacl/core/concept.ttl
+  shapes:  compiled/shacl/core/confidence-record.ttl
+  shapes:  compiled/shacl/core/consumer-effective-declaration.ttl
+  shapes:  compiled/shacl/core/effective-period.ttl
+  shapes:  compiled/shacl/core/evaluation-anchor.ttl
+  shapes:  compiled/shacl/core/evidence-binding.ttl
+  shapes:  compiled/shacl/core/extraction-activity.ttl
+  shapes:  compiled/shacl/core/finding.ttl
+  shapes:  compiled/shacl/core/generated-work-product.ttl
+  shapes:  compiled/shacl/core/justification.ttl
+  shapes:  compiled/shacl/core/lifecycle-event.ttl
+  shapes:  compiled/shacl/core/local-adoption.ttl
+  shapes:  compiled/shacl/core/mapping-state.ttl
+  shapes:  compiled/shacl/core/point-in-time-exception.ttl
+  shapes:  compiled/shacl/core/registry-conflict.ttl
+  shapes:  compiled/shacl/core/relationship-assertion.ttl
+  shapes:  compiled/shacl/core/retention-policy.ttl
+  shapes:  compiled/shacl/core/revalidation-event.ttl
+  shapes:  compiled/shacl/core/source-claimant.ttl
+  shapes:  compiled/shacl/core/source-fragment.ttl
+  shapes:  compiled/shacl/core/trust-and-safety.ttl
+  shapes:  compiled/shacl/core/usage-eligibility.ttl
+  shapes:  compiled/shacl/core/value-assertion.ttl
+  shapes:  compiled/shacl/core/warrant.ttl
+  shapes:  compiled/shacl/core/workspace.ttl
+  shapes:  compiled/shacl/analysis/closure-claim.ttl
+  shapes:  compiled/shacl/analysis/relation-change-event.ttl
+  shapes:  compiled/shacl/analysis/relation-comparison-context.ttl
+  shapes:  compiled/shacl/analysis/relation-finding.ttl
+  shapes:  compiled/shacl/analysis/resolver-proof-record.ttl
+  shapes:  compiled/shacl/profiles/us-rulemaking/rulemaking.ttl
+  shapes:  compiled/shacl/profiles/us-rulemaking/us-lifecycle-event.ttl
+  shapes:  compiled/shacl/profiles/us-rulemaking/us-regulatory-artifact.ttl
+
+[2/3] Per-fixture validation
+  [PASS] fsis-2026-03227.rulespec: 0 violations, 196 triples
+
+[3/3] Summary
+  Shapes:     54 files
+  Fixtures:   1
+  Triples:    196
+  Violations: 0
+  Result:     PASS
+exit=0
