@@ -40,6 +40,15 @@ embed = [
     "sentence-transformers==5.6.1",
     "torch==2.10.0",
 ]
+# Approximate nearest-neighbour serving for the dense concept channel. Optional
+# on purpose: the exact brute-force search in
+# src/spicy_regs/ontology/candidate_channels.py remains the implemented channel,
+# and src/spicy_regs/ontology/ann_index.py imports USearch lazily. Pinned
+# because HNSW construction is a property of the library build, so an
+# unpinned upgrade would silently change a measured recall number.
+ann = [
+    "usearch==2.26.0",
+]
 evaluation = [
     "ir-measures==0.4.3",
     "scikit-learn==1.7.2",
