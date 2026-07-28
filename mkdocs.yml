@@ -36,9 +36,6 @@ markdown_extensions:
 
 nav:
   - Overview: index.md
-  - Regulatory Evidence Framework: regulatory-evidence-framework.md
-  - REF Rulespec application profile: regulatory-evidence-rulespec-profile.md
-  - REF implementation plan: regulatory-evidence-framework-implementation-plan.md
   - Changelog: changelog.md
   - Querying with Python: querying-python.md
   - Ontology and Rulespec L0: ontology.md
