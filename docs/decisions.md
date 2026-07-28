@@ -490,3 +490,37 @@ so explicitly. Plans cite this file; this file cites evidence.
   `_CONTRACT_FILES` rule fix (recorded under post-MVP repairs).
 - **Revisit trigger:** a genuinely third-party consumer appears, at which
   point a real independent review supersedes this one.
+
+## 2026-07-28 — usearch ANN: rejected as a swap for exact dense search
+
+- **Decision:** keep exact brute-force cosine for the dense candidate
+  channel. usearch (2.26.0) installs and runs fine; the experiment
+  answered cleanly against it. Kept as an optional `ann` extra with its
+  benchmark for the revisit case; not wired into any selector.
+- **Evidence:** `evidence/usearch-ann-benchmark-2026-07-28.md` (commit
+  `b893e7c`). Eight configurations over 513,236 concepts, scored against
+  exact search as ground truth and against the 8-target oracle through
+  the ablation harness's own scorer (its exact row reproduces the
+  published ablation — 3/8, 4/8, 2/8, same labels — confirming faithful
+  reuse). Memory and recall proved to be the same dial: the only
+  configuration matching the exact oracle everywhere (`f32-hi`) holds
+  1,617 MB against the baseline's 1,697 MB — a 4.7% saving. Cheaper
+  settings lose 21-74% of the exact top-12.
+- **Why recall is poor, measured not assumed:** duplicate concept strings
+  ruled out (all 513,236 texts distinct); the exact top-50 sits inside a
+  **0.056-wide cosine band**, so HNSW's greedy descent has almost no
+  gradient to follow. Structural to this embedding distribution, not a
+  usearch defect — any graph-based ANN will struggle on the same vectors.
+- **Two traps recorded:** `v2+C` holds 4/8 even at 26% recall, which reads
+  as "ANN is harmless" but actually means the dense channel is not
+  carrying those targets — the lexical channels are. And aggregate recall
+  does not predict target survival (`f16-c32` beats `f16` on recall,
+  0/8 vs 2/8 on the oracle). Judge ANN by the oracle, never by recall
+  alone.
+- **No measured need exists:** 1.70 GB and 16 ms mean latency on a 48 GB
+  machine; the research warning concerned >34 GB tooling. The ~50-minute
+  cost is the *embedding* build, which ANN does not change (graph
+  construction is 20 s - 4.5 min).
+- **Revisit trigger:** the registry outgrows the serving memory budget, or
+  concurrent workers make 1.7 GB/worker binding — start from
+  `usearch-f16-hi` (1,107 MB, both fused oracles at parity).
