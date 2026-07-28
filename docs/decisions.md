@@ -572,3 +572,41 @@ so explicitly. Plans cite this file; this file cites evidence.
 - **Revisit trigger:** RS-P1's decision, or a compiler change that makes
   cross-node conditionals expressible (which would close RS-P6's
   criterion 2 and possibly the minted-digest gap).
+
+## 2026-07-28 — The concept space is the bottleneck, not retrieval
+
+- **Measured:** for a real segment, the single best-matching concept in
+  the fused registry separates from two randomly-picked unrelated
+  concepts by **0.029 on a 0-1 scale**. The shortlist the dense channel
+  hands the model is close to arbitrary. Evidence: `b893e7c`, `d26d07b`
+  (20,000-concept diagnostic; development-only).
+- **Cause 1 — the embedded text is mostly boilerplate.** All 513,236
+  concepts carry a "definition", but there are only **8 distinct ones**,
+  all templates ("FAST … Topical facet term: X."). The boilerplate is
+  **74% of the embedded string**, and 440,599 concepts share the identical
+  sentence. Dropping it on a 20k subset improved best-match separation
+  **6.9×** and raised effective dimensionality from 43 to 94 of 768.
+  **The repo already knew:** the sparse channel deliberately excludes
+  definitions with a comment saying why; the dense channel includes them.
+  That inconsistency is the bug.
+- **Cause 2 — the catalog is 99.6% out-of-domain.** FAST library subject
+  headings 440,599 (85.8%), EPA chemical names 70,736 (13.8%), Federal
+  Register + CRS regulatory terms **1,901 (0.37%)**. The vocabularies our
+  gold labels actually come from are a rounding error in the table, so
+  `Italian language--Conjunctions` competes for shortlist slots with real
+  regulatory concepts. This reframes a result that predates the ANN work:
+  dense-alone surfacing only 3/8 known targets under *exact* search was
+  read as a search problem; it is a catalog problem.
+- **Consequence for the 2026-07-27 fusion entry:** the fusion did add 7
+  real exact-alias targets (coverage 1/35 → 8/35) and that stands, but the
+  same commit added ~511k out-of-domain rows that drown them. Scheme
+  quotas protect the *fused* selector; nothing protects the dense channel
+  internally.
+- **Next, in order (cheapest first, before any further retrieval work):**
+  (1) drop the boilerplate from `concept_embedding_text`; (2) re-embed
+  once (~50 min); (3) re-run the ablation and read the **8-target
+  oracle**, not the geometry numbers. Then decide separately whether 500k
+  library headings belong in the registry or in a filtered secondary tier.
+- **Revisit trigger:** the re-embedded ablation result. A healthier concept
+  space also invalidates today's ANN measurements, so the usearch question
+  reopens only after this lands.
