@@ -1,0 +1,105 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 2387.508,
+        "input_tokens": 1993,
+        "output_tokens": 96,
+        "request_id": "80278288-2d83-48f7-be7d-64e3c33c3399",
+        "response_id": "resp_02602fa9639af3f9016a67b8813464819c824fff4f13db0623",
+        "status": "completed",
+        "total_tokens": 2089
+      }
+    ],
+    "duration_ms": 2388.463,
+    "input_tokens": 1993,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 96,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "ed7a799a7dce62ba844d9ff1ba03b5897b14ef6c98c0948ae5c9411e84c4a666",
+    "prompt_token_estimate": 1954,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "19f9ab20c3d1865d56856ae71c14a6d3e2dc94733bb67d8ebca13438e91652e5",
+    "requested_service_tier": "auto",
+    "response_id": "resp_02602fa9639af3f9016a67b8813464819c824fff4f13db0623",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2089,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Religious accommodation",
+    "Employment discrimination",
+    "Title VII",
+    "Undue hardship",
+    "Sabbath observance",
+    "Work scheduling",
+    "Seniority systems",
+    "Collective bargaining"
+  ],
+  "ordinal": 29,
+  "request": {
+    "input": "{\"segment_text\":\"PRELIMINARY PRINT \\nVolume 600 U. S. Part 1 \\nPages 447\u2013476 \\nOFFICIAL REPORTS \\nOF \\nTHE SUPREME COURT \\nJune 29, 2023 \\nREBECCA A. WOMELDORF \\nreporter of decisions \\nPage Proof Pending Publication\\nNOTICE: This preliminary print is subject to formal revision before \\nthe bound volume is published. Users are requested to notify the Reporter \\nof Decisions, Supreme Court of the United States, Washington, D.C. 20543, \\npio@supremecourt.gov, of any typographical or other formal errors. \\n\\f\\nOCTOBER TERM, 2022 447 \\nSyllabus \\nGROFF v. DeJOY, POSTMASTER GENERAL \\ncertiorari to the united states court of appeals for \\nthe third circuit \\nNo. 22\u2013174. Argued April 18, 2023\u2014Decided June 29, 2023 \\nPetitioner Gerald Groff is an Evangelical Christian who believes for reli-\\ngious reasons that Sunday should be devoted to worship and rest. In \\n2012, Groff took a mail delivery job with the United States Postal Serv-\\nice. Groff's position generally did not involve Sunday work, but that \\nchanged after USPS agreed to begin facilitating Sunday deliveries for \\nAmazon. To avoid the requirement to work Sundays on a rotating \\nbasis, Groff transferred to a rural USPS station that did not make Sun-\\nday deliveries. After Amazon deliveries began at that station as well, \\nGroff remained unwilling to work Sundays, and USPS redistributed \\nGroff's Sunday deliveries to other USPS staff. Groff received \u201cpro-\\ngressive discipline\u201d for failing to work on Sundays, and he eventually \\nresigned. \\nGroff sued under Title VII of the Civil Rights Act of 1964, asserting \\nthat USPS could have accommodated his Sunday Sabbath practice \\n\u201cwithout undue hardship on the conduct of [USPS's] business.\u201d 42 \\nU. S. C. \u00a7 2000e(j). The District Court granted summary judgment to \\nUSPS. The Third Circuit affrmed based on this Court's decision in \\nTrans World Airlines, Inc. v. Hardison, 432 U. S. 63, which it construed \\nto mean \u201cthat requiring an employer `to bear more than a de minimis \\ncost' to provide a religious accommodation is an undue hardship.\u201d 35 \\nF. 4th 162, 174, n. 18 (quoting 432 U. S., at 84). The Third Circuit found \\nthe de minimis cost standard met here, concluding that exempting Groff \\nfrom Sunday work had \u201cimposed on his coworkers, disrupted the work-\\nplace and workfow, and diminished employee morale.\u201d 35 F. 4th, at \\n175. \\nHeld: Title VII requires an employer that denies a religious accommoda-\\ntion to show that the burden of granting an accommodation would result \\nin substantial increased costs in relation to the conduct of its particular \\nbusiness. Pp. 456\u2013473. \\n(a) This case presents the Court's frst opportunity in nearly 50 years \\nto explain the contours of Hardison. The background of that decision \\nhelps to explain the Court's disposition of this case. Pp. 456\u2013467. \\n(1) Title VII of the Civil Rights Act of 1964 made it unlawful for \\ncovered employers \u201cto fail or refuse to hire or to discharge any individ-\\nual, or otherwise to discriminate against any individual with respect \\nPage Proof Pending Publication\\n\\f\\nPage Proof Pending Publication\\n448 GROFF v. DeJOY \\nSyllabus \\nto his compensation, terms, conditions, or privileges [of] employment, \\nbecause of such individual's . . . religion.\u201d \u00a7 2000e\u20132(a)(1). As origi-\\nnally enacted, Title VII did not spell out what it meant by discrimina-\\ntion \u201cbecause of . . . religion.\u201d Subsequent regulations issued by the \\nEEOC obligated employers \u201cto make reasonable accommodations to the \\nreligious needs of employees\u201d whenever doing so would not create \\n\u201cundue hardship on the conduct of the employer's business.\u201d 29 CFR \\n\u00a7 1605.1 (1968). In 1970, however, the Sixth Circuit held that Title VII \\ndid not require an employer \u201cto accede to or accommodate\u201d a Sabbath \\nreligious practice because to do so \u201cwould raise grave\u201d Establishment \\nClause questions. Dewey v. Reynolds Metals Co., 429 F. 2d 324, 334. \\nThis Court affrmed Dewey by an evenly divided vote. See 402 U. S. \\n689. Congress responded by amending Title VII in 1972 to track the \\nEEOC's regulatory language and to clarify that employers must \u201crea-\\nsonably accommodate . . . an employee's or prospective employee's reli-\\ngious observance or practice\u201d unless the employer is \u201cunable\u201d to do so \\n\u201cwithout undue hardship on the conduct of the employer's business.\u201d \\n\u00a7 2000e(j). Pp. 456\u2013458. \\n(2) Hardison concerned an employment dispute that arose prior to \\nthe 1972 amendments to Title VII. In 1967, Trans World Airlines hired \\nLarry Hardison to work in a department that operated \u201c24 hours per \\nday, 365 days per year\u201d and played an \u201cessential role\u201d for TWA by pro-\\nviding parts needed to repair and maintain aircraft. Hardison, 432 \\nU. S., at 66. Hardison later underwent a religious conversion and began \\nmissing work to observe the Sabbath. Initial conficts with Hardison's \\nwork schedule were resolved, but conficts resurfaced when he trans-\\nferred to another position in which he lacked the seniority to avoid work \\nduring his Sabbath. Attempts at accommodation failed, and TWA dis-\\ncharged Hardison for insubordination. \\nHardison sued TWA and his union, and the Eighth Circuit sided with \\nHardison. The Eighth Circuit found that reasonable accommodations \\nwere available to TWA, and rejected the defendants' Establishment \\nClause arguments. Hardison v. Trans World Airlines, Inc., 527 F. 2d \\n33, 42\u201344. This Court granted certiorari. TWA's petition for certio-\\nrari asked this Court to decide whether the 1972 amendment of Title \\nVII violated the Establishment Clause as applied by the Eighth Circuit, \\nparticularly insofar as that decision had approved an accommodation \\nthat allegedly overrode seniority rights granted by the relevant collec-\\ntive bargaining agreement. At the time, some thought that the Court's \\nnow-abrogated decision in Lemon v. Kurtzman, 403 U. S. 602\u2014which \\nadopted a test under which any law whose \u201cprincipal or primary effect\u201d \\n\u201cwas to advance religion\u201d was unconstitutional, id., at 612\u2013613\u2014posed \\na serious problem for the 1972 amendment of Title VII. Ultimately, \\n\\f\\nPage Proof Pending Publication\\nCite as: 600 U. S. 447 (2023) 449 \\nSyllabus \\nhowever, constitutional concerns played no on-stage role in the Court's \\ndecision in Hardison. Instead, the Court's opinion stated that \u201cthe \\nprincipal issue on which TWA and the union came to this Court\u201d was \\nwhether Title VII \u201crequire[s] an employer and a union who have agreed \\non a seniority system to deprive senior employees of their seniority \\nrights in order to accommodate a junior employee's religious prac-\\ntices.\u201d Hardison, 432 U. S., at 83, and n. 14. The Court held that Title \\nVII imposed no such requirement. Ibid. This conclusion, the Court \\nfound, was \u201csupported by the fact that seniority systems are afforded \\nspecial treatment under Title VII itself.\u201d Id., at 81. Applying this \\ninterpretation of Title VII and disagreeing with the Eighth Circuit's \\nevaluation of the factual record, the Court identifed no way in which \\nTWA, without violating seniority rights, could have feasibly accom-\\n\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Religious accommodation",
+      "Employment discrimination",
+      "Title VII",
+      "Undue hardship",
+      "Sabbath observance",
+      "Work scheduling",
+      "Seniority systems",
+      "Collective bargaining"
+    ]
+  },
+  "segment_id": "processing_segment_e7dd209ee9bbb6b34870555a"
+}

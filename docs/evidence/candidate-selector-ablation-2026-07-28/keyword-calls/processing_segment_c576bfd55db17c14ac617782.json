@@ -1,0 +1,109 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 4091.269,
+        "input_tokens": 2082,
+        "output_tokens": 119,
+        "request_id": "50cea037-4a4f-4048-9223-dd228a627f1a",
+        "response_id": "resp_0c0e38f9dddfa45d016a67b8677e4c819292b4381ee2dd6788",
+        "status": "completed",
+        "total_tokens": 2201
+      }
+    ],
+    "duration_ms": 4092.131,
+    "input_tokens": 2082,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 119,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "78cde14d19f6a803b9fd4713921ff80a1870a76a3a94a7fa6d842a43ac3e2cd3",
+    "prompt_token_estimate": 2043,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "190f1f25f27d0053cd7253b890a3df04007848b2a136e60dadd6d6bece29b55c",
+    "requested_service_tier": "auto",
+    "response_id": "resp_0c0e38f9dddfa45d016a67b8677e4c819292b4381ee2dd6788",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2201,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Surprise billing",
+    "Independent dispute resolution",
+    "Health insurance claims",
+    "Payment disclosures",
+    "Remittance advice codes",
+    "Open negotiations",
+    "Dispute resolution fees",
+    "Bundled payment arrangements",
+    "Batched medical services",
+    "Health plan registration"
+  ],
+  "ordinal": 20,
+  "request": {
+    "input": "{\"segment_text\":\"Federal Independent Dispute Resolution Operations\\nThis document sets forth these final rules related to certain provisions of the No Surprises Act regarding the Federal independent dispute resolution (IDR) process, which was established as part of the Consolidated Appropriations Act, 2021 (CAA). These rules finalize new requirements relating to the disclosure of information that group health plans and health insurance issuers offering group or individual health insurance coverage must include along with the initial payment or notice of denial of payment for certain items and services subject to the surprise billing protections in the No Surprises Act. These final rules also require plans and issuers to communicate information by using claim adjustment reason codes (CARCs) and remittance advice remark codes (RARCs), as specified in guidance, when providing any paper or electronic remittance advice (ERA) to an entity that does not have a contractual relationship with the plan or issuer. This document also finalizes amendments to certain requirements related to the open negotiation period preceding the Federal IDR process, the initiation of the Federal IDR process, the Federal IDR dispute eligibility review process, and the payment and collection of administrative fees and certified IDR entity fees. This document also finalizes the definition of bundled payment arrangements, amends requirements related to batched items and services and amends the rules for extensions of timeframes due to extenuating circumstances. Additionally, this document finalizes provisions that require plans and issuers to register in the Federal IDR portal. In accordance with Federal law, a summary of these rules may be found at https://www.regulations.gov/.\\n<div class=\\\"fr-seal-meta\\\">\\n<div class=\\\"fr-seal-desc\\\">\\n\\n<p>\\n                    Document headings vary by document type but may contain\\n                    the following:\\n                  </p>\\n<ol class=\\\"bullets\\\">\\n\\n<li>\\n                      the agency or agencies that issued and signed a document\\n                    </li>\\n\\n<li>\\n                      the number of the CFR title and the number of each part\\n                      the document amends, proposes to amend, or is directly\\n                      related to\\n                    </li>\\n\\n<li>\\n                      the agency docket number / agency internal file number\\n                    </li>\\n\\n<li>\\n                      the RIN which identifies each regulatory action listed in\\n                      the Unified Agenda of Federal Regulatory and Deregulatory\\n                      Actions\\n                    </li>\\n</ol>\\n\\n<p>\\n                    See the\\n                    <a href=\\\"https://www.archives.gov/files/federal-register/write/handbook/ddh.pdf#page=9\\\">\\n                      Document Drafting Handbook\\n                    </a>\\n                    for more details.\\n                  </p>\\n</div></div>\\n</div></div>\\n\\n<div class=\\\"content-block \\\">\\n\\n<h6 class=\\\"agency\\\">Office of Personnel Management</h6>\\n<ol>\\n\\nRule\\n<li>5 CFR Part 890</li>\\n\\n<li>RIN 3206-AO48</li>\\n</ol>\\n\\n<h6 class=\\\"agency\\\">Department of the Treasury</h6>\\n\\n<h6 class=\\\"sub-agency\\\">Internal Revenue Service</h6>\\n<ol>\\n\\n<li>26 CFR Part 54</li>\\n\\n<li>[TD 10049]</li>\\n\\n<li>RIN 1545-BQ55</li>\\n</ol>\\n\\n<h6 class=\\\"agency\\\">Department of Labor</h6>\\n\\n<h6 class=\\\"sub-agency\\\">Employee Benefits Security Administration</h6>\\n<ol>\\n\\n<li>29 CFR Part 2590</li>\\n\\npersonnel-management-office,treasury-department,internal-revenue-service,labor-department,employee-benefits-security-administration,health-and-human-services-department\\n<li>RIN 1210-AC17</li>\\n</ol>\\n\\n<h6 class=\\\"agency\\\">Department of Health and Human Services</h6>\\n<ol>\\n\\n<li>45 CFR Part 149</li>\\n\\n<li>[CMS-9897-F]</li>\\n\\n<li>RIN 0938-AV15</li>\\n</ol>\\n</div>\\n</div></div>\\n<span class=\\\"printed-page-inline unprinted-element document-markup\\\" data-page=\\\"33900\\\">\\n\\n      (<svg class=\\\"svg-icon svg-icon-doc-generic\\\"><use xlink:href=\\\"/assets/fr-icons.svg#doc-generic\\\"></use></svg> printed page 33900)\\n    </span><span class=\\\"printed-page-details unprinted-element document-markup\\\" id=\\\"page-33900\\\" data-page=\\\"33900\\\"><svg class=\\\"svg-icon svg-icon-doc-generic\\\"><use xlink:href=\\\"/assets/fr-icons.svg#doc-generic\\\"></use></svg></span>\\n<div id=\\\"agency\\\">\\n                        \\n<h1 id=\\\"h-1\\\">AGENCY:</h1>\\n                        \\n<p id=\\\"p-1\\\" data-page=\\\"33900\\\">Office of Personnel Management; Internal Revenue Service, Department of the Treasury; Employee Benefits Security Administration, Department of Labor; Centers for Medicare &amp; Medicaid Services, Department of Health and Human Services.</p>\\n                    </div>\\n\\n<div id=\\\"action\\\">\\n                        \\n<h1 id=\\\"h-2\\\">ACTION:</h1>\\n                        \\n\\n                \\n<p id=\\\"p-2\\\" data-page=\\\"33900\\\">Final rule.</p>\\n                    </div>\\n\\n<div id=\\\"summary\\\">\\n                        \\n<h1 id=\\\"h-3\\\">SUMMARY:</h1>\\n                        \\n<p id=\\\"p-3\\\" data-page=\\\"33900\\\">\\n                            This document sets forth these final rules related to certain provisions of the No Surprises Act regarding the Federal independent dispute resolution (IDR) process, which was established as part of the Consolidated Appropriations Act, 2021 (CAA). These rules finalize new requirements relating to the disclosure of information that group health plans and health insurance issuers offering group or individual health insurance coverage must include along with the initial payment or notice of denial of payment for certain items and services subject to the surprise billing protections in the No Surprises Act. These final rules also require plans and issuers to communicate information by using claim adjustment reason codes (CARCs) and remittance advice remark codes (RARCs), as specified in guidance, when providing any paper or electronic remittance advice (ERA) to an entity that does not have a contractual relationship with the plan or issuer. This document also finalizes amendments to certain requirements related to the open negotiation period preceding the Federal IDR process, the initiation of the Federal IDR process, the Federal IDR dispute eligibility review process, and the payment and collection of administrative fees and certified IDR entity fees. This document also finalizes the definition of bundled payment arrangements, amends requirements related to batched items and services and amends the rules for extensions of timeframes due to extenuating circumstances. Additionally, this document finalizes provisions that require plans and issuers to register in the Federal IDR portal. In accordance with Federal law, a summary of these rules may be found at \\n                            <em><a href=\\\"https://www.regulations.gov/\\\" class=\\\"external\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">https://www.regulations.gov/&#8203;</a>.</em></p>\\n                    </div>\\n\\n<div id=\\\"dates\\\">\\n                        \\n<h1 id=\\\"h-4\\\">DATES:</h1>\\n                        \\n<p id=\\\"p-4\\\" data-page=\\\"33900\\\"></p>\\n                        \\n<p id=\\\"p-5\\\" data-page=\\\"33900\\\">\\n                            <em>Effective date:</em>\\n                             These final rules are effective on August 3, 2026.\\n                        </p>\\n                        \\n<p id=\\\"p-6\\\" data-page=\\\"33900\\\">\\n                            <em>Applicability date:</em>\\n                             See section II.H. of these final rules for information on the applicability dates.\\n                        </p>\\n                    </div>\\n\\n<div id=\\\"for-further-information-contact\\\">\\n                        \\n<div class=\\\"preamble\\\">\\n\\n<h1 id=\\\"h-5\\\">FOR FURTHER INFORMATION CONTACT:</h1>\\n                        \\n<p id=\\\"p-7\\\" data-page=\\\"33900\\\">Cameron Stokes, Office of Personnel Management, at 202-936-0162; Alexander Krupnick, Internal Revenue Service, Department of the Treasury, at 202-317-5500; Elizabeth Schumacher or Rebecca Miller, Employee Benefits Security Administration, Department of Labor, at 202-693-8335; Bryan Kirk, Centers for Medicare &amp; Medicaid Services, Department of Health and Human Services, at 301-492-4122.</p>\\n                        \\n<div class=\\\"document-headings\\\">\\n<div class=\\\"fr-box fr-box-published-alt no-footer\\\">\\n\\n<div class=\\\"fr-seal-block fr-seal-block-header with-hover\\\">\\n<div class=\\\"fr-seal-content\\\">\\n<span class=\\\"h6\\\">Document Headings</span>\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Surprise billing",
+      "Independent dispute resolution",
+      "Health insurance claims",
+      "Payment disclosures",
+      "Remittance advice codes",
+      "Open negotiations",
+      "Dispute resolution fees",
+      "Bundled payment arrangements",
+      "Batched medical services",
+      "Health plan registration"
+    ]
+  },
+  "segment_id": "processing_segment_c576bfd55db17c14ac617782"
+}

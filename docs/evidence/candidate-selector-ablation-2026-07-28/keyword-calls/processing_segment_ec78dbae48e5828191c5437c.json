@@ -1,0 +1,107 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 3049.097,
+        "input_tokens": 1947,
+        "output_tokens": 117,
+        "request_id": "8dc03819-bd4a-43b1-b4a0-4d6c2f00ba04",
+        "response_id": "resp_0c32c1b025923216016a67b883a8a081a095f3f2533e22915e",
+        "status": "completed",
+        "total_tokens": 2064
+      }
+    ],
+    "duration_ms": 3050.091,
+    "input_tokens": 1947,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 117,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "2efc1a17308c732bc8824a9e01c9841a7b5124360ee6fa3cf7cc37eea66fcea2",
+    "prompt_token_estimate": 1908,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "c076f462b7c0dd9b4b214f0f44033f1d1f3513888c87e1eba3841bf49d5b004c",
+    "requested_service_tier": "auto",
+    "response_id": "resp_0c32c1b025923216016a67b883a8a081a095f3f2533e22915e",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2064,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Cash or deferred elections",
+    "Qualified retirement plans",
+    "Compensation deferrals",
+    "Elective contributions",
+    "Irrevocable elections",
+    "Employer contributions",
+    "Employee gross income",
+    "Profit-sharing plans",
+    "Contribution timing"
+  ],
+  "ordinal": 30,
+  "request": {
+    "input": "{\"segment_text\":\"<P>(v) <I>Certain one-time elections not treated as cash or deferred elections.</I> A cash or deferred election does not include a one-time irrevocable election made no later than the employee's first becoming eligible under the plan or any other plan or arrangement of the employer that is described in section 219(g)(5)(A) (whether or not such other plan or arrangement has terminated), to have contributions equal to a specified amount or percentage of the employee's compensation (including no amount of compensation) made by the employer on the employee's behalf to the plan and a specified amount or percentage of the employee's compensation (including no amount of compensation) divided among all other plans or arrangements of the employer (including plans or arrangements not yet established) for the duration of the employee's employment with the employer, or in the case of a defined benefit plan to receive accruals or other benefits (including no benefits) under such plans. Thus, for example, employer contributions made pursuant to a one-time irrevocable election described in this paragraph are not treated as having been made pursuant to a cash or deferred election and are not includible in an employee's gross income by reason of \u00a7 1.402(a)-1(d). In the case of an irrevocable election made on or before December 23, 1994\u2014</P>\\n\\n<P>(A) The election does not fail to be treated as a one-time irrevocable election under this paragraph (a)(3)(v) merely because an employee was previously eligible under another plan of the employer (whether or not such other plan has terminated); and</P>\\n\\n<P>(4) <I>Rules applicable to qualified cash or deferred arrangements</I>\u2014(i) <I>Definition of qualified cash or deferred arrangement.</I> A qualified cash or deferred arrangement is a cash or deferred arrangement that satisfies the requirements of paragraphs (b), (c), (d), and (e) of this section.</P>\\n\\n<P>(B) In the case of a plan in which partners may participate, the election does not fail to be treated as a one-time irrevocable election under this paragraph (a)(3)(v) merely because the election was made after commencement of employment or after the employee's first becoming eligible under any plan of the employer, provided that the election was made before the first day of the first plan year beginning after December 31, 1988, or, if later, March 31, 1989.</P>\\n\\n<P>(vi) <I>Tax treatment of employees.</I> An amount generally is includible in an employee's gross income for the taxable year in which the employee actually or constructively receives the amount. But for section 402(e)(3), an employee is treated as having received an amount that is contributed to an exempt trust or plan described in section 401(a) or 403(a) pursuant to the employee's cash or deferred election. This is the case even if the election to defer is made before the year in which the amount is earned, or before the amount is currently available. <I>See</I> \u00a7 1.402(a)-1(d).</P>\\n\\n<P>(vii) <I>Examples.</I> The following examples illustrate the application of this paragraph (a)(3):</P>\\n<EXAMPLE>\\n<HED>Example 1.</HED><PSPACE>(i) An employer maintains a profit-sharing plan under which each eligible employee has an election to defer an annual bonus payable on January 30 each year. The bonus equals 10% of compensation during the previous calendar year. Deferred amounts are not treated as after-tax employee contributions. The bonus is currently available on January 30.\\n</PSPACE>\\n<P>(ii) An election made prior to January 30 to defer all or part of the bonus is a cash or deferred election, and the bonus deferral arrangement is a cash or deferred arrangement.</P></EXAMPLE>\\n<EXAMPLE>\\n<HED>Example 2.</HED><PSPACE>(i) An employer maintains a profit-sharing plan which provides for discretionary profit sharing contributions and under which each eligible employee may elect to reduce his compensation by up to 10% and to have the employer contribute such amount to the plan. The employer pays each employee every two weeks for services during the immediately preceding two weeks. The employee's election to defer compensation for a payroll period must be made prior to the date the amount would otherwise be paid. The employer contributes to the plan the amount of compensation that each employee elected to defer, at the time it would otherwise be paid to the employee, and does not treat the contribution as an after-tax employee contribution.\\n</PSPACE>\\n<P>(ii) The election is a cash or deferred election and the contributions are elective contributions.</P></EXAMPLE>\\n<EXAMPLE>\\n<HED>Example 3.</HED><PSPACE>(i) The facts are the same as in <I>Example 2,</I> except that the employer makes a $10,000 contribution on January 31 of the plan year that is in addition to the contributions that satisfy the employer's obligation to make contributions with respect to cash or deferred elections for prior payroll periods. Employee A makes an election on February 15 to defer $2,000 from compensation that is not currently available and the employer reduces the employee's compensation to reflect the election.\\n</PSPACE>\\n<P>(ii) None of the additional $10,000 contributed January 31 is a contribution made pursuant to Employee A's cash or deferred election, because the contribution was made before the election was made. Accordingly, the employer must make an additional contribution of $2,000 in order to satisfy its obligation to contribute an amount to the plan pursuant to Employee A's election. The $10,000 contribution may be allocated under the plan terms providing for discretionary profit sharing contributions.</P></EXAMPLE>\\n<EXAMPLE>\\n<HED>Example 4.</HED><PSPACE>(i) The facts are the same as in <I>Example 3,</I> except that Employee A had an outstanding election to defer $500 from each payroll period's compensation. The $10,000 additional payment that is contributed early is not made early in order to accommodate bona fide administrative considerations.\\n</PSPACE>\\n<P>(ii) None of the additional $10,000 contributed January 31 is a contribution made pursuant to Employee A's cash or deferred election for future payroll periods, because the contribution was made before the earlier of Employee A's performance of services to which the contribution is attributable or when the compensation would be currently available. Furthermore, the exception for early contributions in paragraph (a)(3)(iii)(C)(<I>2</I>) of this section does not apply. Accordingly, the employer must make an additional contribution of $500 per payroll period in order to satisfy its obligation to contribute an amount to the plan pursuant to Employee A's election. The $10,000 contribution may be allocated under the plan terms providing for discretionary profit sharing contributions.</P></EXAMPLE>\\n<EXAMPLE>\\n<HED>Example 5.</HED><PSPACE>(i) Employer B establishes a money purchase pension plan in 1986. This is the first qualified plan established by Employer B. All salaried employees are eligible to participate under the plan. Hourly-paid employees are not eligible to participate under the plan. In 2000, Employer B establishes a profit-sharing plan under which all employees (both salaried and hourly) are eligible. Employer B permits all employees on the effective date of the profit-sharing plan to make a one-time irrevocable election to have Employer B contribute 5% of compensation on their behalf to the plan and make no other contribution to any other plan of Employer B (including plans not yet established) for the duration of the employee's employment with Employer B, and have their salaries reduced by 5%.\\n</PSPACE>\\n<P>(ii) The election provided under the profit-sharing plan is not a one-time irrevocable election within the meaning of paragraph (a)(3)(v) of this section with respect to the salaried employees of Employer B who, before becoming eligible to participate under the profit-sharing plan, became eligible to participate under the money purchase pension plan. The election under the profit-sharing plan is a one-time irrevocable election within the meaning of paragraph (a)(3)(v) of this section with respect to the hourly employees, because they were not previously eligible to participate under another plan of the employer.</P></EXAMPLE>\\n\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Cash or deferred elections",
+      "Qualified retirement plans",
+      "Compensation deferrals",
+      "Elective contributions",
+      "Irrevocable elections",
+      "Employer contributions",
+      "Employee gross income",
+      "Profit-sharing plans",
+      "Contribution timing"
+    ]
+  },
+  "segment_id": "processing_segment_ec78dbae48e5828191c5437c"
+}

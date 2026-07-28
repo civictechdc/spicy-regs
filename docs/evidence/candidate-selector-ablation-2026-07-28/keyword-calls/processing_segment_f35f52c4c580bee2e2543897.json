@@ -1,0 +1,109 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 2739.808,
+        "input_tokens": 2056,
+        "output_tokens": 136,
+        "request_id": "169b8187-6956-454b-8223-2acd200abf1b",
+        "response_id": "resp_0d096401f3ffeb64016a67b88af63081a293cb66858ed03daa",
+        "status": "completed",
+        "total_tokens": 2192
+      }
+    ],
+    "duration_ms": 2740.811,
+    "input_tokens": 2056,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 136,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "5032857491260ce21991174bd65a8a4ac64072444745b9cbf54e866cb063065d",
+    "prompt_token_estimate": 2017,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "7e5db9a3f3ef9bbf38818ca5e55671c054d4306761477e2f208e6cefae07d72f",
+    "requested_service_tier": "auto",
+    "response_id": "resp_0d096401f3ffeb64016a67b88af63081a293cb66858ed03daa",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2192,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Clean fuel production credit",
+    "Clean transportation fuels",
+    "Lifecycle greenhouse gas emissions",
+    "Fuel emissions rates",
+    "Sustainable aviation fuel",
+    "Tax credit eligibility",
+    "Fuel producer certification",
+    "Excise tax registration",
+    "Elective tax payments",
+    "Tax credit transfers"
+  ],
+  "ordinal": 32,
+  "request": {
+    "input": "{\"segment_text\":\"5160 Federal Register / Vol. 91, No. 23 / Wednesday, February 4, 2026 / Proposed Rules \\nDEPARTMENT OF THE TREASURY \\nInternal Revenue Service \\n26 CFR Parts 1 and 48 \\n[REG\u2013121244\u201323] \\nRIN 1545\u2013BR30 \\nSection 45Z Clean Fuel Production \\nCredit \\nAGENCY: Internal Revenue Service (IRS), \\nTreasury. \\nACTION: Notice of proposed rulemaking \\nand public hearing. \\nSUMMARY: This document contains \\nproposed regulations regarding the \\nclean fuel production credit enacted by \\nthe Inflation Reduction Act of 2022 and \\namended by the One, Big, Beautiful Bill \\nAct (OBBBA). These proposed \\nregulations would provide rules for \\ndetermining clean fuel production \\ncredits, including credit eligibility rules, \\nemissions rates, and certification and \\nregistration requirements. In addition, \\nthe proposed regulations would amend \\nthree sets of final regulations: the \\nelective payment election regulations \\nand the credit transfer election \\nregulations, to clarify language relating \\nto ownership of clean fuel production \\nfacilities, and the Federal excise tax \\nregistration regulations, to make them \\nclearer and more consistent with the \\nclean fuel production credit registration \\nrequirements in these proposed \\nregulations. The proposed regulations \\nwould affect domestic producers of \\nclean transportation fuel, taxpayers that \\nmay claim a credit for a related \\nproducer\u2019s fuel, and excise tax \\nregistrants. \\nDATES: Written or electronic comments \\nmust be received by April 6, 2026. The \\npublic hearing is being held on May 28, \\n2026, at 10 a.m. Eastern Time (ET). \\nRequests to speak and outlines of topics \\nto be discussed at the public hearing \\nmust be received by April 6, 2026. If no \\noutlines are received by April 6, 2026, \\nthe public hearing will be cancelled. \\nRequests to attend the public hearing \\nmust be received by 5 p.m. ET on May \\n26, 2026. \\nADDRESSES: Commenters are strongly \\nencouraged to submit public comments \\nelectronically via the Federal \\neRulemaking Portal at https://\\nwww.regulations.gov (indicate IRS and \\nREG\u2013121244\u201323) by following the \\nonline instructions for submitting \\ncomments. Requests for a public hearing \\nmust be submitted as prescribed in the \\n\u2018\u2018Comments and Requests for a Public \\nHearing\u2019\u2019 section. Once submitted to the \\nFederal eRulemaking Portal, comments \\ncannot be edited or withdrawn. The \\nDepartment of the Treasury (Treasury \\nDepartment) and the IRS will publish \\nfor public availability any comments \\nsubmitted to the IRS\u2019s public docket. \\nSend paper submissions to: \\nCC:PA:01:PR (REG\u2013121244\u201323), Room \\n5503, Internal Revenue Service, P.O. \\nBox 7604, Ben Franklin Station, \\nWashington, DC 20044. A plain \\nlanguage summary of the proposed \\nregulations will be made available at \\nhttps://www.regulations.gov. \\nFOR FURTHER INFORMATION CONTACT : \\nConcerning the proposed regulations, \\nJennifer Golden or Danielle Mayfield of \\nthe Office of Associate Chief Counsel \\n(Energy, Credits, and Excise Tax) at \\n(202) 317\u20136855 (not a toll-free number); \\nconcerning submissions of comments or \\nthe public hearing, Publications and \\nRegulations Section at (202) 317\u20136901 \\n(not a toll-free number) or by email at \\npublichearings@irs.gov (preferred). \\nSUPPLEMENTARY INFORMATION: \\nAuthority \\nThis document contains proposed \\namendments to the Income Tax \\nRegulations (26 CFR part 1) regarding \\nsections 45Z, 1361, 4101, 6417, and \\n6418 of the Internal Revenue Code \\n(Code) as they relate to the clean fuel \\nproduction credit determined under \\nsection 45Z (proposed regulations). This \\ndocument also contains proposed \\namendments to the Manufacturers and \\nRetailers Excise Tax Regulations (26 \\nCFR part 48) regarding section 4101 as \\nthey relate to excise tax registration. The \\nproposed regulations would be issued \\nunder the authority granted by sections \\n45Z, 1361(b)(3)(A), 4101(a)(1) and (c), \\n4222(c), 6001, 6417(h), 6418(h), and \\n7805(a) of the Code. \\nSection 45Z contains several \\ndelegations of authority to the Secretary \\nof the Treasury or the Secretary\u2019s \\ndelegate (Secretary). Section 45Z(e) \\ndirects the Secretary to issue guidance \\nno later than January 1, 2025, regarding \\nimplementation of section 45Z, \\nincluding calculation of emissions \\nfactors of transportation fuel, the \\nemissions rate table described in section \\n45Z(b)(1)(B)(i), and the determination of \\nclean fuel production credits under \\nsection 45Z. Section 45Z(f)(2) further \\nauthorizes the Secretary to issue \\nregulations regarding the fuel \\nproduction attributable to the taxpayer \\nin the case of a facility with multiple \\nowners, and section 45Z(f)(1)(A)(i)(II) \\nauthorizes the Secretary to issue \\nguidance on certification and other \\ninformation with respect to certain \\ntransportation fuels. \\nSection 45Z(f)(3) authorizes the \\nSecretary to prescribe additional related \\nperson rules for other entities similar to \\nthe rule described for corporations that \\nare members of an affiliated group of \\ncorporations filing a consolidated \\nreturn. This includes the authority to \\nprescribe rules for related persons with \\nrespect to which the taxpayer has reason \\nto believe will sell fuel to an unrelated \\nperson in a manner described in section \\n45Z(a)(4). \\nSection 45Z(d)(5)(C) directs the \\nSecretary to issue regulations or other \\nguidance as the Secretary determines \\nnecessary to carry out the purposes of \\nsection 45Z(d)(5)(A)(iv), which excludes \\nfrom the definition of \u2018\u2018transportation \\nfuel\u2019\u2019 any fuel produced from a fuel for \\nwhich a credit under section 45Z is \\nallowable. \\nSection 45Z(b)(1)(B)(ii) authorizes the \\nSecretary to determine, in the case of \\nany transportation fuel that is not a \\nsustainable aviation fuel (SAF), whether \\na model is a successor model to the \\nGreenhouse gases, Regulated Emissions, \\nand Energy use in Transportation model \\ndeveloped by the Argonne National \\nLaboratory (ANL). Additionally, section \\n45Z(b)(1)(B)(i) directs the Secretary, \\nsubject to section 45Z(b)(1)(B)(ii) \\nthrough (v), to annually publish a table \\nsetting forth the emissions rate for \\nsimilar types and categories of \\ntransportation fuels based on the \\namount of lifecycle greenhouse gas \\n(GHG) emissions as described in section \\n211(o)(1)(H) of the Clean Air Act (CAA) \\n(42 U.S.C. 7545(o)(1)(H)), as in effect on \\nAugust 16, 2022 (CAA\u20132022) for such \\nfuels, expressed as kilograms of \\nequivalent carbon dioxide (CO\\n2e) per \\n1,000,000 British thermal units \\n(mmBTU), which a taxpayer must use \\nfor purposes of section 45Z. The \\nproposed regulations cite to the CAA\u2013 \\n2022 as enacted by section 1501(a)(2) of \\nthe Energy Policy Act of 2005, Public \\nLaw 109\u201358, 119 Stat. 594, 1067 (2005), \\namended by section 202(a)(1) of the \\nEnergy Independence and Security Act \\nof 2007, Public Law 110\u2013140, 121 Stat. \\n1492, 1521\u201322 (2007). \\nSection 45Z(b)(1)(B)(iv) authorizes the \\nSecretary to determine the regulations \\nor methodologies for emissions rate \\n\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Clean fuel production credit",
+      "Clean transportation fuels",
+      "Lifecycle greenhouse gas emissions",
+      "Fuel emissions rates",
+      "Sustainable aviation fuel",
+      "Tax credit eligibility",
+      "Fuel producer certification",
+      "Excise tax registration",
+      "Elective tax payments",
+      "Tax credit transfers"
+    ]
+  },
+  "segment_id": "processing_segment_f35f52c4c580bee2e2543897"
+}

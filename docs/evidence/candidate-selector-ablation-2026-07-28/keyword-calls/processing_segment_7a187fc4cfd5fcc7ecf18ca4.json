@@ -1,0 +1,107 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 3515.29,
+        "input_tokens": 1964,
+        "output_tokens": 117,
+        "request_id": "a9d19ecb-ce82-45c1-a6bd-c5d71ac051ff",
+        "response_id": "resp_0d64885bfe983ca9016a67b837a5f0819da464369036cb2e25",
+        "status": "completed",
+        "total_tokens": 2081
+      }
+    ],
+    "duration_ms": 3517.193,
+    "input_tokens": 1964,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 117,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "2f7b94708ec9ce0815c40fd09ee3856a97adab4639618ba00806278216765857",
+    "prompt_token_estimate": 1925,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "b34ff1256180b8b5245c43edb7571f318fa014dcef7f349b71bd2dea4a390b25",
+    "requested_service_tier": "auto",
+    "response_id": "resp_0d64885bfe983ca9016a67b837a5f0819da464369036cb2e25",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2081,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Elections Clause",
+    "Federal elections",
+    "State legislatures",
+    "Congressional redistricting",
+    "Partisan gerrymandering",
+    "State judicial review",
+    "State constitutional law",
+    "Appellate jurisdiction",
+    "Mootness doctrine"
+  ],
+  "ordinal": 7,
+  "request": {
+    "input": "{\"segment_text\":\"PRELIMINARY PRINT \\nVolume 600 U. S. Part 1 \\nPages 1\u201365 \\nOFFICIAL REPORTS \\nOF \\nTHE SUPREME COURT \\nJune 27, 2023 \\nREBECCA A. WOMELDORF \\nreporter of decisions \\nPage Proof Pending Publication\\nNOTICE: This preliminary print is subject to formal revision before \\nthe bound volume is published. Users are requested to notify the Reporter \\nof Decisions, Supreme Court of the United States, Washington, D.C. 20543, \\npio@supremecourt.gov, of any typographical or other formal errors. \\n\\f\\nCASES ADJUDGED \\nIN THE \\nSUPREME COURT OF THE UNITED STATES \\nAT \\nOCTOBER TERM, 2022 \\nMOORE, in his of\ue405cial capacity as SPEAKER OF \\nTHE NORTH CAROLINA HOUSE OF REPRE-\\nSENTATIVES, et al. v. HARPER et al. \\ncertiorari to the supreme court of north carolina \\nNo. 21\u20131271. Argued December 7, 2022\u2014Decided June 27, 2023 \\nThe Elections Clause of the Federal Constitution requires \u201cthe Legisla-\\nture\u201d of each State to prescribe the rules governing federal elections. \\nArt. I, \u00a7 4, cl. 1. This case concerns the claim that the Clause vests \\nstate legislatures with authority to set rules governing federal elections \\nfree from restrictions imposed under state law. Following the 2020 de-\\ncennial census, North Carolina's General Assembly drafted a new fed-\\neral congressional map, which several groups of plaintiffs challenged as \\nan impermissible partisan gerrymander in violation of the North Caro-\\nlina Constitution. The trial court found partisan gerrymandering \\nclaims nonjusticiable under the State Constitution, but the North Caro-\\nlina Supreme Court reversed. Harper v. Hall, 380 N. C. 317, 868 S. E. \\n2d 499 (Harper I ). While acknowledging that partisan gerrymandering \\nclaims are outside the reach of federal courts, see Rucho v. Common \\nCause, 588 U. S. \u2013\u2013\u2013, \u2013\u2013\u2013, the State Supreme Court held that such ques-\\ntions were not beyond the reach of North Carolina courts. The court \\nalso rejected the argument that the Federal Elections Clause vests ex-\\nclusive and independent authority in state legislatures to draw federal \\ncongressional maps. The court enjoined the use of the maps and re-\\nmanded the case to the trial court for remedial proceedings. The legis-\\nlative defendants then fled an emergency application in this Court, cit-\\n1 \\nPage Proof Pending Publication\\n\\f\\nPage Proof Pending Publication\\n2 MOORE v. HARPER \\nSyllabus \\ning the Elections Clause and requesting a stay of the North Carolina \\nSupreme Court's decision. This Court declined to issue a stay, but later \\ngranted certiorari. \\nAfter this Court granted certiorari, the North Carolina Supreme \\nCourt issued a decision addressing a remedial map adopted by the trial \\ncourt. Harper v. Hall, 383 N. C. 89, 125, 881 S. E. 2d 156, 181 (Har-\\nper II). The North Carolina Supreme Court then granted the legisla-\\ntive defendants' request to rehear that remedial decision in Harper II . \\nThe court ultimately withdrew the opinion in Harper II concerning the \\nremedial maps and overruled Harper I, repudiating its holding that par-\\ntisan gerrymandering claims are justiciable under the North Carolina \\nConstitution. The court dismissed plaintiffs' claims but did not rein-\\nstate the 2021 congressional plans struck down in Harper I under the \\nState Constitution. This Court has entertained two rounds of supple-\\nmental briefng on jurisdictional questions in light of the state court's \\nrehearing proceedings. \\nHeld: \\n1. This Court has jurisdiction to review the judgment of the North \\nCarolina Supreme Court in Harper I that adjudicated the Federal Elec-\\ntions Clause issue. A corollary to this Court's jurisdiction over \u201cCases\u201d \\nand \u201cControversies\u201d is that there must exist a dispute \u201cat all stages of \\nreview, not merely at the time the complaint is fled.\u201d Genesis Health-\\nCare Corp. v. Symczyk, 569 U. S. 66, 71 (internal quotation marks omit-\\nted). The North Carolina Supreme Court's decision to withdraw \\nHarper II and overrule Harper I does not moot this case. Prior to the \\nappeal and rehearing proceedings in Harper II, the court had already \\nentered the judgment and issued the mandate in Harper I, and the legis-\\nlative defendants acknowledged that they would remain bound by \\nHarper I 's decision enjoining the use of the 2021 plans. When the \\nNorth Carolina Supreme Court \u201coverruled\u201d Harper I as part of the re-\\nhearing proceedings, it repudiated Harper I 's conclusion that partisan \\ngerrymandering claims are justiciable under the North Carolina Consti-\\ntution. But the court did not purport to alter or amend the judgment \\nin Harper I enjoining the use of the 2021 maps. Were this Court to \\nreverse Harper I, the 2021 plans would again take effect. Because the \\nlegislative defendants' path to complete relief runs through this Court, \\nthe parties continue to have a \u201cpersonal stake in the ultimate disposition \\nof the lawsuit\u201d suffcient to maintain this Court's jurisdiction. Chafn \\nv. Chafn, 568 U. S. 165, 172 (internal quotation marks omitted). \\nThis Court also has jurisdiction to review the judgment in Harper I \\nunder 28 U. S. C. \u00a7 1257(a), which provides that jurisdiction in this Court \\nextends to \u201c[f]inal judgments . . . rendered by the highest court of a \\n\\f\\nPage Proof Pending Publication\\nCite as: 600 U. S. 1 (2023) 3 \\nSyllabus \\nState in which a decision could be had.\u201d Cox Broadcasting Corp. v. \\nCohn, 420 U. S. 469, identifed categories of cases in which a decision of \\na State's highest court was considered a fnal judgment for \u00a7 1257(a) \\npurposes despite the anticipation of additional lower court proceedings, \\nincluding \u201ccases . . . in which the federal issue, fnally decided by \\nthe highest court in the State, will survive and require decision regard-\\nless of the outcome of future statecourt proceedings.\u201d Id., at 480. \\nHarper I is such a case. Because subsequent proceedings have neither \\naltered Harper I 's analysis of the federal issue nor negated the effect of \\nthe Harper I judgment striking down the 2021 plans, that issue both \\nhas survived and requires decision by this Court. Pp. 14\u201319. \\n2. The Elections Clause does not vest exclusive and independent \\nauthority in state legislatures to set the rules regarding federal \\nelections. \\nMarbury v. Madison, 1 Cranch 137, famously proclaimed this \\nCourt's authority to invalidate laws that violate the Federal Constitu-\\ntion. But Marbury did not invent the concept of judicial review. State \\ncourts had already begun to impose restraints on state legislatures, \\neven before the Constitutional Convention, and the practice continued \\nto mature during the founding era. James Madison extolled judicial \\nreview as one of the key virtues of a constitutional system, and the \\nconcept of judicial review was so entrenched by the time the Court \\ndecided Marbury that Chief Justice Marshall referred to it as one of \\nsociety's \u201cfundamental principles.\u201d Id., at 177. \\nThe Elections Clause does not carve out an exception to that funda-\\nmental principle. When state legislatures prescribe the rules concern-\\ning federal elections, they remain subject to the ordinary exercise of \\nstate judicial review. Pp. 19\u201334. \\n\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Elections Clause",
+      "Federal elections",
+      "State legislatures",
+      "Congressional redistricting",
+      "Partisan gerrymandering",
+      "State judicial review",
+      "State constitutional law",
+      "Appellate jurisdiction",
+      "Mootness doctrine"
+    ]
+  },
+  "segment_id": "processing_segment_7a187fc4cfd5fcc7ecf18ca4"
+}

@@ -1,0 +1,103 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 3322.733,
+        "input_tokens": 1982,
+        "output_tokens": 158,
+        "request_id": "c53cbef6-1679-4b52-9221-50f4856138a8",
+        "response_id": "resp_0ff2068ccd416a88016a67b84946a481a296f4441d3fdc3b09",
+        "status": "completed",
+        "total_tokens": 2140
+      }
+    ],
+    "duration_ms": 3323.612,
+    "input_tokens": 1982,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 158,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "ce79d6bafe185b3116b7d35e4cfe0c164b9cce22d7e43728914d6878c1901f88",
+    "prompt_token_estimate": 1943,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "741f133b44ab1df210c32365e6c1958a17e7e2d6606a9c711423a1ab4ff8b643",
+    "requested_service_tier": "auto",
+    "response_id": "resp_0ff2068ccd416a88016a67b84946a481a296f4441d3fdc3b09",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2140,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Unlawful immigration",
+    "Criminal solicitation",
+    "Aiding and abetting",
+    "Freedom of speech",
+    "Overbreadth doctrine",
+    "Immigration fraud",
+    "Statutory interpretation"
+  ],
+  "ordinal": 12,
+  "request": {
+    "input": "{\"segment_text\":\"PRELIMINARY PRINT \\nVolume 599 U. S. Part 1 \\nPages 762\u2013812 \\nOFFICIAL REPORTS \\nOF \\nTHE SUPREME COURT \\nJune 23, 2023 \\nREBECCA A. WOMELDORF \\nreporter of decisions \\nPage Proof Pending Publication\\nNOTICE: This preliminary print is subject to formal revision before \\nthe bound volume is published. Users are requested to notify the Reporter \\nof Decisions, Supreme Court of the United States, Washington, D.C. 20543, \\npio@supremecourt.gov, of any typographical or other formal errors. \\n\\f\\nPage Proof Pending Publication\\n762 OCTOBER TERM, 2022 \\nSyllabus \\nUNITED STATES v. HANSEN \\ncertiorari to the united states court of appeals for \\nthe ninth circuit \\nNo. 22\u2013179. Argued March 27, 2023\u2014Decided June 23, 2023 \\nRespondent Helaman Hansen promised hundreds of noncitizens a path to \\nU. S. citizenship through \u201cadult adoption.\u201d But that was a scam. \\nThough there is no path to citizenship through \u201cadult adoption,\u201d Hansen \\nearned nearly $2 million from his scheme. The United States charged \\nHansen with, inter alia, violating 8 U. S. C. \u00a7 1324(a)(1)(A)(iv), which \\nforbids \u201cencourag[ing] or induc[ing] an alien to come to, enter, or reside \\nin the United States, knowing or in reckless disregard of the fact that \\nsuch [activity] is or will be in violation of law.\u201d Hansen was convicted \\nand moved to dismiss the clause (iv) charges on First Amendment over-\\nbreadth grounds. The District Court rejected Hansen's argument, but \\nthe Ninth Circuit concluded that clause (iv) was unconstitutionally \\noverbroad. \\nHeld: Because \u00a7 1324(a)(1)(A)(iv) forbids only the purposeful solicitation \\nand facilitation of specifc acts known to violate federal law, the clause \\nis not unconstitutionally overbroad. Pp. 769\u2013785. \\n(a) Hansen's First Amendment overbreadth challenge rests on the \\nclaim that clause (iv) punishes so much protected speech that it cannot \\nbe applied to anyone, including him. A court will hold a statute facially \\ninvalid under the overbreadth doctrine if the law \u201cprohibits a substan-\\ntial amount of protected speech\u201d relative to its \u201cplainly legitimate \\nsweep.\u201d United States v. Williams, 553 U. S. 285, 292. In such a cir-\\ncumstance, society's interest in free expression outweighs its interest in \\nthe statute's lawful applications. Otherwise, courts must handle uncon-\\nstitutional applications as they usually do\u2014case-by-case. Pp. 769\u2013770. \\n(b) The issue here is whether Congress used \u201cencourage\u201d and \u201cin-\\nduce\u201d in clause (iv) as terms of art referring to criminal solicitation and \\nfacilitation (thus capturing only a narrow band of speech) or instead as \\nthose terms are used in ordinary conversation (thus encompassing a \\nbroader swath). Pp. 770\u2013774. \\n(1) Criminal solicitation is the intentional encouragement of an un-\\nlawful act, and facilitation\u2014i. e., aiding and abetting\u2014is the provision \\nof assistance to a wrongdoer with the intent to further an offense's com-\\nmission. Neither requires lending physical aid; for both, words may be \\nenough. And both require an intent to bring about a particular unlaw-\\nful act. The terms \u201cencourage\u201d and \u201cinduce,\u201d found in clause (iv), are \\n\\f\\nPage Proof Pending Publication\\nCite as: 599 U. S. 762 (2023) 763 \\nSyllabus \\namong the \u201cmost common\u201d verbs used to denote solicitation and facilita-\\ntion. 2 W. LaFave, Substantive Criminal Law \u00a7 13.2(a). Their special-\\nized usage is displayed in the federal criminal code as well as the crimi-\\nnal laws of every State. If the challenged statute uses those terms as \\nthey are typically understood in the criminal law, an overbreadth chal-\\nlenge would be hard to sustain. Pp. 771\u2013773. \\n(2) Hansen, like the Ninth Circuit, insists that clause (iv) uses \u201cen-\\ncourages\u201d and \u201cinduces\u201d in their ordinary rather than specialized sense. \\nIn ordinary parlance, \u201cinduce\u201d means \u201c[t]o lead on; to infuence; to pre-\\nvail on; to move by persuasion or infuence,\u201d Webster's New Interna-\\ntional Dictionary 1269, and \u201cencourage\u201d means to \u201cinspire with courage, \\nspirit, or hope,\u201d Webster's Third New International Dictionary 747. If \\nclause (iv) conveys these ordinary meanings, it arguably reaches ab-\\nstract advocacy or general encouragement, and its applications to pro-\\ntected speech might render it vulnerable to an overbreadth challenge. \\nPp. 773\u2013774. \\n(c) The Court holds that clause (iv) uses \u201cencourages or induces\u201d in \\nits specialized, criminal-law sense\u2014that is, as incorporating common-\\nlaw liability for solicitation and facilitation. Pp. 774\u2013778. \\n(1) Context indicates that Congress used those words as terms of \\nart. \u201cEncourage\u201d and \u201cinduce\u201d have well-established legal meanings\u2014 \\nand when Congress \u201cborrows terms of art in which are accumulated the \\nlegal tradition and meaning of centuries of practice, it presumably \\nknows and adopts the cluster of ideas that were attached to each bor-\\nrowed word.\u201d Morissette v. United States, 342 U. S. 246, 263. That \\ninference is even stronger here, because clause (iv) prohibits \u201cencourag-\\ning\u201d and \u201cinducing\u201d a violation of law , which is the object of solicitation \\nand facilitation too. The Ninth Circuit stacked the deck in favor of \\nordinary meaning, but it should have given specialized meaning a fair \\nshake. When words have several plausible defnitions, context differen-\\ntiates among them. Here, the context of these words indicates that \\nCongress used them as terms of art. Pp. 774\u2013775. \\n(2) Statutory history is an important part of the relevant context. \\nWhen Congress enacted in 1885 what would become the template for \\nclause (iv), it criminalized \u201cknowingly assisting, encouraging or solicit-\\ning\u201d immigration under a contract to perform labor. 23 Stat. 333. \\nThen, as now, \u201cencourage\u201d had a specialized meaning that channeled \\naccomplice liability. And the words \u201cassisting\u201d and \u201csoliciting,\u201d which \\nappeared alongside \u201cencouraging,\u201d reinforce the narrower criminal-law \\nmeaning. When Congress amended that provision in 1917, it added \u201cin-\\nduce,\u201d which also carried solicitation and facilitation overtones. 39 \\nStat. 879. In 1952, Congress enacted the immediate predecessor for \\nclause (iv) and also simplifed the language from the 1917 Act, dropping \\n\\f\\nPage Proof Pending Publication\\n764 UNITED STATES v. HANSEN \\nSyllabus \\nthe words \u201cassist\u201d and \u201csolicit,\u201d and making it a crime to \u201cwillfully or \\nknowingly encourag[e] or induc[e], or attemp[t] to encourage or induce, \\neither directly or indirectly, the entry into the United States of . . . any \\nalien . . . not lawfully entitled to enter or reside within the United \\nStates.\u201d 66 Stat. 229. Hansen believes these changes dramatically \\nbroadened the scope of clause (iv)'s prohibition on encouragement, but \\naccepting that argument would require the Court to assume that Con-\\ngress took a circuitous route to convey a sweeping\u2014and constitutionally \\ndubious\u2014message. The better understanding is that Congress simply \\nstreamlined the previous statutory language. Critically, the terms \\n\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Unlawful immigration",
+      "Criminal solicitation",
+      "Aiding and abetting",
+      "Freedom of speech",
+      "Overbreadth doctrine",
+      "Immigration fraud",
+      "Statutory interpretation"
+    ]
+  },
+  "segment_id": "processing_segment_9df7928442cc568af293c607"
+}

@@ -1,0 +1,367 @@
+{
+  "instructions_version": "generate-then-map-d1",
+  "keywords_by_segment": {
+    "processing_segment_06664ac1c2c5fd68a82450fa": [
+      "Maritime safety zones",
+      "Fireworks displays",
+      "Vessel navigation restrictions",
+      "Biscayne Bay",
+      "Navigable waters",
+      "Barge operations",
+      "Marine environmental protection",
+      "Small business impacts"
+    ],
+    "processing_segment_1167b4e7a7b8831527aa68ec": [
+      "Project partnership agreements",
+      "Legal protections",
+      "Civil works projects",
+      "Stakeholder perspectives",
+      "Federal partnerships",
+      "Infrastructure development"
+    ],
+    "processing_segment_2e6defc2e81310a14092cb8d": [
+      "Title IX",
+      "religious exemptions",
+      "sex discrimination",
+      "religious educational institutions",
+      "federally funded education",
+      "sexual orientation discrimination",
+      "gender identity discrimination",
+      "administrative enforcement",
+      "civil rights litigation",
+      "constitutional challenges"
+    ],
+    "processing_segment_40ac49fab911f28a9b2c7800": [
+      "General personal jurisdiction",
+      "Consent to jurisdiction",
+      "Foreign corporations",
+      "Corporate registration",
+      "Due process",
+      "Railroad employee liability",
+      "Occupational cancer",
+      "State court jurisdiction"
+    ],
+    "processing_segment_45fbd6bf2f4987eecfc82a34": [
+      "Poultry slaughter",
+      "Processing line speeds",
+      "Poultry inspection",
+      "Carcass inspection",
+      "Young chickens",
+      "Turkey processing",
+      "Food safety",
+      "Worker safety programs"
+    ],
+    "processing_segment_53197da60f4002705cf66434": [
+      "Runaway youth",
+      "Homeless youth",
+      "Youth homelessness programs",
+      "Federal grants",
+      "Emergency shelters",
+      "Transitional housing",
+      "Street outreach",
+      "Supportive services",
+      "Grant administration",
+      "Regulatory burden"
+    ],
+    "processing_segment_7a187fc4cfd5fcc7ecf18ca4": [
+      "Elections Clause",
+      "Federal elections",
+      "State legislatures",
+      "Congressional redistricting",
+      "Partisan gerrymandering",
+      "State judicial review",
+      "State constitutional law",
+      "Appellate jurisdiction",
+      "Mootness doctrine"
+    ],
+    "processing_segment_8a2196646eeb4caa1a319e4d": [
+      "Palestinian children",
+      "Israeli occupation",
+      "Juvenile detention",
+      "Military courts",
+      "Children's rights",
+      "Due process",
+      "International human rights",
+      "International humanitarian law",
+      "Torture prevention"
+    ],
+    "processing_segment_90577a4d263451c598620c27": [
+      "Race-conscious admissions",
+      "Higher education admissions",
+      "Affirmative action",
+      "Equal protection",
+      "Racial discrimination",
+      "Title VI",
+      "Organizational standing",
+      "Selective admissions"
+    ],
+    "processing_segment_91fa9dc6248bf0b0f0979137": [
+      "Hazard communication",
+      "Chemical hazard classification",
+      "Container labeling",
+      "Safety data sheets",
+      "Employee safety training",
+      "Workplace chemical exposure",
+      "Laboratory chemical safety",
+      "Sealed container handling",
+      "Labeling exemptions",
+      "Globally Harmonized System"
+    ],
+    "processing_segment_937dd96666f84c57b921be30": [
+      "Steep-slope mining",
+      "Surface coal mining",
+      "Mine land reclamation",
+      "Contour restoration variances",
+      "Postmining land use",
+      "Watershed management",
+      "Water pollution control",
+      "Highwall backfilling",
+      "Slope stability",
+      "Surface runoff control"
+    ],
+    "processing_segment_9df7928442cc568af293c607": [
+      "Unlawful immigration",
+      "Criminal solicitation",
+      "Aiding and abetting",
+      "Freedom of speech",
+      "Overbreadth doctrine",
+      "Immigration fraud",
+      "Statutory interpretation"
+    ],
+    "processing_segment_a0951fa0b83c989ba35b923a": [
+      "Bench grinders",
+      "Customs duties",
+      "Tariff suspension",
+      "Metal finishing",
+      "Cement finishing",
+      "Machine tool imports",
+      "Harmonized Tariff Schedule"
+    ],
+    "processing_segment_a8daaf69dfc8917e241b0a50": [
+      "Citrus marketing",
+      "Assessment rates",
+      "Agricultural marketing orders",
+      "Oranges",
+      "Grapefruit",
+      "Lower Rio Grande Valley",
+      "Citrus handlers"
+    ],
+    "processing_segment_af5bc38bc56dac7a413e260a": [
+      "Climate change mitigation",
+      "Greenhouse gas emissions",
+      "Renewable electricity",
+      "Zero-emission vehicles",
+      "Regenerative agriculture",
+      "Extreme weather",
+      "Climate justice",
+      "Sustainable land management",
+      "Climate-related health risks",
+      "Disaster economic losses"
+    ],
+    "processing_segment_afa8170b5f3dec5c041a74be": [
+      "Maritime safety zones",
+      "Lower Mississippi River",
+      "Fireworks displays",
+      "Navigable waters",
+      "Vessel traffic restrictions",
+      "Marine environmental protection",
+      "Barge operations"
+    ],
+    "processing_segment_b03e2187c286490cb11269ec": [
+      "Science and technology policy",
+      "Presidential science advice",
+      "Interagency coordination",
+      "Federal research funding",
+      "Congressional oversight",
+      "Executive appointments",
+      "Conflicts of interest",
+      "Federal workforce management",
+      "Workplace culture"
+    ],
+    "processing_segment_b169a1b7a9facf6ee47c7b55": [
+      "Supreme Court jurisdiction",
+      "Judicial review",
+      "Military appellate courts",
+      "Courts-martial",
+      "Article III courts",
+      "Congressional jurisdiction authority",
+      "Military justice",
+      "Writs of mandamus",
+      "Dual judicial service"
+    ],
+    "processing_segment_bcafa7eed92892d4a952fb3c": [
+      "Medicaid coverage",
+      "Incarcerated individuals",
+      "Inmate payment exclusion",
+      "Correctional health care",
+      "Medicaid eligibility",
+      "Coverage suspension",
+      "Inpatient medical services",
+      "Public institutions",
+      "Post-release coverage"
+    ],
+    "processing_segment_c576bfd55db17c14ac617782": [
+      "Surprise billing",
+      "Independent dispute resolution",
+      "Health insurance claims",
+      "Payment disclosures",
+      "Remittance advice codes",
+      "Open negotiations",
+      "Dispute resolution fees",
+      "Bundled payment arrangements",
+      "Batched medical services",
+      "Health plan registration"
+    ],
+    "processing_segment_c8371446baf039654f7e4f74": [
+      "Perfluoroalkyl substances",
+      "Polyfluoroalkyl substances",
+      "Persistent pollutants",
+      "Synthetic chemicals",
+      "Chemical contamination",
+      "Environmental pollution",
+      "Toxic substances",
+      "Public health"
+    ],
+    "processing_segment_cee8a816785b38ff6391bbb0": [
+      "Article III standing",
+      "Student loan forgiveness",
+      "Federal student aid",
+      "Procedural rights",
+      "Causation and traceability",
+      "Administrative rulemaking",
+      "Higher education law",
+      "National emergency powers"
+    ],
+    "processing_segment_cf3468d9c9ce25fd6de79b55": [
+      "Protected health information",
+      "Patient authorizations",
+      "Psychotherapy notes",
+      "Health information marketing",
+      "Health information sales",
+      "Research authorizations",
+      "Compound authorizations",
+      "Authorization revocation",
+      "Health plan enrollment"
+    ],
+    "processing_segment_d0d060ca4aa47936a012782f": [
+      "Student loan forgiveness",
+      "Federal student loans",
+      "Executive authority",
+      "Statutory interpretation",
+      "National emergency powers",
+      "State standing",
+      "Public corporations",
+      "Higher education finance"
+    ],
+    "processing_segment_d328cb7a8d0c334d0bab6d11": [
+      "Software asset management",
+      "Information technology management",
+      "Software licensing",
+      "Asset inventory",
+      "Management practices",
+      "Program performance",
+      "Federal information systems"
+    ],
+    "processing_segment_d32b698b524281b4da98f9fd": [
+      "Fisheries management",
+      "Fishery conservation",
+      "Sustainable fisheries",
+      "Marine resources",
+      "Commercial fishing",
+      "Fishery research",
+      "Magnuson-Stevens Act"
+    ],
+    "processing_segment_d88f625a10f042b43ea7b019": [
+      "True threats",
+      "Freedom of speech",
+      "Criminal mens rea",
+      "Recklessness standard",
+      "Electronic harassment",
+      "Stalking",
+      "Threatening communications",
+      "Emotional distress"
+    ],
+    "processing_segment_e7580728f5b54b5aaa57c47a": [
+      "Federal real property",
+      "Office space consolidation",
+      "Space utilization",
+      "Cost savings",
+      "Government office space",
+      "Property management",
+      "Federal buildings"
+    ],
+    "processing_segment_e7dd209ee9bbb6b34870555a": [
+      "Religious accommodation",
+      "Employment discrimination",
+      "Title VII",
+      "Undue hardship",
+      "Sabbath observance",
+      "Work scheduling",
+      "Seniority systems",
+      "Collective bargaining"
+    ],
+    "processing_segment_ec78dbae48e5828191c5437c": [
+      "Cash or deferred elections",
+      "Qualified retirement plans",
+      "Compensation deferrals",
+      "Elective contributions",
+      "Irrevocable elections",
+      "Employer contributions",
+      "Employee gross income",
+      "Profit-sharing plans",
+      "Contribution timing"
+    ],
+    "processing_segment_ed535ed5349d3f35d107c70c": [
+      "Critical habitat",
+      "Endangered species",
+      "Mariana Islands wildlife",
+      "Mariana Islands plants",
+      "Endangered Species Act",
+      "Habitat conservation",
+      "Guam",
+      "Northern Mariana Islands",
+      "Economic impact analysis"
+    ],
+    "processing_segment_f35f52c4c580bee2e2543897": [
+      "Clean fuel production credit",
+      "Clean transportation fuels",
+      "Lifecycle greenhouse gas emissions",
+      "Fuel emissions rates",
+      "Sustainable aviation fuel",
+      "Tax credit eligibility",
+      "Fuel producer certification",
+      "Excise tax registration",
+      "Elective tax payments",
+      "Tax credit transfers"
+    ],
+    "processing_segment_f78c326cbb4040c423903b33": [
+      "Compelled speech",
+      "Freedom of speech",
+      "Public accommodations",
+      "Anti-discrimination law",
+      "Expressive services",
+      "Website design",
+      "Same-sex marriage",
+      "Sexual orientation discrimination"
+    ],
+    "processing_segment_fafb184467d92086b2ca57e3": [
+      "Trademark infringement",
+      "Extraterritorial jurisdiction",
+      "Lanham Act",
+      "Use in commerce",
+      "Consumer confusion",
+      "Foreign conduct",
+      "Trademark licensing",
+      "Injunctive relief",
+      "Monetary damages"
+    ],
+    "processing_segment_fc23eeaa2ecf6a73c6c18121": [
+      "Aviation cybersecurity",
+      "Air transportation security",
+      "Cybersecurity coordination",
+      "Cyber risk management",
+      "Critical infrastructure protection"
+    ]
+  },
+  "model_id": "openai:gpt-5.6-sol"
+}

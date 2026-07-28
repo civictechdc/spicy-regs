@@ -1,0 +1,103 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 2388.871,
+        "input_tokens": 2085,
+        "output_tokens": 98,
+        "request_id": "226e8f86-5716-4a95-91ef-0a2c78c2b9d5",
+        "response_id": "resp_0b1a9ca2e54f5a90016a67b859957081a38de5c3598589182f",
+        "status": "completed",
+        "total_tokens": 2183
+      }
+    ],
+    "duration_ms": 2389.662,
+    "input_tokens": 2085,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 98,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "5703d1cba125687740b33639e03827bc9d8b365c71096567392487e2f4567539",
+    "prompt_token_estimate": 2046,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "cf9689bc71b33cab02783d615f236c7ea0ceb4a53fc2da65c023f9806dc7f3ee",
+    "requested_service_tier": "auto",
+    "response_id": "resp_0b1a9ca2e54f5a90016a67b859957081a38de5c3598589182f",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2183,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Maritime safety zones",
+    "Lower Mississippi River",
+    "Fireworks displays",
+    "Navigable waters",
+    "Vessel traffic restrictions",
+    "Marine environmental protection",
+    "Barge operations"
+  ],
+  "ordinal": 16,
+  "request": {
+    "input": "{\"segment_text\":\"Safety Zone; Lower Mississippi River, Fireworks Display, Vidalia, LA\\nThe Coast Guard is establishing a temporary safety zone for navigable waters on the Lower Mississippi River. The safety zone is needed to protect personnel, vessels, and the marine environment from potential hazards associated with an over-water fireworks display. Entry of vessels or persons into this zone is prohibited unless specifically authorized by the Captain of the Port Sector Lower Mississippi River, or their designated representative.\\n<div class=\\\"fr-seal-meta\\\">\\n<div class=\\\"fr-seal-desc\\\">\\n\\n<p>\\n                    Document headings vary by document type but may contain\\n                    the following:\\n                  </p>\\n<ol class=\\\"bullets\\\">\\n\\n<li>\\n                      the agency or agencies that issued and signed a document\\n                    </li>\\n\\n<li>\\n                      the number of the CFR title and the number of each part\\n                      the document amends, proposes to amend, or is directly\\n                      related to\\n                    </li>\\n\\n<li>\\n                      the agency docket number / agency internal file number\\n                    </li>\\n\\n<li>\\n                      the RIN which identifies each regulatory action listed in\\n                      the Unified Agenda of Federal Regulatory and Deregulatory\\n                      Actions\\n                    </li>\\n</ol>\\n\\n<p>\\n                    See the\\n                    <a href=\\\"https://www.archives.gov/files/federal-register/write/handbook/ddh.pdf#page=9\\\">\\n                      Document Drafting Handbook\\n                    </a>\\n                    for more details.\\n                  </p>\\n</div></div>\\n</div></div>\\n\\n<div class=\\\"content-block \\\">\\n\\n<h6 class=\\\"agency\\\">Department of Homeland Security</h6>\\n\\nRule\\n<h6 class=\\\"sub-agency\\\">Coast Guard</h6>\\n<ol>\\n\\n<li>33 CFR Part 165</li>\\n\\n<li>[Docket Number USCG-2026-0762]</li>\\n\\n<li>RIN 1625-AA00</li>\\n</ol>\\n</div>\\n</div></div>\\n\\n<div id=\\\"agency\\\">\\n                    \\n<h1 id=\\\"h-1\\\">AGENCY:</h1>\\n                    \\n<p id=\\\"p-1\\\" data-page=\\\"39016\\\">Coast Guard, Department of Homeland Security.</p>\\n                </div>\\n\\n<div id=\\\"action\\\">\\n                    \\n<h1 id=\\\"h-2\\\">ACTION:</h1>\\n                    \\n<p id=\\\"p-2\\\" data-page=\\\"39016\\\">Temporary final rule.</p>\\n                </div>\\n\\nhomeland-security-department,coast-guard\\n<div id=\\\"summary\\\">\\n                    \\n<h1 id=\\\"h-3\\\">SUMMARY:</h1>\\n                    \\n<p id=\\\"p-3\\\" data-page=\\\"39016\\\">The Coast Guard is establishing a temporary safety zone for navigable waters on the Lower Mississippi River. The safety zone is needed to protect personnel, vessels, and the marine environment from potential hazards associated with an over-water fireworks display. Entry of vessels or persons into this zone is prohibited unless specifically authorized by the Captain of the Port Sector Lower Mississippi River, or their designated representative.</p>\\n                </div>\\n\\n<div id=\\\"dates\\\">\\n                    \\n<h1 id=\\\"h-4\\\">DATES:</h1>\\n                    \\n<p id=\\\"p-4\\\" data-page=\\\"39016\\\">This rule is effective on July 4, 2026, from 8 p.m. through 11 p.m.</p>\\n                </div>\\n\\n<div id=\\\"addresses\\\">\\n                    \\n<h1 id=\\\"h-5\\\">ADDRESSES:</h1>\\n                    \\n<p id=\\\"p-5\\\" data-page=\\\"39016\\\">\\n                        To view available documents go to \\n                        <em><a href=\\\"https://www.regulations.gov\\\" class=\\\"external\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">https://www.regulations.gov</a></em>\\n                         and search for USCG-2026-0762.\\n                    </p>\\n                </div>\\n\\n<div id=\\\"for-further-information-contact\\\">\\n                    \\n\\n            \\n<h1 id=\\\"h-6\\\">FOR FURTHER INFORMATION CONTACT:</h1>\\n                    \\n<p id=\\\"p-6\\\" data-page=\\\"39016\\\">\\n                        If you have questions about this rule, contact MST1 Cole Perkins, Sector Lower Mississippi River Waterways Management Division, U.S. Coast Guard; telephone 901-208-0311, or email \\n                        <em><a href=\\\"mailto:Cole.A.Perkins@uscg.mil\\\" class=\\\"email\\\">Cole.A.Perkins@uscg.mil</a>.</em></p>\\n                </div>\\n</div>\\n            \\n<div class=\\\"supplemental-info\\\">\\n                \\n<h1 id=\\\"h-7\\\">SUPPLEMENTARY INFORMATION:</h1>\\n                \\n<h2 id=\\\"h-8\\\">I. Table of Abbreviations</h2>\\n                \\n                    \\n<p class=\\\"flush-paragraph flush-paragraph-1\\\" id=\\\"p-7\\\" data-page=\\\"39016\\\">CFR&emsp;Code of Federal Regulations</p>\\n                    \\n<p class=\\\"flush-paragraph flush-paragraph-1\\\" id=\\\"p-8\\\" data-page=\\\"39016\\\">COTP&emsp;Captain of the Port</p>\\n                    \\n<p class=\\\"flush-paragraph flush-paragraph-1\\\" id=\\\"p-9\\\" data-page=\\\"39016\\\">DHS&emsp;Department of Homeland Security</p>\\n                    \\n<p class=\\\"flush-paragraph flush-paragraph-1\\\" id=\\\"p-10\\\" data-page=\\\"39016\\\">FR&emsp;Federal Register</p>\\n                    \\n<p class=\\\"flush-paragraph flush-paragraph-1\\\" id=\\\"p-11\\\" data-page=\\\"39016\\\">NPRM&emsp;Notice of proposed rulemaking</p>\\n                    \\n<div class=\\\"preamble\\\">\\n\\n<p class=\\\"flush-paragraph flush-paragraph-1\\\" id=\\\"p-12\\\" data-page=\\\"39016\\\">&sect;&emsp;Section </p>\\n                    \\n<p class=\\\"flush-paragraph flush-paragraph-1\\\" id=\\\"p-13\\\" data-page=\\\"39016\\\">U.S.C.&emsp;United States Code</p>\\n                \\n                \\n<h2 id=\\\"h-9\\\">II. Background and Authority</h2>\\n                \\n<p id=\\\"p-14\\\" data-page=\\\"39016\\\">The Coast Guard received notification that fireworks will be launched from a barge on the Lower Mississippi River near Vidalia, LA. The Captain of the Port (COTP) Sector Lower Mississippi River has determined that potential hazards associated with fireworks are a safety concern for anyone within a half mile of the fireworks display. Therefore, the COTP is issuing this rule under the authority in <a href=\\\"https://www.govinfo.gov/link/uscode/46/70034\\\" class=\\\"usc external\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">46 U.S.C. 70034</a>, which is needed to protect personnel, vessels, and the marine environment in the navigable waters within the safety zone.</p>\\n                \\n<p id=\\\"p-15\\\" data-page=\\\"39016\\\">\\n                    Because of these potential hazards, the Coast Guard is issuing this rule without prior notice and comment. As is authorized by <a href=\\\"https://www.govinfo.gov/link/uscode/5/553\\\" class=\\\"usc external\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">5 U.S.C. 553(b)(B)</a>, the Coast Guard finds that good cause exists for not publishing a notice of proposed rulemaking (NPRM) with respect to this rule because it is impracticable. The Coast Guard was notified of this event on May 10, 2026, but we must establish this safety zone by July 4, 2026, to protect personnel, vessels, and the marine environment. Therefore, we do not have enough time to solicit and respond to comments. For the same reason, the Coast Guard finds that under <a href=\\\"https://www.govinfo.gov/link/uscode/5/553\\\" class=\\\"usc external\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">5 U.S.C. 553(d)(3)</a>, good cause exists for making this rule effective less than 30 days after publication in the \\n                    <strong>Federal Register</strong>\\n                    .\\n                </p>\\n                \\n<h2 id=\\\"h-10\\\">III. Discussion of the Rule</h2>\\n                \\n<div class=\\\"document-headings\\\">\\n<div class=\\\"fr-box fr-box-published-alt no-footer\\\">\\n\\n<div class=\\\"fr-seal-block fr-seal-block-header with-hover\\\">\\n<div class=\\\"fr-seal-content\\\">\\n<span class=\\\"h6\\\">Document Headings</span>\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Maritime safety zones",
+      "Lower Mississippi River",
+      "Fireworks displays",
+      "Navigable waters",
+      "Vessel traffic restrictions",
+      "Marine environmental protection",
+      "Barge operations"
+    ]
+  },
+  "segment_id": "processing_segment_afa8170b5f3dec5c041a74be"
+}

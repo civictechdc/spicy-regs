@@ -1,0 +1,103 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 4013.058,
+        "input_tokens": 1789,
+        "output_tokens": 132,
+        "request_id": "a4563832-63e0-4412-95e1-20516a2e19ea",
+        "response_id": "resp_0e9a7be32f9d2779016a67b852804c819d88786e9d4befe619",
+        "status": "completed",
+        "total_tokens": 1921
+      }
+    ],
+    "duration_ms": 4013.971,
+    "input_tokens": 1789,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 132,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "24e371ad8f2c6feb720803df9afb2482fdb462ad2bd1056cdd844508005b9402",
+    "prompt_token_estimate": 1750,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "59dc9bbbaa0aeeca50d48404e56fec3c55a0dd463bc66c6d196da07bf257cab7",
+    "requested_service_tier": "auto",
+    "response_id": "resp_0e9a7be32f9d2779016a67b852804c819d88786e9d4befe619",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 1921,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Citrus marketing",
+    "Assessment rates",
+    "Agricultural marketing orders",
+    "Oranges",
+    "Grapefruit",
+    "Lower Rio Grande Valley",
+    "Citrus handlers"
+  ],
+  "ordinal": 14,
+  "request": {
+    "input": "{\"segment_text\":\"Oranges and Grapefruit Grown in Lower Rio Grande Valley in Texas; Increased Assessment Rate\\nThis final rule implements a recommendation from the Texas Valley Citrus Committee (Committee) to increase the assessment rate established for the 2024-2025 and subsequent fiscal periods from $0.03 to $0.04 per 7/10-bushel carton or equivalent of oranges and grapefruit grown in Texas. The assessment rate will remain in effect indefinitely unless modified, suspended, or terminated.\\n<div class=\\\"fr-seal-meta\\\">\\n<div class=\\\"fr-seal-desc\\\">\\n\\n<p>\\n                    Document headings vary by document type but may contain\\n                    the following:\\n                  </p>\\n<ol class=\\\"bullets\\\">\\n\\n<li>\\n                      the agency or agencies that issued and signed a document\\n                    </li>\\n\\n<li>\\n                      the number of the CFR title and the number of each part\\n                      the document amends, proposes to amend, or is directly\\n                      related to\\n                    </li>\\n\\n<li>\\n                      the agency docket number / agency internal file number\\n                    </li>\\n\\n<li>\\n                      the RIN which identifies each regulatory action listed in\\n                      the Unified Agenda of Federal Regulatory and Deregulatory\\n                      Actions\\n                    </li>\\n</ol>\\n\\n<p>\\n                    See the\\n                    <a href=\\\"https://www.archives.gov/files/federal-register/write/handbook/ddh.pdf#page=9\\\">\\n                      Document Drafting Handbook\\n                    </a>\\n                    for more details.\\n                  </p>\\n</div></div>\\n</div></div>\\n\\n<div class=\\\"content-block \\\">\\n\\n<h6 class=\\\"agency\\\">Department of Agriculture</h6>\\n\\nRule\\n<h6 class=\\\"sub-agency\\\">Agricultural Marketing Service</h6>\\n<ol>\\n\\n<li>7 CFR Part 906</li>\\n\\n<li>[Doc. No. AMS-SC-24-0046]</li>\\n</ol>\\n</div>\\n</div></div>\\n\\n<div id=\\\"agency\\\">\\n                    \\n<h1 id=\\\"h-1\\\">AGENCY:</h1>\\n                    \\n<p id=\\\"p-1\\\" data-page=\\\"41761\\\">Agricultural Marketing Service, USDA.</p>\\n                </div>\\n\\n<div id=\\\"action\\\">\\n                    \\n<h1 id=\\\"h-2\\\">ACTION:</h1>\\n                    \\n<p id=\\\"p-2\\\" data-page=\\\"41761\\\">Final rule.</p>\\n                </div>\\n\\n<div id=\\\"summary\\\">\\n                    <span class=\\\"printed-page-inline unprinted-element document-markup\\\" data-page=\\\"41762\\\">\\n\\n      (<svg class=\\\"svg-icon svg-icon-doc-generic\\\"><use xlink:href=\\\"/assets/fr-icons.svg#doc-generic\\\"></use></svg> printed page 41762)\\n    </span><span class=\\\"printed-page-details unprinted-element document-markup\\\" id=\\\"page-41762\\\" data-page=\\\"41762\\\"><svg class=\\\"svg-icon svg-icon-doc-generic\\\"><use xlink:href=\\\"/assets/fr-icons.svg#doc-generic\\\"></use></svg></span>\\n                    \\nagriculture-department,agricultural-marketing-service\\n<h1 id=\\\"h-3\\\">SUMMARY:</h1>\\n                    \\n<p id=\\\"p-3\\\" data-page=\\\"41762\\\">This final rule implements a recommendation from the Texas Valley Citrus Committee (Committee) to increase the assessment rate established for the 2024-2025 and subsequent fiscal periods from $0.03 to $0.04 per 7/10-bushel carton or equivalent of oranges and grapefruit grown in Texas. The assessment rate will remain in effect indefinitely unless modified, suspended, or terminated.</p>\\n                </div>\\n\\n<div id=\\\"dates\\\">\\n                    \\n<h1 id=\\\"h-4\\\">DATES:</h1>\\n                    \\n<p id=\\\"p-4\\\" data-page=\\\"41762\\\">Effective September 26, 2025.</p>\\n                </div>\\n\\n<div id=\\\"for-further-information-contact\\\">\\n                    \\n<h1 id=\\\"h-5\\\">FOR FURTHER INFORMATION CONTACT:</h1>\\n                    \\n<p id=\\\"p-5\\\" data-page=\\\"41762\\\">\\n                        Delaney Fuhrmeister, Marketing Specialist, or Christian D. Nissen, Chief, Southeast Region Branch, Market Development Division, Specialty Crops Program, AMS, USDA; telephone: (863) 324-3375 or email: \\n                        <em><a href=\\\"mailto:Delaney.Fuhrmeister@usda.gov\\\" class=\\\"email\\\">Delaney.Fuhrmeister@usda.gov</a></em>\\n                         or \\n                        <em><a href=\\\"mailto:Christian.Nissen@usda.gov\\\" class=\\\"email\\\">Christian.Nissen@usda.gov</a></em>.\\n                    </p>\\n                    \\n<p id=\\\"p-6\\\" data-page=\\\"41762\\\">\\n                        Small businesses may request information on complying with this regulation by contacting Antoinette Carter, Market Development Division, Specialty Crops Program, AMS, USDA, 1400 Independence Avenue SW, STOP 0237, Washington, DC 20250-0237; telephone: (202) 720-8085, or email: \\n                        <em><a href=\\\"mailto:Antoinette.Carter@usda.gov\\\" class=\\\"email\\\">Antoinette.Carter@usda.gov</a></em>.\\n                    </p>\\n                </div>\\n</div>\\n            \\n<div class=\\\"supplemental-info\\\">\\n                \\n\\n            \\n<h1 id=\\\"h-6\\\">SUPPLEMENTARY INFORMATION:</h1>\\n                \\n<p id=\\\"p-7\\\" data-page=\\\"41762\\\">This action, pursuant to <a href=\\\"https://www.govinfo.gov/link/uscode/5/553\\\" class=\\\"usc external\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">5 U.S.C. 553</a>, amends regulations issued to carry out a marketing order as defined in <a href=\\\"https://www.ecfr.gov/current/title-7/section-900.2#p-900.2(j)\\\" class=\\\"cfr external\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">7 CFR 900.2(j)</a>. This rule is issued under Marketing Order No. 906 as amended (<a href=\\\"https://www.ecfr.gov/current/title-7/part-906\\\" class=\\\"cfr external\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">7 CFR part 906</a>), regulating the handling of oranges and grapefruit grown in the Lower Rio Grande Valley in Texas. Part 906 (referred to as &ldquo;the Order&rdquo;) is effective under the Agricultural Marketing Agreement Act of 1937, as amended (<a href=\\\"https://www.govinfo.gov/link/uscode/7/601\\\" class=\\\"usc external\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">7 U.S.C. 601-674</a>), hereinafter referred to as the &ldquo;Act.&rdquo; The Committee locally administers the Order and is comprised of producers and handlers of oranges and grapefruit operating within the area of production.</p>\\n                \\n<div class=\\\"preamble\\\">\\n\\n<div class=\\\"document-headings\\\">\\n<div class=\\\"fr-box fr-box-published-alt no-footer\\\">\\n\\n<div class=\\\"fr-seal-block fr-seal-block-header with-hover\\\">\\n<div class=\\\"fr-seal-content\\\">\\n<span class=\\\"h6\\\">Document Headings</span>\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Citrus marketing",
+      "Assessment rates",
+      "Agricultural marketing orders",
+      "Oranges",
+      "Grapefruit",
+      "Lower Rio Grande Valley",
+      "Citrus handlers"
+    ]
+  },
+  "segment_id": "processing_segment_a8daaf69dfc8917e241b0a50"
+}

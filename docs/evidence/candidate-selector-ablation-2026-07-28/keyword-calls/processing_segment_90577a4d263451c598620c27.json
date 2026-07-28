@@ -1,0 +1,105 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 2495.472,
+        "input_tokens": 1992,
+        "output_tokens": 103,
+        "request_id": "39ca05f7-5845-4fd0-a15f-7ed740472584",
+        "response_id": "resp_0cb2b9d0b58954ec016a67b83f9508819e8aa97fd068b78776",
+        "status": "completed",
+        "total_tokens": 2095
+      }
+    ],
+    "duration_ms": 2496.307,
+    "input_tokens": 1992,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 103,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "9e568eb0979c7cd2d361bcaa660cf2aaadd256f64af57b0b7da997f8aa2c7dec",
+    "prompt_token_estimate": 1953,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "457043fadd46970f10dc0333c1cb8024086260b43dd56580b9db6bd6eee36954",
+    "requested_service_tier": "auto",
+    "response_id": "resp_0cb2b9d0b58954ec016a67b83f9508819e8aa97fd068b78776",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2095,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Race-conscious admissions",
+    "Higher education admissions",
+    "Affirmative action",
+    "Equal protection",
+    "Racial discrimination",
+    "Title VI",
+    "Organizational standing",
+    "Selective admissions"
+  ],
+  "ordinal": 9,
+  "request": {
+    "input": "{\"segment_text\":\"PRELIMINARY PRINT \\nVolume 600 U. S. Part 1 \\nPages 181\u2013411 \\nOFFICIAL REPORTS \\nOF \\nTHE SUPREME COURT \\nJune 29, 2023 \\nREBECCA A. WOMELDORF \\nreporter of decisions \\nPage Proof Pending Publication\\nNOTICE: This preliminary print is subject to formal revision before \\nthe bound volume is published. Users are requested to notify the Reporter \\nof Decisions, Supreme Court of the United States, Washington, D.C. 20543, \\npio@supremecourt.gov, of any typographical or other formal errors. \\n\\f\\nPage Proof Pending Publication\\nOCTOBER TERM, 2022 181 \\nSyllabus \\nSTUDENTS FOR FAIR ADMISSIONS, INC. v. \\nPRESIDENT AND FELLOWS OF \\nHARV ARD COLLEGE \\ncertiorari to the united states court of appeals for \\nthe \ue405rst circuit \\nNo. 20\u20131199. Argued October 31, 2022\u2014Decided June 29, 2023* \\nHarvard College and the University of North Carolina (UNC) are two of \\nthe oldest institutions of higher learning in the United States. Every \\nyear, tens of thousands of students apply to each school; many fewer are \\nadmitted. Both Harvard and UNC employ a highly selective admis-\\nsions process to make their decisions. Admission to each school can \\ndepend on a student's grades, recommendation letters, or extracurricu-\\nlar involvement. It can also depend on their race. The question pre-\\nsented is whether the admissions systems used by Harvard College and \\nUNC are lawful under the Equal Protection Clause of the Fourteenth \\nAmendment. \\nAt Harvard, each application for admission is initially screened by a \\n\u201cfrst reader,\u201d who assigns a numerical score in each of six categories: \\nacademic, extracurricular, athletic, school support, personal, and overall. \\nFor the \u201coverall\u201d category\u2014a composite of the fve other ratings\u2014a frst \\nreader can and does consider the applicant's race. Harvard's admissions \\nsubcommittees then review all applications from a particular geographic \\narea. These regional subcommittees make recommendations to the full \\nadmissions committee, and they take an applicant's race into account. \\nWhen the 40-member full admissions committee begins its deliberations, \\nit discusses the relative breakdown of applicants by race. The goal of \\nthe process, according to Harvard's director of admissions, is ensuring \\nthere is no \u201cdramatic drop-off\u201d in minority admissions from the prior \\nclass. An applicant receiving a majority of the full committee's votes \\nis tentatively accepted for admission. At the end of this process, the \\nracial composition of the tentative applicant pool is disclosed to the com-\\nmittee. The last stage of Harvard's admissions process, called the \\n\u201clop,\u201d winnows the list of tentatively admitted students to arrive at the \\nfnal class. Applicants that Harvard considers cutting at this stage are \\nplaced on the \u201clop list,\u201d which contains only four pieces of information: \\n*Together with No. 21\u2013707, Students for Fair Admissions, Inc. v. Uni-\\nversity of North Carolina et al., on certiorari before judgment to the \\nUnited States Court of Appeals for the Fourth Circuit. \\n\\f\\nPage Proof Pending Publication\\n182 STUDENTS FOR FAIR ADMISSIONS, INC. v. PRESIDENT \\nAND FELLOWS OF HARV ARD COLLEGE \\nSyllabus \\nlegacy status, recruited athlete status, fnancial aid eligibility, and race. \\nIn the Harvard admissions process, \u201crace is a determinative tip for\u201d a \\nsignifcant percentage \u201cof all admitted African American and Hispanic \\napplicants.\u201d \\nUNC has a similar admissions process. Every application is re-\\nviewed frst by an admissions offce reader, who assigns a numerical \\nrating to each of several categories. Readers are required to consider \\nthe applicant's race as a factor in their review. Readers then make a \\nwritten recommendation on each assigned application, and they may \\nprovide an applicant a substantial \u201cplus\u201d depending on the applicant's \\nrace. At this stage, most recommendations are provisionally fnal. A \\ncommittee of experienced staff members then conducts a \u201cschool group \\nreview\u201d of every initial decision made by a reader and either approves \\nor rejects the recommendation. In making those decisions, the commit-\\ntee may consider the applicant's race. \\nPetitioner, Students for Fair Admissions (SFFA), is a nonproft orga-\\nnization whose stated purpose is \u201cto defend human and civil rights se-\\ncured by law, including the right of individuals to equal protection under \\nthe law.\u201d SFFA fled separate lawsuits against Harvard and UNC, ar-\\nguing that their race-based admissions programs violate, respectively, \\nTitle VI of the Civil Rights Act of 1964 and the Equal Protection Clause \\nof the Fourteenth Amendment. After separate bench trials, both ad-\\nmissions programs were found permissible under the Equal Protection \\nClause and this Court's precedents. In the Harvard case, the First Cir-\\ncuit affrmed, and this Court granted certiorari. In the UNC case, this \\nCourt granted certiorari before judgment. \\nHeld: Harvard's and UNC's admissions programs violate the Equal Protec-\\ntion Clause of the Fourteenth Amendment. Pp. 198\u2013231. \\n(a) Because SFFA complies with the standing requirements for orga-\\nnizational plaintiffs articulated by this Court in Hunt v. Washington \\nState Apple Advertising Comm'n, 432 U. S. 333, SFFA's obligations \\nunder Article III are satisfed, and this Court has jurisdiction to con-\\nsider the merits of SFFA's claims. \\nThe Court rejects UNC's argument that SFFA lacks standing because \\nit is not a \u201cgenuine\u201d membership organization. An organizational plain-\\ntiff can satisfy Article III jurisdiction in two ways, one of which is to \\nassert \u201cstanding solely as the representative of its members,\u201d Warth v. \\nSeldin, 422 U. S. 490, 511, an approach known as representational or \\norganizational standing. To invoke it, an organization must satisfy the \\nthree-part test in Hunt. Respondents do not suggest that SFFA fails \\nHunt's test for organizational standing. They argue instead that SFFA \\ncannot invoke organizational standing at all because SFFA was not a \\n\\f\\nPage Proof Pending Publication\\nCite as: 600 U. S. 181 (2023) 183 \\nSyllabus \\ngenuine membership organization at the time it fled suit. Respondents \\nmaintain that, under Hunt, a group qualifes as a genuine membership \\norganization only if it is controlled and funded by its members. In \\nHunt, this Court determined that a state agency with no traditional \\nmembers could still qualify as a genuine membership organization in \\nsubstance because the agency represented the interests of individuals \\nand otherwise satisfed Hunt's three-part test for organizational stand-\\ning. See 432 U. S., at 342. Hunt's \u201cindicia of membership\u201d analysis, \\nhowever, has no applicability here. As the courts below found, SFFA \\nis indisputably a voluntary membership organization with identifable \\nmembers who support its mission and whom SFFA represents in good \\nfaith. SFFA is thus entitled to rely on the organizational standing doc-\\ntrine as articulated in Hunt. Pp. 198\u2013201. \\n(b) Proposed by Congress and ratifed by the States in the wake of \\nthe Civil War, the Fourteenth Amendment provides that no State shall \\n\u201cdeny to any person . . . the equal protection of the laws.\u201d Proponents \\nof the Equal Protection Clause described its \u201cfoundation[al] principle\u201d \\nas \u201cnot permit[ing] any distinctions of law based on race or color.\u201d Any \\n\u201claw which operates upon one man,\u201d they maintained, should \u201coperate \\nequally upon all.\u201d Accordingly, as this Court's early decisions inter-\\npreting the Equal Protection Clause explained, the Fourteenth Amend-\\nment guaranteed \u201cthat the law in the States shall be the same for the \\nblack as for the white; that all persons, whether colored or white, shall \\n\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Race-conscious admissions",
+      "Higher education admissions",
+      "Affirmative action",
+      "Equal protection",
+      "Racial discrimination",
+      "Title VI",
+      "Organizational standing",
+      "Selective admissions"
+    ]
+  },
+  "segment_id": "processing_segment_90577a4d263451c598620c27"
+}

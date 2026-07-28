@@ -1,0 +1,109 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 4763.552,
+        "input_tokens": 2071,
+        "output_tokens": 144,
+        "request_id": "503ebbb8-d483-4c1c-8a7a-2a8bb2d10d36",
+        "response_id": "resp_09690e80edb95a12016a67b832e8c081a2b523c15800397e74",
+        "status": "completed",
+        "total_tokens": 2215
+      }
+    ],
+    "duration_ms": 4765.04,
+    "input_tokens": 2071,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 144,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "7d752a8f20477bebcad5390bbb04741648550a8e16312c2d9d71495e5d6ce3ac",
+    "prompt_token_estimate": 2032,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "0682649759f86fb23951e069886a963d9fc4745e792aa48a43d4f44369edf6d3",
+    "requested_service_tier": "auto",
+    "response_id": "resp_09690e80edb95a12016a67b832e8c081a2b523c15800397e74",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2215,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Runaway youth",
+    "Homeless youth",
+    "Youth homelessness programs",
+    "Federal grants",
+    "Emergency shelters",
+    "Transitional housing",
+    "Street outreach",
+    "Supportive services",
+    "Grant administration",
+    "Regulatory burden"
+  ],
+  "ordinal": 6,
+  "request": {
+    "input": "{\"segment_text\":\"40426 Federal Register / Vol. 91, No. 126 / Thursday, July 2, 2026 / Rules and Regulations \\nState citation Title/subject \\nState \\neffective \\ndate \\nEPA approval date Explanation \\n27A O.S. 2\u20135\u2013104 .... Oklahoma Clean Air Act, Defini-\\ntions.\\n07/01/1993 07/02/2026, 91 FR [INSERT \\nFEDERAL REGISTER PAGE \\nWHERE THE DOCUMENT \\nBEGINS].\\nSIP only includes definitions of \\n\u2018\u2018Air contaminants,\u2019\u2019 \u2018\u2018Air pollu-\\ntion,\u2019\u2019 \u2018\u2018Council,\u2019\u2019 \u2018\u2018Director,\u2019\u2019 \\nand \u2018\u2018Person\u2019\u2019. \\n*******  \\n[FR Doc. 2026\u201313398 Filed 7\u20131\u201326; 8:45 am] \\nBILLING CODE 6560\u201350\u2013P \\nDEPARTMENT OF HEALTH AND \\nHUMAN SERVICES \\nAdministration for Children and \\nFamilies \\n45 CFR Part 1351 \\nRIN 0970\u2013AD37 \\nReducing Bureaucracy and Burden for \\nChildren, Youth, and Family Programs \\nAGENCY: Family and Youth Services \\nBureau (FYSB), Administration on \\nChildren, Youth and Families (ACYF), \\nAdministration for Children and \\nFamilies (ACF), Department of Health \\nand Human Services (HHS). \\nACTION: Final rule. \\nSUMMARY: This final rule removes \\nduplicative and unnecessary sections \\nfrom the Runaway and Homeless Youth \\nProgram regulations. These amendments \\nwill streamline the Runaway and \\nHomeless Youth Program regulations to \\nmake them more accessible to the \\npublic. \\nDATES: Effective August 31, 2026. \\nFOR FURTHER INFORMATION CONTACT : \\nAdam N. Jones, Deputy Chief of Staff, \\nImmediate Office of the Assistant \\nSecretary, Administration for Children \\nand Families, Department of Health and \\nHuman Services, Washington, DC 202\u2013 \\n417\u20130115 or Deregulation@acf.hhs.gov. \\nA plain language summary of the final \\nrule is posted at https://\\nwww.regulations.gov. \\nSUPPLEMENTARY INFORMATION: \\nI. Statutory Authority \\nThis final rule is being issued under \\nthe authority granted to the Secretary of \\nHealth and Human Services by the \\nRunaway and Homeless Youth Act of \\n1974, as amended, hereafter referred to \\nas the \u2018\u2018Act,\u2019\u2019 34 U.S.C. 11201 et seq. 34 \\nU.S.C. 11202 specifically authorizes \\nrulemaking. \\nII. Background \\nThe Runaway and Homeless Youth \\n(RHY) Program, authorized under the \\nRunaway and Homeless Youth Act (34 \\nU.S.C. 11201 et seq.), authorizes HHS to \\nprovide grants to public and nonprofit \\nprivate entities to deliver services to \\nrunaway and homeless youth and youth \\nat risk of homelessness. The RHY \\nprogram includes the Basic Center \\nProgram, the Transitional Living \\nProgram (including the Maternity Group \\nHome Program), and the Street Outreach \\nProgram, which together support \\nemergency shelter, transitional housing, \\noutreach, counseling, and \\ncomprehensive supportive services to \\npromote youth safety, well-being, and \\nlong-term stability. The RHY program \\nalso funds a national communications \\nsystem, grants for training and technical \\nassistance, and grants for research, \\nevaluation, training, and service \\nprojects. HHS has issued regulations for \\nthe RHY Program at 45 CFR part 1351. \\nHHS initially published regulations \\nfor the RHY Program on November 20, \\n1978. Office of Human Development \\nServices, Department of Health, \\nEducation, and Welfare, 43 FR 55634 \\n(Nov. 20, 1978) (codified at 45 CFR pt. \\n1351). The regulations were most \\nrecently amended on December 20, 2016 \\nat Runaway and Homeless Youth, 81 FR \\n93030. The most recent revisions added \\nprogram performance standards and \\nprovided additional updates to reflect \\nchanges in the RHY Act made through \\nthe Reconnecting Homeless Youth Act \\nof 2008 (Pub. L. 110\u2013378). See Runaway \\nand Homeless Youth, 81 FR 93030, \\n93030 (Dec. 20, 2016). We are now \\nrescinding several sections of 45 CFR \\npart 1351 to clarify program \\nrequirements, reduce unnecessary \\nadministrative burden, and better align \\nthe regulations with current statutory \\nauthority and language, while \\nmaintaining program operations and \\neffective management of grant funds. \\nIII. Executive Summary \\nThis final rule rescinds multiple RHY \\nProgram regulation sections that can be \\ndelineated into two categories: those \\nthat are duplicative and those that are \\nunnecessary because they are better \\nsuited for a different format. \\nThe duplicative regulation sections \\nare those that carry no legal weight \\nbecause their requirements are listed \\nelsewhere in applicable law, such as in \\nstatute. Duplicative regulations impose \\nno new obligations and offer no new \\nguidance because the authority and \\nrequirements are pulled directly from \\nother statutes and regulations. In many \\ncases, the language in the regulation is \\nidentical to the language in the RHY \\nAct. \\nSeveral of the regulation sections are \\nbetter suited to a different format, such \\nas a Notice of Funding Opportunity \\n(NOFO). These sections either include \\nsummaries of program goals or \\nobjectives that do not impose any \\nrequirements beyond the language in \\nthe authorizing statute or they include \\ninformation generally found in grant \\ndocuments such as NOFOs. In some \\ncases, the sections merely direct grant \\napplicants and recipients to follow \\ninstructions in NOFOs and provide no \\nadditional information. These sections \\nare being removed to allow them to be \\npublished in the more appropriate \\nformat. \\nEffective Date \\nThis final rule will become effective \\n60 days from the date of its publication. \\nSeverability \\nThe purpose of this section is to \\nclarify ACF\u2019s intent with respect to the \\nseverability of the provisions of this \\nNPRM. As explained above, ACF is \\nremoving sections of the RHY \\nregulations because we determined that \\ndoing so would make the regulations \\nVerDate Sep<11>2014 20:30 Jul 01, 2026 Jkt 268001 PO 00000 Frm 00074 Fmt 4700 Sfmt 4700 E:\\\\FR\\\\FM\\\\02JYR1.SGM 02JYR1khammond on DSK9W7S144PROD with RULES\\n\\f\\n40427 Federal Register / Vol. 91, No. 126 / Thursday, July 2, 2026 / Rules and Regulations \\nclearer, less burdensome, and more \\naccessible to the public. To the extent \\nthat any portion of the removals are \\ndeclared invalid by a court, ACF intends \\nfor all other provisions of this final rule \\nto remain in effect to the greatest extent \\npossible to ensure that the RHY \\nregulations remain as concise and \\naccessible as possible. The changes \\naddress a variety of issues relevant to \\nthe Family and Youth Services Bureau. \\nNone of the provisions contained herein \\nare central to an overall intent of the \\nproposed rule, nor are any provisions \\nbeing removed in this final rule \\ndependent on the validity of other, \\nseparate provisions. \\nIV. Summary of Public Comments \\nACF published a notice of proposed \\nrulemaking (NPRM) in the Federal \\nRegister on April 6, 2026, (91 FR 17235) \\nproposing revisions to 45 CFR part \\n1351. ACF provided a 30-day comment \\nperiod during which interested parties \\ncould submit comments in writing \\nelectronically through Regulations.gov \\nor via email to the Immediate Office of \\nthe Assistant Secretary. \\nDuring the 30-day comment period, \\nACF received 918 comments from \\nindividuals and organizations including \\nstudents and clergy; human services, \\neducational, and medical professionals; \\nnational, state and local runaway and \\nhomeless youth focused advocacy \\n\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Runaway youth",
+      "Homeless youth",
+      "Youth homelessness programs",
+      "Federal grants",
+      "Emergency shelters",
+      "Transitional housing",
+      "Street outreach",
+      "Supportive services",
+      "Grant administration",
+      "Regulatory burden"
+    ]
+  },
+  "segment_id": "processing_segment_53197da60f4002705cf66434"
+}

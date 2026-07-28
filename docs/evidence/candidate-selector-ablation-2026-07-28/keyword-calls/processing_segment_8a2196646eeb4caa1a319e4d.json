@@ -1,0 +1,107 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 4408.437,
+        "input_tokens": 2004,
+        "output_tokens": 93,
+        "request_id": "75d03ae7-5efc-4ae0-acf5-e026bf5c352f",
+        "response_id": "resp_0b8eeff7ef488ae7016a67b83b300c819f962cb39077251897",
+        "status": "completed",
+        "total_tokens": 2097
+      }
+    ],
+    "duration_ms": 4409.217,
+    "input_tokens": 2004,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 93,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "0a07fc7b48e7e8bf4cc4d3986328364b215b5984f2b3ab6129acdc859d716c88",
+    "prompt_token_estimate": 1965,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "ee32ad3b80fe5a69cfe3eda552430c2b95e9b5324b38049cde4e7069a25c5bcd",
+    "requested_service_tier": "auto",
+    "response_id": "resp_0b8eeff7ef488ae7016a67b83b300c819f962cb39077251897",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2097,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Palestinian children",
+    "Israeli occupation",
+    "Juvenile detention",
+    "Military courts",
+    "Children's rights",
+    "Due process",
+    "International human rights",
+    "International humanitarian law",
+    "Torture prevention"
+  ],
+  "ordinal": 8,
+  "request": {
+    "input": "{\"segment_text\":\"Defending the Human Rights of Palestinian Children and Families Living Under Israeli Military Occupation Act\\nReferred to the House Committee on Foreign Affairs.\\n<enum>2.</enum>\\n<header>Findings</header>\\n<text display-inline=\\\"no-display-inline\\\">Congress finds the following:</text>\\n<paragraph id=\\\"H0C59BD49CBA149FCA34B97459E49B5C1\\\">\\n<enum>(1)</enum>\\n<text>Approximately 3,100,000 Palestinians live in the West Bank, of which around 42 percent are children under the age of 18 who have lived their entire lives under Israeli military control.</text></paragraph>\\n<paragraph id=\\\"HA9D98247338B42E5AC6E8FA5F9AAD6C4\\\">\\n<enum>(2)</enum>\\n<text>In the Israeli-occupied West Bank, there are two separate and unequal legal systems, with Israeli military law imposed on Palestinians and Israeli civilian law applied to Israeli settlers.</text></paragraph>\\n<paragraph id=\\\"H9F9DDEC41A1143AC86C53CBA4C83DA44\\\">\\nHouse\\n<enum>(3)</enum>\\n<text>Children are entitled to special protections and due process rights under international human rights law and international humanitarian law.</text></paragraph>\\n<paragraph id=\\\"H2CD2311BDED445418FBF31445711DEB0\\\">\\n<enum>(4)</enum>\\n<text>Israel has ratified the Convention on the Rights of the Child, which states\u2014</text><subparagraph id=\\\"H18D6211578684C30A71EE27D5DCED68E\\\">\\n<enum>(A)</enum>\\n<text>in article 37(a), that <quote>no child shall be subject to torture or other cruel, inhuman or degrading treatment or punishment</quote>;</text></subparagraph><subparagraph id=\\\"H8EF5491C70244533B27968CCC90E7763\\\">\\n<enum>(B)</enum>\\n<text>in article 37(b), that the arrest, detention or imprisonment of a child <quote>shall be used only as a measure of last resort and for the shortest appropriate period of time</quote>;</text></subparagraph><subparagraph id=\\\"H12D80A55347A4907A8540F3C76B7864C\\\">\\n<enum>(C)</enum>\\n<?xml version=\\\"1.0\\\"?>\\n<?xml-stylesheet type=\\\"text/xsl\\\" href=\\\"billres.xsl\\\"?>\\n<!DOCTYPE bill PUBLIC \\\"-//US Congress//DTDs/bill.dtd//EN\\\" \\\"bill.dtd\\\">\\n<bill bill-stage=\\\"Introduced-in-House\\\" dms-id=\\\"HE0BBC4F16F864DADAD2F114FB62B2F73\\\" public-private=\\\"public\\\" key=\\\"H\\\" bill-type=\\\"olc\\\"><metadata xmlns:dc=\\\"http://purl.org/dc/elements/1.1/\\\">\\n<dublinCore>\\n<dc:title>117 HR 3103 IH: Defending the Human Rights of Palestinian Children and Families Living Under Israeli Military Occupation Act</dc:title>\\n<dc:publisher>U.S. House of Representatives</dc:publisher>\\n<dc:date>2023-05-05</dc:date>\\n<dc:format>text/xml</dc:format>\\n<dc:language>EN</dc:language>\\n<dc:rights>Pursuant to Title 17 Section 105 of the United States Code, this file is not subject to copyright protection and is in the public domain.</dc:rights>\\n</dublinCore>\\n</metadata>\\n<form>\\n<distribution-code display=\\\"yes\\\">I</distribution-code><congress display=\\\"yes\\\">118th CONGRESS</congress><session display=\\\"yes\\\">1st Session</session><legis-num display=\\\"yes\\\">H. R. 3103</legis-num><current-chamber>IN THE HOUSE OF REPRESENTATIVES</current-chamber><action display=\\\"yes\\\"><action-date date=\\\"20230505\\\">May 5, 2023</action-date><action-desc><sponsor name-id=\\\"M001143\\\">Ms. McCollum</sponsor> (for herself, <cosponsor name-id=\\\"B001292\\\">Mr. Beyer</cosponsor>, <cosponsor name-id=\\\"P000617\\\">Ms. Pressley</cosponsor>, <cosponsor name-id=\\\"T000481\\\">Ms. Tlaib</cosponsor>, <cosponsor name-id=\\\"P000604\\\">Mr. Payne</cosponsor>, <cosponsor name-id=\\\"W000822\\\">Mrs. Watson Coleman</cosponsor>, <cosponsor name-id=\\\"O000173\\\">Ms. Omar</cosponsor>, <cosponsor name-id=\\\"G000551\\\">Mr. Grijalva</cosponsor>, <cosponsor name-id=\\\"B001223\\\">Mr. Bowman</cosponsor>, <cosponsor name-id=\\\"P000607\\\">Mr. Pocan</cosponsor>, <cosponsor name-id=\\\"B001224\\\">Ms. Bush</cosponsor>, <cosponsor name-id=\\\"J000298\\\">Ms. Jayapal</cosponsor>, <cosponsor name-id=\\\"G000586\\\">Mr. Garc\u00eda of Illinois</cosponsor>, <cosponsor name-id=\\\"O000172\\\">Ms. Ocasio-Cortez</cosponsor>, <cosponsor name-id=\\\"L000551\\\">Ms. Lee of California</cosponsor>, <cosponsor name-id=\\\"L000602\\\">Ms. Lee of Pennsylvania</cosponsor>, and <cosponsor name-id=\\\"E000296\\\">Mr. Evans</cosponsor>) introduced the following bill; which was referred to the <committee-name committee-id=\\\"HFA00\\\">Committee on Foreign Affairs</committee-name></action-desc></action><legis-type>A BILL</legis-type><official-title display=\\\"yes\\\">To promote and protect the human rights of Palestinians living under Israeli military occupation, and for other purposes.</official-title></form>\\n<text>in article 37(c), that <quote>every child deprived of liberty shall be treated with humanity and respect for the inherent dignity of the human person, and in a manner which takes into account the needs of persons of his or her age</quote>; and</text></subparagraph><subparagraph id=\\\"HC26DDB324BF943A9B497ED026066F4BD\\\">\\n<enum>(D)</enum>\\n<text>in article 37(d), that <quote>[e]very child deprived of his or her liberty shall have the right to prompt access to legal and other appropriate assistance, as well as the right to challenge the legality of the deprivation of his or her liberty before a court or other competent, independent and impartial authority, and to a prompt decision on any such action</quote>.</text></subparagraph></paragraph>\\n<paragraph id=\\\"HE6DA826C286A4268A5BA9E06DBA277D9\\\">\\n<enum>(5)</enum>\\n<text>The Government of Israel and its military detains around 500 to 700 Palestinian children between the ages of 12 and 17 each year and prosecutes them before a military court system that lacks basic and fundamental guarantees of due process in violation of international standards.</text></paragraph>\\n<paragraph id=\\\"H754B92DC4AA842F0914C8B9601A51CAC\\\">\\n<enum>(6)</enum>\\n<text>Israeli security forces detain children under the age of 12 for interrogation for extended periods of time even though the prosecution of children under 12 is prohibited by Israeli military law.</text></paragraph>\\n<paragraph id=\\\"HA186BDDA9BF942438B11FC258C30BFA6\\\">\\n<legis-body id=\\\"HCCA7D54B514E45E8BB14C7DAD269C991\\\" style=\\\"OLC\\\">\\n<enum>(7)</enum>\\n<section id=\\\"H8B40ECF34DF94E2984704BAF27023C7C\\\" section-type=\\\"section-one\\\">\\n<enum>1.</enum>\\n<header>Short title</header>\\n<text display-inline=\\\"no-display-inline\\\">This Act may be cited as the <quote><short-title>Defending the Human Rights of Palestinian Children and Families Living Under Israeli Military Occupation Act</short-title></quote>.</text></section>\\n<section id=\\\"HCBD9D776AD4A45038E39177BAAC5C190\\\" section-type=\\\"subsequent-section\\\">\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Palestinian children",
+      "Israeli occupation",
+      "Juvenile detention",
+      "Military courts",
+      "Children's rights",
+      "Due process",
+      "International human rights",
+      "International humanitarian law",
+      "Torture prevention"
+    ]
+  },
+  "segment_id": "processing_segment_8a2196646eeb4caa1a319e4d"
+}

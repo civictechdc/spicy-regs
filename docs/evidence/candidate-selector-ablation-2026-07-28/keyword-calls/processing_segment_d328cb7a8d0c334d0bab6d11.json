@@ -1,0 +1,103 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 3011.715,
+        "input_tokens": 2497,
+        "output_tokens": 90,
+        "request_id": "75f19945-8c17-4672-bcb4-956b9031fad6",
+        "response_id": "resp_05f336779f7f6ee8016a67b87676208191befa886067324663",
+        "status": "completed",
+        "total_tokens": 2587
+      }
+    ],
+    "duration_ms": 3012.924,
+    "input_tokens": 2497,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 90,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "4853e8439859d5b9053d2b78b04940570ccb6ae7a236ac5f6f64010257359b2c",
+    "prompt_token_estimate": 2458,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "1a1c11b1cef708c6dc1e58e444872469bae6f9a928fba417e3457db2605be3d3",
+    "requested_service_tier": "auto",
+    "response_id": "resp_05f336779f7f6ee8016a67b87676208191befa886067324663",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2587,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Software asset management",
+    "Information technology management",
+    "Software licensing",
+    "Asset inventory",
+    "Management practices",
+    "Program performance",
+    "Federal information systems"
+  ],
+  "ordinal": 25,
+  "request": {
+    "input": "{\"segment_text\":\"<title>GAO-26-108641, VA SOFTWARE ASSET MANAGEMENT : Adherence to Leading\\r\\nManagement Practices Needed to Achieve Intended Outcomes</title>\\r\\n<style>\\r\\n<!--\\r\\n /* Font Definitions */\\r\\n @font-face\\r\\n\\t{font-family:Wingdings;\\r\\n\\tpanose-1:5 0 0 0 0 0 0 0 0 0;}\\r\\n@font-face\\r\\n\\t{font-family:\\\"Cambria Math\\\";\\r\\n\\tpanose-1:2 4 5 3 5 4 6 3 2 4;}\\r\\n@font-face\\r\\n\\t{font-family:\\\"Segoe UI\\\";\\r\\n\\tpanose-1:2 11 5 2 4 2 4 2 2 3;}\\r\\n@font-face\\r\\n\\t{font-family:\\\"Segoe UI Symbol\\\";\\r\\n\\tpanose-1:2 11 5 2 4 2 4 2 2 3;}\\r\\n /* Style Definitions */\\r\\n p.MsoNormal, li.MsoNormal, div.MsoNormal\\r\\n\\t{margin:0in;\\r\\n\\tline-height:13.0pt;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;}\\r\\nh1\\r\\n\\t{mso-style-link:\\\"Heading 1 Char\\\";\\r\\n\\tmargin-top:12.0pt;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:12.0pt;\\r\\n\\tmargin-left:0in;\\r\\n\\tline-height:normal;\\r\\n\\tfont-size:18.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:#044F91;\\r\\n\\tfont-weight:normal;}\\r\\nh2\\r\\n\\t{mso-style-link:\\\"Heading 2 Char\\\";\\r\\n\\tmargin-top:12.0pt;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:12.0pt;\\r\\n\\tmargin-left:0in;\\r\\n\\tline-height:normal;\\r\\n\\tpage-break-before:always;\\r\\n\\tpage-break-after:avoid;\\r\\n\\tborder:none;\\r\\n\\tpadding:0in;\\r\\n\\tfont-size:18.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:#044F91;\\r\\n\\tfont-weight:normal;}\\r\\nh3\\r\\n\\t{mso-style-link:\\\"Heading 3 Char\\\";\\r\\n\\tmargin-top:6.0pt;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:6.0pt;\\r\\n\\tmargin-left:0in;\\r\\n\\tline-height:normal;\\r\\n\\tpage-break-after:avoid;\\r\\n\\tfont-size:16.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:#044F91;\\r\\n\\tfont-weight:bold;}\\r\\nh4\\r\\n\\t{mso-style-link:\\\"Heading 4 Char\\\";\\r\\n\\tmargin-top:12.0pt;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:12.0pt;\\r\\n\\tmargin-left:0in;\\r\\n\\tline-height:normal;\\r\\n\\tpage-break-after:avoid;\\r\\n\\tfont-size:14.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;\\r\\n\\tfont-weight:bold;}\\r\\nh5\\r\\n\\t{mso-style-link:\\\"Heading 5 Char\\\";\\r\\n\\tmargin-top:12.0pt;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:12.0pt;\\r\\n\\tmargin-left:.25in;\\r\\n\\tline-height:normal;\\r\\n\\tpage-break-after:avoid;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;\\r\\n\\tfont-weight:normal;\\r\\n\\ttext-decoration:underline;}\\r\\nh6\\r\\n\\t{mso-style-link:\\\"Heading 6 Char\\\";\\r\\n\\tmargin-top:12.0pt;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:12.0pt;\\r\\n\\tmargin-left:.25in;\\r\\n\\tline-height:normal;\\r\\n\\tpage-break-after:avoid;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;\\r\\n\\tfont-weight:bold;}\\r\\np.MsoHeading7, li.MsoHeading7, div.MsoHeading7\\r\\n\\t{mso-style-link:\\\"Heading 7 Char\\\";\\r\\n\\tmargin-top:12.0pt;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:3.0pt;\\r\\n\\tmargin-left:.25in;\\r\\n\\tline-height:normal;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;\\r\\n\\tfont-style:italic;}\\r\\np.MsoHeading8, li.MsoHeading8, div.MsoHeading8\\r\\n\\t{mso-style-link:\\\"Heading 8 Char\\\";\\r\\n\\tmargin-top:12.0pt;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:12.0pt;\\r\\n\\tmargin-left:.25in;\\r\\n\\tline-height:normal;\\r\\n\\tfont-size:12.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;\\r\\n\\ttext-decoration:underline;}\\r\\np.MsoHeading9, li.MsoHeading9, div.MsoHeading9\\r\\n\\t{mso-style-link:\\\"Heading 9 Char\\\";\\r\\n\\tmargin-top:12.0pt;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:3.0pt;\\r\\n\\tmargin-left:0in;\\r\\n\\tline-height:13.0pt;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;}\\r\\np.MsoIndex1, li.MsoIndex1, div.MsoIndex1\\r\\n\\t{margin-top:0in;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:0in;\\r\\n\\tmargin-left:11.0pt;\\r\\n\\ttext-indent:-11.0pt;\\r\\n\\tline-height:13.0pt;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;}\\r\\np.MsoIndex2, li.MsoIndex2, div.MsoIndex2\\r\\n\\t{margin-top:0in;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:0in;\\r\\n\\tmargin-left:22.0pt;\\r\\n\\ttext-indent:-11.0pt;\\r\\n\\tline-height:13.0pt;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;}\\r\\np.MsoIndex3, li.MsoIndex3, div.MsoIndex3\\r\\n\\t{margin-top:0in;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:0in;\\r\\n\\tmargin-left:33.0pt;\\r\\n\\ttext-indent:-11.0pt;\\r\\n\\tline-height:13.0pt;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;}\\r\\np.MsoIndex4, li.MsoIndex4, div.MsoIndex4\\r\\n\\t{margin-top:0in;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:0in;\\r\\n\\tmargin-left:44.0pt;\\r\\n\\ttext-indent:-11.0pt;\\r\\n\\tline-height:13.0pt;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;}\\r\\np.MsoIndex5, li.MsoIndex5, div.MsoIndex5\\r\\n\\t{margin-top:0in;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:0in;\\r\\n\\tmargin-left:55.0pt;\\r\\n\\ttext-indent:-11.0pt;\\r\\n\\tline-height:13.0pt;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;}\\r\\np.MsoIndex6, li.MsoIndex6, div.MsoIndex6\\r\\n\\t{margin-top:0in;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:0in;\\r\\n\\tmargin-left:66.0pt;\\r\\n\\ttext-indent:-11.0pt;\\r\\n\\tline-height:13.0pt;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;}\\r\\np.MsoIndex7, li.MsoIndex7, div.MsoIndex7\\r\\n\\t{margin-top:0in;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:0in;\\r\\n\\tmargin-left:77.0pt;\\r\\n\\ttext-indent:-11.0pt;\\r\\n\\tline-height:13.0pt;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;}\\r\\np.MsoIndex8, li.MsoIndex8, div.MsoIndex8\\r\\n\\t{margin-top:0in;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:0in;\\r\\n\\tmargin-left:88.0pt;\\r\\n\\ttext-indent:-11.0pt;\\r\\n\\tline-height:13.0pt;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;}\\r\\np.MsoIndex9, li.MsoIndex9, div.MsoIndex9\\r\\n\\t{margin-top:0in;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:0in;\\r\\n\\tmargin-left:99.0pt;\\r\\n\\ttext-indent:-11.0pt;\\r\\n\\tline-height:13.0pt;\\r\\n\\tfont-size:11.0pt;\\r\\n\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Software asset management",
+      "Information technology management",
+      "Software licensing",
+      "Asset inventory",
+      "Management practices",
+      "Program performance",
+      "Federal information systems"
+    ]
+  },
+  "segment_id": "processing_segment_d328cb7a8d0c334d0bab6d11"
+}

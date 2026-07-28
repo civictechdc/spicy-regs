@@ -1,0 +1,105 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 3073.618,
+        "input_tokens": 1982,
+        "output_tokens": 114,
+        "request_id": "d143914d-7111-4f7d-aa19-51ebd6e507e0",
+        "response_id": "resp_061a7ce94c394bc6016a67b86e458c81a0b6a0b33d95b70b48",
+        "status": "completed",
+        "total_tokens": 2096
+      }
+    ],
+    "duration_ms": 3074.639,
+    "input_tokens": 1982,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 114,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "dc58fdcbc11fa03b1faad0769cf66fa745772bd97382688d731f45759c27dd3a",
+    "prompt_token_estimate": 1943,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "7b982222cc73affe9f7de1a364bb5f747e62ec455de45657653827aee5405534",
+    "requested_service_tier": "auto",
+    "response_id": "resp_061a7ce94c394bc6016a67b86e458c81a0b6a0b33d95b70b48",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2096,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Article III standing",
+    "Student loan forgiveness",
+    "Federal student aid",
+    "Procedural rights",
+    "Causation and traceability",
+    "Administrative rulemaking",
+    "Higher education law",
+    "National emergency powers"
+  ],
+  "ordinal": 22,
+  "request": {
+    "input": "{\"segment_text\":\"PRELIMINARY PRINT \\nVolume 600 U. S. Part 1 \\nPages 551\u2013569 \\nOFFICIAL REPORTS \\nOF \\nTHE SUPREME COURT \\nJune 30, 2023 \\nREBECCA A. WOMELDORF \\nreporter of decisions \\nPage Proof Pending Publication\\nNOTICE: This preliminary print is subject to formal revision before \\nthe bound volume is published. Users are requested to notify the Reporter \\nof Decisions, Supreme Court of the United States, Washington, D.C. 20543, \\npio@supremecourt.gov, of any typographical or other formal errors. \\n\\f\\nOCTOBER TERM, 2022 551 \\nSyllabus \\nDEPARTMENT OF EDUCATION et al. v. BROWN \\net al. \\ncertiorari before judgment to the united states \\ncourt of appeals for the \ue405fth circuit \\nNo. 22\u2013535. Argued February 28, 2023\u2014Decided June 30, 2023 \\nTo alleviate hardship expected to be caused by the impending resumption \\nof federal student-loan repayments that had been suspended during the \\nmulti-year coronavirus pandemic, Secretary of Education Miguel Car-\\ndona announced a substantial student-loan debt-forgiveness plan (Plan). \\nThe Plan discharges $10,000 to $20,000 of an eligible borrower's debt, \\ndepending on criteria such as the borrower's income and the type of \\nloan held. The Secretary invoked the Higher Education Relief Oppor-\\ntunities for Students Act of 2003 (HEROES Act), which authorizes the \\nSecretary \u201cto waive or modify any provision\u201d applicable to federal \u201cstu-\\ndent fnancial assistance\u201d programs \u201cas may be necessary to ensure that \\n. . . recipients of student fnancial assistance\u201d are no worse off \u201cfnan-\\ncially in relation to that fnancial assistance because\u201d of a national emer-\\ngency or disaster. 20 U. S. C. \u00a7\u00a7 1098bb(a)(1), (a)(2)(A), 1098ee(2)(C)\u2013 \\n(D). The HEROES Act also exempts rules promulgated pursuant to \\nit from the otherwise-applicable negotiated-rulemaking and notice-and-\\ncomment processes. \\nBefore the Plan took effect, various plaintiffs\u2014including respondents \\nhere\u2014sued to enjoin it. Respondents Myra Brown and Alexander \\nTaylor are two borrowers who do not qualify for the maximum relief \\navailable under the Plan. Their one-count complaint alleges that the \\nSecretary was required to follow notice-and-comment and negotiated-\\nrulemaking procedures in promulgating the Plan, which all agree he did \\nnot do. Brown and Taylor argue that the HEROES Act's procedural \\nexemptions apply only when the rule promulgated is substantively au-\\nthorized by the Act, and because the HEROES Act does not authorize \\nthe Plan (they argue), the Secretary was required to follow negotiated \\nrulemaking and notice and comment. The District Court rejected their \\nargument regarding the scope of the HEROES Act's procedural exemp-\\ntions, but nevertheless vacated the Plan as substantively unauthorized. \\nThis Court granted certiorari before judgment to consider this case \\nalongside Biden v. Nebraska, No. 22\u2013506, which presents a similar chal-\\nlenge to the Plan. \\nHeld: Because respondents fail to establish that any injury they suffer \\nfrom not having their loans forgiven is fairly traceable to the Plan, they \\nPage Proof Pending Publication\\n\\f\\nPage Proof Pending Publication\\n552 DEP ARTMENT OF EDUCATION v. BROWN \\nSyllabus \\nlack Article III standing, so the Court has no jurisdiction to address \\ntheir procedural claim. Pp. 560\u2013569. \\n(a) \u201cThis case begins and ends with standing.\u201d Carney v. Adams, \\n592 U. S. \u2013\u2013\u2013, \u2013\u2013\u2013. The Court's authority under the Constitution is \\nlimited to resolving \u201cCases\u201d or \u201cControversies.\u201d Art. III, \u00a7 2. The \\nCourt's jurisprudence has \u201cestablished that the irreducible constitu-\\ntional minimum of standing contains three elements\u201d that a plaintiff \\nmust plead and\u2014ultimately\u2014prove. Lujan v. Defenders of Wildlife , \\n504 U. S. 555, 560. Those elements are: (1) a \u201cconcrete and particular-\\nized\u201d injury that is (2) \u201cfairly traceable\u201d to the challenged action of the \\ndefendant and (3) \u201clikely\u201d to be \u201credressed by a favorable decision.\u201d \\nId., at 560\u2013561 (alterations and internal quotation marks omitted). But \\nwhere, as here, the plaintiff alleges that she has been deprived of a \\nprocedural right to protect her concrete interest, she need not show that \\nobserving the contested procedure would necessarily lead to a different \\nsubstantive result. Id., at 572, n. 7. Pp. 560\u2013562. \\n(b) As articulated in this Court, respondents' claim and theory of \\nstanding are twofold: First, because the HEROES Act does not substan-\\ntively authorize the Plan, the Secretary was obligated to follow typical \\nnegotiated-rulemaking and notice-and-comment requirements. Second, \\nif the Secretary had observed those procedures, respondents might have \\nused those opportunities to convince him not only that proceeding under \\nthe HEROES Act is unlawful, but also that he should instead adopt a \\ndifferent loan-forgiveness program under the Higher Education Act of \\n1965 (HEA), and to make that program more generous to respondents \\nthan the Plan. Respondents assert there is at least a chance that this \\nseries of events will come to pass now if this Court vacates the Plan. \\nPp. 562\u2013563. \\n(c) Respondents' standing claim most clearly fails on traceability: \\nThey cannot show that their purported injury of not receiving loan relief \\nunder the HEA is fairly traceable to the Department's (allegedly unlaw-\\nful) decision to grant loan relief under the HEROES Act. Pp. 563\u2013569. \\n(1) Signifcantly, respondents are not claiming that they are injured \\nby not being suffciently included among the Plan's benefciaries: They \\nthink the Plan is substantively unlawful and instead seek debt forgive-\\nness under the HEA. But a decision regarding the lawfulness of the \\nPlan does not directly affect respondents' ability to obtain loan relief \\nunder the HEA; the Department's authority to grant loan relief under \\nthe HEA (upon which the Court does not pass) is not affected by \\nwhether the Plan is lawful or unlawful. Any connection between loan \\nforgiveness under the two statutes is speculative. \\nWhile it is true that the Court's procedural-standing case law toler-\\nates uncertainty over whether observing certain procedures would have \\n\\f\\nPage Proof Pending Publication\\nCite as: 600 U. S. 551 (2023) 553 \\nSyllabus \\nled to (caused) a different substantive outcome, see Lujan, 504 U. S., at \\n572, n. 7, the causal uncertainty here is not so limited. Instead, the \\nuncertainty concerns whether the substantive decisions the Department \\nhas made regarding the Plan under the HEROES Act have a causal \\nrelationship with other substantive decisions respondents want the De-\\npartment to make under the HEA. There is no precedent for tolerating \\nthis sort of causal uncertainty. Respondents cannot show that the de-\\nnial of HEA loan relief\u2014their ostensible injury\u2014\u201cfairly can be traced \\nto\u201d the Department's decision to grant loan relief in the Plan. Simon \\nv. Eastern Ky. Welfare Rights Organization, 426 U. S. 26, 42\u201343. \\nThere is little reason to think that the Department's discretionary deci-\\nsion to pursue one mechanism of loan relief under the HEROES Act has \\nanything to do with its discretionary decision to pursue (or not pursue) \\naction under the HEA. \u201cThe line of causation between\u201d the Depart-\\nment's promulgation of the Plan and respondents' lack of benefts under \\n\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Article III standing",
+      "Student loan forgiveness",
+      "Federal student aid",
+      "Procedural rights",
+      "Causation and traceability",
+      "Administrative rulemaking",
+      "Higher education law",
+      "National emergency powers"
+    ]
+  },
+  "segment_id": "processing_segment_cee8a816785b38ff6391bbb0"
+}

@@ -1,0 +1,105 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 2421.654,
+        "input_tokens": 1991,
+        "output_tokens": 101,
+        "request_id": "2d57356f-338e-9135-a446-c28176058607",
+        "response_id": "resp_0ccfc7f289d1aa3e016a67b87408ac819dbe51368eae706830",
+        "status": "completed",
+        "total_tokens": 2092
+      }
+    ],
+    "duration_ms": 2423.366,
+    "input_tokens": 1991,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 101,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "11ab1be60c60e53e45dd295134ae478e57a22e6c6a69062b959c4a4415f87707",
+    "prompt_token_estimate": 1952,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "6119c9e52280bbbdaa1f67a52142c0a57a5a252ea0b73d6b6ce336e2db2b7915",
+    "requested_service_tier": "auto",
+    "response_id": "resp_0ccfc7f289d1aa3e016a67b87408ac819dbe51368eae706830",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2092,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Student loan forgiveness",
+    "Federal student loans",
+    "Executive authority",
+    "Statutory interpretation",
+    "National emergency powers",
+    "State standing",
+    "Public corporations",
+    "Higher education finance"
+  ],
+  "ordinal": 24,
+  "request": {
+    "input": "{\"segment_text\":\"PRELIMINARY PRINT \\nVolume 600 U. S. Part 1 \\nPages 477\u2013550 \\nOFFICIAL REPORTS \\nOF \\nTHE SUPREME COURT \\nJune 30, 2023 \\nREBECCA A. WOMELDORF \\nreporter of decisions \\nPage Proof Pending Publication\\nNOTICE: This preliminary print is subject to formal revision before \\nthe bound volume is published. Users are requested to notify the Reporter \\nof Decisions, Supreme Court of the United States, Washington, D.C. 20543, \\npio@supremecourt.gov, of any typographical or other formal errors. \\n\\f\\nPage Proof Pending Publication\\nOCTOBER TERM, 2022 477 \\nSyllabus \\nBIDEN, PRESIDENT OF THE UNITED STATES, \\net al. v. NEBRASKA et al. \\ncertiorari before judgment to the united states \\ncourt of appeals for the eighth circuit \\nNo. 22\u2013506. Argued February 28, 2023\u2014Decided June 30, 2023 \\nTitle IV of the Higher Education Act of 1965 (Education Act) governs \\nfederal fnancial aid mechanisms, including student loans. 20 U. S. C. \\n\u00a7 1070(a). The Act authorizes the Secretary of Education to cancel or \\nreduce loans in certain limited circumstances. The Secretary may can-\\ncel a set amount of loans held by some public servants, see \u00a7\u00a7 1078\u201310, \\n1087j, 1087ee. He may also forgive the loans of borrowers who have \\ndied or become \u201cpermanently and totally disabled,\u201d \u00a7 1087(a)(1); borrow-\\ners who are bankrupt, \u00a7 1087(b); and borrowers whose schools falsely \\ncertify them, close down, or fail to pay lenders, \u00a7 1087(c). \\nThe issue presented in this case is whether the Secretary has author-\\nity under the Higher Education Relief Opportunities for Students Act \\nof 2003 (HEROES Act) to depart from the existing provisions of the \\nEducation Act and establish a student loan forgiveness program that \\nwill cancel about $430 billion in debt principal and affect nearly all bor-\\nrowers. Under the HEROES Act, the Secretary \u201cmay waive or modify \\nany statutory or regulatory provision applicable to the student fnancial \\nassistance programs under title IV of the [Education Act] as the Secre-\\ntary deems necessary in connection with a war or other military opera-\\ntion or national emergency.\u201d \u00a7 1098bb(a)(1). As relevant here, the \\nSecretary may issue such waivers or modifcations only \u201cas may be nec-\\nessary to ensure\u201d that \u201crecipients of student fnancial assistance under \\ntitle IV of the [Education Act affected by a national emergency] are \\nnot placed in a worse position fnancially in relation to that fnancial as-\\nsistance because of [the national emergency].\u201d \u00a7\u00a7 1098bb(a)(2)(A), \\n1098ee(2)(C)\u2013(D). \\nIn 2022, a few weeks before President Biden stated that \u201cthe \\n[COVID\u201319] pandemic is over,\u201d the Secretary invoked the HEROES \\nAct to issue \u201cwaivers and modifcations\u201d reducing or eliminating the \\nfederal student debt of most borrowers. Borrowers with eligible fed-\\neral student loans who had an income below $125,000 in either 2020 or \\n2021 qualifed for a loan balance discharge of up to $10,000. Those who \\npreviously received Pell Grants\u2014a specifc type of federal student loan \\nbased on fnancial need\u2014qualifed for a discharge of up to $20,000. \\n\\f\\nPage Proof Pending Publication\\n478 BIDEN v. NEBRASKA \\nSyllabus \\nSix States challenged the plan as exceeding the Secretary's statutory \\nauthority. The Eighth Circuit issued a nationwide preliminary injunc-\\ntion, and this Court granted certiorari before judgment. \\nHeld: \\n1. At least Missouri has standing to challenge the Secretary's pro-\\ngram. Article III requires a plaintiff to have suffered an injury in \\nfact\u2014a concrete and imminent harm to a legally protected interest, like \\nproperty or money\u2014that is fairly traceable to the challenged conduct \\nand likely to be redressed by the lawsuit. Lujan v. Defenders of Wild-\\nlife, 504 U. S. 555, 560\u2013561. Here, as the Government concedes, the \\nSecretary's plan would cost MOHELA, a nonproft government corpora-\\ntion created by Missouri to participate in the student loan market, an \\nestimated $44 million a year in fees. MOHELA is, by law and function, \\nan instrumentality of Missouri: Labeled an \u201cinstrumentality\u201d by the \\nState, it was created by the State, is supervised by the State, and serves \\na public function. The harm to MOHELA in the performance of its \\npublic function is necessarily a direct injury to Missouri itself. The \\nCourt reached a similar conclusion 70 years ago in Arkansas v. Texas, \\n346 U. S. 368. \\nThe Secretary emphasizes that, as a public corporation, MOHELA \\nhas a legal personality separate from the State. But such an instru-\\nmentality\u2014created and supervised by the State to serve a public func-\\ntion\u2014remains \u201c(for many purposes at least) part of the Government \\nitself.\u201d Lebron v. National Railroad Passenger Corporation, 513 U. S. \\n374, 397. The Secretary also contends that because MOHELA can sue \\non its own behalf, it\u2014not Missouri\u2014must be the one to sue. But where \\na State has been harmed in carrying out its responsibilities, the fact \\nthat it chose to exercise its authority through a public corporation it \\ncreated and controls does not bar the State from suing to remedy that \\nharm itself. See Arkansas, 346 U. S. 368. With Article III satisfed, \\nthe Court need not consider the States' other standing arguments. \\nPp. 489\u2013494. \\n2. The HEROES Act allows the Secretary to \u201cwaive or modify\u201d exist-\\ning statutory or regulatory provisions applicable to fnancial assistance \\nprograms under the Education Act, but does not allow the Secretary to \\nrewrite that statute to the extent of canceling $430 billion of student \\nloan principal. Pp. 494\u2013507. \\n(a) The text of the HEROES Act does not authorize the Secretary's \\nloan forgiveness program. The Secretary's power under the Act to \\n\u201cmodify\u201d does not permit \u201cbasic and fundamental changes in the \\nscheme\u201d designed by Congress. MCI Telecommunications Corp. v. \\nAmerican Telephone & Telegraph Co., 512 U. S. 218, 225. Instead, \\n\u201cmodify\u201d carries \u201ca connotation of increment or limitation,\u201d and must \\n\\f\\nPage Proof Pending Publication\\nCite as: 600 U. S. 477 (2023) 479 \\nSyllabus \\nbe read to mean \u201cto change moderately or in minor fashion.\u201d Ibid. \\nThat is how the word is ordinarily used and defned, and the legal def-\\nnition is no different. \\nThe authority to \u201cmodify\u201d statutes and regulations allows the Secre-\\ntary to make modest adjustments and additions to existing provisions, \\nnot transform them. Prior to the COVID\u201319 pandemic, \u201cmodifcations\u201d \\nissued under the Act were minor and had limited effect. But the \u201cmodi-\\nfcations\u201d challenged here create a novel and fundamentally different \\nloan forgiveness program. While Congress specifed in the Education \\nAct a few narrowly delineated situations that could qualify a borrower \\nfor loan discharge, the Secretary has extended such discharge to nearly \\nevery borrower in the country. It is \u201chighly unlikely that Congress\u201d \\nauthorized such a sweeping loan cancellation program \u201cthrough such a \\nsubtle device as permission to `modify.' \u201d Id., at 231. \\nThe Secretary responds that the Act authorizes him to \u201cwaive\u201d legal \\nprovisions as well as modify them\u2014and that this additional term \\n\u201cgrant[s] broader authority\u201d than would \u201cmodify\u201d alone. But the Secre-\\n\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Student loan forgiveness",
+      "Federal student loans",
+      "Executive authority",
+      "Statutory interpretation",
+      "National emergency powers",
+      "State standing",
+      "Public corporations",
+      "Higher education finance"
+    ]
+  },
+  "segment_id": "processing_segment_d0d060ca4aa47936a012782f"
+}

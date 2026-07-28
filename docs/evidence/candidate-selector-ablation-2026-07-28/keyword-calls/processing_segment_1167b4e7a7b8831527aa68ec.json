@@ -1,0 +1,101 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 5245.759,
+        "input_tokens": 2489,
+        "output_tokens": 94,
+        "request_id": "5d666e83-6583-4109-9bd4-546dc73850ae",
+        "response_id": "resp_0a31a30243cf033d016a67b823e0a0819ebe45ab11bdcc80cf",
+        "status": "completed",
+        "total_tokens": 2583
+      }
+    ],
+    "duration_ms": 5246.561,
+    "input_tokens": 2489,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 94,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "b52bb998aae16cdb96ec3fb92356b803c187a36e51c42b5e60a8cb562493c242",
+    "prompt_token_estimate": 2450,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "a2e329d8f499f81ea939052b9fa0c8b4396669731d14c7d81e5990a589671ab1",
+    "requested_service_tier": "auto",
+    "response_id": "resp_0a31a30243cf033d016a67b823e0a0819ebe45ab11bdcc80cf",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2583,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Project partnership agreements",
+    "Legal protections",
+    "Civil works projects",
+    "Stakeholder perspectives",
+    "Federal partnerships",
+    "Infrastructure development"
+  ],
+  "ordinal": 2,
+  "request": {
+    "input": "{\"segment_text\":\"<title>GAO-26-108625, ARMY CORPS OF ENGINEERS: Stakeholders and Corps Views on\\r\\nLegal Protections in Project Partnership Agreements</title>\\r\\n<style>\\r\\n<!--\\r\\n /* Font Definitions */\\r\\n @font-face\\r\\n\\t{font-family:Wingdings;\\r\\n\\tpanose-1:5 0 0 0 0 0 0 0 0 0;}\\r\\n@font-face\\r\\n\\t{font-family:\\\"Cambria Math\\\";\\r\\n\\tpanose-1:2 4 5 3 5 4 6 3 2 4;}\\r\\n /* Style Definitions */\\r\\n p.MsoNormal, li.MsoNormal, div.MsoNormal\\r\\n\\t{margin:0in;\\r\\n\\tline-height:13.0pt;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;}\\r\\nh1\\r\\n\\t{mso-style-link:\\\"Heading 1 Char\\\";\\r\\n\\tmargin-top:12.0pt;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:12.0pt;\\r\\n\\tmargin-left:0in;\\r\\n\\tline-height:normal;\\r\\n\\tfont-size:18.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:#044F91;\\r\\n\\tfont-weight:normal;}\\r\\nh2\\r\\n\\t{mso-style-link:\\\"Heading 2 Char\\\";\\r\\n\\tmargin-top:12.0pt;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:12.0pt;\\r\\n\\tmargin-left:0in;\\r\\n\\tline-height:normal;\\r\\n\\tpage-break-before:always;\\r\\n\\tpage-break-after:avoid;\\r\\n\\tborder:none;\\r\\n\\tpadding:0in;\\r\\n\\tfont-size:18.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:#044F91;\\r\\n\\tfont-weight:normal;}\\r\\nh3\\r\\n\\t{mso-style-link:\\\"Heading 3 Char\\\";\\r\\n\\tmargin-top:6.0pt;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:6.0pt;\\r\\n\\tmargin-left:0in;\\r\\n\\tline-height:normal;\\r\\n\\tpage-break-after:avoid;\\r\\n\\tfont-size:16.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:#044F91;\\r\\n\\tfont-weight:bold;}\\r\\nh4\\r\\n\\t{mso-style-link:\\\"Heading 4 Char\\\";\\r\\n\\tmargin-top:12.0pt;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:12.0pt;\\r\\n\\tmargin-left:0in;\\r\\n\\tline-height:normal;\\r\\n\\tpage-break-after:avoid;\\r\\n\\tfont-size:14.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;\\r\\n\\tfont-weight:bold;}\\r\\np.MsoToc1, li.MsoToc1, div.MsoToc1\\r\\n\\t{margin-top:6.0pt;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:6.0pt;\\r\\n\\tmargin-left:0in;\\r\\n\\tline-height:normal;\\r\\n\\tpage-break-after:avoid;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:blue;\\r\\n\\ttext-transform:uppercase;\\r\\n\\tfont-weight:bold;}\\r\\np.MsoToc3, li.MsoToc3, div.MsoToc3\\r\\n\\t{mso-style-name:\\\"TOC 3\\\\,Head1s\\\";\\r\\n\\tmargin-top:0in;\\r\\n\\tmargin-right:.5in;\\r\\n\\tmargin-bottom:0in;\\r\\n\\tmargin-left:12.25pt;\\r\\n\\ttext-indent:-12.25pt;\\r\\n\\tline-height:13.0pt;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:blue;}\\r\\np.MsoToc4, li.MsoToc4, div.MsoToc4\\r\\n\\t{mso-style-name:\\\"TOC 4\\\\,Tables\\\";\\r\\n\\tmargin-top:0in;\\r\\n\\tmargin-right:.5in;\\r\\n\\tmargin-bottom:0in;\\r\\n\\tmargin-left:40.3pt;\\r\\n\\ttext-indent:-40.3pt;\\r\\n\\tline-height:13.0pt;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:blue;}\\r\\np.MsoToc5, li.MsoToc5, div.MsoToc5\\r\\n\\t{mso-style-name:\\\"TOC 5\\\\,Figures\\\";\\r\\n\\tmargin-top:0in;\\r\\n\\tmargin-right:.5in;\\r\\n\\tmargin-bottom:0in;\\r\\n\\tmargin-left:.6in;\\r\\n\\ttext-indent:-.6in;\\r\\n\\tline-height:13.0pt;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:blue;}\\r\\np.MsoFootnoteText, li.MsoFootnoteText, div.MsoFootnoteText\\r\\n\\t{mso-style-link:\\\"Footnote Text Char\\\";\\r\\n\\tmargin-top:0in;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:8.0pt;\\r\\n\\tmargin-left:0in;\\r\\n\\tline-height:normal;\\r\\n\\tfont-size:9.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;}\\r\\nspan.MsoFootnoteReference\\r\\n\\t{position:relative;\\r\\n\\ttop:1.0pt;\\r\\n\\tletter-spacing:0pt;\\r\\n\\tvertical-align:super;}\\r\\np.MsoListBullet, li.MsoListBullet, div.MsoListBullet\\r\\n\\t{margin-top:0in;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:6.0pt;\\r\\n\\tmargin-left:.25in;\\r\\n\\ttext-indent:-.25in;\\r\\n\\tline-height:normal;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;}\\r\\np.MsoBodyText, li.MsoBodyText, div.MsoBodyText\\r\\n\\t{mso-style-link:\\\"Body Text Char\\\";\\r\\n\\tmargin-top:12.0pt;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:12.0pt;\\r\\n\\tmargin-left:0in;\\r\\n\\tline-height:normal;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;}\\r\\na:link, span.MsoHyperlink\\r\\n\\t{color:blue;\\r\\n\\ttext-decoration:none;}\\r\\np.NoteCaption, li.NoteCaption, div.NoteCaption\\r\\n\\t{mso-style-name:\\\"Note\\\\/Caption\\\";\\r\\n\\tmargin-top:4.0pt;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:3.0pt;\\r\\n\\tmargin-left:0in;\\r\\n\\tline-height:normal;\\r\\n\\tfont-size:8.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;}\\r\\np.Cell-AlignLeft, li.Cell-AlignLeft, div.Cell-AlignLeft\\r\\n\\t{mso-style-name:\\\"Cell - Align Left\\\";\\r\\n\\tmargin-top:1.0pt;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:3.0pt;\\r\\n\\tmargin-left:0in;\\r\\n\\tline-height:normal;\\r\\n\\tfont-size:9.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;}\\r\\np.ReportNumber, li.ReportNumber, div.ReportNumber\\r\\n\\t{mso-style-name:\\\"Report Number\\\";\\r\\n\\tmargin:0in;\\r\\n\\tline-height:13.0pt;\\r\\n\\tbackground:white;\\r\\n\\tfont-size:12.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;}\\r\\np.ITC12, li.ITC12, div.ITC12\\r\\n\\t{mso-style-name:ITC12;\\r\\n\\tmargin:0in;\\r\\n\\tline-height:normal;\\r\\n\\tbackground:white;\\r\\n\\tfont-size:12.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:black;}\\r\\np.FigureTable-TitleFigureFull, li.FigureTable-TitleFigureFull, div.FigureTable-TitleFigureFull\\r\\n\\t{mso-style-name:\\\"Figure\\\\/Table - Title Figure Full\\\";\\r\\n\\tmargin-top:6.0pt;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:6.0pt;\\r\\n\\tmargin-left:0in;\\r\\n\\tline-height:normal;\\r\\n\\tpage-break-after:avoid;\\r\\n\\tborder:none;\\r\\n\\tpadding:0in;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:#044F91;\\r\\n\\tfont-weight:bold;}\\r\\np.FigureTable-TitleTableFull, li.FigureTable-TitleTableFull, div.FigureTable-TitleTableFull\\r\\n\\t{mso-style-name:\\\"Figure\\\\/Table - Title Table Full\\\";\\r\\n\\tmargin-top:6.0pt;\\r\\n\\tmargin-right:0in;\\r\\n\\tmargin-bottom:6.0pt;\\r\\n\\tmargin-left:0in;\\r\\n\\tline-height:normal;\\r\\n\\tpage-break-after:avoid;\\r\\n\\tborder:none;\\r\\n\\tpadding:0in;\\r\\n\\tfont-size:11.0pt;\\r\\n\\tfont-family:\\\"Arial\\\",sans-serif;\\r\\n\\tcolor:#044F91;\\r\\n\\tfont-weight:bold;}\\r\\np.FigureTable-TitleFigure23, li.FigureTable-TitleFigure23, div.FigureTable-TitleFigure23\\r\\n\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Project partnership agreements",
+      "Legal protections",
+      "Civil works projects",
+      "Stakeholder perspectives",
+      "Federal partnerships",
+      "Infrastructure development"
+    ]
+  },
+  "segment_id": "processing_segment_1167b4e7a7b8831527aa68ec"
+}

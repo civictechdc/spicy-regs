@@ -1,0 +1,105 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 2702.789,
+        "input_tokens": 1991,
+        "output_tokens": 115,
+        "request_id": "9ed1e908-9166-4882-ae7e-941d882fb6ff",
+        "response_id": "resp_0e08cd15468d0d05016a67b88da7d481a183c95beb428c586b",
+        "status": "completed",
+        "total_tokens": 2106
+      }
+    ],
+    "duration_ms": 2703.574,
+    "input_tokens": 1991,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 115,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "cffa158b53cec64bd4ac352561cb193dd7681cb8e219bf0f3d41d068ebfad4ad",
+    "prompt_token_estimate": 1952,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "331fe973ce3034bdeba248978bd8765fdadb072cb459afe58570a9401326bee0",
+    "requested_service_tier": "auto",
+    "response_id": "resp_0e08cd15468d0d05016a67b88da7d481a183c95beb428c586b",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2106,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Compelled speech",
+    "Freedom of speech",
+    "Public accommodations",
+    "Anti-discrimination law",
+    "Expressive services",
+    "Website design",
+    "Same-sex marriage",
+    "Sexual orientation discrimination"
+  ],
+  "ordinal": 33,
+  "request": {
+    "input": "{\"segment_text\":\"PRELIMINARY PRINT \\nVolume 600 U. S. Part 1 \\nPages 570\u2013640 \\nOFFICIAL REPORTS \\nOF \\nTHE SUPREME COURT \\nJune 30, 2023 \\nREBECCA A. WOMELDORF \\nreporter of decisions \\nPage Proof Pending Publication\\nNOTICE: This preliminary print is subject to formal revision before \\nthe bound volume is published. Users are requested to notify the Reporter \\nof Decisions, Supreme Court of the United States, Washington, D.C. 20543, \\npio@supremecourt.gov, of any typographical or other formal errors. \\n\\f\\n570 OCTOBER TERM, 2022 \\nSyllabus \\n303 CREATIVE LLC et al. v. ELENIS et al. \\ncertiorari to the united states court of appeals for \\nthe tenth circuit \\nNo. 21\u2013476. Argued December 5, 2022\u2014Decided June 30, 2023 \\nLorie Smith wants to expand her graphic design business, 303 Creative \\nLLC, to include services for couples seeking wedding websites. But Ms. \\nSmith worries that Colorado will use the Colorado Anti-Discrimination \\nAct to compel her\u2014in violation of the First Amendment\u2014to create web-\\nsites celebrating marriages she does not endorse. To clarify her rights, \\nMs. Smith fled a lawsuit seeking an injunction to prevent the State \\nfrom forcing her to create websites celebrating marriages that defy her \\nbelief that marriage should be reserved to unions between one man and \\none woman. \\nCADA prohibits all \u201cpublic accommodations\u201d from denying \u201cthe full \\nand equal enjoyment\u201d of its goods and services to any customer based \\non his race, creed, disability, sexual orientation, or other statutorily enu-\\nmerated trait. Colo. Rev. Stat. \u00a7 24\u201334\u2013601(2)(a). The law defnes \\n\u201cpublic accommodation\u201d broadly to include almost every public-facing \\nbusiness in the State. \u00a7 24\u201334\u2013601(1). Either state offcials or private \\ncitizens may bring actions to enforce the law. \u00a7\u00a7 24\u201334\u2013306, 24\u201334\u2013 \\n602(1). And a variety of penalties can follow any violation. \\nBefore the district court, Ms. Smith and the State stipulated to a \\nnumber of facts: Ms. Smith is \u201cwilling to work with all people regardless \\nof classifcations such as race, creed, sexual orientation, and gender\u201d and \\n\u201cwill gladly create custom graphics and websites\u201d for clients of any sex-\\nual orientation; she will not produce content that \u201ccontradicts biblical \\ntruth\u201d regardless of who orders it; Ms. Smith's belief that marriage is a \\nunion between one man and one woman is a sincerely held conviction; \\nMs. Smith provides design services that are \u201cexpressive\u201d and her \u201corigi-\\nnal, customized\u201d creations \u201ccontribut[e] to the overall message\u201d her \\nbusiness conveys \u201cthrough the websites\u201d it creates; the wedding web-\\nsites she plans to create \u201cwill be expressive in nature,\u201d will be \u201ccusto-\\nmized and tailored\u201d through close collaboration with individual couples, \\nand will \u201cexpress Ms. Smith's and 303 Creative's message celebrating \\nand promoting\u201d her view of marriage; viewers of Ms. Smith's websites \\n\u201cwill know that the websites are her original artwork;\u201d and \u201c[t]here are \\nnumerous companies in the State of Colorado and across the nation that \\noffer custom website design services.\u201d \\nPage Proof Pending Publication\\n\\f\\nPage Proof Pending Publication\\nCite as: 600 U. S. 570 (2023) 571 \\nSyllabus \\nUltimately, the district court held that Ms. Smith was not entitled to \\nthe injunction she sought, and the Tenth Circuit affrmed. \\nHeld: The First Amendment prohibits Colorado from forcing a website \\ndesigner to create expressive designs speaking messages with which \\nthe designer disagrees. Pp. 584\u2013603. \\n(a) The framers designed the Free Speech Clause of the First Amend-\\nment to protect the \u201cfreedom to think as you will and to speak as you \\nthink.\u201d Boy Scouts of America v. Dale, 530 U. S. 640, 660\u2013661 (inter-\\nnal quotation marks omitted). The freedom to speak is among our in-\\nalienable rights. The freedom of thought and speech is \u201cindispensable \\nto the discovery and spread of political truth.\u201d Whitney v. California, \\n274 U. S. 357, 375 (Brandeis, J., concurring). For these reasons, \u201c[i]f \\nthere is any fxed star in our constitutional constellation,\u201d West Virginia \\nBd. of Ed. v. Barnette, 319 U. S. 624, 642, it is the principle that the \\ngovernment may not interfere with \u201can uninhibited marketplace of \\nideas,\u201d McCullen v. Coakley, 573 U. S. 464, 476 (internal quotation \\nmarks omitted). \\nThis Court has previously faced cases where governments have \\nsought to test these foundational principles. In Barnette, the Court \\nheld that the State of West Virginia's efforts to compel schoolchildren \\nto salute the Nation's fag and recite the Pledge of Allegiance \u201cinvad[ed] \\nthe sphere of intellect and spirit which it is the purpose of the First \\nAmendment . . . to reserve from all offcial control.\u201d 319 U. S., at 642. \\nState authorities had \u201ctranscend[ed] constitutional limitations on their \\npowers.\u201d Ibid. In Hurley v. Irish-American Gay, Lesbian and Bisex-\\nual Group of Boston, Inc., 515 U. S. 557, the Court held that Massachu-\\nsetts's public accommodations statute could not be used to force veter-\\nans organizing a parade in Boston to include a group of gay, lesbian, \\nand bisexual individuals because the parade was protected speech, and \\nrequiring the veterans to include voices they wished to exclude would \\nimpermissibly require them to \u201calter the expressive content of their \\nparade.\u201d Id., at 572\u2013573. And in Boy Scouts of America v. Dale, \\nwhen the Boy Scouts sought to exclude assistant scoutmaster James \\nDale from membership after learning he was gay, the Court held the \\nBoy Scouts to be \u201can expressive association\u201d entitled to First Amend-\\nment protection. 530 U. S., at 656. The Court found that forcing the \\nScouts to include Mr. Dale would undoubtedly \u201cinterfere with [its] \\nchoice not to propound a point of view contrary to its beliefs.\u201d Id., \\nat 654. \\nThese cases illustrate that the First Amendment protects an individu-\\nal's right to speak his mind regardless of whether the government con-\\n\\f\\n572 303 CREATIVE LLC v. ELENIS \\nSyllabus \\nsiders his speech sensible and well intentioned or deeply \u201cmisguided,\u201d \\nHurley, 515 U. S., at 574, and likely to cause \u201canguish\u201d or \u201cincalculable \\ngrief,\u201d Snyder v. Phelps, 562 U. S. 443, 456. Generally, too, the govern-\\nment may not compel a person to speak its own preferred messages. \\nSee Tinker v. Des Moines Independent Community School Dist., 393 \\nU. S. 503, 505. Pp. 584\u2013587. \\n(b) Applying these principles to the parties' stipulated facts, the \\nCourt agrees with the Tenth Circuit that the wedding websites \\nMs. Smith seeks to create qualify as pure speech protected by the First \\nAmendment under this Court's precedents. Ms. Smith's websites will \\nexpress and communicate ideas\u2014namely, those that \u201ccelebrate and pro-\\nmote the couple's wedding and unique love story\u201d and those that \u201ccele-\\nbrat[e] and promot[e]\u201d what Ms. Smith understands to be a marriage. \\nSpeech conveyed over the internet, like all other manner of speech, qual-\\nifes for the First Amendment's protections. And the Court agrees \\nwith the Tenth Circuit that the wedding websites Ms. Smith seeks to \\n\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Compelled speech",
+      "Freedom of speech",
+      "Public accommodations",
+      "Anti-discrimination law",
+      "Expressive services",
+      "Website design",
+      "Same-sex marriage",
+      "Sexual orientation discrimination"
+    ]
+  },
+  "segment_id": "processing_segment_f78c326cbb4040c423903b33"
+}

@@ -1,0 +1,103 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 5876.247,
+        "input_tokens": 706,
+        "output_tokens": 42,
+        "request_id": "d5f877ec-dc59-4e0c-961f-a3657dc7e7c3",
+        "response_id": "resp_03722bb23356cf00016a67b84ca69c81a3a3a1418f1c6b64a7",
+        "status": "completed",
+        "total_tokens": 748
+      }
+    ],
+    "duration_ms": 5877.107,
+    "input_tokens": 706,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 42,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "4ce4259a18c248339762c1e2976e04368e617cf55188a164879660ffd9b8e2d4",
+    "prompt_token_estimate": 667,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "678883e811dd9e9cef385215a3f3a9a5f8eb8ce6cec4be5042562fdf5b4e6d29",
+    "requested_service_tier": "auto",
+    "response_id": "resp_03722bb23356cf00016a67b84ca69c81a3a3a1418f1c6b64a7",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 748,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Bench grinders",
+    "Customs duties",
+    "Tariff suspension",
+    "Metal finishing",
+    "Cement finishing",
+    "Machine tool imports",
+    "Harmonized Tariff Schedule"
+  ],
+  "ordinal": 13,
+  "request": {
+    "input": "{\"segment_text\":\"A bill to suspend temporarily the duty on 8-inch bench grinders for grinding, polishing or otherwise finishing metal or cement, valued under $3,025 each.\\nRead twice and referred to the Committee on Finance.\\nSenate\\n<html><body>\\n<pre>\\n[Congressional Bills 109th Congress]\\n[From the U.S. Government Publishing Office]\\n[S. 2977 Introduced in Senate (IS)]\\n\\n\\n109th CONGRESS\\n  2d Session\\n                                S. 2977\\n\\nTo suspend temporarily the duty on 8-inch bench grinders for grinding, \\n polishing or otherwise finishing metal or cement, valued under $3,025 \\n                                 each.\\n\\n\\n_______________________________________________________________________\\n\\n\\n                   IN THE SENATE OF THE UNITED STATES\\n\\n                              May 23, 2006\\n\\n  Mr. Isakson introduced the following bill; which was read twice and \\n                  referred to the Committee on Finance\\n\\n_______________________________________________________________________\\n\\n                                 A BILL\\n\\n\\n \\nTo suspend temporarily the duty on 8-inch bench grinders for grinding, \\n polishing or otherwise finishing metal or cement, valued under $3,025 \\n                                 each.\\n\\n    Be it enacted by the Senate and House of Representatives of the \\nUnited States of America in Congress assembled,\\n\\nSECTION 1. 8-INCH BENCH GRINDERS FOR GRINDING, POLISHING OR OTHERWISE \\n              FINISHING METAL OR CEMENT, VALUED UNDER $3,025 EACH.\\n\\n    (a) In General.--Subchapter II of chapter 99 of the Harmonized \\nTariff Schedule of the United States is amended by inserting in \\nnumerical sequence the following new heading:\\n\\n      \\n\\n``      9902.84.60        8-inch bench grinders   Free      No change       No change       On or before 12/\\n                           for grinding,                                                     31/2009          ''\\n                           polishing or                                                                        .\\n                           otherwise finishing\\n                           metal or cement,\\n                           valued under $3,025\\n                           each (provided for in\\n                           subheading\\n                           8460.90.80)..........\\n\\n    (b) Effective Date.--The amendment made by subsection (a) applies \\nto goods entered, or withdrawn from warehouse for consumption, on or \\nafter the 15th day after the date of the enactment of this Act.\\n                                 &lt;all&gt;\\n</pre></body></html>\\n\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Bench grinders",
+      "Customs duties",
+      "Tariff suspension",
+      "Metal finishing",
+      "Cement finishing",
+      "Machine tool imports",
+      "Harmonized Tariff Schedule"
+    ]
+  },
+  "segment_id": "processing_segment_a0951fa0b83c989ba35b923a"
+}

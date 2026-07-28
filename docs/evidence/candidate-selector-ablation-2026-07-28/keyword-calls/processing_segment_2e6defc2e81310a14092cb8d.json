@@ -1,0 +1,109 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 2800.469,
+        "input_tokens": 2019,
+        "output_tokens": 133,
+        "request_id": "5eb704ea-ce77-400c-b1d9-35e0c7298787",
+        "response_id": "resp_0970c3b51750cddc016a67b828951081918e27abca9e1b4610",
+        "status": "completed",
+        "total_tokens": 2152
+      }
+    ],
+    "duration_ms": 2801.285,
+    "input_tokens": 2019,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 133,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "2259a2ba2c5d01d137903cfc5569a5ffeffa8fe6034b1cc95c63771bb66be13a",
+    "prompt_token_estimate": 1980,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "520069a8acb401ad816f4b52ca1465b3dcc2f71633aab82ea5f6e5bb7332d790",
+    "requested_service_tier": "auto",
+    "response_id": "resp_0970c3b51750cddc016a67b828951081918e27abca9e1b4610",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2152,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Title IX",
+    "religious exemptions",
+    "sex discrimination",
+    "religious educational institutions",
+    "federally funded education",
+    "sexual orientation discrimination",
+    "gender identity discrimination",
+    "administrative enforcement",
+    "civil rights litigation",
+    "constitutional challenges"
+  ],
+  "ordinal": 3,
+  "request": {
+    "input": "{\"segment_text\":\"Title IX\u2019s Religious Exemption: Agency Practice and Judicial Application\\nReports\\nCongressional Research Service  \\nContents \\nTitle IX: Background and Context .................................................................................................. 1 \\nAdministrative Enforcement ........................................................................................................... 3 \\nTitle IX Regulations .................................................................................................................. 3 \\nED OCR\u2019s Application of the Religious Exemption ................................................................. 6 \\nApplication of Religious Exemption by Agencies Other Than ED ........................................... 7 \\nCase Law Addressing Title IX\u2019s Religious Exemption ................................................................... 8 \\nReligious Control ...................................................................................................................... 9 \\nConflict with a Religious Tenet ................................................................................................. 9 \\nPretext Determinations ............................................................................................................ 12 \\nConstitutional Challenges ....................................................................................................... 15 \\nConsiderations for Congress.......................................................................................................... 16 \\n \\n\\nContacts \\nAuthor Information ........................................................................................................................ 18 \\n \\n\\n\\f\\nTitle IX\u2019s Religious Exemption: Agency Practice and Judicial Application \\n \\n\\nCongressional Research Service   1 \\nitle IX of the Education Amendments of 1972 prohibits discrimination \u201con the basis of \\nsex\u201d in education programs that receive federal financial assistance.1 The law contains \\nseveral exceptions, including a religious exemption that permits conduct by a religiously \\ncontrolled educational institution that might otherwise violate the statute\u2019s requirements when (1) \\nthe institution acts for a religious reason, and (2) compliance with the statute would conflict with \\na religious tenet.2 \\nThough the religious exemption was enacted with Title IX\u2019s other original provisions in 1972,3 it \\nhas received renewed attention in the past several years,4 particularly as questions have arisen \\nconcerning whether Title IX\u2019s antidiscrimination mandate may be construed to prohibit \\ndiscrimination based on sexual orientation and gender identity.5 These legal developments have \\nalready prompted litigation6 and may generate new questions about the application of Title IX\u2019s \\nreligious exemption. \\nThis report begins with a discussion of how federal agencies enforce Title IX, including \\ndetermining whether Title IX\u2019s religious exemption applies.7 As many Title IX religious \\nexemption determinations are made at the federal agency level, this report examines Title IX \\nregulations and guidance addressing the exemption, the Department of Education\u2019s (ED\u2019s) \\napplication of the exemption, and other federal agency practices. The report then examines case \\nlaw analyzing Title IX\u2019s religious exemption, including federal court decisions addressing certain \\nfeatures of the statutory text and when the exemption may apply. The report closes with potential \\nconsiderations for Congress relating to Title IX\u2019s religious exemption.  \\nTitle IX: Background and Context \\nAs a general matter, federally funded education programs must comply with Title IX\u2019s prohibition \\nagainst discrimination \u201con the basis of sex.\u201d8 All public school districts and most colleges and \\nuniversities receive federal funding and are therefore subject to the statute\u2019s requirements.9 For \\nexample, denying a qualified female applicant admission into a federally funded vocational \\n \\n\\nActive\\n \\n \\n\\n  \\n \\n\\nTitle IX\u2019s Religious Exemption: \\nAgency Practice and Judicial Application \\nJune 29, 2023 \\nCongressional Research Service \\nhttps://crsreports.congress.gov \\nR47613 \\n\\f\\n \\n\\nCongressional Research Service  \\nSUMMARY \\n \\n\\nTitle IX\u2019s Religious Exemption: Agency Practice \\nand Judicial Application \\nTitle IX of the Education Amendments of 1972 prohibits discrimination \u201con the basis of sex\u201d in \\neducation programs that receive federal financial assistance. The law also contains nine statutory \\nexceptions to that prohibition, including an exemption for religiously controlled educational \\ninstitutions. The religious exemption does not operate as a blanket exemption foreclosing all Title \\nIX claims against a religiously controlled school. Nor does it allow religious entities to use the \\nexemption as a pretext for engaging in otherwise unlawful sex discrimination under Title IX. \\nRather, the exemption allows conduct by a religiously controlled school that would otherwise \\nviolate Title IX\u2019s requirements if (1) its actions are motivated by a religious reason, and (2) the \\napplication of Title IX would conflict with a religious tenet. \\nFederal agencies including the Department of Education (ED) that distribute financial assistance to education programs are \\nresponsible for ensuring that those programs comply with Title IX; agencies also administer and enforce the statute\u2019s \\nreligious exemption. According to ED\u2019s Office for Civil Rights (OCR), when reviewing request s for an exemption assurance, \\nit examines whether the requesting institution has (1) identified the religious organization that controls it; and (2) specified \\nthe provisions of the statute or regulations that conflict with religious tenets. With respect to the latter, OCR requests that an \\ninstitution specify the requirements from which it seeks an exemption and the \u201creligious tenets that conflict with those \\nprovisions.\u201d A school may submit a statement of its religious tenets or \u201csubmit a statement of its practices, as based on its \\nreligious tenets.\u201d As indicated above, even if a school qualifies for a religious exemption from a specific Title IX \\nrequirement, the exemption does not insulate a school from all other Title IX requirements. Instead, ED applies the \\nexemption where a school\u2019s compliance with a particular Title IX requirement would conflict with a religious tenet. For \\ninstance, while a religious school might claim an exemption allowing it to exclude women from ministry courses because of \\nreligious beliefs that only men may be ministers, the exemption would not justify barring women fr om other courses. \\nIn addition to this administrative enforcement, individuals may bring private suits in federal court to enforce Title IX dire ctly \\nagainst federally funded schools. Courts thus also play a role in applying the religious exemption and make determinations on \\nwhether the exemption forecloses a Title IX claim. To date, it appears that few federal courts have reached questions \\naddressing Title IX\u2019s religious exemption. In the limited case law addressing it, courts have offered some discussion on \\nwhich entities qualify for the religious exemption and the need to show a religious conflict for it to apply. In general, federal \\ncourts appear unlikely to probe into matters of religious interpretation when assessing the applicability of the religio us \\nexemption. Rather, if an entity identifies a religious tenet that conflicts with a Title IX requirement and meets the \\nexemption\u2019s other requirements, a federal court would likely apply the exemption without evaluating the religious tenet at \\nissue. If a plaintiff presents evidence that a school\u2019s challenged conduct was not in fact religiously motivated, however, at \\nleast one federal court has held that a Title IX claim may proceed for further fact-finding to establish the school\u2019s actual \\nmotivation, without involving analysis of religious doctrine itself. \\nIn light of a 2020 Supreme Court decision evaluating Title VII of the Civil Rights Act of 1964, Bostock v. Clayton County, \\nsome federal courts and federal agencies, including ED, have also concluded that Title IX\u2019s prohibition of discrimination \u201con \\nthe basis of sex\u201d bars sexual orientation and gender identity discrimination. This legal development could prompt new \\nquestions about the application of Title IX\u2019s religious exemption. A number of religious educational institutions, for example, \\nhave sought and received exemptions from ED\u2019s OCR concerning application of certain Title IX regulatory provisions that \\ncould conflict with religious tenets concerning sexual orientation and gender identity.  Litigation has also raised questions \\nconcerning Title IX\u2019s religious exemption, including a recent pending case challenging the constitutionality of the exemption \\nand actions taken by religiously controlled schools concerning sexual orientation and gender identity.  \\nTo the extent there is legislative interest in amending Title IX\u2019s religious exemption, o ne important consideration, apart from \\nFirst Amendment issues, involves the constitutional authority that Congress relied upon when enacting Title IX. The \\nSupreme Court has repeatedly interpreted Title IX as Spending Clause-based legislation. Under that framework, recipients of \\nfederal funding voluntarily agree to comply with civil rights requirements as a condition of receiving that assistance. For \\nCongress to impose conditions on those funds, the Supreme Court has held that statutory requirements must be \u201cclear\u201d and \\n\u201cunambiguous[]\u201d so that recipients have \u201cnotice\u201d of their obligations. Thus, any ambiguities in the law may have \\nimplications for how federal courts construe Title IX\u2019s requirements. \\nR47613 \\nJune 29, 2023 \\nJared P. Cole \\nLegislative Attorney  \\n  \\n\\nChristine J. Back \\nLegislative Attorney \\n  \\n\\n \\n\\f\\nTitle IX\u2019s Religious Exemption: Agency Practice and Judicial Application \\n \\n\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Title IX",
+      "religious exemptions",
+      "sex discrimination",
+      "religious educational institutions",
+      "federally funded education",
+      "sexual orientation discrimination",
+      "gender identity discrimination",
+      "administrative enforcement",
+      "civil rights litigation",
+      "constitutional challenges"
+    ]
+  },
+  "segment_id": "processing_segment_2e6defc2e81310a14092cb8d"
+}

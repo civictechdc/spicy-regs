@@ -1,0 +1,105 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 2656.557,
+        "input_tokens": 1982,
+        "output_tokens": 97,
+        "request_id": "4f211deb-33a9-49f3-b937-f22b340a2415",
+        "response_id": "resp_0631ff2a5d634377016a67b87c24a881919e05f062594fbef1",
+        "status": "completed",
+        "total_tokens": 2079
+      }
+    ],
+    "duration_ms": 2657.374,
+    "input_tokens": 1982,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 97,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "c898a63740624de16602ac669436d24b7c0393b5347241448614a76bd5ec4e49",
+    "prompt_token_estimate": 1943,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "7f8260836cd7324f20b2f64f16b16f4b1f9de33957ec64122c8ebd473ede8fc7",
+    "requested_service_tier": "auto",
+    "response_id": "resp_0631ff2a5d634377016a67b87c24a881919e05f062594fbef1",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2079,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "True threats",
+    "Freedom of speech",
+    "Criminal mens rea",
+    "Recklessness standard",
+    "Electronic harassment",
+    "Stalking",
+    "Threatening communications",
+    "Emotional distress"
+  ],
+  "ordinal": 27,
+  "request": {
+    "input": "{\"segment_text\":\"PRELIMINARY PRINT \\nVolume 600 U. S. Part 1 \\nPages 66\u2013121 \\nOFFICIAL REPORTS \\nOF \\nTHE SUPREME COURT \\nJune 27, 2023 \\nREBECCA A. WOMELDORF \\nreporter of decisions \\nPage Proof Pending Publication\\nNOTICE: This preliminary print is subject to formal revision before \\nthe bound volume is published. Users are requested to notify the Reporter \\nof Decisions, Supreme Court of the United States, Washington, D.C. 20543, \\npio@supremecourt.gov, of any typographical or other formal errors. \\n\\f\\nPage Proof Pending Publication\\n66 OCTOBER TERM, 2022 \\nSyllabus \\nCOUNTERMAN v. COLORADO \\ncertiorari to the court of appeals of colorado \\nNo. 22\u2013138. Argued April 19, 2023\u2014Decided June 27, 2023 \\nFrom 2014 to 2016, petitioner Billy Counterman sent hundreds of Face-\\nbook messages to C. W., a local singer and musician. The two had never \\nmet, and C. W. did not respond. In fact, she tried repeatedly to block \\nhim, but each time, Counterman created a new Facebook account and \\nresumed contacting C. W. Several of his messages envisaged violent \\nharm befalling her. Counterman's messages put C. W. in fear and up-\\nended her daily existence: C. W. stopped walking alone, declined social \\nengagements, and canceled some of her performances. C. W. eventually \\ncontacted the authorities. The State charged Counterman under a Col-\\norado statute making it unlawful to \u201c[r]epeatedly . . . make[ ] any form \\nof communication with another person\u201d in \u201ca manner that would cause \\na reasonable person to suffer serious emotional distress and does cause \\nthat person . . . to suffer serious emotional distress.\u201d Colo. Rev. Stat. \\n\u00a7 18\u20133\u2013602(1)(c). Counterman moved to dismiss the charge on First \\nAmendment grounds, arguing that his messages were not \u201ctrue threats\u201d \\nand therefore could not form the basis of a criminal prosecution. Fol-\\nlowing Colorado law, the trial court rejected that argument under an \\nobjective standard, fnding that a reasonable person would consider the \\nmessages threatening. Counterman appealed, arguing that the First \\nAmendment required the State to show not only that his statements \\nwere objectively threatening, but also that he was aware of their threat-\\nening character. The Colorado Court of Appeals disagreed and af-\\nfrmed his conviction. The Colorado Supreme Court denied review. \\nHeld: The State must prove in true-threats cases that the defendant had \\nsome subjective understanding of his statements' threatening nature, \\nbut the First Amendment requires no more demanding a showing than \\nrecklessness. Pp. 72\u201383. \\n(a) The First Amendment permits restrictions upon the content of \\nspeech in a few limited areas. Among these historic and traditional \\ncategories of unprotected expression is true threats. True threats are \\n\u201cserious expression[s]\u201d conveying that a speaker means to \u201ccommit an \\nact of unlawful violence.\u201d Virginia v. Black, 538 U. S. 343, 359. The \\nexistence of a threat depends not on \u201cthe mental state of the author,\u201d \\nbut on \u201cwhat the statement conveys\u201d to the person on the receiving end. \\nElonis v. United States, 575 U. S. 723, 733. Yet the First Amendment \\nmay still demand a subjective mental-state requirement shielding some \\n\\f\\nPage Proof Pending Publication\\nCite as: 600 U. S. 66 (2023) 67 \\nSyllabus \\ntrue threats from liability. That is because bans on speech have the \\npotential to chill, or deter, speech outside their boundaries. An impor-\\ntant tool to prevent that outcome is to condition liability on the State's \\nshowing of a culpable mental state. Speiser v. Randall, 357 U. S. 513, \\n526. That kind of \u201cstrategic protection\u201d features in this Court's prece-\\ndent concerning the most prominent categories of unprotected speech. \\nGertz v. Robert Welch, Inc., 418 U. S. 323, 342. With regard to defama-\\ntion, a public fgure cannot recover for the injury such a statement \\ncauses unless the speaker acted with \u201cknowledge that it was false or \\nwith reckless disregard of whether it was false or not.\u201d New York \\nTimes Co. v. Sullivan, 376 U. S. 254, 280. The same idea arises in the \\nlaw respecting obscenity and incitement to unlawful conduct. See, e. g., \\nHess v. Indiana, 414 U. S. 105, 109; Hamling v. United States, 418 U. S. \\n87, 122\u2013123. And that same reasoning counsels in favor of requiring a \\nsubjective element in a true-threats case. A speaker's fear of mistak-\\ning whether a statement is a threat, fear of the legal system getting \\nthat judgment wrong, and fear of incurring legal costs all may lead a \\nspeaker to swallow words that are in fact not true threats. Insistence \\non a subjective element in unprotected-speech cases, no doubt, has a \\ncost: Even as it lessens chill of protected speech, it makes prosecution \\nof otherwise proscribable, and often dangerous, communications harder. \\nBut a subjective standard is still required for true threats, lest prosecu-\\ntions chill too much protected, non-threatening expression. Pp. 73\u201378. \\n(b) In this context, a recklessness standard\u2014i. e., a showing that a \\nperson \u201cconsciously disregard[ed] a substantial [and unjustifable] risk \\nthat [his] conduct will cause harm to another,\u201d Voisine v. United States, \\n579 U. S. 686, 691\u2014is the appropriate mens rea. Requiring purpose or \\nknowledge would make it harder for States to counter true threats\u2014 \\nwith diminished returns for protected expression. Using a reckless-\\nness standard also fts with this Court's defamation decisions, which \\nadopted a recklessness rule more than a half-century ago. The Court \\nsees no reason to offer greater insulation to threats than to defamation. \\nWhile this Court's incitement decisions demand more, the reason for \\nthat demand\u2014the need to protect from legal sanction the political advo-\\ncacy a hair's-breadth away from incitement\u2014is not present here. For \\ntrue threats, recklessness strikes the right balance, offering \u201cenough \\n`breathing space' for protected speech,\u201d without sacrifcing too many of \\nthe benefts of enforcing laws against true threats. Elonis, 575 U. S., \\nat 748. Pp. 78\u201382. \\n(c) The State prosecuted Counterman in accordance with an objective \\nstandard and did not have to show any awareness on Counterman's part \\nof his statements' threatening character. That is a violation of the \\nFirst Amendment. Pp. 82\u201383. \\n\\f\\n68 COUNTERMAN v. COLORADO \\nSyllabus \\n497 P. 3d 1039, vacated and remanded. \\nKagan, J., delivered the opinion of the Court, in which Roberts, C. J., \\nand Alito, Kavanaugh, and Jackson, JJ., joined. Sotomayor, J., fled \\nan opinion concurring in part and concurring in the judgment, in which \\nGorsuch, J., joined as to Parts I, II, III\u2013A, and III\u2013B, post, p. 83. \\nThomas, J., fled a dissenting opinion, post, p. 105. Barrett, J., fled a \\ndissenting opinion, in which Thomas, J., joined, post, p. 106. \\nJohn P . Elwood argued the cause for petitioner. With \\nhim on the briefs were Anthony J. Franze, Kolya D. Glick, \\n\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "True threats",
+      "Freedom of speech",
+      "Criminal mens rea",
+      "Recklessness standard",
+      "Electronic harassment",
+      "Stalking",
+      "Threatening communications",
+      "Emotional distress"
+    ]
+  },
+  "segment_id": "processing_segment_d88f625a10f042b43ea7b019"
+}

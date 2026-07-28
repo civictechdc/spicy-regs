@@ -1,0 +1,107 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 2687.636,
+        "input_tokens": 2036,
+        "output_tokens": 114,
+        "request_id": "ef79a086-b010-4677-91fc-ffb9ec8fd8ab",
+        "response_id": "resp_0d4bbff08bb175eb016a67b871575c819dba4d97351cda9eba",
+        "status": "completed",
+        "total_tokens": 2150
+      }
+    ],
+    "duration_ms": 2688.507,
+    "input_tokens": 2036,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 114,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "57d8ecc0e0a281d354ac03e3dde4a8fcd146ce3eb4a83d8dc7be889812924dea",
+    "prompt_token_estimate": 1997,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "d6cef40ca27b284c860e3465a1e2fb6e0e32dd7349d87a0dad332c6be5831dd9",
+    "requested_service_tier": "auto",
+    "response_id": "resp_0d4bbff08bb175eb016a67b871575c819dba4d97351cda9eba",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2150,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Protected health information",
+    "Patient authorizations",
+    "Psychotherapy notes",
+    "Health information marketing",
+    "Health information sales",
+    "Research authorizations",
+    "Compound authorizations",
+    "Authorization revocation",
+    "Health plan enrollment"
+  ],
+  "ordinal": 23,
+  "request": {
+    "input": "{\"segment_text\":\"Uses and disclosures for which an authorization is required.\\n45 CFR 164.508\\n<P>(B) Use or disclosure by the covered entity for its own training programs in which students, trainees, or practitioners in mental health learn under supervision to practice or improve their skills in group, joint, family, or individual counseling; or</P>\\n\\n<P>(C) Use or disclosure by the covered entity to defend itself in a legal action or other proceeding brought by the individual; and</P>\\n\\n<P>(ii) A use or disclosure that is required by \u00a7 164.502(a)(2)(ii) or permitted by \u00a7 164.512(a); \u00a7 164.512(d) with respect to the oversight of the originator of the psychotherapy notes; \u00a7 164.512(g)(1); or \u00a7 164.512(j)(1)(i).</P>\\n\\n<P>(3) <I>Authorization required: Marketing.</I> (i) Notwithstanding any provision of this subpart, other than the transition provisions in \u00a7 164.532, a covered entity must obtain an authorization for any use or disclosure of protected health information for marketing, except if the communication is in the form of:</P>\\n\\n<P>(A) A face-to-face communication made by a covered entity to an individual; or</P>\\n\\n<P>(B) A promotional gift of nominal value provided by the covered entity.</P>\\n\\n<P>(ii) If the marketing involves financial remuneration, as defined in paragraph (3) of the definition of marketing at \u00a7 164.501, to the covered entity from a third party, the authorization must state that such remuneration is involved.</P>\\n\\n<P>(4) <I>Authorization required: Sale of protected health information.</I> (i) Notwithstanding any provision of this subpart, other than the transition provisions in \u00a7 164.532, a covered entity must obtain an authorization for any disclosure of protected health information which is a sale of protected health information, as defined in \u00a7 164.501 of this subpart. (ii) Such authorization must state that the disclosure will result in remuneration to the covered entity.</P>\\n\\n<P>(b) <I>Implementation specifications: General requirements</I>\u2014(1) <I>Valid authorizations.</I> (i) A valid authorization is a document that meets the requirements in paragraphs (a)(3)(ii), (a)(4)(ii), (c)(1), and (c)(2) of this section, as applicable.</P>\\n\\n<P>(ii) A valid authorization may contain elements or information in addition to the elements required by this section, provided that such additional elements or information are not inconsistent with the elements required by this section.</P>\\n\\n45\\n<P>(2) <I>Defective authorizations.</I> An authorization is not valid, if the document submitted has any of the following defects:</P>\\n\\n<P>(i) The expiration date has passed or the expiration event is known by the covered entity to have occurred;</P>\\n\\n<P>(ii) The authorization has not been filled out completely, with respect to an element described by paragraph (c) of this section, if applicable;</P>\\n\\n<P>(iii) The authorization is known by the covered entity to have been revoked;</P>\\n\\n<P>(iv) The authorization violates paragraph (b)(3) or (4) of this section, if applicable;</P>\\n\\n<P>(v) Any material information in the authorization is known by the covered entity to be false.</P>\\n\\n<P>(3) <I>Compound authorizations.</I> An authorization for use or disclosure of protected health information may not be combined with any other document to create a compound authorization, except as follows:</P>\\n\\n<P>(i) An authorization for the use or disclosure of protected health information for a research study may be combined with any other type of written permission for the same or another research study. This exception includes combining an authorization for the use or disclosure of protected health information for a research study with another authorization for the same research study, with an authorization for the creation or maintenance of a research database or repository, or with a consent to participate in research. Where a covered health care provider has conditioned the provision of research-related treatment on the provision of one of the authorizations, as permitted under paragraph (b)(4)(i) of this section, any compound authorization created under this paragraph must clearly differentiate between the conditioned and unconditioned components and provide the individual with an opportunity to opt in to the research activities described in the unconditioned authorization.</P>\\n\\n<P>(ii) An authorization for a use or disclosure of psychotherapy notes may only be combined with another authorization for a use or disclosure of psychotherapy notes.</P>\\n\\n<P>(iii) An authorization under this section, other than an authorization for a use or disclosure of psychotherapy notes, may be combined with any other such authorization under this section, except when a covered entity has conditioned the provision of treatment, payment, enrollment in the health plan, or eligibility for benefits under paragraph (b)(4) of this section on the provision of one of the authorizations. The prohibition in this paragraph on combining authorizations where one authorization conditions the provision of treatment, payment, enrollment in a health plan, or eligibility for benefits under paragraph (b)(4) of this section does not apply to a compound authorization created in accordance with paragraph (b)(3)(i) of this section.</P>\\n\\n164\\n<P>(4) <I>Prohibition on conditioning of authorizations.</I> A covered entity may not condition the provision to an individual of treatment, payment, enrollment in the health plan, or eligibility for benefits on the provision of an authorization, except:</P>\\n\\n<P>(i) A covered health care provider may condition the provision of research-related treatment on provision of an authorization for the use or disclosure of protected health information for such research under this section;</P>\\n\\n<P>(ii) A health plan may condition enrollment in the health plan or eligibility for benefits on provision of an authorization requested by the health plan prior to an individual's enrollment in the health plan, if:</P>\\n\\n<P>(A) The authorization sought is for the health plan's eligibility or enrollment determinations relating to the individual or for its underwriting or risk rating determinations; and</P>\\n\\n<P>(B) The authorization is not for a use or disclosure of psychotherapy notes under paragraph (a)(2) of this section; and</P>\\n\\n<P>(iii) A covered entity may condition the provision of health care that is solely for the purpose of creating protected health information for disclosure to a third party on provision of an authorization for the disclosure of the protected health information to such third party.</P>\\n\\n<P>(5) <I>Revocation of authorizations.</I> An individual may revoke an authorization provided under this section at any time, provided that the revocation is in writing, except to the extent that:</P>\\n\\n<P>(i) The covered entity has taken action in reliance thereon; or</P>\\n\\n<P>(ii) If the authorization was obtained as a condition of obtaining insurance coverage, other law provides the insurer with the right to contest a claim under the policy or the policy itself.</P>\\n\\n<P>(6) <I>Documentation.</I> A covered entity must document and retain any signed authorization under this section as required by \u00a7 164.530(j).</P>\\n\\n164.508\\n<?xml version=\\\"1.0\\\" encoding=\\\"UTF-8\\\"?> \\n<DIV8 N=\\\"164.508\\\" TYPE=\\\"SECTION\\\" hierarchy_metadata=\\\"{&quot;path&quot;:&quot;/on/_SUBSTITUTE_DATE_/title-45/section-164.508&quot;,&quot;citation&quot;:&quot;45 CFR 164.508&quot;}\\\">\\n<HEAD>\u00a7 164.508 Uses and disclosures for which an authorization is required.</HEAD>\\n\\n<P>(a) <I>Standard: Authorizations for uses and disclosures</I>\u2014(1) <I>Authorization required: General rule.</I> Except as otherwise permitted or required by this subchapter, a covered entity may not use or disclose protected health information without an authorization that is valid under this section. When a covered entity obtains or receives a valid authorization for its use or disclosure of protected health information, such use or disclosure must be consistent with such authorization.</P>\\n\\n<P>(2) <I>Authorization required: Psychotherapy notes.</I> Notwithstanding any provision of this subpart, other than the transition provisions in \u00a7 164.532, a covered entity must obtain an authorization for any use or disclosure of psychotherapy notes, except:</P>\\n\\n<P>(i) To carry out the following treatment, payment, or health care operations:</P>\\n\\n<P>(A) Use by the originator of the psychotherapy notes for treatment;</P>\\n\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Protected health information",
+      "Patient authorizations",
+      "Psychotherapy notes",
+      "Health information marketing",
+      "Health information sales",
+      "Research authorizations",
+      "Compound authorizations",
+      "Authorization revocation",
+      "Health plan enrollment"
+    ]
+  },
+  "segment_id": "processing_segment_cf3468d9c9ce25fd6de79b55"
+}

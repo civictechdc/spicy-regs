@@ -1,0 +1,109 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 3371.061,
+        "input_tokens": 2007,
+        "output_tokens": 122,
+        "request_id": "4d3d1ba8-26cc-4e22-a288-0856f85fcca4",
+        "response_id": "resp_06cb93def3b4bff9016a67b8421e0081a3a83c1126629d00e2",
+        "status": "completed",
+        "total_tokens": 2129
+      }
+    ],
+    "duration_ms": 3371.823,
+    "input_tokens": 2007,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 122,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "ca323ccab4a1cc5eacdab45db25703355a2993ec68e078bd7bf37db9e8581488",
+    "prompt_token_estimate": 1968,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "98816a2837ced48a60164e8aadbba33159f3fae5a422b1aa8cbfc09d72e9045c",
+    "requested_service_tier": "auto",
+    "response_id": "resp_06cb93def3b4bff9016a67b8421e0081a3a83c1126629d00e2",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2129,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Hazard communication",
+    "Chemical hazard classification",
+    "Container labeling",
+    "Safety data sheets",
+    "Employee safety training",
+    "Workplace chemical exposure",
+    "Laboratory chemical safety",
+    "Sealed container handling",
+    "Labeling exemptions",
+    "Globally Harmonized System"
+  ],
+  "ordinal": 10,
+  "request": {
+    "input": "{\"segment_text\":\"Hazard communication.\\n29 CFR 1910.1200\\n<P>(3) This section applies to laboratories only as follows:</P>\\n\\n<P>(i) Employers shall ensure that labels on incoming containers of hazardous chemicals are not removed or defaced;</P>\\n\\n<P>(ii) Employers shall maintain any safety data sheets that are received with incoming shipments of hazardous chemicals, and ensure that they are readily accessible during each workshift to laboratory employees when they are in their work areas;</P>\\n\\n<P>(iii) Employers shall ensure that laboratory employees are provided information and training in accordance with paragraph (h) of this section, except for the location and availability of the written hazard communication program under paragraph (h)(2)(iii) of this section; and,</P>\\n\\n<P>(iv) Laboratory employers that ship hazardous chemicals are considered to be either a chemical manufacturer or a distributor under this rule, and thus must ensure that any containers of hazardous chemicals leaving the laboratory are labeled in accordance with paragraph (f) of this section, and that a safety data sheet is provided to distributors and other employers in accordance with paragraphs (g)(6) and (g)(7) of this section.</P>\\n\\n<P>(4) In work operations where employees only handle chemicals in sealed containers which are not opened under normal conditions of use (such as are found in marine cargo handling, warehousing, or retail sales), this section applies to these operations only as follows:</P>\\n\\n<P>(i) Employers shall ensure that labels on incoming containers of hazardous chemicals are not removed or defaced;</P>\\n\\n<P>(ii) Employers shall maintain copies of any safety data sheets that are received with incoming shipments of the sealed containers of hazardous chemicals, shall obtain a safety data sheet as soon as possible for sealed containers of hazardous chemicals received without a safety data sheet if an employee requests the safety data sheet, and shall ensure that the safety data sheets are readily accessible during each work shift to employees when they are in their work area(s); and,</P>\\n\\n<P>(iii) Employers shall ensure that employees are provided with information and training in accordance with paragraph (h) of this section (except for the location and availability of the written hazard communication program under paragraph (h)(2)(iii) of this section), to the extent necessary to protect them in the event of a spill or leak of a hazardous chemical from a sealed container.</P>\\n\\n<P>(5) This section does not require labeling of the following chemicals:</P>\\n\\n29\\n<P>(i) Any pesticide as such term is defined in the Federal Insecticide, Fungicide, and Rodenticide Act (7 U.S.C. 136 <I>et seq.</I>), when subject to the labeling requirements of that Act and labeling regulations issued under that Act by the Environmental Protection Agency;</P>\\n\\n<P>(ii) Any chemical substance or mixture as such terms are defined in the Toxic Substances Control Act (15 U.S.C. 2601 <I>et seq.</I>), when subject to the labeling requirements of that Act and labeling regulations issued under that Act by the Environmental Protection Agency.</P>\\n\\n<P>(iii) Any food, food additive, color additive, drug, cosmetic, or medical or veterinary device or product, including materials intended for use as ingredients in such products (e.g., flavors and fragrances), as such terms are defined in the Federal Food, Drug, and Cosmetic Act (21 U.S.C. 301 <I>et seq.</I>) or the Virus-Serum-Toxin Act of 1913 (21 U.S.C. 151 <I>et seq.</I>), and regulations issued under those Acts, when they are subject to the labeling requirements under those Acts by either the Food and Drug Administration or the Department of Agriculture;</P>\\n\\n<P>(iv) Any distilled spirits (beverage alcohols), wine, or malt beverage intended for nonindustrial use, as such terms are defined in the Federal Alcohol Administration Act (27 U.S.C. 201 <I>et seq.</I>) and regulations issued under that Act, when subject to the labeling requirements of that Act and labeling regulations issued under that Act by the Bureau of Alcohol, Tobacco, Firearms and Explosives;</P>\\n\\n<P>(v) Any consumer product or hazardous substance as those terms are defined in the Consumer Product Safety Act (15 U.S.C. 2051 <I>et seq.</I>) and Federal Hazardous Substances Act (15 U.S.C. 1261 <I>et seq.</I>) respectively, when subject to a consumer product safety standard or labeling requirement of those Acts, or regulations issued under those Acts by the Consumer Product Safety Commission; and,</P>\\n\\n<P>(vi) Agricultural or vegetable seed treated with pesticides and labeled in accordance with the Federal Seed Act (7 U.S.C. 1551 <I>et seq.</I>) and the labeling regulations issued under that Act by the Department of Agriculture.</P>\\n\\n<P>(6) This section does not apply to: (i) Any hazardous waste as such term is defined by the Solid Waste Disposal Act, as amended by the Resource Conservation and Recovery Act of 1976, as amended (42 U.S.C. 6901 <I>et seq.</I>), when subject to regulations issued under that Act by the Environmental Protection Agency;</P>\\n\\n<P>(ii) Any hazardous substance as such term is defined by the Comprehensive Environmental Response, Compensation and Liability Act (CERCLA) (42 U.S.C. 9601 <I>et seq.</I>) when the hazardous substance is the focus of remedial or removal action being conducted under CERCLA in accordance with Environmental Protection Agency regulations.</P>\\n\\n<P>(iii) Tobacco or tobacco products;</P>\\n\\n1910\\n1910.1200\\n<?xml version=\\\"1.0\\\" encoding=\\\"UTF-8\\\"?> \\n<DIV8 N=\\\"1910.1200\\\" TYPE=\\\"SECTION\\\" hierarchy_metadata=\\\"{&quot;path&quot;:&quot;/on/_SUBSTITUTE_DATE_/title-29/section-1910.1200&quot;,&quot;citation&quot;:&quot;29 CFR 1910.1200&quot;}\\\">\\n<HEAD>\u00a7 1910.1200 Hazard communication.</HEAD>\\n\\n<P>(a) <I>Purpose.</I> (1) The purpose of this section is to ensure that the hazards of all chemicals produced or imported are classified, and that information concerning the classified hazards is transmitted to employers and employees. The requirements of this section are intended to be consistent with the provisions of the United Nations Globally Harmonized System of Classification and Labeling of Chemicals (GHS), primarily Revision 7. The transmittal of information is to be accomplished by means of comprehensive hazard communication programs, which are to include container labeling and other forms of warning, safety data sheets and employee training.</P>\\n\\n<P>(2) This occupational safety and health standard is intended to address comprehensively the issue of classifying the potential hazards of chemicals, and communicating information concerning hazards and appropriate protective measures to employees, and to preempt any legislative or regulatory enactments of a state, or political subdivision of a state, pertaining to this subject. Classifying the potential hazards of chemicals and communicating information concerning hazards and appropriate protective measures to employees, may include, for example, but is not limited to, provisions for: developing and maintaining a written hazard communication program for the workplace, including lists of hazardous chemicals present; labeling of containers of chemicals in the workplace, as well as of containers of chemicals being shipped to other workplaces; preparation and distribution of safety data sheets to employees and downstream employers; and development and implementation of employee training programs regarding hazards of chemicals and protective measures. Under section 18 of the Act, no state or political subdivision of a state may adopt or enforce any requirement relating to the issue addressed by this Federal standard, except pursuant to a Federally-approved state plan.</P>\\n\\n<P>(b) <I>Scope and application.</I> (1) This section requires chemical manufacturers or importers to classify the hazards of chemicals which they produce or import, and all employers to provide information to their employees about the hazardous chemicals to which they are exposed, by means of a hazard communication program, labels and other forms of warning, safety data sheets, and information and training. In addition, this section requires distributors to transmit the required information to employers. (Employers who do not produce or import chemicals need only focus on those parts of this rule that deal with establishing a workplace program and communicating information to their workers.)</P>\\n\\n<P>(2) This section applies to any chemical which is known to be present in the workplace in such a manner that employees may be exposed under normal conditions of use or in a foreseeable emergency.</P>\\n\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Hazard communication",
+      "Chemical hazard classification",
+      "Container labeling",
+      "Safety data sheets",
+      "Employee safety training",
+      "Workplace chemical exposure",
+      "Laboratory chemical safety",
+      "Sealed container handling",
+      "Labeling exemptions",
+      "Globally Harmonized System"
+    ]
+  },
+  "segment_id": "processing_segment_91fa9dc6248bf0b0f0979137"
+}

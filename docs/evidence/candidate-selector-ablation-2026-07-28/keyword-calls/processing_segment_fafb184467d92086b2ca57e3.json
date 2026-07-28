@@ -1,0 +1,107 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 4110.609,
+        "input_tokens": 1984,
+        "output_tokens": 122,
+        "request_id": "7db5fd52-65e1-4ff2-9c21-909aa90cd2fc",
+        "response_id": "resp_0d20a20e8310dbaa016a67b8905cf081a1b9b07976238571c7",
+        "status": "completed",
+        "total_tokens": 2106
+      }
+    ],
+    "duration_ms": 4111.387,
+    "input_tokens": 1984,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 122,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "40a86ab12568e89a271331178ad65f4d743c867efa94055aa3069d49e1d200a5",
+    "prompt_token_estimate": 1945,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "c080f433b93a53652b2bd7f4df3be75ca1c9bed738c5f7573a8554929d4e8a52",
+    "requested_service_tier": "auto",
+    "response_id": "resp_0d20a20e8310dbaa016a67b8905cf081a1b9b07976238571c7",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2106,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Trademark infringement",
+    "Extraterritorial jurisdiction",
+    "Lanham Act",
+    "Use in commerce",
+    "Consumer confusion",
+    "Foreign conduct",
+    "Trademark licensing",
+    "Injunctive relief",
+    "Monetary damages"
+  ],
+  "ordinal": 34,
+  "request": {
+    "input": "{\"segment_text\":\"PRELIMINARY PRINT \\nVolume 600 U. S. Part 1 \\nPages 412\u2013446 \\nOFFICIAL REPORTS \\nOF \\nTHE SUPREME COURT \\nJune 29, 2023 \\nREBECCA A. WOMELDORF \\nreporter of decisions \\nPage Proof Pending Publication\\nNOTICE: This preliminary print is subject to formal revision before \\nthe bound volume is published. Users are requested to notify the Reporter \\nof Decisions, Supreme Court of the United States, Washington, D.C. 20543, \\npio@supremecourt.gov, of any typographical or other formal errors. \\n\\f\\nPage Proof Pending Publication\\n412 OCTOBER TERM, 2022 \\nSyllabus \\nABITRON AUSTRIA GmbH et al. v. HETRONIC \\nINTERNATIONAL, INC. \\ncertiorari to the united states court of appeals for \\nthe tenth circuit \\nNo. 21\u20131043. Argued March 21, 2023\u2014Decided June 29, 2023 \\nThis case requires the Court to decide the foreign reach of 15 U. S. C. \\n\u00a7 1114(1)(a) and \u00a7 1125(a)(1), two provisions of the Lanham Act that pro-\\nhibit trademark infringement. The case concerns a trademark dispute \\nbetween Hetronic (a U. S. company) and six foreign parties (collectively \\nAbitron). Hetronic manufactures remote controls for construction \\nequipment. Abitron, once a licensed distributor for Hetronic, claimed \\nownership of the rights to much of Hetronic's intellectual property and \\nbegan employing Hetronic's marks on products it sold. \\nHetronic sued Abitron in the Western District of Oklahoma for trade-\\nmark violations under two related provisions of the Lanham Act, both \\nof which prohibit the unauthorized use in commerce of protected marks \\nwhen, inter alia, that use is likely to cause confusion. See \u00a7\u00a7 1114(1)(a), \\n1125(a)(1). Hetronic sought damages for Abitron's infringing acts \\nworldwide. Abitron argued that Hetronic sought an impermissible ex-\\ntraterritorial application of the Lanham Act. The District Court re-\\njected Abitron's argument, and a jury later awarded Hetronic approxi-\\nmately $96 million in damages related to Abitron's global employment \\nof Hetronic's marks. The District Court also entered a permanent in-\\njunction preventing Abitron from using Hetronic's marks anywhere in \\nthe world. On appeal, the Tenth Circuit narrowed the injunction, but \\notherwise affrmed the judgment, concluding that the Lanham Act ex-\\ntended to \u201call of [Abitron's] foreign infringing conduct.\u201d \\nHeld: Applying the presumption against extraterritoriality, \u00a7 1114(1)(a) \\nand \u00a7 1125(a)(1) of the Lanham Act are not extraterritorial and extend \\nonly to claims where the infringing use in commerce is domestic. \\nPp. 417\u2013428. \\n(a) The presumption against extraterritoriality refects the longstand-\\ning principle \u201cthat legislation of Congress, unless a contrary intent ap-\\npears, is meant to apply only within the territorial jurisdiction of the \\nUnited States.\u201d Morrison v. National Australia Bank Ltd., 561 U. S. \\n247, 255. The presumption \u201cserves to avoid the international discord \\nthat can result when U. S. law is applied to conduct in foreign countries\u201d \\nand refects the \u201ccommonsense notion that Congress generally legislates \\nwith domestic concerns in mind.\u201d RJR Nabisco, Inc. v. European \\nCommunity, 579 U. S. 325, 335\u2013336. \\n\\f\\nCite as: 600 U. S. 412 (2023) 413 \\nSyllabus \\nApplying the presumption involves a two-step framework, which asks \\nat step one whether the statute is extraterritorial. This step turns on \\nwhether \u201cCongress has affrmatively and unmistakably instructed that\u201d \\nthe provision at issue should \u201capply to foreign conduct.\u201d Id., at 335. \\nIf Congress has provided such an instruction, then the provision is ex-\\ntraterritorial. If not, then the provision is not extraterritorial and step \\ntwo applies. That step resolves whether a suit seeks a (permissible) \\ndomestic or (impermissible) foreign application of the provision. That \\ndetermination requires courts to identify the \u201cfocus\u201d of congressional \\nconcern underlying the provision at issue, id., at 336, and then \u201cas[k] \\nwhether the conduct relevant to that focus occurred in United States \\nterritory,\u201d WesternGeco LLC v. ION Geophysical Corp., 585 U. S. \\n\u2013\u2013\u2013, \u2013\u2013\u2013. Thus, to prove that a claim involves a domestic application of \\na statute, \u201cplaintiffs must establish that `the conduct relevant to the \\nstatute's focus occurred in the United States.' \u201d Nestl\u00e9 USA, Inc. v. \\nDoe, 593 U. S. \u2013\u2013\u2013, \u2013\u2013\u2013 (emphasis added). Step two is designed to apply \\nthe presumption to claims that involve both domestic and foreign con-\\nduct, separating the activity that matters from the activity that does \\nnot. After all, the Court has long recognized that the presumption \\nwould be meaningless if any domestic conduct could defeat it. See \\nMorrison, 561 U. S., at 266. Pp. 417\u2013419. \\n(b) Neither provision at issue provides an express statement of extra-\\nterritorial application or any other clear indication that it is one of the \\n\u201crare\u201d provisions that nonetheless applies abroad. Both simply pro-\\nhibit the use \u201cin commerce\u201d of protected trademarks when that use \u201cis \\nlikely to cause confusion.\u201d \u00a7\u00a7 1114(1)(a), 1125(a)(1). Hetronic main-\\ntains that the Lanham Act's defnition of \u201ccommerce\u201d\u2014\u201call commerce \\nwhich may lawfully be regulated by Congress,\u201d \u00a7 1127\u2014rebuts the pre-\\nsumption against extraterritoriality. But this Court's repeated holding \\nthat \u201c `even statutes . . . that expressly refer to \u201c foreign commerce' \u201d \\nwhen defning \u201ccommerce\u201d are not extraterritorial, Morrison, 561 U. S., \\nat 262\u2013263, dooms Hetronic's arguments. Pp. 419\u2013421. \\n(c) Because \u00a7 1114(1)(a) and \u00a7 1125(a)(1) are not extraterritorial, the \\nCourt must consider at step two when claims involve \u201cdomestic\u201d applica-\\ntions of these provisions. Under the proper test, the ultimate question \\nregarding permissible domestic application turns on the location of the \\nconduct relevant to the focus of the statutory provisions. But much of \\nthe parties' dispute in this case misses this critical point and centers on \\nthe \u201cfocus\u201d of the relevant provisions without regard to the \u201cconduct \\nrelevant to that focus.\u201d WesternGeco, 585 U. S., at \u2013\u2013\u2013. Abitron con-\\ntends that \u00a7 1114(1)(a) and \u00a7 1125(a)(1) focus on preventing infringing \\nuse of trademarks, while Hetronic argues that they focus both on pro-\\ntecting the goodwill of mark owners and on preventing consumer confu-\\nsion. The United States as amicus curiae argues that the provisions \\nPage Proof Pending Publication\\n\\f\\nPage Proof Pending Publication\\n414 ABITRON AUSTRIA GmbH v. HETRONIC INT'L, INC. \\nSyllabus \\nfocus only on likely consumer confusion. The parties all seek support \\nfor their positions in Steele v. Bulova Watch Co., 344 U. S. 280, but be-\\ncause Steele implicated both domestic conduct and a likelihood of domes-\\ntic confusion, Steele does not answer which one determines the domestic \\napplications of the provisions here. \\nThe ultimate question regarding permissible domestic application \\nturns on the location of the conduct relevant to the focus. See, e. g., \\n\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Trademark infringement",
+      "Extraterritorial jurisdiction",
+      "Lanham Act",
+      "Use in commerce",
+      "Consumer confusion",
+      "Foreign conduct",
+      "Trademark licensing",
+      "Injunctive relief",
+      "Monetary damages"
+    ]
+  },
+  "segment_id": "processing_segment_fafb184467d92086b2ca57e3"
+}

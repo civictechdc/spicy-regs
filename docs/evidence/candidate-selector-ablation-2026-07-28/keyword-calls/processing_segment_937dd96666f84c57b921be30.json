@@ -1,0 +1,109 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 3827.01,
+        "input_tokens": 2002,
+        "output_tokens": 136,
+        "request_id": "aed262a2-246c-4bb8-a6e7-dcbbd137ae3e",
+        "response_id": "resp_0b277a0ff41af1d6016a67b845732881928e45fb6f3a9a41bd",
+        "status": "completed",
+        "total_tokens": 2138
+      }
+    ],
+    "duration_ms": 3827.974,
+    "input_tokens": 2002,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 136,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "f554fc60e17005440955ba33304beae2fc3d55af11868f6a01db4dca2d5f0c8e",
+    "prompt_token_estimate": 1963,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "6ff6cfa658990927433ea3d08a1cad39fc3165609188216d4ba7558fa72062b4",
+    "requested_service_tier": "auto",
+    "response_id": "resp_0b277a0ff41af1d6016a67b845732881928e45fb6f3a9a41bd",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2138,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Steep-slope mining",
+    "Surface coal mining",
+    "Mine land reclamation",
+    "Contour restoration variances",
+    "Postmining land use",
+    "Watershed management",
+    "Water pollution control",
+    "Highwall backfilling",
+    "Slope stability",
+    "Surface runoff control"
+  ],
+  "ordinal": 11,
+  "request": {
+    "input": "{\"segment_text\":\"Steep-slope mining.\\n30\\n<P>\\n            (e) \\n            <E T=\\\"03\\\">Variances from approximate original contour restoration requirements.</E>\\n             (1) This section applies to surface coal mining operations on steep slopes where the operation is not to be reclaimed to achieve the approximate original contour and is not a mountaintop removal operation.\\n        </P>\\n        \\n<P>(2) The objective of this subsection is to allow for a variance from the approximate original contour restoration requirements on steep slopes to\u2014</P>\\n        \\n<P>(i) Improve watershed control of the area; and</P>\\n        \\n<P>(ii) Allow the land to be used for an industrial, commercial, residential, or public use, including recreational facilities.</P>\\n        \\n<P>(3) The regulatory authority may grant a variance from the requirement for restoration of the affected lands to their approximate original contour only if it first finds, in writing, on the basis of a showing made by the permittee, that all of the following requirements are met:</P>\\n        \\n<P>\\n            (i) The permittee has demonstrated that the purpose of the variance is to \\n            <PRTPAGE P=\\\"90\\\"/>\\n            make the lands to be affected within the permit area suitable for an industrial, commercial, residential, or public use postmining land use and that the proposed industrial, commercial, residential, or public use is likely to occur.\\n        </P>\\n        \\n<P>(ii) The proposed use, after consultation with the appropriate land-use planning agencies, if any, constitutes an equal or better economic or public use.</P>\\n        \\n<P>(iii) The permittee has demonstrated that compliance with the requirements for acceptable alternative postmining industrial, commercial, residential or public land uses of 30 CFR 715.13 has been achieved except for the requirement at \u00a7\u2009715.13(d)(3) and (4) to provide letters of commitment. The permittee must demonstrate to the regulatory authority that necessary public facilities are likely to be provided and that the plan is financially feasible.</P>\\n        \\n<P>(iv) The permittee has demonstrated that the watershed of the area will be improved as compared to the condition of the watershed before mining. The watershed will be deemed improved only if\u2014</P>\\n        \\n<P>(A) There will be a reduction in the amount of total suspended solids or other pollutants discharged to ground or surface waters from the area as compared to such discharges; or, there will be reduced flood hazards or more even flow within the watershed containing the area due to reduction of the peak flow discharges from precipitation events or thaws; or any other criterion authority in the granting of the variance. While improving one or more variables, the permittee must also at least maintain the variables not improved at their premining levels;</P>\\n        \\n716-2\\n<P>(B) The total volume of flows from the proposed affected lands, during every season of the year, will not vary in a way that adversely affects the ecology of any surface water or any existing or planned use of surface or ground water; and</P>\\n        \\n<P>(C) The appropriate State environmental agency approves the plan.</P>\\n        \\n<P>(v) The permittee has demonstrated that the owner of the surface of the lands within the permit area has knowingly requested, in writing, as a part of the application, that a variance be granted. The request shall be made separately from any surface owner consent given for the operation and shall show an understanding that the variance could not be granted without the surface owner's request.</P>\\n        \\n<P>(vi) The proposal is designed and certified by a qualified registered professional engineer in conformance with professional standards established to assure the stability, drainage, and configuration necessary for the intended use of the site.</P>\\n        \\n<P>(vii) All other requirements of the Act and these regulations will be met by the proposed operations.</P>\\n        \\n<P>(4) Every permittee who obtains a variance under this subsection shall:</P>\\n        \\n<P>(i) Backfill completely the highwall with spoil material, in a manner which results in a static factor of safety of at least 1.3 using general geotechnical analysis.</P>\\n        \\n<P>(ii) Improve the watershed control of the area by reducing the peak flow from precipitation or thaw or reducing the total suspended solids or other pollutants in the surface water discharge during precipitation or thaw or by attaining the criteria approved by the regulatory authority in the granting of the variance. While improving one or more variables, the permittee must also at least maintain the variables not improved at their premining levels. The total volume of flow during every season of the year shall not vary in a way that adversely affects the ecology of any surface or ground water.</P>\\n        \\n<P>(iii) Disturb land above the highwall only to the extent that the regulatory authority deems appropriate and approves as necessary to facilitate compliance with the provisions of this section. The regulatory authority may authorize such a disturbance above the highwall if it finds the disturbance is necessary to\u2014</P>\\n        \\n<P>(A) Blend the solid highwall and the backfilled material; or</P>\\n        \\n<?xml version=\\\"1.0\\\"?>\\n<?xml-stylesheet type=\\\"text/xsl\\\" href=\\\"cfr.xsl\\\"?>\\n<CFRGRANULE xmlns:xsi=\\\"http://www.w3.org/2001/XMLSchema-instance\\\" xsi:noNamespaceSchemaLocation=\\\"CFRMergedXML.xsd\\\">\\n    <FDSYS>\\n        <CFRTITLE>30</CFRTITLE>\\n        <CFRTITLETEXT>Mineral Resources</CFRTITLETEXT>\\n        <VOL>3</VOL>\\n        <DATE>2025-07-01</DATE>\\n        <COVERONLY>false</COVERONLY>\\n        <ORIGINALDATE>2025-07-01</ORIGINALDATE>\\n        <ANCESTORS>\\n            <PARENT HEADING=\\\"Title 30\\\" SEQ=\\\"3\\\">Mineral Resources</PARENT>\\n            <PARENT HEADING=\\\"CHAPTER VII\\\" SEQ=\\\"2\\\">OFFICE OF SURFACE MINING RECLAMATION AND ENFORCEMENT, DEPARTMENT OF THE INTERIOR</PARENT>\\n            <PARENT HEADING=\\\"SUBCHAPTER B\\\" SEQ=\\\"1\\\">INITIAL PROGRAM REGULATIONS</PARENT>\\n            <PARENT HEADING=\\\"PART 716\\\" SEQ=\\\"0\\\">SPECIAL PERFORMANCE STANDARDS</PARENT>\\n        </ANCESTORS>\\n    </FDSYS>\\n    \\n<P>(B) Control surface runoff; or</P>\\n        \\n<P>(C) Provide access to the area above the highwall.</P>\\n        \\n<SECTION>\\n        <SECTNO>\u00a7\u2009716.2</SECTNO>\\n        <SUBJECT>Steep-slope mining.</SUBJECT>\\n        \\n<P>The permittee conducting surface coal mining and reclamation operations on natural slopes that exceed 20 degrees, or on lesser slopes that require measures to protect the area from disturbance, as determined by the regulatory authority after consideration of soils, climate, the method of operation, geology, and other regional characteristics, shall meet the following performance standards. The standards of this section do not apply where mining is done on a flat or gently rolling terrain with an occasional steep slope through which the mining proceeds and leaves a plain or predominantly flat area; or where the mining is governed by \u00a7\u2009716.3.</P>\\n        \\n<P>(a) Spoil, waste materials or debris, including that from clearing and grubbing, and abandoned or disabled equipment, shall not be placed or allowed to remain on the downslope.</P>\\n        \\n<P>(b) The highwall shall be completely covered with spoil and the disturbed are a graded to comply with the provisions of \u00a7\u2009715.14 of this chapter. Land above the highwall shall not be disturbed unless the regulatory authority finds that the disturbance will facilitate compliance with the requirements of this section.</P>\\n        \\n<P>(c) Material in excess of that required to meet the provisions of \u00a7\u2009715.14 of this chapter shall be disposed of in accordance with the requirements of \u00a7\u2009715.15 of this chapter.</P>\\n        \\n<P>(d) Woody materials may be buried in the backfilled area only when burial does not cause, or add to, instability of the backfill. Woody materials may be chipped and distributed through the backfill when approved by the regulatory authority.</P>\\n        \"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Steep-slope mining",
+      "Surface coal mining",
+      "Mine land reclamation",
+      "Contour restoration variances",
+      "Postmining land use",
+      "Watershed management",
+      "Water pollution control",
+      "Highwall backfilling",
+      "Slope stability",
+      "Surface runoff control"
+    ]
+  },
+  "segment_id": "processing_segment_937dd96666f84c57b921be30"
+}

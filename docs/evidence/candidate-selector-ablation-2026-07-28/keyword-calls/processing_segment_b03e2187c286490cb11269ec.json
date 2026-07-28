@@ -1,0 +1,107 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 5145.111,
+        "input_tokens": 1807,
+        "output_tokens": 139,
+        "request_id": "2de83e5c-bf52-449f-ad02-b06bbcc57116",
+        "response_id": "resp_0f08ca0b4f1ea30d016a67b85c6714819f8de4755ee31ccac0",
+        "status": "completed",
+        "total_tokens": 1946
+      }
+    ],
+    "duration_ms": 5145.915,
+    "input_tokens": 1807,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 139,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "835cc95ffa320530f709bf0427e95f9c26a2972214bde3436d1616a504de0057",
+    "prompt_token_estimate": 1768,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "209897cf64a91f272faefc2f7734fe33030314c2793183849f6236e3c00d2047",
+    "requested_service_tier": "auto",
+    "response_id": "resp_0f08ca0b4f1ea30d016a67b85c6714819f8de4755ee31ccac0",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 1946,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Science and technology policy",
+    "Presidential science advice",
+    "Interagency coordination",
+    "Federal research funding",
+    "Congressional oversight",
+    "Executive appointments",
+    "Conflicts of interest",
+    "Federal workforce management",
+    "Workplace culture"
+  ],
+  "ordinal": 17,
+  "request": {
+    "input": "{\"segment_text\":\"The Office of Science and Technology Policy (OSTP): Overview and Issues for Congress\\nReports\\nFigures \\nFigure 1. OSTP Organization Under President Biden ..................................................................... 3 \\nFigure 2. OSTP Funding, FY1993-FY2023 .................................................................................... 9 \\nFigure 3. OSTP Full-Time Equivalent (FTE) Levels ..................................................................... 11 \\nFigure 4. National Science and Technology Council Overview .................................................... 14 \\n  \\n\\nTables \\nTable 1. OSTP Policy Teams Under President Biden ...................................................................... 5 \\nTable 2. OSTP Funding, FY2020-FY2023 ...................................................................................... 9 \\nTable 3. Selected National Coordination Office (NCO) Budgets .................................................. 17 \\n  \\n\\nAppendixes \\nAppendix A. National Science and Technology Council Organization ......................................... 24 \\nAppendix B. NSTC Special Committees ...................................................................................... 27 \\n \\n\\n\\f\\nThe Office of Science and Technology Policy (OSTP): Overview and Issues for Congress \\n \\n\\nCongressional Research Service \\nContacts \\nAuthor Information ........................................................................................................................ 27 \\n \\n\\n \\n\\f\\nThe Office of Science and Technology Policy (OSTP): Overview and Issues for Congress \\n \\n\\nActive\\n \\n \\n\\n  \\n \\n\\nThe Office of Science and Technology Policy \\n(OSTP): Overview and Issues for Congress \\nFebruary 7, 2023 \\nCongressional Research Service \\nhttps://crsreports.congress.gov \\nR47410 \\n\\f\\n \\n\\nCongressional Research Service  \\nSUMMARY \\n \\n\\nThe Office of Science and Technology Policy \\n(OSTP): Overview and Issues for Congress \\nCongress established the Office of Science and Technology Policy (OSTP) through the National \\nScience and Technology Policy, Organization, and Priorities Act of 1976 (P.L. 94-282) to \u201cserve \\nas a source of scientific and technological analysis and judgment for the President with respect to \\nmajor policies, plans, and programs of the Federal Government.\u201d The act further charged the \\nOSTP Director with specific advisory duties within the Executive Office of the President (EOP), \\nincluding providing \u201cadvice on the scientific, engineering, and technological aspects of issues \\nthat require attention at the highest level of Government.\u201d  \\nCurrently, the White House science and technology (S&T) advisory structure consists of OSTP and two advisory  councils: \\nthe National Science and Technology Council (NSTC) and the President\u2019s Council of Advisor s on Science and Technology \\n(PCAST).  \\nThe President nominates the OSTP Director, who is subject to confirmation by the Senate. In some Administrations, the \\nPresident has concurrently appointed the OSTP Director to the position of Assistant to the President  for Science and \\nTechnology (APST), often referred to as the President\u2019s \u201cscience advisor,\u201d a position which allows for the provision of \\nconfidential advice to the President on matters of science and technology. Arati Prabhakar, President Biden\u2019s nominee to \\nserve as Director of OSTP, was confirmed by the Senate on September 22, 2022. President Biden also appointed Prabhakar to \\nserve concurrently as Assistant to the President for Science and Technology and as a member of his Cabinet. President Biden \\nbecame the first U.S. President to appoint a Science Advisor to the President\u2019s Cabinet, an advisory governmental body \\nconsisting of the Vice President, the heads of the 15 executive branch departments, and other designated top executive branch \\nofficials.  \\nWhen designated to do so by the President, the APST convenes and chairs the NSTC, a cabinet-level body of advisors to the \\nPresident on S&T policies and issues. Established in 1993 by Executive Order 12881, the NSTC is composed of \\nrepresentatives from departments and agencies with significant S&T responsibilities and is charged with coordinating S&T \\npolicy across the federal government. OSTP staff chair or co-chair most of the committees, subcommittees, and interagency \\nworking groups of the NSTC. OSTP staff provide operational and administrative support to the NSTC. \\nThe Director of OSTP co-chairs PCAST. Established in 1990 by Executive Order 12700, PCAST is an independent Federal \\nAdvisory Committee composed of external advisors who advise the President on matters involving policy affecting science, \\ntechnology, and innovation as well as on matters involving S&T information needed to inform public policy in other areas.  \\nOSTP staff provide operational and administrative support to PCAST.  \\nCongress appropriated $7.96 million for OSTP in FY2023 an increase of 19.7% above the FY2022 enacted level. In addition \\nto appropriations for the office provided in the annual Commerce, Justice, Science, and Related Agencies appropriations acts, \\nOSTP receives indirect support from two federal agencies: the National Science Foundation (NSF), which provides funding \\nfor the Science and Technology Policy Institute, a federally-funded research and development center that supports OSTP, and \\nthe Department of Energy (DOE), which provides funding for PCAST.  \\nOSTP is statutorily charged with advising the President on S&T matters; coordinating the implementation of S&T priorities \\nacross the federal government; and engaging with external partners in industry, academia, civil society organizations, and \\nother governmental bodies. Accordingly, several issues related to the activities and focus of OSTP (as well as the advisory \\nbodies it supports, the NSTC and PCAST) are of potential interest to Congress, including staffing practices and potential \\nconflict-of-interest concerns; workplace culture and past congressional oversight activity; the efficacy of federal S&T \\ncoordination; persistent vacancies of Senate-confirmed leadership positions within OSTP; and the stature and influence of \\nPCAST. \\nR47410 \\nFebruary 7, 2023 \\nEmily G. Blevins \\nAnalyst in Science and \\nTechnology Policy \\n  \\n\\nFor a copy of the full report, \\nplease call 7-5700 or visit \\nwww.crs.gov. \\n\\f\\nThe Office of Science and Technology Policy (OSTP): Overview and Issues for Congress \\n \\n\\nCongressional Research Service  \\nContents \\nIntroduction ..................................................................................................................................... 1 \\nOffice of Science and Technology Policy ....................................................................................... 1 \\nOverview and Background ........................................................................................................ 1 \\nOrganization .............................................................................................................................. 2 \\nLeadership ........................................................................................................................... 2 \\nRoles and Responsibilities ........................................................................................................ 7 \\nS&T Priority-Setting and the Federal Budget Process ........................................................ 8 \\nBudget and Staffing ................................................................................................................... 8 \\nNational Science and Technology Council .................................................................................... 12 \\nOverview and Background ...................................................................................................... 13 \\nOrganization ............................................................................................................................ 13 \\nRoles and Responsibilities ...................................................................................................... 14 \\nBudget and Staffing ................................................................................................................. 16 \\nPresident\u2019s Council of Advisors on Science and Technology ....................................................... 17 \\nOverview and Background ...................................................................................................... 17 \\nOrganization ............................................................................................................................ 18 \\nRoles and Responsibilities ...................................................................................................... 19 \\nBudget and Staffing ................................................................................................................. 19 \\nIssues for Congress ........................................................................................................................ 20 \\nIPAs, Fellows, and Potential Conflicts of Interest at OSTP .................................................... 20 \\nOSTP Workplace Culture and Congressional Oversight ......................................................... 22 \\nInteragency S&T Coordination ............................................................................................... 23 \\nOSTP\u2019s Senate-Confirmed Leadership Positions.................................................................... 23 \\n \\n\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Science and technology policy",
+      "Presidential science advice",
+      "Interagency coordination",
+      "Federal research funding",
+      "Congressional oversight",
+      "Executive appointments",
+      "Conflicts of interest",
+      "Federal workforce management",
+      "Workplace culture"
+    ]
+  },
+  "segment_id": "processing_segment_b03e2187c286490cb11269ec"
+}

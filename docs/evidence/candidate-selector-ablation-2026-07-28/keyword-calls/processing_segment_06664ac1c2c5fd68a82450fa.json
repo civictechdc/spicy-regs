@@ -1,0 +1,105 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 6590.722,
+        "input_tokens": 2035,
+        "output_tokens": 134,
+        "request_id": "7b1d60db-62a9-4ead-b6cd-f91289e5aa13",
+        "response_id": "resp_0d6b52902db5f35a016a67b81e7654819da6b887bb946cfc69",
+        "status": "completed",
+        "total_tokens": 2169
+      }
+    ],
+    "duration_ms": 6593.44,
+    "input_tokens": 2035,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 134,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "89c8d98e8abe9855ced027de1d3c686d74ce25dcb320b2b53f2a190a7e704d22",
+    "prompt_token_estimate": 1996,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "12143ccfbe451186dca59b08ec2a06e67282cdfe5af4444d229aac9211e8b4d8",
+    "requested_service_tier": "auto",
+    "response_id": "resp_0d6b52902db5f35a016a67b81e7654819da6b887bb946cfc69",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2169,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Maritime safety zones",
+    "Fireworks displays",
+    "Vessel navigation restrictions",
+    "Biscayne Bay",
+    "Navigable waters",
+    "Barge operations",
+    "Marine environmental protection",
+    "Small business impacts"
+  ],
+  "ordinal": 1,
+  "request": {
+    "input": "{\"segment_text\":\"40392 Federal Register / Vol. 91, No. 126 / Thursday, July 2, 2026 / Rules and Regulations \\n1 91 FR 32369. \\nensign. The Coast Guard may be assisted \\nby other Federal, state, or local agencies. \\nIn addition to this notice of \\nenforcement in the Federal Register, the \\nCoast Guard plans to provide \\nnotification of this enforcement period \\nvia the Local Notice to Mariners and \\nmarine information broadcasts. \\nIf the Captain of the Port determines \\nthat the regulated area need not be \\nenforced for the full duration stated in \\nthis notice, a Broadcast Notice to \\nMariners may be used to grant general \\npermission to enter the regulated area. \\nDated: June 30, 2026. \\nJordan M. Baldueza, \\nCaptain, U.S. Coast Guard, Captain of the \\nPort San Francisco. \\n[FR Doc. 2026\u201313491 Filed 7\u20131\u201326; 8:45 am] \\nBILLING CODE 9110\u201304\u2013P \\nDEPARTMENT OF HOMELAND \\nSECURITY \\nCoast Guard \\n33 CFR Part 165 \\n[Docket Number USCG\u20132026\u20130610] \\nRIN 1625\u2013AA00 \\nSafety Zone; Bayfront Park 4th of July \\nFireworks Display, Intercoastal \\nWaterway, Biscayne Bay, Miami, FL \\nAGENCY: Coast Guard, Department of \\nHomeland Security. \\nACTION: Temporary final rule. \\nSUMMARY: The Coast Guard is \\nestablishing a temporary safety zone for \\ncertain navigable waters on the \\nIntercoastal Waterway portion of \\nBiscayne Bay in Miami, FL. The safety \\nzone is necessary to protect personnel, \\nvessels, and the marine environment \\nfrom potential hazards associated with \\ntwo barge-based fireworks displays on \\nJuly 4, 2026. The safety zone will \\nencompass all waters within a 250-yard \\nradius of the firework barges. This \\nrulemaking prohibits entry of vessels or \\npersons into this safety zone unless \\nspecifically authorized by the Captain of \\nthe Port, Sector Miami or their \\ndesignated representative. \\nDATES: This rule is effective from 11:10 \\np.m. on July 4, 2026, through 12:10 a.m. \\non July 5, 2026. \\nADDRESSES: To view available \\ndocuments, go to https://\\nwww.regulations.gov and search for \\nUSCG\u20132026\u20130610. \\nFOR FURTHER INFORMATION CONTACT : If \\nyou have questions about this rule, \\ncontact LT Guerschom Etienne, U.S. \\nCoast Guard; telephone 786\u2013295\u20139051 \\nor email Guerschom.Etienne@uscg.mil. \\nSUPPLEMENTARY INFORMATION: \\nI. Table of Abbreviations \\nCFR Code of Federal Regulations \\nCOTP Captain of the Port \\nDHS Department of Homeland Security \\nFR Federal Register \\nNPRM Notice of proposed rulemaking \\n\u00a7 Section \\nU.S.C. United States Code \\nII. Background and Authority \\nThe Coast Guard received notification \\nthat fireworks will be launched from \\ntwo barges on Bayfront Park in Miami, \\nFL from 11:10 p.m. on July 4, 2026, \\nthrough 12:10 a.m. on July 5, 2026. \\nHazards from fireworks displays include \\naccidental discharge of fireworks, \\ndangerous projectiles, and falling hot \\nembers or other debris. The Captain of \\nthe Port Sector Miami (COTP) has \\ndetermined that potential hazards \\nassociated with fireworks are a safety \\nconcern for anyone within a 250-yard \\nradius of the fireworks display. \\nOn June 1, 2026, the Coast Guard \\npublished a notice of proposed \\nrulemaking (NPRM) titled Safety Zone; \\nBayfront Park 4th of July Fireworks \\nDisplay, Intercoastal Waterway, \\nBiscayne Bay, Miami, FL.\\n1 In that \\nNPRM, we stated why we issued the \\nNPRM and invited comments on our \\nproposed regulatory action related to \\nthis fireworks display. \\nUnder the authority in 46 U.S.C. \\n70034, the COTP has determined that \\nthis rule is necessary to protect \\npersonnel, vessels, and the marine \\nenvironment from potential hazards \\nassociated with the fireworks display. \\nNo vessel or person will be permitted to \\nenter the safety zone without obtaining \\npermission from the COTP or their \\ndesignated representative. \\nIII. Discussion of Comments and the \\nRule \\nAs stated above, during the comment \\nperiod that ended on June 16, 2026, we \\nreceived no comments. There are no \\nchanges in the regulatory text of this \\nrule from the proposed rule in the \\nNPRM. \\nThis rule establishes a safety zone \\nfrom 11:10 p.m. on July 4, 2026, through \\n12:10 a.m. on July 5, 2026. The safety \\nzone covers all navigable water within \\n250 yards of the fireworks barges. No \\nvessel or person is permitted to enter \\nthe safety zone without obtaining \\npermission from the COTP or their \\ndesignated representative. \\nIV. Regulatory Analyses \\nWe developed this rule after \\nconsidering numerous statutes and \\nExecutive orders related to rulemaking. \\nBelow we summarize our analysis based \\non a number of these statutes and \\nExecutive orders. \\nA. Impact on Small Entities \\nThe Regulatory Flexibility Act of 1980 \\n(RFA), 5 U.S.C. 601\u2013612, as amended, \\nrequires Federal agencies to consider \\nthe potential impact of regulations on \\nsmall entities during rulemaking. The \\nterm \u2018\u2018small entities\u2019\u2019 comprises small \\nbusinesses, not-for-profit organizations \\nthat are independently owned and \\noperated and are not dominant in their \\nfields, and governmental jurisdictions \\nwith populations of less than 50,000. \\nSection 605 of the RFA allows an \\nagency to certify a rule, in lieu of \\npreparing an analysis, if the rulemaking \\nis not expected to have a significant \\neconomic impact on a substantial \\nnumber of small entities. \\nThe Coast Guard certifies that, \\nalthough some small entities may intend \\nto transit the safety zone above, this rule \\nwill not have a significant economic \\nimpact on a substantial number of small \\nentities. Vessel traffic will be able to \\nsafely transit around this safety zone. \\nThis safety zone will only impact a \\nsmall, designated area for a few \\nminutes. In addition, the Coast Guard \\nwill issue a Broadcast Notice to Marines \\nvia VHF FM marine channel 16, which \\nwill allow small entities to adjust their \\ntransit plans. \\nUnder section 213(a) of the Small \\nBusiness Regulatory Enforcement \\nFairness Act of 1996 (Pub. L. 104\u2013121), \\nif this rule will affect your small \\nbusiness, organization, or governmental \\njurisdiction and you have questions, \\ncontact the person listed in the \\nFOR \\nFURTHER INFORMATION CONTACT section. \\nSmall businesses may send comments \\nto the Small Business and Agriculture \\nRegulatory Enforcement Ombudsman \\nand the Regional Small Business \\nRegulatory Fairness Boards by calling 1\u2013 \\n888\u2013REG\u2013FAIR (1\u2013888\u2013734\u20133247). \\nB. Collection of Information \\nThis rule will not call for a new \\ncollection of information under the \\nPaperwork Reduction Act of 1995 (44 \\nU.S.C. 3501\u20133520). \\nC. Federalism and Indian Tribal \\nGovernments \\nWe have analyzed this rule under \\nExecutive Order 13132, Federalism, and \\nhave determined that it is consistent \\nwith the fundamental federalism \\nprinciples and preemption requirements \\ndescribed in that Order. \\nAlso, this rule does not have tribal \\nimplications under Executive Order \\n13175, Consultation and Coordination \\n\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Maritime safety zones",
+      "Fireworks displays",
+      "Vessel navigation restrictions",
+      "Biscayne Bay",
+      "Navigable waters",
+      "Barge operations",
+      "Marine environmental protection",
+      "Small business impacts"
+    ]
+  },
+  "segment_id": "processing_segment_06664ac1c2c5fd68a82450fa"
+}

@@ -1,0 +1,105 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 4410.858,
+        "input_tokens": 1978,
+        "output_tokens": 141,
+        "request_id": "a9425319-a3fc-483a-947f-0f908d44ee58",
+        "response_id": "resp_011b97679c2bc91f016a67b82b62ec819d89f5a377470dae02",
+        "status": "completed",
+        "total_tokens": 2119
+      }
+    ],
+    "duration_ms": 4411.857,
+    "input_tokens": 1978,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 141,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "0b0c76b829e05bd30072d9d49230f77500d97952a03b9118be46e4fa428e8d24",
+    "prompt_token_estimate": 1939,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "f658b1001e83976970c658eab765aecff2590b766d2d190308b441d960b61bbf",
+    "requested_service_tier": "auto",
+    "response_id": "resp_011b97679c2bc91f016a67b82b62ec819d89f5a377470dae02",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2119,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "General personal jurisdiction",
+    "Consent to jurisdiction",
+    "Foreign corporations",
+    "Corporate registration",
+    "Due process",
+    "Railroad employee liability",
+    "Occupational cancer",
+    "State court jurisdiction"
+  ],
+  "ordinal": 4,
+  "request": {
+    "input": "{\"segment_text\":\"PRELIMINARY PRINT \\nVolume 600 U. S. Part 1 \\nPages 122\u2013180 \\nOFFICIAL REPORTS \\nOF \\nTHE SUPREME COURT \\nJune 27, 2023 \\nREBECCA A. WOMELDORF \\nreporter of decisions \\nPage Proof Pending Publication\\nNOTICE: This preliminary print is subject to formal revision before \\nthe bound volume is published. Users are requested to notify the Reporter \\nof Decisions, Supreme Court of the United States, Washington, D.C. 20543, \\npio@supremecourt.gov, of any typographical or other formal errors. \\n\\f\\nPage Proof Pending Publication\\n122 OCTOBER TERM, 2022 \\nSyllabus \\nMALLORY v. NORFOLK SOUTHERN RAILWAY CO. \\ncertiorari to the supreme court of pennsylvania, \\neastern district \\nNo. 21\u20131168. Argued November 8, 2022\u2014Decided June 27, 2023 \\nRobert Mallory worked for Norfolk Southern as a freight-car mechanic for \\nnearly 20 years, frst in Ohio, then in Virginia. After he left the com-\\npany, Mr. Mallory moved to Pennsylvania for a period before returning \\nto Virginia. Along the way he was diagnosed with cancer. Because \\nhe attributed his illness to his work at Norfolk Southern, Mr. Mallory \\nsued his former employer under the Federal Employers' Liability Act, \\n45 U. S. C. \u00a7\u00a7 51\u201360, a federal workers' compensation scheme permitting \\nrailroad employees to recover damages for their employers' negligence. \\nMr. Mallory fled his lawsuit in Pennsylvania state court. Norfolk \\nSouthern\u2014a company incorporated in Virginia and headquartered \\nthere\u2014resisted the suit on the basis that a Pennsylvania court's exercise \\nof personal jurisdiction over it would offend the Due Process Clause of \\nthe Fourteenth Amendment. Norfolk Southern noted that when the \\ncomplaint was fled, Mr. Mallory resided in Virginia, and the complaint \\nalleged that Mr. Mallory was exposed to carcinogens only in Ohio and \\nVirginia. Mr. Mallory pointed to Norfolk Southern's presence in Penn-\\nsylvania, noting that Norfolk Southern manages over 2,000 miles of \\ntrack, operates 11 rail yards, and runs 3 locomotive repair shops in \\nPennsylvania. In fact, Norfolk Southern has registered to do business \\nin Pennsylvania in light of its \u201c `regular, systematic, [and] extensive' \u201d \\noperations there. 266 A. 3d 542, 562; see 15 Pa. Cons. Stat. \u00a7 411(a). \\nAnd Pennsylvania requires out-of-state companies that register to do \\nbusiness in the Commonwealth to agree to appear in its courts on \u201cany \\ncause of action\u201d against them. 42 Pa. Cons. Stat. \u00a7 5301(a)(2)(i), (b). \\nBy complying with this statutory scheme, Mr. Mallory submitted, Nor-\\nfolk Southern had consented to suit in Pennsylvania on claims just like \\nhis. \\nThe Pennsylvania Supreme Court sided with Norfolk Southern. \\nThat court found that the Pennsylvania law\u2014requiring an out-of-state \\nfrm to answer in the Commonwealth any suits against it in exchange for \\nstatus as a registered foreign corporation and the benefts that entails\u2014 \\nviolates the Due Process Clause. \\nHeld: The judgment is vacated, and the case remanded. This case is con-\\ntrolled by Pennsylvania Fire Ins. Co. of Philadelphia v. Gold Issue \\nMining & Milling Co., 243 U. S. 93. Much like the Missouri law that \\nthe Court in Pennsylvania Fire found to comport with the Due Process \\n\\f\\nCite as: 600 U. S. 122 (2023) 123 \\nSyllabus \\nClause, the Pennsylvania law at issue here provides that an out-of-state \\ncorporation \u201cmay not do business in this Commonwealth until it regis-\\nters with\u201d the Department of State. 15 Pa. Cons. Stat. \u00a7 411(a). \\nAmong other things, Pennsylvania law is explicit that \u201cqualifcation as \\na foreign corporation\u201d shall permit state courts to \u201cexercise general per-\\nsonal jurisdiction\u201d over a registered foreign corporation, just as they \\ncan over domestic corporations. 42 Pa. Cons. Stat. \u00a7 5301(a)(2). Nor-\\nfolk Southern has complied with this law since 1998, when it registered \\nto do business in Pennsylvania. Norfolk Southern applied for a \u201cCer-\\ntifcate of Authority\u201d from the Commonwealth which, once approved, \\nconferred on Norfolk Southern both the benefts and burdens shared by \\ndomestic corporations, including amenability to suit in state court on \\nany claim. For more than two decades, Norfolk Southern has agreed \\nto be found in Pennsylvania and answer any suit there. \\nPennsylvania Fire held that suits premised on these grounds do not \\ndeny a defendant due process of law. Mr. Mallory no longer lives in \\nPennsylvania and his cause of action did not accrue there. But none of \\nthat makes any difference. To decide this case, the Court need not \\nspeculate whether any other statutory scheme and set of facts would \\nsuffce to establish consent to suit. It is enough to acknowledge that \\nthe state law and facts before the Court fall squarely within Pennsylva-\\nnia Fire's rule. \\nIn the proceedings below, the Pennsylvania Supreme Court seemed \\nto recognize that Pennsylvania Fire dictated an answer in Mr. Mal-\\nlory's favor but ruled for Norfolk Southern because, in its view, inter-\\nvening decisions from this Court had \u201cimplicitly overruled\u201d Pennsylva-\\nnia Fire . See 266 A. 3d, at 559, 567. That was error. As this Court \\nhas explained: \u201cIf a precedent of this Court has direct application in a \\ncase,\u201d as Pennsylvania Fire does here, a lower court \u201cshould follow the \\ncase which directly controls, leaving to this Court the prerogative of \\noverruling its own decisions.\u201d Rodriguez de Quijas v. Shearson/Amer-\\nican Express, Inc., 490 U. S. 477, 484. This is true even if the lower \\ncourt thinks the precedent is in tension with \u201csome other line of deci-\\nsions.\u201d Ibid. Pp. 134\u2013136. \\n266 A. 3d 542, vacated and remanded. \\nGorsuch, J., announced the judgment of the Court, delivered the opin-\\nion of the Court with respect to Parts I and III\u2013B, in which Thomas, \\nAlito, Sotomayor, and Jackson, JJ., joined, and an opinion with respect \\nto Parts II, III\u2013A, and IV , in which Thomas, Sotomayor, and Jackson, \\nJJ., joined. Jackson, J., fled a concurring opinion, post, p. 147. Alito, \\nJ., fled an opinion concurring in part and concurring in the judgment, post, \\np. 150. Barrett, J., fled a dissenting opinion, in which Roberts, C. J., \\nand Kagan and Kavanaugh, JJ., joined, post, p. 163. \\nPage Proof Pending Publication\\n\\f\\nPage Proof Pending Publication\\n124 MAL LORY v. NORFOLK SOUTHERN R. CO. \\nCounsel \\nAshley Keller argued the cause for petitioner. With him \\non the briefs were Warren Postman, Matthew A. Seligman, \\nDaniel C. Levin, Frederick S. Longer, and Zina Bash. \\nCarter G. Phillips argued the cause for respondent. With \\nhim on the brief were Tobias Loss-Eaton, Ralph G. Welling-\\nton, Bruce P . Merenstein, Daniel B. Donahoe, and Ira L. \\nPodheiser. \\nDeputy Solicitor Gannon argued the cause for the United \\nStates as amicus curiae urging affrmance. With him on \\nthe brief were Solicitor General Prelogar, Principal Deputy \\nAssistant Attorney General Boynton, Vivek Suri, Sharon \\nSwingle, and Joshua M. Koppel.* \\n\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "General personal jurisdiction",
+      "Consent to jurisdiction",
+      "Foreign corporations",
+      "Corporate registration",
+      "Due process",
+      "Railroad employee liability",
+      "Occupational cancer",
+      "State court jurisdiction"
+    ]
+  },
+  "segment_id": "processing_segment_40ac49fab911f28a9b2c7800"
+}

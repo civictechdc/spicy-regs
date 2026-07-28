@@ -1,0 +1,109 @@
+{
+  "call": {
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt": 1,
+        "duration_ms": 3061.603,
+        "input_tokens": 1968,
+        "output_tokens": 111,
+        "request_id": "048ee847-ec37-4843-8393-ec211ca566fe",
+        "response_id": "resp_07c379a6386ead8d016a67b85687d081a3b50b74d2edc052cd",
+        "status": "completed",
+        "total_tokens": 2079
+      }
+    ],
+    "duration_ms": 3062.341,
+    "input_tokens": 1968,
+    "max_output_tokens": 8192,
+    "max_retries": 3,
+    "model_id": "openai:gpt-5.6-sol",
+    "output_tokens": 111,
+    "prompt_input_token_budget": 8192,
+    "prompt_safety_margin_tokens": 1024,
+    "prompt_sha256": "8ec833143efd93739e43b7745f0561adb4e8f8122a32cb796e6d168eb2974273",
+    "prompt_token_estimate": 1929,
+    "provider": "openai",
+    "reasoning_effort": "medium",
+    "request_sha256": "5564637934fc071a3af5e223081e375d7abbf42d8e610f07ec2bd61387eb4921",
+    "requested_service_tier": "auto",
+    "response_id": "resp_07c379a6386ead8d016a67b85687d081a3b50b74d2edc052cd",
+    "response_model": "gpt-5.6-sol",
+    "response_service_tier": "default",
+    "retry_count": 0,
+    "schema_name": "segment_descriptor_keywords",
+    "schema_token_estimate": 41,
+    "schema_validated_locally": true,
+    "sdk_max_retries": 0,
+    "status": "completed",
+    "store": false,
+    "timeout_seconds": 120.0,
+    "tokenizer": "o200k_base",
+    "tokenizer_version": "0.13.0",
+    "total_tokens": 2079,
+    "transport": "openai-responses"
+  },
+  "keywords": [
+    "Climate change mitigation",
+    "Greenhouse gas emissions",
+    "Renewable electricity",
+    "Zero-emission vehicles",
+    "Regenerative agriculture",
+    "Extreme weather",
+    "Climate justice",
+    "Sustainable land management",
+    "Climate-related health risks",
+    "Disaster economic losses"
+  ],
+  "ordinal": 15,
+  "request": {
+    "input": "{\"segment_text\":\"Earth Act to Stop Climate Pollution by 2030\\nReferred to the Subcommittee on Livestock, Dairy, and Poultry.\\n<enum>2.</enum>\\n<header>Findings</header>\\n<text display-inline=\\\"no-display-inline\\\">Congress finds the following:</text>\\n<paragraph id=\\\"H8336E77767CF4E158F125C5ECDB5631F\\\">\\n<enum>(1)</enum>\\n<text>Global climate change is an immediate threat to the national security, public health, and national economy of the United States as well as the legacy we will leave to our children.</text></paragraph>\\n<paragraph id=\\\"H893DD36C6F074A318E7C670DBADB9909\\\">\\n<enum>(2)</enum>\\n<text>The most vulnerable communities, including communities of color, women, children, the elderly, persons with disabilities, low-income communities, and those with underlying health conditions, face even greater health risks as a result of climate change.</text></paragraph>\\n<paragraph id=\\\"H1EF5D4882DD240D3B223B6CAFB17E92E\\\">\\nHouse\\n<enum>(3)</enum>\\n<text>The United States is already seeing climate change exacerbate extreme weather events, with\u2014</text><subparagraph id=\\\"HD67A3F3B611D48C79D7CB299D0453768\\\">\\n<enum>(A)</enum>\\n<text>the year 2020 seeing the most active Atlantic hurricane season on record with 30 named storms and six major hurricanes;</text></subparagraph><subparagraph id=\\\"HB907EBA5DD454C61AF2763169004F881\\\">\\n<enum>(B)</enum>\\n<text>the 2019 issuance of the first-ever Extreme Red Flag Warning for wildfires;</text></subparagraph><subparagraph id=\\\"H0A5F200CEBBD4283B73204347501C13F\\\">\\n<enum>(C)</enum>\\n<text>hundreds of thousands of acres in the Western United States currently or recently experiencing devastating wildfires; and</text></subparagraph><subparagraph id=\\\"H611FC664A8684B1580880D577E719818\\\">\\n<enum>(D)</enum>\\n<text>communities around the country regularly facing <quote>100-Year Floods</quote>.</text></subparagraph></paragraph>\\n<?xml version=\\\"1.0\\\"?>\\n<?xml-stylesheet type=\\\"text/xsl\\\" href=\\\"billres.xsl\\\"?>\\n<!DOCTYPE bill PUBLIC \\\"-//US Congress//DTDs/bill.dtd//EN\\\" \\\"bill.dtd\\\">\\n<bill bill-stage=\\\"Introduced-in-House\\\" dms-id=\\\"HBC4E1459CE0F46A0AAD9FB996A53190A\\\" public-private=\\\"public\\\" key=\\\"H\\\" bill-type=\\\"olc\\\"><metadata xmlns:dc=\\\"http://purl.org/dc/elements/1.1/\\\">\\n<dublinCore>\\n<dc:title>118 HR 598 IH: Earth Act to Stop Climate Pollution by 2030</dc:title>\\n<dc:publisher>U.S. House of Representatives</dc:publisher>\\n<dc:date>2023-01-27</dc:date>\\n<dc:format>text/xml</dc:format>\\n<dc:language>EN</dc:language>\\n<dc:rights>Pursuant to Title 17 Section 105 of the United States Code, this file is not subject to copyright protection and is in the public domain.</dc:rights>\\n</dublinCore>\\n</metadata>\\n<form>\\n<distribution-code display=\\\"yes\\\">I</distribution-code><congress display=\\\"yes\\\">118th CONGRESS</congress><session display=\\\"yes\\\">1st Session</session><legis-num display=\\\"yes\\\">H. R. 598</legis-num><current-chamber>IN THE HOUSE OF REPRESENTATIVES</current-chamber><action display=\\\"yes\\\"><action-date date=\\\"20230127\\\">January 27, 2023</action-date><action-desc><sponsor name-id=\\\"E000297\\\">Mr. Espaillat</sponsor> (for himself, <cosponsor name-id=\\\"V000081\\\">Ms. Vel\u00e1zquez</cosponsor>, <cosponsor name-id=\\\"L000551\\\">Ms. Lee of California</cosponsor>, <cosponsor name-id=\\\"N000002\\\">Mr. Nadler</cosponsor>, and <cosponsor name-id=\\\"G000551\\\">Mr. Grijalva</cosponsor>) introduced the following bill; which was referred to the <committee-name committee-id=\\\"HAG00\\\">Committee on Agriculture</committee-name>, and in addition to the Committees on <committee-name committee-id=\\\"HWM00\\\">Ways and Means</committee-name>, and <committee-name committee-id=\\\"HIF00\\\">Energy and Commerce</committee-name>, for a period to be subsequently determined by the Speaker, in each case for consideration of such provisions as fall within the jurisdiction of the committee concerned</action-desc></action><legis-type>A BILL</legis-type><official-title display=\\\"yes\\\">To ensure 100 percent renewable electricity, zero emission vehicles, and regenerative agriculture by 2030 to address global warming caused by human activity.</official-title></form>\\n<paragraph id=\\\"H04D62D4E12F04EC190278418B90A3E2D\\\">\\n<enum>(4)</enum>\\n<text>The United Nations Intergovernmental Panel on Climate Change 2016 Special Report on Climate Change and Land found that sustainable land management can contribute to reducing the negative impacts of multiple stressors, including climate change.</text></paragraph>\\n<paragraph id=\\\"H18B3E028C297430C8EFEC0E853B7DD73\\\">\\n<enum>(5)</enum>\\n<text>The Environmental Protection Agency found that electricity, transportation, and agriculture accounted for more than 60 percent of greenhouse gas emissions in 2019.</text></paragraph>\\n<paragraph id=\\\"H6ABB74B53F8342BF9998D97A9FC7813B\\\">\\n<enum>(6)</enum>\\n<text>The National Centers for Environmental Information found that, in 2021, there were 20 weather and climate disaster events with losses exceeding $1,000,000,000 each to affect the United States. These events resulted in the deaths of 688 people and had significant economic effects on the areas impacted. The 1980\u20132021 annual average is 7.4 events.</text></paragraph>\\n<paragraph id=\\\"HC56D496CA4514A4FBD5FF542A32BF4F0\\\">\\n<legis-body id=\\\"H60D09CB61CCD44DD94CC84F65FB0995E\\\" style=\\\"OLC\\\">\\n<enum>(7)</enum>\\n<text>The total cost of United States billion-dollar disasters over the years 2016 through 2020 exceeds $600,000,000,000, with a 5-year annual cost average of $121,300,000,000. </text></paragraph>\\n<paragraph id=\\\"H059C21352BD04139B38F27D47619DE0F\\\">\\n<enum>(8)</enum>\\n<text>The IPCC released its Working Group I, 2021 report, which found that, unless immediate and broad reductions in greenhouse gas emissions are made by the international community, it will be impossible to limit global warming to 2 degrees Celsius, the warming level which the scientific community believes will precipitate catastrophic climate-related consequences and risks to human health, livelihoods, food security, human security, water supply, and economic growth will all increase.</text></paragraph>\\n<paragraph id=\\\"H55065F99B53D4522901039C93BA10F26\\\">\\n<enum>(9)</enum>\\n<section id=\\\"H45B49D6505624AF89D335B112C384B4E\\\" section-type=\\\"section-one\\\">\\n<enum>1.</enum>\\n<header>Short title</header>\\n<text display-inline=\\\"no-display-inline\\\">This Act may be cited as the <quote><short-title>Earth Act to Stop Climate Pollution by 2030</short-title></quote>.</text></section>\\n<section id=\\\"HB95BDC9D74DB48E38B2B387E0FF276F1\\\">\"}",
+    "instructions": "You are a subject indexer. Read one segment of a regulatory or legislative document and name the topics it is about.\nReturn between 5 and 10 short descriptor keywords, most central first.\nEach keyword is a noun phrase of one to four words naming a subject, a regulated activity, an industry, or a body of law \u2014 the kind of term a library subject heading would use.\nDescribe the subject matter, not the document type: do not return 'rule', 'notice', 'comment period', 'Federal Register', agency names, docket numbers, or dates.\nDo not repeat a keyword, and do not explain your choices.",
+    "max_output_tokens": 8192,
+    "model": "gpt-5.6-sol",
+    "reasoning": {
+      "effort": "medium"
+    },
+    "service_tier": "auto",
+    "store": false,
+    "text": {
+      "format": {
+        "name": "segment_descriptor_keywords",
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "keywords": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "maxItems": 10,
+              "type": "array"
+            }
+          },
+          "required": [
+            "keywords"
+          ],
+          "type": "object"
+        },
+        "strict": true,
+        "type": "json_schema"
+      }
+    }
+  },
+  "response": {
+    "keywords": [
+      "Climate change mitigation",
+      "Greenhouse gas emissions",
+      "Renewable electricity",
+      "Zero-emission vehicles",
+      "Regenerative agriculture",
+      "Extreme weather",
+      "Climate justice",
+      "Sustainable land management",
+      "Climate-related health risks",
+      "Disaster economic losses"
+    ]
+  },
+  "segment_id": "processing_segment_af5bc38bc56dac7a413e260a"
+}
