@@ -10,6 +10,7 @@ is complete and reproducible with zero provider calls.
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 from pathlib import Path
@@ -418,34 +419,75 @@ def test_the_no_model_projection_is_complete_without_a_provider(corpus: Path, ta
     assert artifact["rkaf:hasContentDigest"] == "sha256:" + hashlib.sha256(FR_BODY.encode("utf-8")).hexdigest()
 
 
-def test_the_pending_contract_findings_are_configuration_not_code(corpus: Path, tables: Path, monkeypatch: Any) -> None:
-    """Six contract findings are landing. Each must be a value, not a rewrite.
+def test_the_landed_contract_findings_are_what_the_projection_emits(corpus: Path, tables: Path) -> None:
+    """The six findings landed; this is what the answered contract looks like.
+
+    G3 gave the deterministic records a real origin and made their extraction
+    provenance REQUIRED, G4 stopped the invent-your-own-contract digest, G2 made
+    the document's own docket expressible, G5 made the edge/assertion pair
+    normative. All four are visible in one emitted document.
+    """
+    result = project_document("federal-register-document-v1", "2026-00001", settings=_settings(corpus, tables))
+    graph = result.document["@graph"]
+    artifact = next(n for n in graph if n["@type"] == "rkaf:Artifact")
+    proceeding = next(n for n in graph if n["@type"] == "rkaf:Proceeding")
+    assertions = [n for n in graph if n["@type"] == "rkaf:RelationshipAssertion"]
+    activities = [n for n in graph if n["@type"] == "rkaf:ExtractionActivity"]
+
+    # G3: the deterministic origin, and the provenance the contract now requires
+    # alongside it on every node that claims it.
+    assert {n["rkaf:assertionOrigin"] for n in assertions} == {"rkaf:deterministicExtraction"}
+    assert all(n.get("rkaf:hasExtractionProvenance") for n in assertions), (
+        "rkaf:deterministicExtraction is REQUIRED to name its extraction activity"
+    )
+    activity_iris = {n["@id"] for n in activities}
+    assert {n["rkaf:hasExtractionProvenance"] for n in assertions} <= activity_iris, (
+        "every cited activity is a real ExtractionActivity node in this graph"
+    )
+
+    # G4: a deterministic parse issues no request, so it names no request contract.
+    assert all(n["rkaf:extractionMethod"] == "rkaf:deterministicParse" for n in activities)
+    assert all("rkaf:requestContractDigest" not in n for n in activities)
+
+    # G2: the document's own docket, bound to a Docket that carries its identity.
+    assert artifact["rkaf:publishedInDocket"] == ["urn:rkaf:us:regsgov:TEST-2026-0001"]
+    docket = next(n for n in graph if n["@type"] == "rkaf:Docket")
+    assert docket["@id"] == "urn:rkaf:us:regsgov:TEST-2026-0001"
+    assert docket["rkaf:hasDocketIdentifier"] == docket["@id"], "§5.3: the Docket names itself"
+
+    # G5: the affirmed assertion and its projected edge are both emitted.
+    assert proceeding["rkaf:hasDocket"] == ["urn:rkaf:us:regsgov:TEST-2026-0001"]
+    assert "rkaf:hasDocket" in {n["rkaf:assertsPredicate"] for n in assertions}
+
+    flags = result.run_record["contract_flags"]
+    assert flags["assertion_origin_deterministic"] == "rkaf:deterministicExtraction"
+    assert flags["request_contract_digest_required_for"] == ["rkaf:modelExtraction"]
+    assert flags["emit_document_docket_edge"] is True
+    assert flags["emit_profile_edge_projections"] is True
+
+
+def test_the_contract_findings_are_configuration_not_code(corpus: Path, tables: Path, monkeypatch: Any) -> None:
+    """Each finding must remain a value, not a rewrite.
 
     Flipping the constants must change the emitted document — otherwise they are
-    decoration, and re-pinning the contract would mean editing code paths.
+    decoration, and the next re-pin would mean editing code paths.
     """
     from spicy_regs.docpipeline import rkaf_projection
 
-    baseline = project_document("federal-register-document-v1", "2026-00001", settings=_settings(corpus, tables))
-    proceeding = next(n for n in baseline.document["@graph"] if n["@type"] == "rkaf:Proceeding")
-    assert "rkaf:hasDocket" in proceeding, "G5: the plain profile edge is emitted today"
-    assert {
-        n["rkaf:assertionOrigin"] for n in baseline.document["@graph"] if n["@type"] == "rkaf:RelationshipAssertion"
-    } == {"rkaf:imported"}
-
-    # G5: profile edges become derived projections of assertions.
     monkeypatch.setattr(rkaf_projection, "EMIT_PROFILE_EDGE_PROJECTIONS", False)
-    # G3: a deterministic-extraction AssertionOrigin value arrives.
-    monkeypatch.setattr(rkaf_projection, "ASSERTION_ORIGIN_DETERMINISTIC", "rkaf:machineExtracted")
-    # G4: requestContractDigest becomes conditional on a request-shaped method.
-    monkeypatch.setattr(rkaf_projection, "REQUEST_CONTRACT_DIGEST_REQUIRED_FOR", frozenset({"rkaf:modelExtraction"}))
+    monkeypatch.setattr(rkaf_projection, "ASSERTION_ORIGIN_DETERMINISTIC", "rkaf:imported")
+    monkeypatch.setattr(
+        rkaf_projection,
+        "REQUEST_CONTRACT_DIGEST_REQUIRED_FOR",
+        frozenset({"rkaf:deterministicParse", "rkaf:modelExtraction"}),
+    )
 
-    repinned = project_document("federal-register-document-v1", "2026-00001", settings=_settings(corpus, tables))
-    proceeding = next(n for n in repinned.document["@graph"] if n["@type"] == "rkaf:Proceeding")
-    assertions = [n for n in repinned.document["@graph"] if n["@type"] == "rkaf:RelationshipAssertion"]
-    activities = [n for n in repinned.document["@graph"] if n["@type"] == "rkaf:ExtractionActivity"]
-
-    artifact = next(n for n in repinned.document["@graph"] if n["@type"] == "rkaf:Artifact")
+    unpinned = project_document("federal-register-document-v1", "2026-00001", settings=_settings(corpus, tables))
+    graph = unpinned.document["@graph"]
+    artifact = next(n for n in graph if n["@type"] == "rkaf:Artifact")
+    proceeding = next(n for n in graph if n["@type"] == "rkaf:Proceeding")
+    assertions = [n for n in graph if n["@type"] == "rkaf:RelationshipAssertion"]
+    activities = [n for n in graph if n["@type"] == "rkaf:ExtractionActivity"]
     predicates = {n["rkaf:assertsPredicate"] for n in assertions}
 
     assert "rkaf:hasDocket" not in proceeding, "the plain edge is gone"
@@ -453,9 +495,105 @@ def test_the_pending_contract_findings_are_configuration_not_code(corpus: Path, 
     assert {"rkaf:hasDocket", "rkaf:publishedInProceeding"} <= predicates, (
         "every fact the plain edges carried survives as a reified assertion"
     )
-    assert {n["rkaf:assertionOrigin"] for n in assertions} == {"rkaf:machineExtracted"}
-    assert all("rkaf:requestContractDigest" not in n for n in activities)
-    assert repinned.run_record["pending_contract_flags"]["emit_profile_edge_projections"] is False
+    assert {n["rkaf:assertionOrigin"] for n in assertions} == {"rkaf:imported"}
+    assert all("rkaf:requestContractDigest" in n for n in activities)
+    assert unpinned.run_record["contract_flags"]["emit_profile_edge_projections"] is False
+
+    # G2 is independent of G5: the document's own docket is a source-native fact,
+    # not the projection of an assertion, so switching the projections off must
+    # not delete it. Only its own flag does that.
+    assert artifact["rkaf:publishedInDocket"] == ["urn:rkaf:us:regsgov:TEST-2026-0001"]
+    monkeypatch.setattr(rkaf_projection, "EMIT_DOCUMENT_DOCKET_EDGE", False)
+    without = project_document("federal-register-document-v1", "2026-00001", settings=_settings(corpus, tables))
+    artifact = next(n for n in without.document["@graph"] if n["@type"] == "rkaf:Artifact")
+    assert "rkaf:publishedInDocket" not in artifact
+    assert any("finding G2" in note for note in without.run_record["notes"])
+
+
+@pytest.mark.parametrize(
+    ("stated", "expected"),
+    [
+        ("TEST-2026-0001", "urn:rkaf:us:regsgov:TEST-2026-0001"),
+        ("Docket No. TEST-2026-0001", "urn:rkaf:us:regsgov:TEST-2026-0001"),
+        ("Docket No.TEST-2026-0001", "urn:rkaf:us:regsgov:TEST-2026-0001"),
+        ("Doc. No. TEST-2026-0001", "urn:rkaf:us:regsgov:TEST-2026-0001"),
+        ("Docket Number TEST-2026-0001", "urn:rkaf:us:regsgov:TEST-2026-0001"),
+    ],
+)
+def test_the_docket_label_is_presentation_and_the_identifier_survives_it(
+    corpus: Path, tables: Path, stated: str, expected: str
+) -> None:
+    """FR metadata writes the docket behind a human label; identity is the rest."""
+    _write(
+        corpus / "federal_register.parquet",
+        [
+            {
+                "document_number": "2026-00001",
+                "title": "Poultry slaughter inspection",
+                "abstract": "A proposed rule.",
+                "document_type": "Proposed Rule",
+                "agency_slugs": json.dumps(["food-safety-and-inspection-service"]),
+                "body_html": FR_BODY,
+                "docket_ids_json": json.dumps([stated]),
+                "topics_json": json.dumps(["Poultry and poultry products"]),
+            }
+        ],
+    )
+    result = project_document("federal-register-document-v1", "2026-00001", settings=_settings(corpus, tables))
+    artifact = next(n for n in result.document["@graph"] if n["@type"] == "rkaf:Artifact")
+    assert artifact["rkaf:publishedInDocket"] == [expected]
+
+
+def test_a_docket_only_the_document_claims_is_never_minted(corpus: Path, tables: Path) -> None:
+    """§5.3: the Docket node may not be minted from the document alone.
+
+    An edge to a container with no ``rkaf:hasDocketIdentifier`` names nothing, so
+    a docket no other published row establishes is dropped with a reason rather
+    than conjured into existence to hang an edge off.
+    """
+    _write(
+        corpus / "federal_register.parquet",
+        [
+            {
+                "document_number": "2026-00001",
+                "title": "Poultry slaughter inspection",
+                "abstract": "A proposed rule.",
+                "document_type": "Proposed Rule",
+                "agency_slugs": json.dumps(["food-safety-and-inspection-service"]),
+                "body_html": FR_BODY,
+                # The proceedings row names TEST-2026-0001; nothing names this one.
+                "docket_ids_json": json.dumps(["Docket No. UNPUBLISHED-2026-9999", "not a docket id"]),
+                "topics_json": json.dumps(["Poultry and poultry products"]),
+            }
+        ],
+    )
+    result = project_document("federal-register-document-v1", "2026-00001", settings=_settings(corpus, tables))
+    graph = result.document["@graph"]
+    artifact = next(n for n in graph if n["@type"] == "rkaf:Artifact")
+
+    assert "rkaf:publishedInDocket" not in artifact
+    assert "urn:rkaf:us:regsgov:UNPUBLISHED-2026-9999" not in {n["@id"] for n in graph}
+    notes = " ".join(result.run_record["notes"])
+    assert "UNPUBLISHED-2026-9999" in notes and "§5.3" in notes
+    assert "not expressible in rkaf:us-regsgov" in notes
+
+
+def test_a_deterministic_assertion_that_cannot_name_its_activity_aborts(corpus: Path, tables: Path) -> None:
+    """G3 made rkaf:hasExtractionProvenance REQUIRED for the deterministic origin.
+
+    An edge whose activity went missing is a projection bug, not a weaker
+    assertion, so it aborts rather than emitting a node no gate would accept.
+    """
+    from spicy_regs.docpipeline import rkaf_projection
+
+    artifact, row = _fr_artifact(corpus)
+    facts = rkaf_projection.build_profile_facts(
+        artifact, row, tables=PublishedTables(tables), partner="urn:rkaf:partner:spicy-regs"
+    )
+    orphaned = dataclasses.replace(facts, activities=())
+
+    with pytest.raises(ProjectionError, match="rkaf:hasExtractionProvenance"):
+        rkaf_projection.assemble(artifact, orphaned, settings=_settings(corpus, tables))
 
 
 def test_every_emitted_fragment_urn_is_reachable_from_the_stored_text(corpus: Path, tables: Path) -> None:

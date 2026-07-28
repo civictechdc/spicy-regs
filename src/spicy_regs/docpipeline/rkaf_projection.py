@@ -72,75 +72,88 @@ from spicy_regs.ontology.common import RunContext, canonical_json, stable_id, te
 from spicy_regs.ontology.llm import resolve_exact_evidence_offsets
 
 # --------------------------------------------------------------------------- #
-# Pending-contract configuration.
+# Contract configuration.
 #
-# Six contract findings from the hand-authored projection's G1-G6 list are
-# landing in the rulespec repo. This module validates against the CURRENTLY
-# PINNED contract (branch ``us-regulatory-identifiers`` @ ``f2a939d``), and every
-# one of the six changes a VALUE or a SWITCH below rather than a code path — so
-# re-pinning is a constant edit and a re-run, not a rewrite. Each constant names
-# its finding and the rulespec commit that answers it.
+# Six contract findings from the hand-authored projection's G1-G6 list have
+# LANDED in the rulespec repo. This module validates against branch
+# ``us-regulatory-identifiers`` @ ``062fa79``, contract digest
+# ``sha256:7d45dcd2…`` — the revision spicy-regs pins as of ``8d08882``. Every
+# one of the six was a VALUE or a SWITCH below rather than a code path, so the
+# re-pin was a constant edit and a re-run, not a rewrite. Each constant names its
+# finding and the rulespec commit that answered it.
 #
 #   G1  921d1ff  prov:wasDerivedFrom class range stated in §2.4
 #                -> already satisfied: every cited row is a typed prov:Entity.
 #   G2  3644803  rkaf:publishedInDocket added
-#                -> EMIT_DOCUMENT_DOCKET_EDGE below.
+#                -> EMIT_DOCUMENT_DOCKET_EDGE below, now True.
 #   G3  3c16018  rkaf:deterministicExtraction added to #AssertionOrigin
-#                -> ASSERTION_ORIGIN_DETERMINISTIC below.
+#                -> ASSERTION_ORIGIN_DETERMINISTIC below, now that value.
 #   G4  e8794ba  requestContractDigest made conditional on a model extraction
-#                -> REQUEST_CONTRACT_DIGEST_REQUIRED_FOR below.
+#                -> REQUEST_CONTRACT_DIGEST_REQUIRED_FOR below, now narrowed.
 #   G5  062fa79  §2.1 decides the direct-edge / reified-assertion pair
-#                -> EMIT_PROFILE_EDGE_PROJECTIONS below.
+#                -> EMIT_PROFILE_EDGE_PROJECTIONS below, unchanged at True.
 #   G6  361348c  the ten untyped timestamp context terms typed
 #                -> no change here; it is a context fix, and the emitted
 #                   rkaf:attestedAt / rkaf:assertedAt literals are unchanged.
+#                   The vendored context copy the CLI ships carries the fix.
 # --------------------------------------------------------------------------- #
 
-#: G3 — the pinned ``#AssertionOrigin`` has no machine-deterministic value, so a
-#: record re-serialized from a published spicy-regs table is filed as
-#: ``rkaf:imported`` and carries the honest method on its
-#: ``rkaf:ExtractionActivity``. RE-PIN: set to ``"rkaf:deterministicExtraction"``
-#: (rulespec 3c16018) and the deterministic-parse fact stops being droppable.
-ASSERTION_ORIGIN_DETERMINISTIC = "rkaf:imported"
+#: G3 — ``#AssertionOrigin`` gained ``rkaf:deterministicExtraction`` (rulespec
+#: 3c16018): a mechanically reproducible derivation, not an interpretive
+#: judgment. It replaces the ``rkaf:imported`` workaround, which said only that
+#: the record came from somewhere else and left the parse method on an OPTIONAL
+#: ``rkaf:hasExtractionProvenance`` edge — droppable, with no gate objecting.
+#:
+#: The value is not free: every compiled target now REQUIRES
+#: ``rkaf:hasExtractionProvenance`` alongside it, so :func:`assemble` refuses to
+#: emit an assertion at this origin that cannot name its activity.
+ASSERTION_ORIGIN_DETERMINISTIC = "rkaf:deterministicExtraction"
 
 #: An unreviewed model candidate. ``#AssertionEnvelope`` requires
 #: ``rkaf:hasAILineage`` alongside it, which is why every model-derived
 #: assignment emits an ``rkaf:AILineage`` node.
 ASSERTION_ORIGIN_MODEL = "rkaf:aiSuggested"
 
-#: G4 — the pinned contract REQUIRES ``rkaf:requestContractDigest`` on every
-#: ``rkaf:ExtractionActivity``, including the ones that never sent a request, so
-#: a deterministic activity hashes the documented envelope in
-#: :func:`request_contract_digest`. RE-PIN: narrow to
-#: ``frozenset({"rkaf:modelExtraction"})`` (rulespec e8794ba) and the
-#: invent-your-own-contract step disappears for the deterministic activities.
-REQUEST_CONTRACT_DIGEST_REQUIRED_FOR = frozenset(
-    {
-        "rkaf:deterministicParse",
-        "rkaf:ruleBasedExtraction",
-        "rkaf:modelExtraction",
-        "rkaf:humanExtraction",
-        "rkaf:importedRecord",
-    }
-)
+#: G4 — ``rkaf:requestContractDigest`` is conditional on a request-shaped
+#: extraction (rulespec e8794ba, Core §2.4). The field presumes a run that sent
+#: instructions, a schema and a configuration somewhere and got an answer back;
+#: a deterministic table parse sends nothing. The old universal requirement left
+#: one conforming move — define an envelope, hash it, cite the result — which
+#: yields a real digest naming a contract the run never published. That is now
+#: explicitly non-conforming, so the set is narrowed to the one method that
+#: genuinely issues a contract and :func:`_activity_node` emits nothing for the
+#: rest. The other four MAY still carry the digest, but only when the run really
+#: issued the contract it names, which none of this module's do.
+REQUEST_CONTRACT_DIGEST_REQUIRED_FOR = frozenset({"rkaf:modelExtraction"})
 
-#: G2 — the pinned contract has no document->docket predicate, so a document
-#: reaches its docket only through a Proceeding and a producer without a
-#: proceedings model cannot state the FR-native fact at all. RE-PIN: set the flag
-#: to ``True`` (rulespec 3644803) and ``federal_register.docket_ids_json``
-#: becomes directly expressible as an edge on the Artifact.
-EMIT_DOCUMENT_DOCKET_EDGE = False
+#: G2 — ``rkaf:publishedInDocket`` exists (rulespec 3644803, rulemaking §5.3):
+#: Artifact -> Docket, the source-native FR metadata fact. Before it, a document
+#: reached its docket only through a Proceeding, so a producer without a
+#: proceedings model had to mint a surrogate Proceeding or drop the fact.
+#: ``federal_register.docket_ids_json`` is now directly expressible as an edge on
+#: the Artifact.
+#:
+#: §5.3 forbids minting the Docket node from the document alone — an edge to a
+#: container with no ``rkaf:hasDocketIdentifier`` names nothing — so
+#: :func:`_document_docket_iris` emits the edge only for a docket whose identity
+#: some OTHER published row establishes. It is deliberately not reified: §5.3
+#: calls this a source-native fact rather than a derivation, and Core §2.1 makes
+#: a direct edge with no matching assertion legal and explicitly unbacked. It is
+#: therefore not governed by :data:`EMIT_PROFILE_EDGE_PROJECTIONS`, which
+#: projects assertions; turning that flag off must not drop this fact.
+EMIT_DOCUMENT_DOCKET_EDGE = True
 DOCUMENT_DOCKET_PREDICATE = "rkaf:publishedInDocket"
 
 #: G5 — the graph states profile edges twice: once as the profile's plain edge on
-#: the node, once as a reified ``rkaf:RelationshipAssertion``. RE-PIN: rulespec
-#: 062fa79 makes the pair normative — the direct edge is the queryable
-#: projection, the assertion is the provenance-bearing source of truth, and a
-#: producer SHOULD emit both for an affirmed assertion and MUST NOT emit the edge
-#: for a denied, superseded, or retracted one. ``True`` is therefore correct
-#: before and after the re-pin; this projection emits only affirmed assertions.
-#: Setting it to ``False`` emits the reified half alone, which is still
-#: conforming and is what proves no fact lives only in a plain edge.
+#: the node, once as a reified ``rkaf:RelationshipAssertion``. Rulespec 062fa79
+#: makes the pair normative in Core §2.1 — the direct edge is the queryable
+#: projection, the assertion is the provenance-bearing source of truth, a
+#: consumer seeing both counts ONE statement, and a producer SHOULD emit both for
+#: an affirmed assertion and MUST NOT emit the edge for a denied, superseded, or
+#: retracted one. ``True`` is therefore what §2.1 now prescribes; this projection
+#: emits only affirmed assertions. Setting it to ``False`` emits the reified half
+#: alone, which stays conforming and is what proves no fact lives only in a plain
+#: edge.
 EMIT_PROFILE_EDGE_PROJECTIONS = True
 
 #: A model attesting its own output is not approval. ``rkaf:approved`` would be
@@ -158,6 +171,11 @@ MODEL_USAGE_ELIGIBILITY = "rkaf:reviewQueueOnly"
 DETERMINISTIC_USAGE_ELIGIBILITY = "rkaf:localOperationalUse"
 
 PROJECTION_SCHEMA_VERSION = "rkaf-document-projection-v1"
+
+#: The rulespec revision these constants are set for, recorded in every run
+#: record so an emitted document says which contract it was built against.
+CONTRACT_REVISION = "us-regulatory-identifiers@062fa79"
+CONTRACT_DIGEST = "sha256:7d45dcd2f5ff6391b185fd98099740b34d3b6cac8ed66c99196e6ac368806553"
 
 #: The carrier-local fragment URN grammar, Core §4.2. Copied from the compiled
 #: pattern so a test can prove the minted form satisfies it without a validator.
@@ -363,6 +381,10 @@ class ProfileFacts:
     regulatory_identifier: str | None = None
     regulatory_scheme: str | None = None
     published_in_proceeding: tuple[str, ...] = ()
+    published_in_docket: tuple[str, ...] = ()
+    """Docket IRIs this document was filed under (rulemaking §5.3). Every one is
+    a Docket whose identity another published row establishes — never one minted
+    from the document alone."""
     extra_nodes: tuple[Mapping[str, Any], ...] = ()
     edges: tuple[DeterministicEdge, ...] = ()
     activities: tuple[ExtractionActivitySpec, ...] = ()
@@ -371,12 +393,16 @@ class ProfileFacts:
 
 
 def request_contract_digest(spec: ExtractionActivitySpec) -> tuple[str, str]:
-    """Digest the documented request contract for one extraction activity.
+    """Digest the request contract and the input row for one extraction activity.
 
-    Recipe (spicy-regs-defined, because the contract requires the field of runs
-    that never sent a request — finding G4): SHA-256 over the canonical JSON of
+    Recipe: SHA-256 over the canonical JSON of
     ``{instructions, actor_id, run_id, input_row}`` with every input value
     stringified. Returns ``(contract digest, input-row digest)``.
+
+    Since finding G4 landed only the contract digest of a genuinely
+    request-shaped run is emitted (see
+    :data:`REQUEST_CONTRACT_DIGEST_REQUIRED_FOR`); the input-row digest is
+    unconditional, because every activity really does have inputs.
     """
     clean = {str(key): (None if value is None else str(value)) for key, value in spec.input_row.items()}
     contract = {
@@ -494,6 +520,68 @@ def _authority_iri(row: Mapping[str, Any]) -> str | None:
     except ValueError:
         return None
     return None
+
+
+#: Federal Register metadata writes a docket id behind a human label — "Docket
+#: No. FSIS-2025-0012", "Doc. No. AMS-SC-24-0046", "Docket Number X". The label
+#: is presentation, not identity, so it is stripped before the remainder is
+#: offered to :func:`canonical_regsgov_iri`. Nothing else is rewritten.
+_DOCKET_LABEL_PREFIX = re.compile(r"^\s*(?:docket|doc\.?)\s*(?:no\.?|nos\.?|number|id)?\s*", re.IGNORECASE)
+
+
+def _document_docket_iris(
+    row: Mapping[str, Any],
+    *,
+    tables: PublishedTables,
+    known_docket_iris: Sequence[str],
+) -> tuple[list[str], list[dict[str, Any]], list[str]]:
+    """Resolve ``federal_register.docket_ids_json`` into Docket IRIs (§5.3).
+
+    Returns ``(iris, docket nodes to add, notes)``.
+
+    Two refusals, both because §5.3 forbids minting the Docket node from the
+    document alone — an edge to a container with no ``rkaf:hasDocketIdentifier``
+    names nothing. A value whose label-stripped remainder is not a syntactically
+    valid regulations.gov identifier is refused, and so is one that no OTHER
+    published row establishes: a docket the proceedings path already
+    materialized, or a ``dockets.parquet`` row carrying that id. The document's
+    own say-so is never enough to bring a Docket into existence.
+    """
+    iris: list[str] = []
+    nodes: list[dict[str, Any]] = []
+    notes: list[str] = []
+    already = set(known_docket_iris)
+    for raw in _json_list(row.get("docket_ids_json")):
+        stated = _clean(raw)
+        if not stated:
+            continue
+        try:
+            docket_iri = canonical_regsgov_iri(_DOCKET_LABEL_PREFIX.sub("", stated, count=1))
+        except ValueError:
+            notes.append(f"document docket identifier {stated!r} is not expressible in rkaf:us-regsgov")
+            continue
+        if docket_iri in iris:
+            continue
+        if docket_iri in already:
+            iris.append(docket_iri)
+            continue
+        docket_id = docket_iri.rsplit(":", 1)[-1]
+        if not tables.rows("dockets", docket_id=docket_id):
+            notes.append(
+                f"document docket {docket_id} is stated by the document but no published dockets row "
+                "carries it, so rulemaking §5.3 forbids minting the Docket node and the edge is dropped"
+            )
+            continue
+        iris.append(docket_iri)
+        nodes.append(
+            {
+                "@id": docket_iri,
+                "@type": "rkaf:Docket",
+                "rkaf:hasDocketIdentifier": docket_iri,
+                "rkaf:docketIdentifierScheme": "rkaf:us-regsgov",
+            }
+        )
+    return iris, nodes, notes
 
 
 def _authority_edge(
@@ -716,7 +804,19 @@ def _federal_register_facts(
         )
         break
 
-    if not EMIT_DOCUMENT_DOCKET_EDGE and _json_list(row.get("docket_ids_json")):
+    # G2 / rulemaking §5.3: the document's own docket membership. This is the
+    # document -> docket fact the FR record states outright, NOT a restatement of
+    # the proceeding's rkaf:hasDocket: a proceeding may span dockets a given one
+    # of its documents was not filed in, and neither edge implies the other.
+    published_in_docket: tuple[str, ...] = ()
+    if EMIT_DOCUMENT_DOCKET_EDGE:
+        docket_edge_iris, docket_edge_nodes, docket_notes = _document_docket_iris(
+            row, tables=tables, known_docket_iris=docket_iris
+        )
+        published_in_docket = tuple(docket_edge_iris)
+        extra_nodes.extend(docket_edge_nodes)
+        notes.extend(docket_notes)
+    elif _json_list(row.get("docket_ids_json")):
         notes.append(
             "finding G2: the document's own docket_ids_json is not directly expressible — "
             "there is no document->docket predicate, so the docket is reached through the Proceeding"
@@ -731,6 +831,7 @@ def _federal_register_facts(
         regulatory_identifier=regulatory_iri,
         regulatory_scheme=scheme,
         published_in_proceeding=(proceeding_iri,) if proceeding_iri else (),
+        published_in_docket=published_in_docket,
         extra_nodes=tuple(extra_nodes),
         edges=tuple(edges),
         activities=tuple({spec.key: spec for spec in activities}.values()),
@@ -1211,6 +1312,11 @@ def assemble(
         artifact_node["rkaf:regulatoryIdentifierScheme"] = facts.regulatory_scheme
     if EMIT_PROFILE_EDGE_PROJECTIONS and facts.published_in_proceeding:
         artifact_node["rkaf:publishedInProceeding"] = list(facts.published_in_proceeding)
+    # Not gated on EMIT_PROFILE_EDGE_PROJECTIONS: this edge projects no
+    # assertion, it is the source-native fact itself (rulemaking §5.3), so
+    # turning the assertion projections off must not delete it.
+    if EMIT_DOCUMENT_DOCKET_EDGE and facts.published_in_docket:
+        artifact_node[DOCUMENT_DOCKET_PREDICATE] = list(facts.published_in_docket)
     graph.append(artifact_node)
     graph.extend(dict(node) for node in facts.extra_nodes)
 
@@ -1235,8 +1341,18 @@ def assemble(
             "rkaf:usageEligibility": DETERMINISTIC_USAGE_ELIGIBILITY,
             "prov:wasDerivedFrom": [record_iri],
         }
-        if edge.activity_key in activities:
-            assertion["rkaf:hasExtractionProvenance"] = f"{partner}:activity:{edge.activity_key}"
+        # Since G3 landed, rkaf:deterministicExtraction REQUIRES
+        # rkaf:hasExtractionProvenance on every compiled target: a claim of
+        # mechanical reproducibility that names no run is not checkable. An edge
+        # whose activity is missing is a projection bug, not a weaker assertion,
+        # so it aborts rather than emitting a non-conforming node.
+        if edge.activity_key not in activities:
+            raise ProjectionError(
+                f"edge {edge.key!r} asserts {ASSERTION_ORIGIN_DETERMINISTIC} but names no extraction "
+                f"activity {edge.activity_key!r}; the contract requires rkaf:hasExtractionProvenance "
+                f"for that origin (known activities: {sorted(activities)})"
+            )
+        assertion["rkaf:hasExtractionProvenance"] = f"{partner}:activity:{edge.activity_key}"
         grounded = ground_literal(
             artifact,
             key=f"edge-{edge.key}",
@@ -1461,7 +1577,9 @@ def assemble(
             "content_digest": f"sha256:{artifact_digest}",
             "available_fields": sorted(artifact.raw_fields),
         },
-        "pending_contract_flags": {
+        "contract_flags": {
+            "contract_revision": CONTRACT_REVISION,
+            "contract_digest": CONTRACT_DIGEST,
             "assertion_origin_deterministic": ASSERTION_ORIGIN_DETERMINISTIC,
             "request_contract_digest_required_for": sorted(REQUEST_CONTRACT_DIGEST_REQUIRED_FOR),
             "emit_document_docket_edge": EMIT_DOCUMENT_DOCKET_EDGE,
