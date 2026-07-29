@@ -23,6 +23,7 @@ def _concept(
     label: str,
     *,
     aliases: str = "[]",
+    hidden_aliases: str = "[]",
 ) -> dict[str, object]:
     return {
         "concept_id": concept_id,
@@ -31,6 +32,7 @@ def _concept(
         "scheme": "subject",
         "pref_label": label,
         "alt_labels_json": aliases,
+        "hidden_labels_json": hidden_aliases,
         "status": "active",
     }
 
@@ -149,6 +151,36 @@ def test_partition_boundary_refuses_registered_alias_leakage() -> None:
                     "concept-speech",
                     "Freedom of speech",
                     aliases='["Free speech"]',
+                )
+            ],
+        )
+
+
+@pytest.mark.parametrize(
+    ("train_label", "holdout_label"),
+    [
+        ("Climatización", "CLIMATIZACIÓN"),
+        ("Climate policy", "CLIMATE POLICY"),
+        ("Weather governance", "WEATHER GOVERNANCE"),
+    ],
+)
+def test_partition_boundary_normalizes_every_skos_label_role(
+    train_label: str,
+    holdout_label: str,
+) -> None:
+    answers = _answers(
+        (train_label, "concept-climate"),
+        (holdout_label, None),
+    )
+    with pytest.raises(EvaluationBoundaryError, match="shared_aliases"):
+        partition_leakage_facts(
+            answers,
+            [
+                _concept(
+                    "concept-climate",
+                    "Climatización",
+                    aliases='["Climate policy"]',
+                    hidden_aliases='["Weather governance"]',
                 )
             ],
         )

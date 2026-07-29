@@ -552,7 +552,14 @@ def load_testbed_inputs(
         except EvaluationBoundaryError as exc:
             raise DiagnosticInputError(str(exc)) from exc
     try:
-        leakage = partition_leakage_facts(answers, concepts)
+        leakage = partition_leakage_facts(
+            answers,
+            concepts,
+            require_complete=(
+                evaluation_dataset is not None
+                and not evaluation_dataset.permanently_development
+            ),
+        )
     except EvaluationBoundaryError as exc:
         raise DiagnosticInputError(str(exc)) from exc
     configuration = {

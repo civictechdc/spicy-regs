@@ -25,12 +25,12 @@ it. Layer 4 of ``docs/evidence/failure-analysis-2026-07-27.md`` (gold encodes
 the annotator's frame) and layer 5 (information flows downhill from gold into
 every artifact it touches) are the reasons this file exists in this shape.
 
-**No labels are created here.** Configuration pins — ``registry_sha256``,
-selector, prompt, schema, and token budget — are written as ``RESERVED``. They
-freeze at label-exposure time, not at draw time, because the exit bar's trivial
-baselines are computed on the holdout itself (``docs/experiment-strategy.md``,
-"Evaluation data"). ``--require-adoption-ready`` stays red after this tool runs:
-a drawn-but-unadjudicated holdout is not an adoption-ready one.
+**No labels are created here.** The semantic vocabulary universe—registry
+releases, mapping releases, imports, coverage reports, and output profile—is
+frozen before selection. Model-facing implementation pins such as selector,
+prompt, schema, index build, and token budget remain ``RESERVED`` until the
+later pre-label-exposure freeze. ``--require-adoption-ready`` stays red after
+this tool runs: a drawn-but-unadjudicated holdout is not adoption-ready.
 
 Selection procedure ``holdout-seeded-stratified-v1``, in full:
 
@@ -81,6 +81,10 @@ from spicy_regs.evaluation_boundary import (
     BOUNDARY_SCHEMA_VERSION,
     DEFAULT_BOUNDARY_MANIFEST,
     DEVELOPMENT_DATASET_ID,
+)
+from spicy_regs.enrichment.reference_runtime import (
+    ReferenceRuntimeError,
+    require_vocabulary_universe_freeze,
 )
 from spicy_regs.ontology.common import canonical_json, iter_parquet_rows, read_parquet_rows
 
@@ -637,6 +641,7 @@ class HoldoutDraw:
     procedure: str
     settings: SegmentSettings
     strata: tuple[StratumDraw, ...]
+    vocabulary_universe_freeze: Mapping[str, Any]
 
     @property
     def artifacts(self) -> tuple[DrawnArtifact, ...]:
@@ -666,6 +671,12 @@ class HoldoutDraw:
                     "selection_seed": self.seed,
                     "profile_strata": [stratum.stratum.identity() for stratum in self.strata],
                     "segmentation": self.settings.identity(),
+                    "vocabulary_universe_freeze": {
+                        "id": self.vocabulary_universe_freeze["id"],
+                        "canonicalPayloadDigest": self.vocabulary_universe_freeze[
+                            "canonicalPayloadDigest"
+                        ],
+                    },
                     "membership": self.membership(),
                 }
             ).encode("utf-8")
@@ -690,12 +701,19 @@ def draw_holdout(
     *,
     settings: SegmentSettings,
     counter: TokenCounter,
+    vocabulary_universe_freeze: Mapping[str, Any],
     strata: Sequence[ProfileStratum] = PROFILE_STRATA,
     seed: str = SELECTION_SEED,
     procedure: str = SELECTION_PROCEDURE,
     dataset_id: str = HOLDOUT_DATASET_ID,
 ) -> HoldoutDraw:
-    """Draw every stratum from a corpus directory, in declaration order."""
+    """Draw every stratum after freezing the registry and mapping universe."""
+    try:
+        require_vocabulary_universe_freeze(vocabulary_universe_freeze)
+    except ReferenceRuntimeError as exc:
+        raise HoldoutDrawError(
+            f"vocabulary universe is not frozen: {exc}"
+        ) from exc
     drawn = tuple(
         draw_stratum(
             stratum,
@@ -714,6 +732,7 @@ def draw_holdout(
         procedure=procedure,
         settings=settings,
         strata=drawn,
+        vocabulary_universe_freeze=dict(vocabulary_universe_freeze),
     )
 
 
@@ -881,9 +900,9 @@ RESERVED = "RESERVED"
 
 PENDING_REASON = (
     "A holdout has been drawn and pinned, and no label exists for it. It is not adjudicated, "
-    "no configuration is frozen, and it can authorize nothing. Configuration pins freeze at "
-    "label-exposure time, not at draw time, because the exit bar's trivial baselines are "
-    "computed on this same set."
+    "the semantic vocabulary universe is frozen, but the evaluated implementation configuration "
+    "is not yet frozen, so it can authorize nothing. Remaining implementation pins freeze at "
+    "label-exposure time because the exit bar's trivial baselines are computed on this same set."
 )
 
 STEPS_COMPLETED = (
@@ -914,7 +933,7 @@ def pending_holdout_record(
             "Keep target concepts and every registered alias disjoint from train.",
             "Complete blind adjudication with at least two independent model families or humans; "
             "publish agreement and resolve or exclude every disagreement.",
-            "Freeze and pin the selector, registry, prompt, schema, and token-budget configuration "
+            "Freeze and pin the selector, index build, prompt, schema, and token-budget configuration "
             "before revealing holdout labels.",
         ],
         "draw": {
@@ -933,6 +952,21 @@ def pending_holdout_record(
             "segmentation": {
                 **draw.settings.identity(),
                 "settings_sha256": draw.settings.digest,
+            },
+            "vocabulary_universe_freeze": {
+                "id": draw.vocabulary_universe_freeze["id"],
+                "canonicalPayloadDigest": draw.vocabulary_universe_freeze[
+                    "canonicalPayloadDigest"
+                ],
+                "registryReleases": draw.vocabulary_universe_freeze[
+                    "registryReleases"
+                ],
+                "mappingReleases": draw.vocabulary_universe_freeze[
+                    "mappingReleases"
+                ],
+                "outputProfile": draw.vocabulary_universe_freeze[
+                    "outputProfile"
+                ],
             },
             "corpus": dict(corpus),
             "membership": draw.membership(),
@@ -1032,6 +1066,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--dataset-dir", type=Path, default=DEFAULT_DATASET_DIR)
     parser.add_argument("--selection-file", type=Path, default=DEFAULT_SELECTION_FILE)
     parser.add_argument("--drafting-output", type=Path, required=True)
+    parser.add_argument(
+        "--vocabulary-freeze",
+        type=Path,
+        required=True,
+        help=(
+            "Sealed VocabularyUniverseFreeze JSON. Registry and mapping "
+            "releases must be pinned before selection."
+        ),
+    )
     parser.add_argument("--boundary", type=Path, default=DEFAULT_BOUNDARY_MANIFEST)
     parser.add_argument("--seed", default=SELECTION_SEED)
     parser.add_argument("--dataset-id", default=HOLDOUT_DATASET_ID)
@@ -1058,11 +1101,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         settings=settings,
         counter=counter,
     )
+    try:
+        vocabulary_freeze = json.loads(
+            args.vocabulary_freeze.read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError) as exc:
+        raise HoldoutDrawError(
+            f"cannot read vocabulary freeze {args.vocabulary_freeze}"
+        ) from exc
+    if not isinstance(vocabulary_freeze, dict):
+        raise HoldoutDrawError("vocabulary freeze must be a JSON object")
+
     draw = draw_holdout(
         args.corpus_dir,
         exclusions,
         settings=settings,
         counter=counter,
+        vocabulary_universe_freeze=vocabulary_freeze,
         seed=args.seed,
         dataset_id=args.dataset_id,
     )

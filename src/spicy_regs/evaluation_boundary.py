@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from spicy_regs.docpipeline.runtime import sha256_file
+from spicy_regs.enrichment.reference_runtime import normalize_unicode_text
 from spicy_regs.ontology.common import canonical_json
-from spicy_regs.ontology.concepts import concept_aliases, normalize_label
 
 BOUNDARY_SCHEMA_VERSION = "rulespec-evaluation-boundary-v1"
 DEFAULT_BOUNDARY_MANIFEST = (
@@ -179,25 +179,108 @@ def gold_split(
 def partition_leakage_facts(
     answers: Mapping[str, Any],
     concepts: Sequence[Mapping[str, Any]],
+    *,
+    require_complete: bool = False,
 ) -> dict[str, Any]:
-    """Detect concept identity and alias leakage between train and holdout."""
+    """Detect every RefSpec partition key crossing train and holdout.
+
+    The historical boundary checked concept ids, registered aliases, and
+    artifact digests.  REF-EVAL-012 also requires reviewed exact-match
+    clusters, source identity, extracted or normalized text, and versioned
+    near-duplicate clusters.  Optional legacy inputs remain readable, but a
+    supplied key is never ignored.
+    """
+
+    def strings(value: object) -> set[str]:
+        if value is None:
+            return set()
+        if isinstance(value, str):
+            text = value.strip()
+            if not text:
+                return set()
+            if text[:1] in {"[", "{"}:
+                try:
+                    return strings(json.loads(text))
+                except json.JSONDecodeError:
+                    return {text}
+            return {text}
+        if isinstance(value, Mapping):
+            result: set[str] = set()
+            for child in value.values():
+                result.update(strings(child))
+            return result
+        if isinstance(value, Sequence):
+            result = set()
+            for child in value:
+                result.update(strings(child))
+            return result
+        text = str(value).strip()
+        return {text} if text else set()
+
+    def registered_aliases(concept: Mapping[str, Any]) -> set[str]:
+        values: set[str] = set()
+        for key in (
+            "pref_label",
+            "alt_labels_json",
+            "hidden_labels_json",
+            "prefLabel",
+            "altLabel",
+            "hiddenLabel",
+            "skos:prefLabel",
+            "skos:altLabel",
+            "skos:hiddenLabel",
+        ):
+            values.update(strings(concept.get(key)))
+        return {
+            normalized
+            for value in values
+            if (normalized := normalize_unicode_text(value))
+        }
+
+    def cluster_ids(record: Mapping[str, Any]) -> set[str]:
+        result: set[str] = set()
+        for key in (
+            "exact_match_cluster_id",
+            "exactMatchCluster",
+            "exact_match_clusters",
+            "exactMatchClusters",
+        ):
+            result.update(strings(record.get(key)))
+        return result
+
+    def first_value(record: Mapping[str, Any], keys: Sequence[str]) -> str:
+        for key in keys:
+            value = str(record.get(key) or "").strip()
+            if value:
+                return value
+        return ""
+
     concepts_by_id = {
         str(concept.get("concept_id") or ""): concept
         for concept in concepts
         if concept.get("concept_id")
     }
     aliases_by_concept = {
-        concept_id: concept_aliases(dict(concept))
+        concept_id: registered_aliases(concept)
+        for concept_id, concept in concepts_by_id.items()
+    }
+    clusters_by_concept = {
+        concept_id: cluster_ids(concept)
         for concept_id, concept in concepts_by_id.items()
     }
     concept_ids_by_alias: dict[str, set[str]] = defaultdict(set)
-    for concept_id, registered_aliases in aliases_by_concept.items():
-        for alias in registered_aliases:
+    for concept_id, concept_aliases in aliases_by_concept.items():
+        for alias in concept_aliases:
             concept_ids_by_alias[alias].add(concept_id)
 
     concept_ids: dict[str, set[str]] = defaultdict(set)
     aliases: dict[str, set[str]] = defaultdict(set)
+    exact_match_clusters: dict[str, set[str]] = defaultdict(set)
+    source_identities: dict[str, set[str]] = defaultdict(set)
     artifact_digests: dict[str, set[str]] = defaultdict(set)
+    text_digests: dict[str, set[str]] = defaultdict(set)
+    near_duplicate_clusters: dict[str, set[str]] = defaultdict(set)
+    complete_partition_key_items = 0
     for artifact in answers.get("artifacts", ()):
         if not isinstance(artifact, Mapping):
             continue
@@ -210,12 +293,121 @@ def partition_leakage_facts(
         if not artifact_digest:
             raise EvaluationBoundaryError("evaluation artifact has no artifact digest")
         artifact_digests[split].add(artifact_digest)
+        if require_complete:
+            partition_keys = artifact.get("partitionKeys")
+            if not isinstance(partition_keys, Mapping):
+                raise EvaluationBoundaryError(
+                    "adoption artifact is missing complete partitionKeys"
+                )
+            required_dimensions = {
+                "conceptIdentity",
+                "exactMatchCluster",
+                "alias",
+                "sourceIdentity",
+                "artifactDigest",
+                "textDigest",
+                "nearDuplicateCluster",
+            }
+            missing_dimensions = sorted(
+                required_dimensions - set(partition_keys)
+            )
+            if missing_dimensions:
+                raise EvaluationBoundaryError(
+                    "adoption artifact partitionKeys are missing dimensions: "
+                    + ", ".join(missing_dimensions)
+                )
+            for dimension in (
+                "sourceIdentity",
+                "artifactDigest",
+                "textDigest",
+                "nearDuplicateCluster",
+            ):
+                if not strings(partition_keys[dimension]):
+                    raise EvaluationBoundaryError(
+                        f"adoption artifact has no {dimension} partition key"
+                    )
+            concept_ids[split].update(
+                strings(partition_keys["conceptIdentity"])
+            )
+            exact_match_clusters[split].update(
+                strings(partition_keys["exactMatchCluster"])
+            )
+            aliases[split].update(
+                normalize_unicode_text(value)
+                for value in strings(partition_keys["alias"])
+                if normalize_unicode_text(value)
+            )
+            source_identities[split].update(
+                strings(partition_keys["sourceIdentity"])
+            )
+            artifact_digests[split].update(
+                strings(partition_keys["artifactDigest"])
+            )
+            text_digests[split].update(
+                strings(partition_keys["textDigest"])
+            )
+            near_duplicate_clusters[split].update(
+                strings(partition_keys["nearDuplicateCluster"])
+            )
+            if artifact_digest not in strings(
+                partition_keys["artifactDigest"]
+            ):
+                raise EvaluationBoundaryError(
+                    "artifact digest is absent from its partitionKeys"
+                )
+            complete_partition_key_items += 1
+        source_identity = first_value(
+            artifact,
+            (
+                "source_identity",
+                "sourceIdentity",
+                "source_resource_id",
+                "sourceResource",
+            ),
+        )
+        if not source_identity:
+            profile_id = str(artifact.get("profile_id") or "").strip()
+            subject_type = str(artifact.get("subject_type") or "").strip()
+            subject_id = str(artifact.get("subject_id") or "").strip()
+            if profile_id and subject_type and subject_id:
+                source_identity = "|".join(
+                    (profile_id, subject_type, subject_id)
+                )
+        if source_identity:
+            source_identities[split].add(source_identity)
+        for key in (
+            "text_digest",
+            "textDigest",
+            "extracted_text_sha256",
+            "normalized_text_digest",
+            "normalizedTextDigest",
+        ):
+            text_digests[split].update(strings(artifact.get(key)))
+        for key in (
+            "near_duplicate_cluster",
+            "nearDuplicateCluster",
+            "near_duplicate_cluster_id",
+            "nearDuplicateClusterId",
+        ):
+            near_duplicate_clusters[split].update(strings(artifact.get(key)))
         for expected in artifact.get("expected_tags", ()):
             if not isinstance(expected, Mapping):
                 continue
-            normalized = normalize_label(expected.get("label"))
+            normalized = normalize_unicode_text(expected.get("label"))
             if normalized:
                 aliases[split].add(normalized)
+            for key in (
+                "aliases",
+                "current_aliases",
+                "deprecated_aliases",
+                "currentAliases",
+                "deprecatedAliases",
+            ):
+                aliases[split].update(
+                    normalize_unicode_text(value)
+                    for value in strings(expected.get(key))
+                    if normalize_unicode_text(value)
+                )
             matched_ids = set(concept_ids_by_alias.get(normalized, ()))
             explicit_id = str(expected.get("concept_id") or "").strip()
             if explicit_id:
@@ -223,17 +415,52 @@ def partition_leakage_facts(
             concept_ids[split].update(matched_ids)
             for concept_id in matched_ids:
                 aliases[split].update(aliases_by_concept.get(concept_id, ()))
+                exact_match_clusters[split].update(
+                    clusters_by_concept.get(concept_id, ())
+                )
+            exact_match_clusters[split].update(cluster_ids(expected))
 
     shared_ids = sorted(concept_ids[TRAIN_SPLIT] & concept_ids[ADOPTION_SPLIT])
     shared_aliases = sorted(aliases[TRAIN_SPLIT] & aliases[ADOPTION_SPLIT])
+    shared_exact_clusters = sorted(
+        exact_match_clusters[TRAIN_SPLIT]
+        & exact_match_clusters[ADOPTION_SPLIT]
+    )
+    shared_sources = sorted(
+        source_identities[TRAIN_SPLIT]
+        & source_identities[ADOPTION_SPLIT]
+    )
     shared_artifacts = sorted(artifact_digests[TRAIN_SPLIT] & artifact_digests[ADOPTION_SPLIT])
+    shared_text = sorted(
+        text_digests[TRAIN_SPLIT] & text_digests[ADOPTION_SPLIT]
+    )
+    shared_near_duplicates = sorted(
+        near_duplicate_clusters[TRAIN_SPLIT]
+        & near_duplicate_clusters[ADOPTION_SPLIT]
+    )
     facts = {
         "train_concept_count": len(concept_ids[TRAIN_SPLIT]),
         "holdout_concept_count": len(concept_ids[ADOPTION_SPLIT]),
         "shared_concept_ids": shared_ids,
         "shared_aliases": shared_aliases,
+        "shared_exact_match_clusters": shared_exact_clusters,
+        "shared_source_identities": shared_sources,
         "shared_artifact_digests": shared_artifacts,
-        "passed": not shared_ids and not shared_aliases and not shared_artifacts,
+        "shared_text_digests": shared_text,
+        "shared_near_duplicate_clusters": shared_near_duplicates,
+        "complete_partition_key_items": complete_partition_key_items,
+        "complete_partition_keys_required": require_complete,
+        "passed": not any(
+            (
+                shared_ids,
+                shared_aliases,
+                shared_exact_clusters,
+                shared_sources,
+                shared_artifacts,
+                shared_text,
+                shared_near_duplicates,
+            )
+        ),
     }
     if not facts["passed"]:
         raise EvaluationBoundaryError(
@@ -242,7 +469,11 @@ def partition_leakage_facts(
                 {
                     "shared_concept_ids": shared_ids,
                     "shared_aliases": shared_aliases,
+                    "shared_exact_match_clusters": shared_exact_clusters,
+                    "shared_source_identities": shared_sources,
                     "shared_artifact_digests": shared_artifacts,
+                    "shared_text_digests": shared_text,
+                    "shared_near_duplicate_clusters": shared_near_duplicates,
                 }
             )
         )
@@ -280,7 +511,10 @@ def adoption_gate_facts(
     if split_counts[ADOPTION_SPLIT] < minimum_holdout:
         blockers.append("no held-out artifact is present")
     if leakage.get("passed") is not True:
-        blockers.append("train/holdout concept or alias leakage was not cleared")
+        blockers.append(
+            "train/holdout concept, alias, source, artifact, text, or "
+            "near-duplicate leakage was not cleared"
+        )
 
     pinned_configuration = record.get("frozen_configuration")
     configuration_mismatches: list[str] = []

@@ -18,6 +18,7 @@ import pytest
 
 from spicy_regs.docpipeline.segments import SegmentSettings
 from spicy_regs.docpipeline.source import SourceRecord, profile_for_table
+from spicy_regs.enrichment.reference_runtime import VocabularyUniverseFreeze
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DRAW_PATH = REPO_ROOT / "tools" / "draw_holdout.py"
@@ -67,6 +68,27 @@ class _CharacterCounter:
 
 COUNTER = _CharacterCounter()
 SETTINGS = SegmentSettings.for_counter(COUNTER)
+_DIGEST = "sha256:" + "1" * 64
+VOCABULARY_FREEZE = VocabularyUniverseFreeze(
+    freeze_id="urn:test:vocabulary-freeze",
+    registry_releases=(
+        {
+            "release": "urn:test:release:subjects",
+            "releaseDigest": _DIGEST,
+            "importSnapshot": "urn:test:import:subjects",
+            "coverageReport": "urn:test:coverage:subjects",
+            "coverageReportDigest": _DIGEST,
+        },
+    ),
+    mapping_releases=(),
+    output_profile={
+        "id": "urn:test:output-profile",
+        "version": "1",
+        "digest": _DIGEST,
+    },
+    frozen_at="2026-07-28T00:00:00Z",
+    frozen_by="urn:test:activity:freeze",
+).sealed_payload()
 
 GAO = profile_for_table("gao_reports")
 CRS = profile_for_table("crs_reports")
@@ -290,6 +312,7 @@ def test_a_full_draw_is_verified_disjoint_across_its_strata(tmp_path: Path) -> N
         _empty_exclusions(),
         settings=SETTINGS,
         counter=COUNTER,
+        vocabulary_universe_freeze=VOCABULARY_FREEZE,
         strata=_two_strata(),
     )
     facts = verify_draw(draw, _empty_exclusions(), minimum_profiles=2)
@@ -306,6 +329,7 @@ def test_verification_refuses_a_draw_that_overlaps_development(tmp_path: Path) -
         _empty_exclusions(),
         settings=SETTINGS,
         counter=COUNTER,
+        vocabulary_universe_freeze=VOCABULARY_FREEZE,
         strata=_two_strata(),
     )
     contaminated = build_exclusions(
@@ -330,6 +354,7 @@ def test_verification_refuses_a_draw_below_the_profile_floor(tmp_path: Path) -> 
         _empty_exclusions(),
         settings=SETTINGS,
         counter=COUNTER,
+        vocabulary_universe_freeze=VOCABULARY_FREEZE,
         strata=(ProfileStratum("gao-report-v1", "gao_reports", 3, 50, 100),),
     )
     with pytest.raises(HoldoutDrawError, match="source profiles"):
@@ -343,6 +368,7 @@ def test_verification_refuses_an_unfilled_stratum(tmp_path: Path) -> None:
         _empty_exclusions(),
         settings=SETTINGS,
         counter=COUNTER,
+        vocabulary_universe_freeze=VOCABULARY_FREEZE,
         strata=_two_strata(),
     )
     with pytest.raises(HoldoutDrawError, match="could not be filled"):
@@ -368,6 +394,7 @@ def _document(tmp_path: Path) -> dict[str, object]:
         _empty_exclusions(),
         settings=SETTINGS,
         counter=COUNTER,
+        vocabulary_universe_freeze=VOCABULARY_FREEZE,
         strata=_two_strata(),
     )
     return drafting_document(
@@ -499,6 +526,7 @@ def _section(tmp_path: Path) -> dict[str, object]:
         _empty_exclusions(),
         settings=SETTINGS,
         counter=COUNTER,
+        vocabulary_universe_freeze=VOCABULARY_FREEZE,
         strata=_two_strata(),
     )
     return pending_holdout_record(
