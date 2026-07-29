@@ -82,7 +82,7 @@ from spicy_regs.evaluation_boundary import (
     DEFAULT_BOUNDARY_MANIFEST,
     DEVELOPMENT_DATASET_ID,
 )
-from spicy_regs.enrichment.reference_runtime import (
+from refspec import (
     ReferenceRuntimeError,
     require_vocabulary_universe_freeze,
 )

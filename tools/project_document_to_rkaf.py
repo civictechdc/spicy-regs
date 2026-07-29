@@ -12,7 +12,7 @@ Deterministic layer only:
 With the model layer (concept assignments only; identity stays deterministic):
 
     python3 tools/project_document_to_rkaf.py ... \
-        --vocabulary-dir output/normalized-vocabulary-v1 \
+        --migration-vocabulary-dir output/normalized-vocabulary-v1 \
         --provider openai --model gpt-5.6-sol
 
 Writes ``<output-dir>/<slug>.rulespec.jsonld``, ``projection-run.json``,
@@ -130,20 +130,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model", default=None, help="Provider model id; defaults to the arm's pinned model.")
     parser.add_argument("--compat-provider", default="", help="Named profile for --provider openai-compatible.")
     parser.add_argument(
-        "--vocabulary-dir",
+        "--migration-vocabulary-dir",
         type=Path,
         default=None,
         help=(
-            "Directory containing concept_labels.parquet, "
+            "Migration-only directory containing concept_labels.parquet, "
             "concept_relations.parquet, concept_event_participants.parquet, "
             "and vocabulary-manifest.jsonld. Required with the model layer."
         ),
     )
     parser.add_argument(
-        "--vocabulary-manifest",
+        "--migration-vocabulary-manifest",
         type=Path,
         default=None,
-        help=("Authoritative RKAF JSON-LD manifest; defaults to <vocabulary-dir>/vocabulary-manifest.jsonld."),
+        help=(
+            "Migration-only RKAF JSON-LD manifest; defaults to "
+            "<migration-vocabulary-dir>/vocabulary-manifest.jsonld."
+        ),
     )
     parser.add_argument(
         "--vocabulary-default-language",
@@ -183,8 +186,14 @@ def main(argv: list[str] | None = None) -> int:
             scope=args.scope,
             context_ref=f"./{CONTEXT_NAME}",
             asserted_at=args.asserted_at,
-            vocabulary_directory=None if args.no_model else args.vocabulary_dir,
-            vocabulary_manifest_path=(None if args.no_model else args.vocabulary_manifest),
+            migration_vocabulary_directory=(
+                None if args.no_model else args.migration_vocabulary_dir
+            ),
+            migration_vocabulary_manifest_path=(
+                None
+                if args.no_model
+                else args.migration_vocabulary_manifest
+            ),
             vocabulary_default_language=args.vocabulary_default_language,
             prompt_concept_limit=args.prompt_concept_limit,
             max_segments=args.max_segments,

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from spicy_regs.docpipeline.runtime import sha256_file
-from spicy_regs.enrichment.reference_runtime import normalize_unicode_text
+from refspec import normalize_unicode_text
 from spicy_regs.ontology.common import canonical_json
 
 BOUNDARY_SCHEMA_VERSION = "rulespec-evaluation-boundary-v1"

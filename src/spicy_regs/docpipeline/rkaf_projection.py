@@ -47,7 +47,12 @@ import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from spicy_regs.enrichment.managed_release import (
+        ManagedReleaseCandidateSource,
+    )
 
 from spicy_regs.docpipeline.source import (
     SourceArtifact,
@@ -1214,9 +1219,10 @@ class ProjectionSettings:
     context_ref: str = "./rkaf-context.jsonld"
     asserted_at: str | None = None
     attestor_id: str = ""
-    vocabulary_directory: Path | None = None
-    vocabulary_manifest_path: Path | None = None
+    migration_vocabulary_directory: Path | None = None
+    migration_vocabulary_manifest_path: Path | None = None
     vocabulary_default_language: str = "en"
+    managed_release_candidate_facet: str = "subject"
     prompt_concept_limit: int = 12
     max_segments: int = 0
     """Cap on the segments sent to the model; ``0`` means every segment. A cap
@@ -1800,13 +1806,13 @@ _RELATION_PROPERTY = {
 
 
 def _language_tag(value: object, *, label: str) -> str:
-    from spicy_regs.enrichment.reference_runtime import (
+    from refspec import (
         ReferenceRuntimeError,
-        _require_language_tag,
+        require_language_tag,
     )
 
     try:
-        return _require_language_tag(value, label)
+        return require_language_tag(value, label)
     except ReferenceRuntimeError as error:
         raise ProjectionError(str(error)) from error
 
@@ -1887,28 +1893,169 @@ def _rows_digest(
     return hashlib.sha256(canonical_json(inventory).encode("utf-8")).hexdigest()
 
 
-def load_normalized_vocabulary(
+def managed_release_candidate_vocabulary(
+    source: "ManagedReleaseCandidateSource",
+    *,
+    default_language: str,
+    facet: str,
+) -> NormalizedVocabulary:
+    """Build the model selector's read-only view from managed expressions."""
+
+    from spicy_regs.enrichment.managed_release import (
+        ManagedReleaseCandidateSource,
+    )
+
+    if not isinstance(source, ManagedReleaseCandidateSource):
+        raise ProjectionError(
+            "managed candidate lookup requires ManagedReleaseCandidateSource"
+        )
+    if source.usage_ceiling != "candidateUseOnly":
+        raise ProjectionError(
+            "managed release source must retain the candidateUseOnly ceiling"
+        )
+    default_language = _language_tag(
+        default_language,
+        label="vocabulary_default_language",
+    )
+    facet = str(facet).strip()
+    if not facet:
+        raise ProjectionError("managed_release_candidate_facet is required")
+
+    property_roles = {
+        "http://www.w3.org/2004/02/skos/core#prefLabel": "preferred",
+        "http://www.w3.org/2004/02/skos/core#altLabel": "alternate",
+        "http://www.w3.org/2004/02/skos/core#hiddenLabel": "hidden",
+        "http://www.w3.org/2004/02/skos/core#definition": "definition",
+    }
+    expressions_by_member: dict[
+        str,
+        dict[str, dict[str, list[str]]],
+    ] = {}
+    for expression in source.iter_expressions():
+        role = property_roles.get(expression.source_property_or_path)
+        language = expression.language_tag
+        if role is None or language is None:
+            continue
+        language_values = expressions_by_member.setdefault(
+            expression.member_iri,
+            {},
+        ).setdefault(role, {}).setdefault(language, [])
+        if expression.original_literal not in language_values:
+            language_values.append(expression.original_literal)
+
+    concepts: dict[str, VocabularyConcept] = {}
+    selector_rows: list[dict[str, Any]] = []
+    concept_nodes: list[Mapping[str, Any]] = []
+    for member_iri, roles in sorted(expressions_by_member.items()):
+        member = source.lookup_member(member_iri)
+        if member is None:
+            raise ProjectionError(
+                f"managed expression member {member_iri!r} is not in the "
+                "exact release"
+            )
+        preferred_values = roles.get("preferred", {})
+        if not preferred_values:
+            continue
+        if any(len(values) != 1 for values in preferred_values.values()):
+            raise ProjectionError(
+                f"{member_iri}: managed release must carry one preferred "
+                "label per language"
+            )
+        preferred = {
+            language: values[0]
+            for language, values in sorted(preferred_values.items())
+        }
+        alternate = _one_or_many_map(roles.get("alternate", {}))
+        hidden = _one_or_many_map(roles.get("hidden", {}))
+        definitions = _one_or_many_map(roles.get("definition", {}))
+        concept = VocabularyConcept(
+            concept_iri=member.member_iri,
+            scheme_iri=member.scheme_iri,
+            release_iri=member.release_iri,
+            facet=facet,
+            preferred_labels=preferred,
+            alternate_labels=alternate,
+            hidden_labels=hidden,
+            definitions=definitions,
+        )
+        concepts[member_iri] = concept
+        selector_rows.append(
+            {
+                "concept_id": member.member_iri,
+                "facet": facet,
+                "source_vocabulary": member.scheme_iri,
+                "scheme": facet,
+                "pref_label": concept.display_label(default_language),
+                "alt_labels_json": canonical_json(
+                    [
+                        value
+                        for language in sorted(alternate)
+                        for value in (
+                            [alternate[language]]
+                            if isinstance(alternate[language], str)
+                            else list(alternate[language])
+                        )
+                    ]
+                ),
+                "definition": (
+                    _first_language_value(
+                        definitions,
+                        default_language=default_language,
+                    )
+                    if definitions
+                    else ""
+                ),
+                "status": "active",
+                "external_ids_json": "[]",
+            }
+        )
+        concept_nodes.append(member.record)
+
+    if not concepts:
+        raise ProjectionError(
+            "managed release has no language-tagged preferred-label candidates"
+        )
+    content_identity = {
+        "expressionCorpusSnapshot": dict(
+            source.expression_corpus_snapshot
+        ),
+        "lookupIndexManifest": dict(source.lookup_index_manifest),
+        "defaultLanguage": default_language,
+        "facet": facet,
+    }
+    return NormalizedVocabulary(
+        selector_rows=tuple(selector_rows),
+        concepts=concepts,
+        manifest_nodes=tuple(concept_nodes),
+        content_sha256=hashlib.sha256(
+            canonical_json(content_identity).encode("utf-8")
+        ).hexdigest(),
+        default_language=default_language,
+    )
+
+
+def load_migration_normalized_vocabulary_directory(
     directory: Path,
     *,
     manifest_path: Path | None = None,
     default_language: str = "en",
 ) -> NormalizedVocabulary:
-    """Load diagnostic vocabulary inputs without reviving the fused registry.
+    """Load an explicitly migration-only normalized vocabulary directory.
 
     ``concept_labels``, ``concept_relations``, and
     ``concept_event_participants`` are the executable storage interfaces. The
     JSON-LD manifest supplies the governed scheme, concept, exact release, and
     distribution records that an RKAF assignment must cite. Flat
     ``registry.parquet`` rows are accepted only by the migration adapter in
-    :mod:`spicy_regs.enrichment.reference_runtime`; this path never reads them.
+    :mod:`refspec`; this path never reads them.
     """
-    from spicy_regs.enrichment.reference_runtime import (
+    from refspec import (
         ConceptEventParticipant,
         ConceptLabel,
         ConceptRelation,
         ReferenceRuntimeError,
         ReferenceRuntimeStore,
-        assert_conforming_vocabulary_rows,
+        assert_managed_vocabulary_row_integrity,
     )
 
     directory = Path(directory)
@@ -2022,7 +2169,7 @@ def load_normalized_vocabulary(
             "members": member_list,
         }
     try:
-        assert_conforming_vocabulary_rows(
+        assert_managed_vocabulary_row_integrity(
             labels,
             relations,
             participants,
@@ -2171,13 +2318,78 @@ def load_normalized_vocabulary(
     )
 
 
-def run_model_layer(
+def run_migration_model_layer(
     artifact: SourceArtifact,
     *,
     model: Any,
-    vocabulary_directory: Path,
-    vocabulary_manifest_path: Path | None,
+    migration_vocabulary_directory: Path,
+    migration_vocabulary_manifest_path: Path | None,
     vocabulary_default_language: str,
+    run_directory: Path,
+    evidence_field: str,
+    artifact_iri: str,
+    prompt_concept_limit: int = 12,
+    max_segments: int = 0,
+    allowed_facets: Sequence[str] = ("subject",),
+) -> ModelLayer:
+    """Run the explicitly migration-only directory consumer."""
+
+    vocabulary = load_migration_normalized_vocabulary_directory(
+        migration_vocabulary_directory,
+        manifest_path=migration_vocabulary_manifest_path,
+        default_language=vocabulary_default_language,
+    )
+    return _run_model_layer_with_vocabulary(
+        artifact,
+        model=model,
+        vocabulary=vocabulary,
+        run_directory=run_directory,
+        evidence_field=evidence_field,
+        artifact_iri=artifact_iri,
+        prompt_concept_limit=prompt_concept_limit,
+        max_segments=max_segments,
+        allowed_facets=allowed_facets,
+    )
+
+
+def run_managed_release_model_layer(
+    artifact: SourceArtifact,
+    *,
+    model: Any,
+    candidate_source: "ManagedReleaseCandidateSource",
+    vocabulary_default_language: str,
+    candidate_facet: str,
+    run_directory: Path,
+    evidence_field: str,
+    artifact_iri: str,
+    prompt_concept_limit: int = 12,
+    max_segments: int = 0,
+) -> ModelLayer:
+    """Run candidate lookup only through a verified managed-release source."""
+
+    vocabulary = managed_release_candidate_vocabulary(
+        candidate_source,
+        default_language=vocabulary_default_language,
+        facet=candidate_facet,
+    )
+    return _run_model_layer_with_vocabulary(
+        artifact,
+        model=model,
+        vocabulary=vocabulary,
+        run_directory=run_directory,
+        evidence_field=evidence_field,
+        artifact_iri=artifact_iri,
+        prompt_concept_limit=prompt_concept_limit,
+        max_segments=max_segments,
+        allowed_facets=(candidate_facet,),
+    )
+
+
+def _run_model_layer_with_vocabulary(
+    artifact: SourceArtifact,
+    *,
+    model: Any,
+    vocabulary: NormalizedVocabulary,
     run_directory: Path,
     evidence_field: str,
     artifact_iri: str,
@@ -2213,11 +2425,6 @@ def run_model_layer(
     )
     from spicy_regs.ontology.segmentation import TiktokenCounter
 
-    vocabulary = load_normalized_vocabulary(
-        vocabulary_directory,
-        manifest_path=vocabulary_manifest_path,
-        default_language=vocabulary_default_language,
-    )
     concepts = list(vocabulary.selector_rows)
     vocabulary_sha256 = vocabulary.content_sha256
     counter = TiktokenCounter()
@@ -2330,6 +2537,7 @@ def project_document(
     settings: ProjectionSettings,
     model: Any = None,
     model_run_directory: Path | None = None,
+    managed_release_source: "ManagedReleaseCandidateSource | None" = None,
 ) -> ProjectionResult:
     """Project one document into RKAF diagnostic output.
 
@@ -2342,20 +2550,62 @@ def project_document(
     facts = build_profile_facts(artifact, row, tables=tables, partner=settings.partner)
     model_layer: ModelLayer | None = None
     if model is not None:
-        if settings.vocabulary_directory is None:
-            raise ProjectionError("the model layer needs a normalized candidate vocabulary directory")
+        if (
+            managed_release_source is not None
+            and settings.migration_vocabulary_directory is not None
+        ):
+            raise ProjectionError(
+                "choose either the managed-release candidate source or the "
+                "migration-only vocabulary directory"
+            )
+        if (
+            managed_release_source is None
+            and settings.migration_vocabulary_directory is None
+        ):
+            raise ProjectionError(
+                "the model layer needs a managed-release candidate source or "
+                "an explicitly migration-only normalized candidate "
+                "vocabulary directory"
+            )
         if model_run_directory is None:
             raise ProjectionError("the model layer needs a run directory for provider custody")
-        model_layer = run_model_layer(
-            artifact,
-            model=model,
-            vocabulary_directory=settings.vocabulary_directory,
-            vocabulary_manifest_path=settings.vocabulary_manifest_path,
-            vocabulary_default_language=settings.vocabulary_default_language,
-            run_directory=model_run_directory,
-            evidence_field=facts.evidence_field,
-            artifact_iri=facts.artifact_iri,
-            prompt_concept_limit=settings.prompt_concept_limit,
-            max_segments=settings.max_segments,
+        if managed_release_source is not None:
+            model_layer = run_managed_release_model_layer(
+                artifact,
+                model=model,
+                candidate_source=managed_release_source,
+                vocabulary_default_language=(
+                    settings.vocabulary_default_language
+                ),
+                candidate_facet=settings.managed_release_candidate_facet,
+                run_directory=model_run_directory,
+                evidence_field=facts.evidence_field,
+                artifact_iri=facts.artifact_iri,
+                prompt_concept_limit=settings.prompt_concept_limit,
+                max_segments=settings.max_segments,
+            )
+        else:
+            assert settings.migration_vocabulary_directory is not None
+            model_layer = run_migration_model_layer(
+                artifact,
+                model=model,
+                migration_vocabulary_directory=(
+                    settings.migration_vocabulary_directory
+                ),
+                migration_vocabulary_manifest_path=(
+                    settings.migration_vocabulary_manifest_path
+                ),
+                vocabulary_default_language=(
+                    settings.vocabulary_default_language
+                ),
+                run_directory=model_run_directory,
+                evidence_field=facts.evidence_field,
+                artifact_iri=facts.artifact_iri,
+                prompt_concept_limit=settings.prompt_concept_limit,
+                max_segments=settings.max_segments,
+            )
+    elif managed_release_source is not None:
+        raise ProjectionError(
+            "managed_release_source is only used by the diagnostic model layer"
         )
     return assemble(artifact, facts, settings=settings, model_layer=model_layer)

@@ -13,7 +13,7 @@ import pytest
 from jsonschema import Draft202012Validator, FormatChecker
 from referencing import Registry, Resource
 
-from spicy_regs.enrichment.reference_runtime import (
+from refspec import (
     MAPPING_IMPORT_REQUIRED_FEATURES,
     REQUIRED_IMPORT_FEATURES,
     ConceptEventParticipant,
@@ -33,7 +33,7 @@ from spicy_regs.enrichment.reference_runtime import (
     RegistryReconciliationReport,
     VocabularyUniverseFreeze,
     adapt_source_terms_for_migration,
-    assert_conforming_vocabulary_rows,
+    assert_managed_vocabulary_row_integrity,
     bind_ranked_candidates,
     canonical_payload_digest,
     canonical_text_digest,
@@ -45,7 +45,6 @@ from spicy_regs.enrichment.reference_runtime import (
     require_payload_digest,
     require_vocabulary_universe_freeze,
     seal_payload,
-    validate_lifecycle_participants,
 )
 from spicy_regs.evaluation_boundary import (
     EvaluationBoundaryError,
@@ -89,6 +88,54 @@ def versioned_ref(
         "version": version,
         "digest": digest,
     }
+
+
+def release_graph_receipt(
+    *,
+    covered_releases: Sequence[str] = (RELEASE,),
+) -> dict[str, Any]:
+    return seal_payload(
+        {
+            "id": "urn:test:receipt:release-graph:v1",
+            "type": "urn:ref:type:ReleaseGraphValidationReceipt",
+            "recordedAt": NOW,
+            "recordedBy": ACTOR,
+            "schemaVersion": "1.0",
+            "operationalState": "passed",
+            "receiptVersion": "1.0",
+            "rulespecDependencyManifest": digest_ref(
+                "rulespec-dependency"
+            ),
+            "rulespecGraph": digest_ref("rulespec-graph"),
+            "refRecordDigests": [digest_ref("ref-record")],
+            "rulespecValidator": {
+                "id": "urn:test:validator:rulespec",
+                "revision": "test",
+                "digest": DIGEST_A,
+            },
+            "rulespecBehaviorRuntime": {
+                "id": "urn:test:runtime:rulespec-l4",
+                "revision": "test",
+                "digest": DIGEST_A,
+            },
+            "gateImplementation": {
+                "id": "urn:test:validator:combined-gate",
+                "revision": "test",
+                "digest": DIGEST_B,
+            },
+            "verdicts": {
+                "refBinding": "pass",
+                "rulespecConformance": "pass",
+                "rulespecBehavior": "pass",
+                "crossBoundary": "pass",
+            },
+            "authorizationEvaluations": [],
+            "coveredRulespecIdentifiers": list(covered_releases),
+            "crossReferencesDigest": DIGEST_C,
+            "validatedAt": NOW,
+            "activity": ACTIVITY,
+        }
+    )
 
 
 def component_pin(
@@ -214,81 +261,6 @@ def lifecycle_release_membership(
     return memberships
 
 
-@pytest.mark.parametrize(
-    "operation",
-    [
-        "deprecation",
-        "withdrawal",
-        "replacement",
-        "split",
-        "merge",
-        "promotion",
-        "demotion",
-    ],
-)
-def test_every_lifecycle_operation_accepts_its_exact_cardinality(
-    operation: str,
-) -> None:
-    rows = lifecycle_rows(operation)
-    validate_lifecycle_participants(
-        rows,
-        release_membership=lifecycle_release_membership(rows),
-    )
-
-
-def test_lifecycle_rejects_duplicate_members_release_drift_and_wrong_promotion_type() -> None:
-    replacement = list(lifecycle_rows("replacement"))
-    replacement[1] = replace(
-        replacement[1],
-        concept_iri=replacement[0].concept_iri,
-    )
-    with pytest.raises(ReferenceRuntimeError, match="duplicate participant"):
-        validate_lifecycle_participants(
-            replacement,
-            release_membership=lifecycle_release_membership(replacement),
-        )
-
-    split = list(lifecycle_rows("split"))
-    split[2] = replace(split[2], release_iri="urn:test:release:other")
-    with pytest.raises(ReferenceRuntimeError, match="successor release"):
-        validate_lifecycle_participants(
-            split,
-            release_membership=lifecycle_release_membership(split),
-        )
-
-    promotion = list(lifecycle_rows("promotion"))
-    promotion[0] = replace(promotion[0], concept_kind="registered")
-    with pytest.raises(ReferenceRuntimeError, match="local to registered"):
-        validate_lifecycle_participants(
-            promotion,
-            release_membership=lifecycle_release_membership(promotion),
-        )
-
-
-def test_lifecycle_rejects_a_participant_missing_from_its_pinned_release() -> None:
-    rows = lifecycle_rows("replacement")
-    membership = lifecycle_release_membership(rows)
-    membership[rows[1].release_iri]["members"] = []
-    with pytest.raises(ReferenceRuntimeError, match="is not a member"):
-        validate_lifecycle_participants(
-            rows,
-            release_membership=membership,
-        )
-
-
-def test_lifecycle_rejects_the_same_release_on_both_sides() -> None:
-    rows = list(lifecycle_rows("replacement"))
-    rows[1] = replace(rows[1], release_iri=rows[0].release_iri)
-    with pytest.raises(
-        ReferenceRuntimeError,
-        match="predecessor and successor releases must differ",
-    ):
-        validate_lifecycle_participants(
-            rows,
-            release_membership=lifecycle_release_membership(rows),
-        )
-
-
 def test_multilingual_labels_and_multiple_parents_round_trip(
     tmp_path: Path,
 ) -> None:
@@ -331,12 +303,16 @@ def test_multilingual_labels_and_multiple_parents_round_trip(
         ],
     }
     store.write_vocabulary_rows(
+        release_digest=DIGEST_A,
+        release_graph_validation_receipt=release_graph_receipt(
+            covered_releases=tuple(membership)
+        ),
         labels=labels,
         relations=relations,
         participants=participants,
         release_membership=membership,
     )
-    rows = store.read_vocabulary_rows()
+    rows = store.read_vocabulary_rows(release_digest=DIGEST_A)
     assert {row["language_tag"] for row in rows["concept_labels"]} == {"en", "es", "zh-Hant"}
     assert {row["object_concept_iri"] for row in rows["concept_relations"]} == {
         "urn:test:concept:environment",
@@ -348,10 +324,38 @@ def test_multilingual_labels_and_multiple_parents_round_trip(
         row["complete_membership"] is True and isinstance(row["ordinal"], int)
         for row in rows["concept_event_participants"]
     )
+    store.write_vocabulary_rows(
+        release_digest=DIGEST_A,
+        release_graph_validation_receipt=release_graph_receipt(
+            covered_releases=tuple(membership)
+        ),
+        labels=labels,
+        relations=relations,
+        participants=participants,
+        release_membership=membership,
+    )
+    changed_labels = (
+        replace(labels[0], original_literal="Changed water policy"),
+        *labels[1:],
+    )
+    with pytest.raises(
+        ReferenceRuntimeError,
+        match="already bound to different vocabulary rows",
+    ):
+        store.write_vocabulary_rows(
+            release_digest=DIGEST_A,
+            release_graph_validation_receipt=release_graph_receipt(
+                covered_releases=tuple(membership)
+            ),
+            labels=changed_labels,
+            relations=relations,
+            participants=participants,
+            release_membership=membership,
+        )
 
 
-def test_label_collision_uses_rdf_lexical_equality_not_search_normalization() -> None:
-    assert_conforming_vocabulary_rows(
+def test_ref_row_integrity_does_not_reimplement_rulespec_label_semantics() -> None:
+    assert_managed_vocabulary_row_integrity(
         (
             concept_label(
                 "preferred",
@@ -366,39 +370,33 @@ def test_label_collision_uses_rdf_lexical_equality_not_search_normalization() ->
         (),
         (),
     )
-    with pytest.raises(ReferenceRuntimeError, match="disjoint"):
-        assert_conforming_vocabulary_rows(
-            (
-                concept_label("preferred", literal="Café"),
-                concept_label(
-                    "alternate",
-                    role="alternate",
-                    literal="Café",
-                ),
+    assert_managed_vocabulary_row_integrity(
+        (
+            concept_label("preferred", literal="Café"),
+            concept_label(
+                "alternate",
+                role="alternate",
+                literal="Café",
             ),
-            (),
-            (),
-        )
-
-
-def test_hierarchy_requires_absolute_scheme_internal_skos_predicates() -> None:
-    with pytest.raises(ReferenceRuntimeError, match="absolute IRI"):
-        concept_relation(
-            "compact",
-            parent="urn:test:concept:parent",
-            predicate="skos:broader",
-        )
-    with pytest.raises(ReferenceRuntimeError, match="scheme-internal"):
-        concept_relation(
-            "cross-scheme",
-            parent="urn:test:concept:parent",
-            object_scheme=OTHER_SCHEME,
-        )
-    concept_relation(
-        "related",
-        parent="urn:test:concept:neighbor",
-        predicate="http://www.w3.org/2004/02/skos/core#related",
+        ),
+        (),
+        (),
     )
+
+
+def test_relation_rows_preserve_rulespec_semantics_for_the_pinned_gate() -> None:
+    compact = concept_relation(
+        "compact",
+        parent="urn:test:concept:parent",
+        predicate="skos:broader",
+    )
+    cross_scheme = concept_relation(
+        "cross-scheme",
+        parent="urn:test:concept:neighbor",
+        object_scheme=OTHER_SCHEME,
+    )
+    assert compact.predicate_iri == "skos:broader"
+    assert cross_scheme.object_scheme_iri == OTHER_SCHEME
 
 
 def test_hierarchy_targets_resolve_to_exact_catalog_and_release_membership() -> None:
@@ -423,7 +421,7 @@ def test_hierarchy_targets_resolve_to_exact_catalog_and_release_membership() -> 
             ],
         }
     }
-    assert_conforming_vocabulary_rows(
+    assert_managed_vocabulary_row_integrity(
         labels,
         (relation,),
         (),
@@ -431,7 +429,7 @@ def test_hierarchy_targets_resolve_to_exact_catalog_and_release_membership() -> 
     )
 
     with pytest.raises(ReferenceRuntimeError, match="target does not resolve"):
-        assert_conforming_vocabulary_rows(
+        assert_managed_vocabulary_row_integrity(
             labels,
             (
                 concept_relation(
@@ -449,8 +447,8 @@ def test_hierarchy_targets_resolve_to_exact_catalog_and_release_membership() -> 
             "members": ["urn:test:concept:water"],
         }
     }
-    with pytest.raises(ReferenceRuntimeError, match="target is not a member"):
-        assert_conforming_vocabulary_rows(
+    with pytest.raises(ReferenceRuntimeError, match="is not a member"):
+        assert_managed_vocabulary_row_integrity(
             labels,
             (relation,),
             (),
@@ -498,7 +496,9 @@ def coverage_report() -> RegistryImportCoverageReport:
         distribution_artifacts=(digest_ref("artifact:subjects"),),
         import_profile=versioned_ref("import-profile:skos"),
         parser_version="source-parser-v1",
-        index_snapshot=digest_ref("index:subjects"),
+        expression_corpus_snapshot=digest_ref(
+            "expression-corpus:subjects"
+        ),
         activity=ACTIVITY,
         receipt="urn:test:receipt:coverage",
         feature_rows=tuple(feature_row(feature) for feature in sorted(REQUIRED_IMPORT_FEATURES)),
@@ -521,7 +521,9 @@ def mapping_coverage_report() -> RegistryImportCoverageReport:
         import_snapshot=digest_ref("import:mappings"),
         reference_resource_release=versioned_ref("release:mappings"),
         distribution_artifacts=(digest_ref("artifact:mappings"),),
-        index_snapshot=digest_ref("index:mappings"),
+        expression_corpus_snapshot=digest_ref(
+            "expression-corpus:mappings"
+        ),
         receipt="urn:test:receipt:coverage:mappings",
         feature_rows=feature_rows,
     )
@@ -529,7 +531,7 @@ def mapping_coverage_report() -> RegistryImportCoverageReport:
 
 def test_coverage_report_reconciles_every_required_feature() -> None:
     payload = coverage_report().sealed_payload()
-    assert len(payload["features"]) == 10
+    assert len(payload["features"]) == len(REQUIRED_IMPORT_FEATURES)
     require_payload_digest(payload)
 
 
@@ -649,25 +651,33 @@ def test_registry_deployment_selects_only_exact_passing_coverage() -> None:
         )
 
 
-def test_registry_deployment_requires_exact_authorization_validations() -> None:
+def test_registry_deployment_caller_authorization_claims_are_non_authoritative() -> None:
     coverage = coverage_report().sealed_payload()
     profile = output_profile().sealed_payload()
     decision = registry_deployment_decision(
         coverage=coverage,
         profile=profile,
     )
-    incomplete = replace(
+    caller_claim = replace(
         decision,
         authorization_validations=decision.authorization_validations[:1],
     )
-    with pytest.raises(
-        ReferenceRuntimeError,
-        match="at least two authorization",
-    ):
-        incomplete.payload(
-            coverage_report_record=coverage,
-            output_profile_record=profile,
-        )
+    caller_payload = caller_claim.sealed_payload(
+        coverage_report_record=coverage,
+        output_profile_record=profile,
+    )
+    no_claim_payload = replace(
+        decision,
+        authorization_validations=(),
+    ).sealed_payload(
+        coverage_report_record=coverage,
+        output_profile_record=profile,
+    )
+
+    assert caller_payload["selectionState"] == "selected"
+    assert len(caller_payload["authorizationValidations"]) == 1
+    assert "authorizationValidations" not in no_claim_payload
+    assert release_graph_receipt()["authorizationEvaluations"] == []
 
 
 def expression(
@@ -713,7 +723,9 @@ def expression(
         indexed_text=indexed,
         indexed_text_digest=canonical_text_digest(indexed),
         indexed_representation_version="labels-v1",
-        index_snapshot=digest_ref("index:subjects"),
+        expression_corpus_snapshot=digest_ref(
+            "expression-corpus:subjects"
+        ),
         activity=ACTIVITY,
         receipt="urn:test:receipt:index",
     )
@@ -1264,7 +1276,13 @@ def configuration() -> EnrichmentConfiguration:
         },
         indexes=(
             {
-                "indexSnapshot": digest_ref("index:subjects"),
+                "expressionCorpusSnapshot": digest_ref(
+                    "expression-corpus:subjects"
+                ),
+                "lookupIndexManifest": digest_ref(
+                    "lookup-index-manifest:subjects",
+                    DIGEST_B,
+                ),
                 "indexedExpressionCorpusDigest": DIGEST_A,
                 "indexedRepresentationVersion": "labels-v1",
                 "normalizationPolicy": versioned_ref("normalization:unicode-nfkc"),
@@ -1616,6 +1634,18 @@ def test_configuration_digest_changes_with_behavior_pins() -> None:
             },
         ),
     )
+    rebuilt_lookup = replace(
+        config,
+        indexes=(
+            {
+                **config.indexes[0],
+                "lookupIndexManifest": digest_ref(
+                    "lookup-index-manifest:subjects:v2",
+                    DIGEST_C,
+                ),
+            },
+        ),
+    )
     assert (
         len(
             {
@@ -1623,10 +1653,23 @@ def test_configuration_digest_changes_with_behavior_pins() -> None:
                 changed_prompt.digest,
                 changed_budget.digest,
                 changed_index.digest,
+                rebuilt_lookup.digest,
             }
         )
-        == 4
+        == 5
     )
+
+
+def test_configuration_keeps_expression_corpus_and_lookup_index_distinct() -> None:
+    config = configuration()
+    conflated = {
+        **config.indexes[0],
+        "lookupIndexManifest": dict(
+            config.indexes[0]["expressionCorpusSnapshot"]
+        ),
+    }
+    with pytest.raises(ReferenceRuntimeError, match="must not conflate"):
+        replace(config, indexes=(conflated,)).payload()
 
 
 @pytest.mark.parametrize(
@@ -2150,7 +2193,7 @@ def test_reconciliation_differences_name_exact_input_identifiers() -> None:
         ).payload()
 
 
-def test_synthesized_reconciliation_requires_external_governance_validation() -> None:
+def test_synthesized_reconciliation_ignores_caller_governance_callbacks() -> None:
     selected = reconciliation_report()
     reconciled = replace(
         selected,
@@ -2164,39 +2207,31 @@ def test_synthesized_reconciliation_requires_external_governance_validation() ->
         selected_input_release=None,
         reconciled_release=versioned_ref("release:reconciled"),
     )
-    with pytest.raises(
-        ReferenceRuntimeError,
-        match="externally validated Rulespec governance",
-    ):
-        reconciled.payload()
-    with pytest.raises(ReferenceRuntimeError, match="did not authorize"):
-        reconciled.payload(governance_validator=lambda _request: False)
-
     requests: list[Mapping[str, Any]] = []
 
     def validate_governance(request: Mapping[str, Any]) -> bool:
         requests.append(request)
-        return (
-            request["attestationRefs"] == ["urn:test:attestation:official"]
-            and request["localAdoptionRefs"] == ["urn:test:adoption:official"]
-            and request["reconciledRelease"]["id"] == "urn:test:release:reconciled"
-        )
+        return False
 
     payload = reconciled.sealed_payload(governance_validator=validate_governance)
     assert payload["synthesizedUnionAuthorized"] is True
-    assert requests
+    assert requests == []
 
 
-def test_reconciliation_requires_receipts_for_exact_governance_refs() -> None:
+def test_reconciliation_caller_validation_claims_are_non_authoritative() -> None:
     report = reconciliation_report()
-    with pytest.raises(
-        ReferenceRuntimeError,
-        match="exactly validate every",
-    ):
-        replace(
-            report,
-            rulespec_authority_refs=("urn:test:authority:other",),
-        ).payload()
+    changed = replace(
+        report,
+        rulespec_authority_refs=("urn:test:authority:other",),
+    ).sealed_payload()
+
+    assert changed["rulespecAuthorityRefs"] == [
+        "urn:test:authority:other"
+    ]
+    assert changed["authorizationValidations"] == list(
+        report.authorization_validations
+    )
+    assert release_graph_receipt()["authorizationEvaluations"] == []
 
 
 def test_ranked_candidates_require_exact_expression_lineage() -> None:
@@ -2205,9 +2240,17 @@ def test_ranked_candidates_require_exact_expression_lineage() -> None:
             "conceptIri": "urn:test:concept:water",
             "schemeIri": SCHEME,
             "facet": FACET,
-            "referenceResourceRelease": RELEASE,
-            "registryImportSnapshot": IMPORT,
-            "indexSnapshot": "urn:test:index:subjects",
+            "referenceResourceRelease": versioned_ref(
+                "release:subjects"
+            ),
+            "registryImportSnapshot": digest_ref("import:subjects"),
+            "expressionCorpusSnapshot": digest_ref(
+                "expression-corpus:subjects"
+            ),
+            "lookupIndexManifest": digest_ref(
+                "lookup-index-manifest:subjects",
+                DIGEST_B,
+            ),
         }
     }
     bound = bind_ranked_candidates(
@@ -2218,12 +2261,37 @@ def test_ranked_candidates_require_exact_expression_lineage() -> None:
     )
     assert bound[0]["rank"] == 1
     assert bound[0]["indexedExpressionIds"]
+    assert (
+        bound[0]["expressionCorpusSnapshot"]["id"]
+        == "urn:test:expression-corpus:subjects"
+    )
+    assert (
+        bound[0]["lookupIndexManifest"]["id"]
+        == "urn:test:lookup-index-manifest:subjects"
+    )
     with pytest.raises(ReferenceRuntimeError, match="no indexed expression"):
         bind_ranked_candidates(
             ["concept-water"],
             channel="bm25s-lucene-e1",
             concept_catalog=catalog,
             expression_ids_by_concept={},
+        )
+    conflated_catalog = {
+        "concept-water": {
+            **catalog["concept-water"],
+            "lookupIndexManifest": dict(
+                catalog["concept-water"]["expressionCorpusSnapshot"]
+            ),
+        }
+    }
+    with pytest.raises(ReferenceRuntimeError, match="conflates"):
+        bind_ranked_candidates(
+            ["concept-water"],
+            channel="bm25s-lucene-e1",
+            concept_catalog=conflated_catalog,
+            expression_ids_by_concept={
+                "concept-water": ("urn:ref:indexed-expression:abc",)
+            },
         )
 
 
@@ -2284,7 +2352,7 @@ def test_existing_source_parser_output_is_preserved_only_in_quarantine() -> None
     assert len(batch.relations) == 2
     assert {row.concept_iri for row in batch.labels} == {"urn:authority:concept:water"}
     with pytest.raises(ReferenceRuntimeError, match="migration rows"):
-        assert_conforming_vocabulary_rows(
+        assert_managed_vocabulary_row_integrity(
             batch.labels,
             batch.relations,
             batch.participants,
@@ -2320,7 +2388,7 @@ def test_legacy_flat_registry_is_readable_but_never_conforming() -> None:
     assert batch.production_eligible is False
     assert len(batch.relations) == 1
     with pytest.raises(ReferenceRuntimeError, match="migration rows"):
-        assert_conforming_vocabulary_rows(
+        assert_managed_vocabulary_row_integrity(
             batch.labels,
             batch.relations,
             (),
@@ -2533,6 +2601,19 @@ def test_record_store_requires_matching_type_and_binding_validation(
     )
     assert path.is_file()
     assert json.loads(path.read_text(encoding="utf-8")) == payload
+
+    changed = dict(payload)
+    changed["recordedAt"] = "2026-07-29T12:00:01Z"
+    changed = seal_payload(changed)
+    with pytest.raises(
+        ReferenceRuntimeError,
+        match="stable record id .* already bound to different content",
+    ):
+        store.put_record(
+            "enrichment-configuration",
+            changed,
+            binding_validator=validate_runtime_record_bundle,
+        )
 
 
 def test_record_store_accepts_registry_deployment_decisions(

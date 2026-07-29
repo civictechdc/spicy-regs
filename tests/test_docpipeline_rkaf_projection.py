@@ -13,10 +13,11 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+import runpy
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, cast
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -34,7 +35,7 @@ from spicy_regs.docpipeline.rkaf_projection import (
     encode_for_uri,
     fragment_urn,
     ground_literal,
-    load_normalized_vocabulary,
+    load_migration_normalized_vocabulary_directory,
     load_artifact,
     project_document,
     verify_candidate_rows,
@@ -45,7 +46,8 @@ from spicy_regs.docpipeline.source import (
     build_source_artifact,
     profile_for_table,
 )
-from spicy_regs.enrichment.reference_runtime import (
+from spicy_regs.enrichment import ManagedReleaseCandidateSource
+from refspec import (
     ConceptLabel,
     ConceptRelation,
     ReferenceRuntimeStore,
@@ -231,7 +233,7 @@ def normalized_vocabulary(tmp_path: Path) -> Path:
         ),
     )
     members = list(concepts.values())
-    ReferenceRuntimeStore(directory).write_vocabulary_rows(
+    ReferenceRuntimeStore(directory).write_migration_vocabulary_rows(
         labels=labels,
         relations=relations,
         participants=(),
@@ -313,7 +315,7 @@ def _settings(
         rulespec_version=rulespec_version,
         rulespec_constraint_digest=rulespec_constraint_digest,
         rulespec_source_revision=rulespec_source_revision,
-        vocabulary_directory=normalized_vocabulary,
+        migration_vocabulary_directory=normalized_vocabulary,
         vocabulary_default_language="en",
         asserted_at="2026-07-28T00:00:00Z",
         prompt_concept_limit=4,
@@ -842,6 +844,84 @@ def _project_with_model(
     )
 
 
+def _managed_release_candidate_source(
+    root: Path,
+) -> ManagedReleaseCandidateSource:
+    support = runpy.run_path(
+        str(
+            Path(__file__).resolve().parents[1]
+            / "RefSpec"
+            / "tests"
+            / "test_managed_release_view.py"
+        )
+    )
+    builder = cast(Callable[[Path], Path], support["build_bundle"])
+    manifest_path = builder(root)
+    manifest_digest = (
+        "sha256:" + hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    )
+    return ManagedReleaseCandidateSource.open(
+        manifest_path,
+        expected_manifest_digest=manifest_digest,
+        lookup_index_manifest={
+            "id": "urn:test:lookup-index:managed-release:v1",
+            "digest": "sha256:" + "c" * 64,
+        },
+    )
+
+
+def test_managed_release_drives_the_real_model_path_without_output_authority(
+    corpus: Path,
+    tables: Path,
+    tmp_path: Path,
+) -> None:
+    source = _managed_release_candidate_source(
+        tmp_path / "managed-release"
+    )
+    member_iri = "urn:rkaf:fixture:concept:income"
+    model = FakeModel(
+        lambda payload: [
+            tag
+            for tag in [
+                _tag(
+                    payload,
+                    quote="poultry slaughter inspection",
+                    concept_id=member_iri,
+                )
+            ]
+            if tag
+        ]
+    )
+
+    result = project_document(
+        "federal-register-document-v1",
+        "2026-00001",
+        settings=_settings(corpus, tables),
+        model=model,
+        model_run_directory=tmp_path / "managed-model-run",
+        managed_release_source=source,
+    )
+
+    assignment = next(
+        node
+        for node in result.document["@graph"]
+        if node.get("@type") == "rkaf:ConceptAssignment"
+    )
+    assert assignment["rkaf:assertsObject"] == member_iri
+    assert assignment["rkaf:assignedConceptRelease"] == (
+        "urn:rkaf:fixture:release:digest-vector"
+    )
+    assert assignment["rkaf:usageEligibility"] == "rkaf:reviewQueueOnly"
+    assert source.usage_ceiling == "candidateUseOnly"
+    assert (
+        result.run_record["refspec_authorization"][
+            "accepted_output_authorized"
+        ]
+        is False
+    )
+    assert len(model.calls) == 1
+
+
 def test_a_verified_judgment_becomes_a_concept_assignment(
     corpus: Path,
     tables: Path,
@@ -911,7 +991,9 @@ def test_retired_inline_concept_status_cannot_enter_the_projection(
     )
 
     with pytest.raises(ProjectionError, match="conceptStatus is retired"):
-        load_normalized_vocabulary(normalized_vocabulary)
+        load_migration_normalized_vocabulary_directory(
+            normalized_vocabulary
+        )
 
 
 def test_all_three_normalized_vocabulary_tables_are_required(
@@ -923,7 +1005,9 @@ def test_all_three_normalized_vocabulary_tables_are_required(
         ProjectionError,
         match="normalized vocabulary input is incomplete",
     ):
-        load_normalized_vocabulary(normalized_vocabulary)
+        load_migration_normalized_vocabulary_directory(
+            normalized_vocabulary
+        )
 
 
 def test_the_model_attests_production_and_never_approval(

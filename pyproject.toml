@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Regulations Data Analysis Tools"
 requires-python = ">=3.10"
 dependencies = [
+    "refspec==0.1.0.dev0",
     "beautifulsoup4>=4.13,<5",
     "boto3",
     "python-dotenv",
@@ -123,6 +124,9 @@ validate-relation-exclusion-v2 = "spicy_regs.corpora.relation_exclusion_evaluati
 [build-system]
 requires = ["uv_build<0.12"]
 build-backend = "uv_build"
+
+[tool.uv.sources]
+refspec = { path = "RefSpec", editable = true }
 
 [tool.pytest.ini_options]
 # Integration tests hit external services (the public Mirrulations S3 mirror)

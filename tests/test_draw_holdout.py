@@ -18,7 +18,7 @@ import pytest
 
 from spicy_regs.docpipeline.segments import SegmentSettings
 from spicy_regs.docpipeline.source import SourceRecord, profile_for_table
-from spicy_regs.enrichment.reference_runtime import VocabularyUniverseFreeze
+from refspec import VocabularyUniverseFreeze
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DRAW_PATH = REPO_ROOT / "tools" / "draw_holdout.py"
