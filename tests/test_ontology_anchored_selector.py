@@ -112,6 +112,20 @@ def test_short_aliases_are_suppressed():
     assert "concept_three" in matched
 
 
+def test_unicode_labels_remain_reachable_instead_of_normalizing_to_empty():
+    registry = [
+        concept("concept_water_zh", "水政策"),
+        concept("concept_poultry", "Poultry inspection"),
+    ]
+
+    assert ontology_concepts.normalize_label("水政策") == "水政策"
+    selected = select_candidate_concepts_anchored_v2(
+        "本规则涉及水政策。",
+        registry,
+    )
+    assert selected[0]["concept_id"] == "concept_water_zh"
+
+
 def test_generic_alias_below_the_idf_floor_cannot_anchor():
     """An alias made only of vocabulary-generic tokens is not evidence."""
     filler = [concept(f"concept_fill_{index:02d}", f"Program administration {index}") for index in range(40)]

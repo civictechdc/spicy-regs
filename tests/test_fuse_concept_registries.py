@@ -256,8 +256,8 @@ def test_fast_reads_a_zip_the_way_it_is_distributed(tool, tmp_path):
 
 
 def test_degenerate_aliases_are_dropped_but_real_short_tokens_survive(tool):
-    # ``Ḥūr`` normalizes to ``r``, which is a substring of nearly every text.
-    assert not tool.retain_alt_label("Ḥūr")
+    # Unicode-aware normalization preserves the authored three-letter label.
+    assert tool.retain_alt_label("Ḥūr")
     assert not tool.retain_alt_label("TV")
     assert not tool.retain_alt_label("...")
     # Multi-word aliases keep their one-character tokens: these are real labels.
@@ -272,10 +272,11 @@ def test_dropped_aliases_are_counted_not_silently_discarded(tool):
             '<http://id.worldcat.org/fast/9> <http://www.w3.org/2004/02/skos/core#prefLabel> "Houris" .',
             '<http://id.worldcat.org/fast/9> <http://www.w3.org/2004/02/skos/core#altLabel> "\\u1e24\\u016br" .',
             '<http://id.worldcat.org/fast/9> <http://www.w3.org/2004/02/skos/core#altLabel> "Huris" .',
+            '<http://id.worldcat.org/fast/9> <http://www.w3.org/2004/02/skos/core#altLabel> "TV" .',
         ]
     )
-    assert terms[0].alt_labels == ["Huris"]
-    assert terms[0].dropped_alt_labels == ["Ḥūr"]
+    assert terms[0].alt_labels == ["Huris", "Ḥūr"]
+    assert terms[0].dropped_alt_labels == ["TV"]
 
 
 # --------------------------------------------------------------------------
@@ -406,7 +407,7 @@ def test_a_rewritten_frozen_row_is_rejected(tool):
         tool.assert_frozen_rows_survive(existing, [])
 
 
-def test_fused_rows_carry_the_selector_schema_and_hold_the_graph_invariants(tool, context):
+def test_migration_rows_carry_the_legacy_selector_schema_and_graph_invariants(tool, context):
     registry, sidecar, _, _ = tool.fuse(
         existing=[_frozen_row("Accounting")],
         contributions=[
@@ -420,7 +421,7 @@ def test_fused_rows_carry_the_selector_schema_and_hold_the_graph_invariants(tool
         retrieved_at={},
     )
     for row in registry:
-        assert set(row) == set(CONCEPT_COLUMNS), "the selector's schema admits no extra column"
+        assert set(row) == set(CONCEPT_COLUMNS), "the legacy selector schema admits no extra column"
         assert row["status"] in {"active", "candidate"}
     # ``broader_id``/``replaced_by`` must resolve inside the table; leaving them
     # null is what keeps that true for an imported vocabulary.
@@ -430,7 +431,7 @@ def test_fused_rows_carry_the_selector_schema_and_hold_the_graph_invariants(tool
         assert row["concept_id"] and row["license"]
 
 
-def test_the_production_selector_reads_the_fused_registry(tool, context):
+def test_the_legacy_selector_can_read_migration_rows(tool, context):
     registry, _, _, _ = tool.fuse(
         existing=[_frozen_row("Accounting")],
         contributions=[
@@ -451,8 +452,20 @@ def test_the_production_selector_reads_the_fused_registry(tool, context):
     assert all(concept_aliases(row) for row in selected)
 
 
-def test_end_to_end_writes_a_registry_a_sidecar_and_a_manifest(tool, tmp_path):
-    """One run over synthetic inputs, exercising the command line itself."""
+def test_flat_fusion_cli_requires_explicit_migration_acknowledgment(tool):
+    with pytest.raises(SystemExit):
+        tool.main(
+            [
+                "--existing-legacy-registry",
+                "legacy.parquet",
+                "--output-dir",
+                "unused",
+            ]
+        )
+
+
+def test_end_to_end_writes_a_migration_registry_sidecar_and_manifest(tool, tmp_path):
+    """One acknowledged migration run over synthetic inputs."""
     existing_path = tmp_path / "existing.parquet"
     from spicy_regs.ontology.common import write_parquet_rows
 
@@ -472,7 +485,8 @@ def test_end_to_end_writes_a_registry_a_sidecar_and_a_manifest(tool, tmp_path):
     assert (
         tool.main(
             [
-                "--existing-registry",
+                "--migration-only",
+                "--existing-legacy-registry",
                 str(existing_path),
                 "--fr-thesaurus",
                 str(fr_path),
@@ -493,9 +507,12 @@ def test_end_to_end_writes_a_registry_a_sidecar_and_a_manifest(tool, tmp_path):
         == 0
     )
 
-    registry = read_parquet_rows(out / "registry.parquet")
+    registry = read_parquet_rows(out / "legacy-registry-migration.parquet")
     sidecar = read_parquet_rows(out / "provenance.parquet")
     manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["operational_state"] == "migrationOnly"
+    assert manifest["production_eligible"] is False
+    assert manifest["authority"] == "legacyFusedRegistry"
 
     # The two frozen rows are still there, unchanged, and "Safety" was enriched
     # by the thesaurus rather than duplicated.
@@ -545,7 +562,17 @@ def test_a_source_left_off_the_command_line_is_reported_not_guessed(tool, tmp_pa
     fr_path.write_text(FR_FIXTURE, encoding="utf-8")
     out = tmp_path / "out"
     assert (
-        tool.main(["--existing-registry", str(existing_path), "--fr-thesaurus", str(fr_path), "--output-dir", str(out)])
+        tool.main(
+            [
+                "--migration-only",
+                "--existing-legacy-registry",
+                str(existing_path),
+                "--fr-thesaurus",
+                str(fr_path),
+                "--output-dir",
+                str(out),
+            ]
+        )
         == 0
     )
     manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))

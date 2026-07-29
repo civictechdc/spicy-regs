@@ -1,4 +1,10 @@
-"""Fuse public controlled vocabularies without confusing source with facet.
+"""Migration-only reader for the historical flat fused vocabulary artifact.
+
+This tool preserves reusable source parsers and can reconstruct the old flat
+rows for migration analysis. Its output is explicitly non-conforming and is
+not production authority. Production consumers use ``concept_labels``,
+``concept_relations``, and ``concept_event_participants`` through the RefSpec
+reference runtime.
 
 Every registry row carries a semantic ``facet`` used by tag policy and a
 ``source_vocabulary`` used for identity, provenance, shortlist quotas, and
@@ -69,7 +75,7 @@ from spicy_regs.ontology.concept_dimensions import (  # noqa: E402
 )
 from spicy_regs.ontology.concepts import CONCEPT_COLUMNS, normalize_label  # noqa: E402
 
-SCHEMA_VERSION = "fused-concept-registry-v2"
+SCHEMA_VERSION = "legacy-fused-concept-registry-migration-v2"
 
 # Source vocabularies. ``FR_SCHEME`` remains as a test/import compatibility
 # alias; new code uses the explicit name.
@@ -235,14 +241,10 @@ def _clean(value: object) -> str:
 def retain_alt_label(alt: str) -> bool:
     """Reject an alias that would match nearly every document as a substring.
 
-    ``normalize_label`` keeps only ASCII ``[a-z0-9]``, so a transliterated alias
-    such as ``Ḥūr`` or ``Bīṇā`` collapses to ``r`` or ``b``. The consuming
-    selector scores an alias that is a *substring* of the text at 1.0, and a
-    one-letter alias is a substring of essentially every document -- so those
-    handful of concepts would take a permanent share of every candidate list
-    while carrying no information. Genuine short aliases (``TV``, ``Ox``) are
-    lost with them; that is the cheaper error, and the raw files named in the
-    manifest still hold them.
+    ``normalize_label`` preserves Unicode scripts and diacritics, so authored
+    labels such as ``Ḥūr`` and ``Bīṇā`` remain usable expressions. Truly empty
+    or two-character aliases still carry too little evidence for the consuming
+    substring channel and are retained only in the source distribution.
 
     Only whole-alias degeneracy is rejected. A multi-word alias keeps its short
     tokens, because ``Hansen's disease`` and ``4-H clubs`` are real labels that
@@ -1137,7 +1139,17 @@ def _load_sources(args: argparse.Namespace) -> tuple[list[tuple[SourceSpec, list
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--existing-registry", required=True, help="frozen registry parquet copied through unchanged")
+    parser.add_argument(
+        "--migration-only",
+        required=True,
+        action="store_true",
+        help="Acknowledge that every emitted flat row is migration-only.",
+    )
+    parser.add_argument(
+        "--existing-legacy-registry",
+        required=True,
+        help="Historical flat registry parquet copied through unchanged.",
+    )
     parser.add_argument("--fr-thesaurus", help="thesaurus-alpha.txt")
     parser.add_argument("--billstatus", nargs="*", help="BILLSTATUS zip files or directories of bill XML")
     parser.add_argument("--tsca-csv", help="TSCAINV csv, or the zip carrying it")
@@ -1151,9 +1163,12 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     retrieved = args.retrieved_at or iso_now()
-    context = RunContext.resolve(run_id=args.run_id, prefix="fused-registry")
+    context = RunContext.resolve(
+        run_id=args.run_id,
+        prefix="legacy-fused-registry-migration",
+    )
 
-    existing_path = Path(args.existing_registry)
+    existing_path = Path(args.existing_legacy_registry)
     existing = read_parquet_rows(existing_path)
     if not existing:
         raise FusionError(f"{existing_path} carries no rows")
@@ -1171,7 +1186,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    registry_path = output_dir / "registry.parquet"
+    registry_path = output_dir / "legacy-registry-migration.parquet"
     sidecar_path = output_dir / "provenance.parquet"
     mappings_path = output_dir / "presentation-mappings.parquet"
     write_parquet_rows(registry_path, columns=CONCEPT_COLUMNS, rows=registry)
@@ -1206,11 +1221,18 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     manifest = {
         "schema_version": SCHEMA_VERSION,
+        "operational_state": "migrationOnly",
+        "production_eligible": False,
+        "authority": "legacyFusedRegistry",
+        "warning": (
+            "Flat fused rows are migration-only and cannot authorize "
+            "conforming or production output."
+        ),
         "run_id": context.run_id,
         "asserted_at": context.asserted_at,
         "retrieved_at": retrieved,
-        "registry_path": str(registry_path),
-        "registry_sha256": sha256_path(registry_path),
+        "legacy_registry_path": str(registry_path),
+        "legacy_registry_sha256": sha256_path(registry_path),
         "provenance_path": str(sidecar_path),
         "provenance_sha256": sha256_path(sidecar_path),
         "presentation_mappings_path": str(mappings_path),
@@ -1259,7 +1281,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     manifest_path = output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
-    print(f"fused registry: {registry_path}")
+    print(f"legacy migration registry: {registry_path}")
     print(f"total rows: {len(registry):,}")
     for vocabulary, count in sorted(per_vocabulary.items()):
         print(f"  {vocabulary:<30} {count:>9,}")

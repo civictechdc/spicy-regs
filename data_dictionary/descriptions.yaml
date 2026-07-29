@@ -428,21 +428,23 @@ tables:
 
   concepts:
     summary: >-
-      SKOS-style retrieval concept registry. The v1 `subject` facet is seeded
-      from Federal Register Thesaurus terms; `regulated_entity` starts empty and
-      grows through extraction. Concepts are never hard-deleted or renamed in
-      place.
+      Legacy development and migration-only flat retrieval view. The v1
+      `subject` facet is seeded from Federal Register Thesaurus terms;
+      `regulated_entity` starts empty and grows through extraction. This table
+      cannot authorize conforming REF or Rulespec output. Production vocabulary
+      projection uses `concept_labels`, `concept_relations`,
+      `concept_event_participants`, and an authoritative JSON-LD manifest.
     columns:
-      concept_id: "Stable opaque concept id. Primary key."
-      facet: "Semantic tag-policy facet: `subject` or `regulated_entity`."
-      source_vocabulary: "Authority vocabulary used for concept identity, provenance, quotas, and Rulespec `inScheme`."
+      concept_id: "Stable legacy local id. Primary key; not an authority-issued concept IRI."
+      facet: "Legacy tag-policy facet: `subject` or `regulated_entity`."
+      source_vocabulary: "Recorded source-vocabulary key for migration and provenance; not production authority."
       scheme: "Deprecated compatibility mirror of `facet`; new rows must keep the two values equal."
-      pref_label: "Preferred human-readable label."
-      alt_labels_json: "JSON array of synonyms and labels absorbed by merges."
-      definition: "One-sentence scope note."
-      broader_id: "Parent concept id for the subject hierarchy; graph must remain acyclic."
+      pref_label: "Language-flattened legacy display label; migrate through `concept_labels` before conforming use."
+      alt_labels_json: "Legacy JSON array of language-flattened synonyms and labels absorbed by merges."
+      definition: "Language-flattened legacy scope note."
+      broader_id: "Legacy single-parent pointer; migrate each source relation to `concept_relations`."
       status: "`active`, `candidate`, or `deprecated`."
-      replaced_by: "Replacement concept id after a merge; chain is acyclic and resolvable."
+      replaced_by: "Legacy replacement pointer; reconstruct an exact release-qualified lifecycle event before conforming use."
       external_ids_json: "JSON array of FR Thesaurus anchors, CAS numbers, NAICS codes, or `skos:exactMatch` IRIs."
       method: "`deterministic`, `llm`, `embedding`, or `human`."
       actor_id: "Model, ruleset, or human actor that last asserted registry state."
@@ -452,14 +454,16 @@ tables:
 
   concept_assignments:
     summary: >-
-      Append-only artifact-to-concept assertions. Segment proposals aggregate
-      at source-artifact grain, and validation appends a superseding assertion;
-      existing rows are never updated.
+      Legacy development-only artifact-to-flat-concept assertions. Segment
+      proposals aggregate at source-artifact grain, and validation appends a
+      superseding assertion; existing rows are never updated. These rows must
+      migrate to exact Rulespec concept and release references before they can
+      enter conforming output.
     columns:
       assignment_id: "Stable assertion id. Primary key."
       subject_type: "Source-artifact family, such as `docket`, `document`, `comment`, `cfr_section`, or `gao_report`."
       subject_id: "Source-scoped artifact identifier for the declared subject type."
-      concept_id: "Assigned concept; deprecated ids resolve through `concepts.replaced_by`."
+      concept_id: "Legacy assigned concept id; `concepts.replaced_by` is migration input, not resolution or publication authority."
       confidence: "Assertion confidence from 0 through 1, stored as VARCHAR."
       evidence_json: "Exact artifact-field offsets, quoted source text, deterministic alignment method, artifact digest, element and segment provenance, justifications, and optional per-span validation."
       method: "`llm`, `embedding`, `human`, or deterministic method."
@@ -470,12 +474,14 @@ tables:
 
   concept_events:
     summary: >-
-      Append-only audit trail of structural concept changes and the tagging
-      loop's memory. It supports undo/reconstruction without hard deletion.
+      Legacy development and migration-only audit trail of flat concept
+      changes and the tagging loop's memory. A conforming migration reconstructs
+      exact predecessor and successor rows in `concept_event_participants` and
+      release-qualified Rulespec lifecycle events.
     columns:
       event_id: "Stable event id. Primary key."
       event_type: "`seed`, `merge`, `split`, `rename`, `deprecate`, or `promote`."
-      payload_json: "Canonical JSON before/after payload with affected ids, labels, scores, and rationale."
+      payload_json: "Legacy before/after payload used only to reconstruct normalized lifecycle participants and evidence."
       method: "Method responsible for the event."
       actor_id: "Model, ruleset, or human actor responsible for the event."
       run_id: "Pipeline run identifier."

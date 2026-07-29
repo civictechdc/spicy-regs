@@ -2,7 +2,7 @@
 
 # `concept_events`
 
-Append-only audit trail of structural concept changes and the tagging loop's memory. It supports undo/reconstruction without hard deletion.
+Legacy development and migration-only audit trail of flat concept changes and the tagging loop's memory. A conforming migration reconstructs exact predecessor and successor rows in `concept_event_participants` and release-qualified Rulespec lifecycle events.
 
 - **Parquet file:** `materialized/ontology/latest.json` (atomic snapshot manifest)
 - **Supported by MCP `query_sql` after first publication:** Yes
@@ -11,7 +11,7 @@ Append-only audit trail of structural concept changes and the tagging loop's mem
 | --- | --- | --- |
 | `event_id` | `VARCHAR` | Stable event id. Primary key. |
 | `event_type` | `VARCHAR` | `seed`, `merge`, `split`, `rename`, `deprecate`, or `promote`. |
-| `payload_json` | `VARCHAR` | Canonical JSON before/after payload with affected ids, labels, scores, and rationale. |
+| `payload_json` | `VARCHAR` | Legacy before/after payload used only to reconstruct normalized lifecycle participants and evidence. |
 | `method` | `VARCHAR` | Method responsible for the event. |
 | `actor_id` | `VARCHAR` | Model, ruleset, or human actor responsible for the event. |
 | `run_id` | `VARCHAR` | Pipeline run identifier. |

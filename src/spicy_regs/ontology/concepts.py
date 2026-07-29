@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import math
-import re
+import unicodedata
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -90,8 +90,20 @@ CANDIDATE_REGISTRY_MAX_TOKENS = 2_400
 
 
 def normalize_label(label: object) -> str:
-    text = str(label or "").casefold()
-    return " ".join(re.findall(r"[a-z0-9]+", text))
+    """Normalize lookup text without erasing non-ASCII scripts.
+
+    NFKC folds compatibility forms, ``casefold`` supplies Unicode-aware case
+    handling, and non-alphanumeric code points become token boundaries. This
+    retains labels such as ``水政策`` and ``zh-Hant`` authored text instead of
+    collapsing them to the empty string.
+    """
+    text = unicodedata.normalize("NFKC", str(label or "")).casefold()
+    return " ".join(
+        "".join(
+            character if character.isalnum() else " "
+            for character in text
+        ).split()
+    )
 
 
 def _topic_parts(topic: object) -> tuple[str | None, str | None]:

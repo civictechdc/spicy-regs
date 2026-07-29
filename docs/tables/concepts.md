@@ -2,23 +2,23 @@
 
 # `concepts`
 
-SKOS-style retrieval concept registry. The v1 `subject` facet is seeded from Federal Register Thesaurus terms; `regulated_entity` starts empty and grows through extraction. Concepts are never hard-deleted or renamed in place.
+Legacy development and migration-only flat retrieval view. The v1 `subject` facet is seeded from Federal Register Thesaurus terms; `regulated_entity` starts empty and grows through extraction. This table cannot authorize conforming REF or Rulespec output. Production vocabulary projection uses `concept_labels`, `concept_relations`, `concept_event_participants`, and an authoritative JSON-LD manifest.
 
 - **Parquet file:** `materialized/ontology/latest.json` (atomic snapshot manifest)
 - **Supported by MCP `query_sql` after first publication:** Yes
 
 | Column | Type | Description |
 | --- | --- | --- |
-| `concept_id` | `VARCHAR` | Stable opaque concept id. Primary key. |
-| `facet` | `VARCHAR` | Semantic tag-policy facet: `subject` or `regulated_entity`. |
-| `source_vocabulary` | `VARCHAR` | Authority vocabulary used for concept identity, provenance, quotas, and Rulespec `inScheme`. |
+| `concept_id` | `VARCHAR` | Stable legacy local id. Primary key; not an authority-issued concept IRI. |
+| `facet` | `VARCHAR` | Legacy tag-policy facet: `subject` or `regulated_entity`. |
+| `source_vocabulary` | `VARCHAR` | Recorded source-vocabulary key for migration and provenance; not production authority. |
 | `scheme` | `VARCHAR` | Deprecated compatibility mirror of `facet`; new rows must keep the two values equal. |
-| `pref_label` | `VARCHAR` | Preferred human-readable label. |
-| `alt_labels_json` | `VARCHAR` | JSON array of synonyms and labels absorbed by merges. |
-| `definition` | `VARCHAR` | One-sentence scope note. |
-| `broader_id` | `VARCHAR` | Parent concept id for the subject hierarchy; graph must remain acyclic. |
+| `pref_label` | `VARCHAR` | Language-flattened legacy display label; migrate through `concept_labels` before conforming use. |
+| `alt_labels_json` | `VARCHAR` | Legacy JSON array of language-flattened synonyms and labels absorbed by merges. |
+| `definition` | `VARCHAR` | Language-flattened legacy scope note. |
+| `broader_id` | `VARCHAR` | Legacy single-parent pointer; migrate each source relation to `concept_relations`. |
 | `status` | `VARCHAR` | `active`, `candidate`, or `deprecated`. |
-| `replaced_by` | `VARCHAR` | Replacement concept id after a merge; chain is acyclic and resolvable. |
+| `replaced_by` | `VARCHAR` | Legacy replacement pointer; reconstruct an exact release-qualified lifecycle event before conforming use. |
 | `external_ids_json` | `VARCHAR` | JSON array of FR Thesaurus anchors, CAS numbers, NAICS codes, or `skos:exactMatch` IRIs. |
 | `method` | `VARCHAR` | `deterministic`, `llm`, `embedding`, or `human`. |
 | `actor_id` | `VARCHAR` | Model, ruleset, or human actor that last asserted registry state. |

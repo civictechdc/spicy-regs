@@ -2,7 +2,7 @@
 
 # `concept_assignments`
 
-Append-only artifact-to-concept assertions. Segment proposals aggregate at source-artifact grain, and validation appends a superseding assertion; existing rows are never updated.
+Legacy development-only artifact-to-flat-concept assertions. Segment proposals aggregate at source-artifact grain, and validation appends a superseding assertion; existing rows are never updated. These rows must migrate to exact Rulespec concept and release references before they can enter conforming output.
 
 - **Parquet file:** `materialized/ontology/latest.json` (atomic snapshot manifest)
 - **Supported by MCP `query_sql` after first publication:** Yes
@@ -12,7 +12,7 @@ Append-only artifact-to-concept assertions. Segment proposals aggregate at sourc
 | `assignment_id` | `VARCHAR` | Stable assertion id. Primary key. |
 | `subject_type` | `VARCHAR` | Source-artifact family, such as `docket`, `document`, `comment`, `cfr_section`, or `gao_report`. |
 | `subject_id` | `VARCHAR` | Source-scoped artifact identifier for the declared subject type. |
-| `concept_id` | `VARCHAR` | Assigned concept; deprecated ids resolve through `concepts.replaced_by`. |
+| `concept_id` | `VARCHAR` | Legacy assigned concept id; `concepts.replaced_by` is migration input, not resolution or publication authority. |
 | `confidence` | `VARCHAR` | Assertion confidence from 0 through 1, stored as VARCHAR. |
 | `evidence_json` | `VARCHAR` | Exact artifact-field offsets, quoted source text, deterministic alignment method, artifact digest, element and segment provenance, justifications, and optional per-span validation. |
 | `method` | `VARCHAR` | `llm`, `embedding`, `human`, or deterministic method. |
