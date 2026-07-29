@@ -26,7 +26,7 @@ the request and the response for every provider call. This module adds no second
 prompt, no second schema, and no second matcher. It consumes accepted candidate
 rows, re-verifies their offsets against the stored text one more time, and turns
 the survivors into ``rkaf:ConceptAssignment`` nodes. A model-supplied value that
-cannot be verified against source text or against a registry row is dropped with
+cannot be verified against source text or a normalized vocabulary row is dropped with
 a recorded reason; it is never repaired.
 
 Text-state convention (load-bearing, and the one place this projection has to
@@ -41,6 +41,7 @@ silently re-based, and the count of such refusals is reported.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections.abc import Callable, Mapping, Sequence
@@ -74,13 +75,11 @@ from spicy_regs.ontology.llm import resolve_exact_evidence_offsets
 # --------------------------------------------------------------------------- #
 # Contract configuration.
 #
-# Six contract findings from the hand-authored projection's G1-G6 list have
-# LANDED in the rulespec repo. This module validates against branch
-# ``us-regulatory-identifiers`` @ ``062fa79``, contract digest
-# ``sha256:7d45dcd2…`` — the revision spicy-regs pins as of ``8d08882``. Every
-# one of the six was a VALUE or a SWITCH below rather than a code path, so the
-# re-pin was a constant edit and a re-run, not a rewrite. Each constant names its
-# finding and the rulespec commit that answered it.
+# Six historical contract findings from the hand-authored projection's G1-G6
+# list landed in Rulespec. Every one was a value or switch below rather than a
+# separate code path. The projection no longer hard-codes the historical
+# revision that introduced them: every run must receive and record the exact
+# Rulespec version and constraint digest it actually uses.
 #
 #   G1  921d1ff  prov:wasDerivedFrom class range stated in §2.4
 #                -> already satisfied: every cited row is a typed prov:Entity.
@@ -172,10 +171,14 @@ DETERMINISTIC_USAGE_ELIGIBILITY = "rkaf:localOperationalUse"
 
 PROJECTION_SCHEMA_VERSION = "rkaf-document-projection-v1"
 
-#: The rulespec revision these constants are set for, recorded in every run
-#: record so an emitted document says which contract it was built against.
-CONTRACT_REVISION = "us-regulatory-identifiers@062fa79"
-CONTRACT_DIGEST = "sha256:7d45dcd2f5ff6391b185fd98099740b34d3b6cac8ed66c99196e6ac368806553"
+#: This path emits diagnostic candidates for review. It does not accept the
+#: RefSpec authorization records needed to publish accepted enrichment output.
+REFSPEC_AUTHORIZATION_STATE = "notEvaluated"
+REFSPEC_OUTPUT_MODE = "diagnosticReviewQueue"
+
+_RULESPEC_VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$")
+_RULESPEC_REVISION_PATTERN = re.compile(r"^[0-9a-f]{40}$")
+_CONSTRAINT_DIGEST_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 #: The carrier-local fragment URN grammar, Core §4.2. Copied from the compiled
 #: pattern so a test can prove the minted form satisfies it without a validator.
@@ -980,8 +983,14 @@ class ConceptJudgment:
     """One accepted concept assignment, with its verified evidence region."""
 
     concept_id: str
+    concept_iri: str
     concept_label: str
-    definition: str
+    preferred_labels: Mapping[str, str]
+    alternate_labels: Mapping[str, str | tuple[str, ...]]
+    hidden_labels: Mapping[str, str | tuple[str, ...]]
+    definitions: Mapping[str, str | tuple[str, ...]]
+    scheme_iri: str
+    release_iri: str
     facet: str
     role: str
     confidence: float
@@ -1002,7 +1011,10 @@ class ModelLayer:
     run_directory: str
     receipt_sha256: str
     selector_version: str
-    registry_sha256: str
+    vocabulary_sha256: str
+    vocabulary_default_language: str
+    vocabulary_nodes: tuple[Mapping[str, Any], ...]
+    vocabulary_concepts: Mapping[str, "VocabularyConcept"]
     candidate_concept_count: int
     judgments: tuple[ConceptJudgment, ...]
     rejections: tuple[Mapping[str, Any], ...]
@@ -1010,6 +1022,37 @@ class ModelLayer:
     segment_count: int = 0
     segments_projected: int = 0
     temperature: float = 0.0
+
+
+@dataclass(frozen=True)
+class VocabularyConcept:
+    """One production concept resolved through normalized authored records."""
+
+    concept_iri: str
+    scheme_iri: str
+    release_iri: str
+    facet: str
+    preferred_labels: Mapping[str, str]
+    alternate_labels: Mapping[str, str | tuple[str, ...]]
+    hidden_labels: Mapping[str, str | tuple[str, ...]]
+    definitions: Mapping[str, str | tuple[str, ...]]
+
+    def display_label(self, default_language: str) -> str:
+        preferred = self.preferred_labels
+        if default_language in preferred:
+            return preferred[default_language]
+        return preferred[sorted(preferred)[0]]
+
+
+@dataclass(frozen=True)
+class NormalizedVocabulary:
+    """Validated normalized tables plus their authoritative JSON-LD manifest."""
+
+    selector_rows: tuple[dict[str, Any], ...]
+    concepts: Mapping[str, VocabularyConcept]
+    manifest_nodes: tuple[Mapping[str, Any], ...]
+    content_sha256: str
+    default_language: str
 
 
 ASSIGNMENT_ROLE_IRIS: dict[str, str] = {
@@ -1026,6 +1069,7 @@ def verify_candidate_rows(
     *,
     artifact_iri: str,
     evidence_field: str,
+    vocabulary_concepts: Mapping[str, VocabularyConcept] | None = None,
 ) -> tuple[list[ConceptJudgment], list[dict[str, Any]]]:
     """Re-verify accepted tag candidates and turn survivors into judgments.
 
@@ -1048,9 +1092,14 @@ def verify_candidate_rows(
         }
         if not concept_id:
             # The tag task admits a novel concept the model proposes. A novel
-            # concept has no registry row, and this projection never mints
+            # concept has no normalized vocabulary row, and this projection never mints
             # identity, so it is refused here rather than registered.
-            rejections.append({**base, "reason": "model_proposed_concept_not_in_registry"})
+            rejections.append(
+                {
+                    **base,
+                    "reason": "model_proposed_concept_not_in_normalized_vocabulary",
+                }
+            )
             continue
         if _clean(row.get("source_field")) != evidence_field:
             rejections.append({**base, "reason": "evidence_outside_projected_text_state"})
@@ -1076,12 +1125,52 @@ def verify_candidate_rows(
         except OffsetVerificationError as error:
             rejections.append({**base, "reason": "offset_verification_failed", "detail": str(error)})
             continue
+        vocabulary_concept = vocabulary_concepts.get(concept_id) if vocabulary_concepts is not None else None
+        if vocabulary_concepts is not None and vocabulary_concept is None:
+            rejections.append(
+                {
+                    **base,
+                    "reason": "normalized_vocabulary_concept_not_resolved",
+                }
+            )
+            continue
+        if vocabulary_concept is None:
+            # Compatibility for callers that use this verification helper in
+            # isolation. The production model path always supplies normalized
+            # vocabulary metadata and never enters this branch.
+            facet = _clean(row.get("facet")) or _clean(row.get("scheme"))
+            concept_iri = concept_id
+            scheme_iri = f"urn:spicy-regs:unresolved-scheme:{facet}"
+            release_iri = "urn:spicy-regs:unresolved-release"
+            label = _clean(row.get("concept_label"))
+            preferred_labels: Mapping[str, str] = {"und": label}
+            definitions: Mapping[str, str | tuple[str, ...]] = (
+                {"und": _clean(row.get("definition"))} if _clean(row.get("definition")) else {}
+            )
+            alternate_labels: Mapping[str, str | tuple[str, ...]] = {}
+            hidden_labels: Mapping[str, str | tuple[str, ...]] = {}
+        else:
+            facet = vocabulary_concept.facet
+            concept_iri = vocabulary_concept.concept_iri
+            scheme_iri = vocabulary_concept.scheme_iri
+            release_iri = vocabulary_concept.release_iri
+            label = vocabulary_concept.display_label("en")
+            preferred_labels = vocabulary_concept.preferred_labels
+            alternate_labels = vocabulary_concept.alternate_labels
+            hidden_labels = vocabulary_concept.hidden_labels
+            definitions = vocabulary_concept.definitions
         judgments.append(
             ConceptJudgment(
                 concept_id=concept_id,
-                concept_label=_clean(row.get("concept_label")),
-                definition=_clean(row.get("definition")),
-                facet=_clean(row.get("facet")) or _clean(row.get("scheme")),
+                concept_iri=concept_iri,
+                concept_label=label,
+                preferred_labels=preferred_labels,
+                alternate_labels=alternate_labels,
+                hidden_labels=hidden_labels,
+                definitions=definitions,
+                scheme_iri=scheme_iri,
+                release_iri=release_iri,
+                facet=facet,
                 role=role,
                 confidence=float(row.get("confidence") or 0.0),
                 fragment=fragment,
@@ -1117,18 +1206,35 @@ class ProjectionSettings:
 
     corpus_dir: Path
     tables_dir: Path
+    rulespec_version: str
+    rulespec_constraint_digest: str
+    rulespec_source_revision: str | None = None
     partner: str = "urn:rkaf:partner:spicy-regs"
     scope: str = "document-rkaf-projection"
     context_ref: str = "./rkaf-context.jsonld"
     asserted_at: str | None = None
     attestor_id: str = ""
-    registry_path: Path | None = None
+    vocabulary_directory: Path | None = None
+    vocabulary_manifest_path: Path | None = None
+    vocabulary_default_language: str = "en"
     prompt_concept_limit: int = 12
     max_segments: int = 0
     """Cap on the segments sent to the model; ``0`` means every segment. A cap
     bounds provider spend on a long document, and it changes what the emitted
     document can claim, so both the cap and the segment count are recorded."""
     extra_notes: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not _RULESPEC_VERSION_PATTERN.fullmatch(self.rulespec_version):
+            raise ProjectionError("rulespec_version must be an exact semantic version")
+        if not _CONSTRAINT_DIGEST_PATTERN.fullmatch(self.rulespec_constraint_digest):
+            raise ProjectionError("rulespec_constraint_digest must be sha256:<64 lowercase hex>")
+        if self.rulespec_source_revision is not None and not _RULESPEC_REVISION_PATTERN.fullmatch(
+            self.rulespec_source_revision
+        ):
+            raise ProjectionError(
+                "rulespec_source_revision must be a 40-character Git revision or None for a local candidate"
+            )
 
 
 def load_artifact(
@@ -1225,6 +1331,7 @@ def _fragment_node(fragment: ProjectedFragment, *, artifact_iri: str, artifact_d
         "oa:hasSource": artifact_iri,
         "oa:hasSelector": fragment.selector_iri,
         "rkaf:selectorKind": [_SELECTOR_KIND],
+        "rkaf:fragmentIdentityScheme": _EVIDENCE_SCHEME,
         "rkaf:fragmentContentDigest": f"sha256:{fragment.text_sha256}",
         "rkaf:sourceArtifactDigest": f"sha256:{artifact_digest}",
     }
@@ -1337,6 +1444,7 @@ def assemble(
             "rkaf:assertsObject": edge.object,
             "rkaf:assertionPolarity": "rkaf:affirmed",
             "rkaf:assertionOrigin": ASSERTION_ORIGIN_DETERMINISTIC,
+            "rkaf:epistemicBasis": "rkaf:deterministicDerivation",
             "rkaf:assertedAt": edge.asserted_at or context.asserted_at,
             "rkaf:usageEligibility": DETERMINISTIC_USAGE_ELIGIBILITY,
             "prov:wasDerivedFrom": [record_iri],
@@ -1378,6 +1486,8 @@ def assemble(
                     "@type": "rkaf:EvidenceBinding",
                     "rkaf:bindsAssertion": assertion_iri,
                     "rkaf:bindsSourceFragment": [grounded.urn],
+                    "rkaf:evidenceRole": "rkaf:textualEvidence",
+                    "rkaf:evidentiaryFunction": "rkaf:supports",
                 }
             )
             if edge.claimant_identity:
@@ -1395,6 +1505,14 @@ def assemble(
                 )
         else:
             record["reason"] = "no unique verbatim restatement of this citation in the projected field"
+            graph.append(
+                {
+                    "@id": f"{partner}:binding:{edge.key}",
+                    "@type": "rkaf:EvidenceBinding",
+                    "rkaf:bindsAssertion": assertion_iri,
+                    "rkaf:noEvidenceReason": "rkaf:inferred-from-warrant-class",
+                }
+            )
         edge_records.append(record)
         graph.append(assertion)
 
@@ -1402,19 +1520,8 @@ def assemble(
     judgment_records: list[dict[str, Any]] = []
     assignment_iris: list[str] = []
     if model_layer is not None and model_layer.judgments:
-        scheme_iri = f"{partner}:scheme:{model_layer.judgments[0].facet}"
-        workspace_iri = f"{partner}:workspace:main"
         lineage_iri = f"{partner}:lineage:{settings.scope}"
-        graph.append(
-            {
-                "@id": scheme_iri,
-                "@type": "rkaf:ConceptScheme",
-                "skos:prefLabel": f"spicy-regs fused registry — {model_layer.judgments[0].facet} facet",
-                "rkaf:schemeFacet": f"{partner}:facet:{model_layer.judgments[0].facet}",
-                "rkaf:conceptStatus": "rkaf:active",
-                "rkaf:definedInScope": workspace_iri,
-            }
-        )
+        graph.extend(dict(node) for node in model_layer.vocabulary_nodes)
         graph.append(
             {
                 "@id": lineage_iri,
@@ -1442,7 +1549,8 @@ def assemble(
                         "schema_sha256": model_layer.schema_sha256,
                         "input_context_sha256": model_layer.input_context_sha256,
                         "selector_version": model_layer.selector_version,
-                        "registry_sha256": model_layer.registry_sha256,
+                        "vocabulary_sha256": model_layer.vocabulary_sha256,
+                        "vocabulary_default_language": (model_layer.vocabulary_default_language),
                     },
                     model_ref=f"{partner}:model:{model_layer.model_id}",
                     prompt_ref=f"{partner}:prompt:concept-tags-v1:{model_layer.instructions_sha256[:16]}",
@@ -1450,41 +1558,26 @@ def assemble(
                 partner=partner,
             )
         )
-        seen_concepts: set[str] = set()
         for judgment in model_layer.judgments:
-            concept_iri = f"{partner}:concept:{judgment.concept_id}"
-            if concept_iri not in seen_concepts:
-                seen_concepts.add(concept_iri)
-                concept_node: dict[str, Any] = {
-                    "@id": concept_iri,
-                    "@type": "rkaf:LocalConcept",
-                    "skos:prefLabel": judgment.concept_label,
-                    "skos:inScheme": scheme_iri,
-                    "rkaf:definedInScope": workspace_iri,
-                    "rkaf:conceptScope": f"{partner}:scope:{settings.scope}",
-                    "rkaf:conceptStatus": "rkaf:active",
-                }
-                if judgment.definition:
-                    concept_node["skos:definition"] = judgment.definition
-                graph.append(concept_node)
             note_fragment(judgment.fragment)
             assignment_iri = f"{partner}:assignment:{judgment.candidate_id}"
             assignment_iris.append(assignment_iri)
-            record_iri = f"{partner}:record:concept_registry:{judgment.concept_id}"
+            record_iri = (
+                f"{partner}:record:normalized-vocabulary:"
+                f"{stable_id(judgment.concept_iri, judgment.release_iri, length=20)}"
+            )
             provenance_records.add(record_iri)
             graph.append(
                 {
                     "@id": assignment_iri,
                     "@type": "rkaf:ConceptAssignment",
-                    "rkaf:assignmentSubject": artifact_iri,
-                    "rkaf:assignmentSubjectType": "rkaf:Artifact",
-                    "rkaf:assignedConcept": concept_iri,
-                    "skos:inScheme": scheme_iri,
-                    "rkaf:assignmentRole": judgment.role,
-                    "rkaf:assignmentDerivation": "rkaf:directAssignment",
-                    "rkaf:assignmentEvidence": [judgment.fragment.urn],
-                    "rkaf:assignmentEvidenceScheme": _EVIDENCE_SCHEME,
+                    "rkaf:assertsSubject": artifact_iri,
+                    "rkaf:assertsPredicate": judgment.role,
+                    "rkaf:assertsObject": judgment.concept_iri,
+                    "rkaf:assertionPolarity": "rkaf:affirmed",
+                    "rkaf:assignedConceptRelease": judgment.release_iri,
                     "rkaf:assertionOrigin": ASSERTION_ORIGIN_MODEL,
+                    "rkaf:epistemicBasis": "rkaf:statisticalInference",
                     "rkaf:hasAILineage": lineage_iri,
                     "rkaf:hasExtractionProvenance": f"{partner}:activity:concept-tags",
                     "rkaf:assertedAt": context.asserted_at,
@@ -1492,12 +1585,25 @@ def assemble(
                     "prov:wasDerivedFrom": [record_iri],
                 }
             )
+            graph.append(
+                {
+                    "@id": f"{partner}:binding:assignment:{judgment.candidate_id}",
+                    "@type": "rkaf:EvidenceBinding",
+                    "rkaf:bindsAssertion": assignment_iri,
+                    "rkaf:bindsSourceFragment": [judgment.fragment.urn],
+                    "rkaf:evidenceRole": "rkaf:textualEvidence",
+                    "rkaf:evidentiaryFunction": "rkaf:supports",
+                }
+            )
             judgment_records.append(
                 {
                     "candidate_id": judgment.candidate_id,
                     "assignment": assignment_iri,
                     "concept_id": judgment.concept_id,
+                    "concept_iri": judgment.concept_iri,
                     "concept_label": judgment.concept_label,
+                    "scheme_iri": judgment.scheme_iri,
+                    "release_iri": judgment.release_iri,
                     "role": judgment.role,
                     "evidence_urn": judgment.fragment.urn,
                     "evidence_text": judgment.evidence_text,
@@ -1578,14 +1684,30 @@ def assemble(
             "available_fields": sorted(artifact.raw_fields),
         },
         "contract_flags": {
-            "contract_revision": CONTRACT_REVISION,
-            "contract_digest": CONTRACT_DIGEST,
+            "rulespec_version": settings.rulespec_version,
+            "rulespec_source_revision": settings.rulespec_source_revision,
+            "rulespec_constraint_digest": (settings.rulespec_constraint_digest),
+            "rulespec_pin_state": (
+                "callerDeclaredRevision" if settings.rulespec_source_revision is not None else "localCandidate"
+            ),
             "assertion_origin_deterministic": ASSERTION_ORIGIN_DETERMINISTIC,
             "request_contract_digest_required_for": sorted(REQUEST_CONTRACT_DIGEST_REQUIRED_FOR),
             "emit_document_docket_edge": EMIT_DOCUMENT_DOCKET_EDGE,
             "document_docket_predicate": DOCUMENT_DOCKET_PREDICATE,
             "emit_profile_edge_projections": EMIT_PROFILE_EDGE_PROJECTIONS,
             "model_attestation_decision": MODEL_ATTESTATION_DECISION,
+        },
+        "refspec_authorization": {
+            "state": REFSPEC_AUTHORIZATION_STATE,
+            "mode": REFSPEC_OUTPUT_MODE,
+            "output_profile": None,
+            "coverage_report": None,
+            "configuration": None,
+            "evaluation_result": None,
+            "deployment_decision": None,
+            "candidate_use_authorized": False,
+            "accepted_output_authorized": False,
+            "usage_ceiling": MODEL_USAGE_ELIGIBILITY,
         },
         "deterministic": {
             "fragments": [
@@ -1605,7 +1727,24 @@ def assemble(
         "model": None,
         "judgments": {"accepted": judgment_records, "rejected": []},
         "attestation": attestation_record,
-        "notes": list(facts.notes) + list(settings.extra_notes),
+        "notes": (
+            list(facts.notes)
+            + list(settings.extra_notes)
+            + (
+                [
+                    "Rulespec source_revision is null; this run names a local "
+                    "candidate and cannot support an immutable conformance claim."
+                ]
+                if settings.rulespec_source_revision is None
+                else []
+            )
+            + [
+                "No RefSpec OutputProfile, coverage report, evaluated "
+                "configuration, or deployment decision was supplied. Model "
+                "results are diagnostic review-queue candidates only and "
+                "cannot enter accepted output."
+            ]
+        ),
         "offset_verification": transcript,
         "node_count": len(graph),
     }
@@ -1618,7 +1757,8 @@ def assemble(
             "extraction_run_directory": model_layer.run_directory,
             "extraction_receipt_sha256": model_layer.receipt_sha256,
             "candidate_selector_version": model_layer.selector_version,
-            "candidate_registry_sha256": model_layer.registry_sha256,
+            "candidate_vocabulary_sha256": model_layer.vocabulary_sha256,
+            "candidate_vocabulary_default_language": (model_layer.vocabulary_default_language),
             "candidate_concept_count": model_layer.candidate_concept_count,
             "provider_call_count": model_layer.call_count,
             "segment_count": model_layer.segment_count,
@@ -1640,21 +1780,404 @@ def assemble(
 # --------------------------------------------------------------------------- #
 
 
-def load_registry(path: Path) -> tuple[list[dict[str, Any]], str]:
-    """Read the candidate concept registry and digest the file that was read."""
-    import hashlib
+_SKOS_TEXT_PROPERTIES = (
+    "skos:prefLabel",
+    "skos:altLabel",
+    "skos:hiddenLabel",
+    "skos:definition",
+    "skos:example",
+    "skos:note",
+    "skos:scopeNote",
+    "skos:changeNote",
+    "skos:editorialNote",
+    "skos:historyNote",
+)
+_RELATION_PROPERTY = {
+    "http://www.w3.org/2004/02/skos/core#broader": "skos:broader",
+    "http://www.w3.org/2004/02/skos/core#narrower": "skos:narrower",
+    "http://www.w3.org/2004/02/skos/core#related": "skos:related",
+}
 
-    from spicy_regs.ontology.common import read_parquet_rows
 
-    digest = hashlib.sha256(Path(path).read_bytes()).hexdigest()
-    return read_parquet_rows(Path(path)), digest
+def _language_tag(value: object, *, label: str) -> str:
+    from spicy_regs.enrichment.reference_runtime import (
+        ReferenceRuntimeError,
+        _require_language_tag,
+    )
+
+    try:
+        return _require_language_tag(value, label)
+    except ReferenceRuntimeError as error:
+        raise ProjectionError(str(error)) from error
+
+
+def _language_map(
+    value: object,
+    *,
+    default_language: str,
+    label: str,
+    one_per_language: bool,
+) -> dict[str, str | list[str]]:
+    """Materialize authored text as a JSON-LD language map.
+
+    A scalar is legal only because the caller declared ``default_language``;
+    the emitted value always carries that language explicitly. Existing maps
+    preserve script subtags such as ``zh-Hant``.
+    """
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            raise ProjectionError(f"{label} must not be empty")
+        return {default_language: text}
+    if not isinstance(value, Mapping) or not value:
+        raise ProjectionError(f"{label} must be a nonempty language map")
+    result: dict[str, str | list[str]] = {}
+    for raw_language, raw_text in value.items():
+        language = _language_tag(raw_language, label=f"{label} language")
+        values = list(raw_text) if isinstance(raw_text, (list, tuple)) else [raw_text]
+        clean = [str(item).strip() for item in values if str(item).strip()]
+        if not clean:
+            raise ProjectionError(f"{label}[{language}] must not be empty")
+        if one_per_language and len(clean) != 1:
+            raise ProjectionError(f"{label}[{language}] must contain exactly one string")
+        result[language] = clean[0] if len(clean) == 1 else clean
+    return result
+
+
+def _one_or_many_map(
+    language_values: Mapping[str, Sequence[str]],
+) -> dict[str, str | tuple[str, ...]]:
+    return {
+        language: values[0] if len(values) == 1 else tuple(values)
+        for language, values in sorted(language_values.items())
+    }
+
+
+def _first_language_value(
+    values: Mapping[str, str | tuple[str, ...]],
+    *,
+    default_language: str,
+) -> str:
+    language = default_language if default_language in values else sorted(values)[0]
+    value = values[language]
+    return value if isinstance(value, str) else value[0]
+
+
+def _facet_name(facet_iri: object) -> str:
+    iri = str(facet_iri or "").strip()
+    if not iri:
+        raise ProjectionError("the vocabulary scheme must declare rkaf:schemeFacet")
+    name = re.split(r"[:/#]", iri)[-1]
+    if not name:
+        raise ProjectionError(f"cannot derive a facet name from {iri!r}")
+    return name
+
+
+def _rows_digest(
+    paths: Sequence[Path],
+    manifest: Mapping[str, Any],
+    *,
+    default_language: str,
+) -> str:
+    inventory = {
+        "files": {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(paths)},
+        "manifest": manifest,
+        "defaultLanguage": default_language,
+    }
+    return hashlib.sha256(canonical_json(inventory).encode("utf-8")).hexdigest()
+
+
+def load_normalized_vocabulary(
+    directory: Path,
+    *,
+    manifest_path: Path | None = None,
+    default_language: str = "en",
+) -> NormalizedVocabulary:
+    """Load diagnostic vocabulary inputs without reviving the fused registry.
+
+    ``concept_labels``, ``concept_relations``, and
+    ``concept_event_participants`` are the executable storage interfaces. The
+    JSON-LD manifest supplies the governed scheme, concept, exact release, and
+    distribution records that an RKAF assignment must cite. Flat
+    ``registry.parquet`` rows are accepted only by the migration adapter in
+    :mod:`spicy_regs.enrichment.reference_runtime`; this path never reads them.
+    """
+    from spicy_regs.enrichment.reference_runtime import (
+        ConceptEventParticipant,
+        ConceptLabel,
+        ConceptRelation,
+        ReferenceRuntimeError,
+        ReferenceRuntimeStore,
+        assert_conforming_vocabulary_rows,
+    )
+
+    directory = Path(directory)
+    resolved_manifest = Path(manifest_path) if manifest_path is not None else directory / "vocabulary-manifest.jsonld"
+    required_paths = (
+        directory / "concept_labels.parquet",
+        directory / "concept_relations.parquet",
+        directory / "concept_event_participants.parquet",
+        resolved_manifest,
+    )
+    missing = [str(path) for path in required_paths if not path.is_file()]
+    if missing:
+        raise ProjectionError("normalized vocabulary input is incomplete; missing " + ", ".join(missing))
+    default_language = _language_tag(
+        default_language,
+        label="vocabulary_default_language",
+    )
+    manifest = json.loads(resolved_manifest.read_text(encoding="utf-8"))
+    raw_graph = manifest.get("@graph") if isinstance(manifest, Mapping) else None
+    if not isinstance(raw_graph, list) or not raw_graph:
+        raise ProjectionError(f"{resolved_manifest} must contain a nonempty @graph")
+    graph = [dict(node) for node in raw_graph if isinstance(node, Mapping)]
+    if len(graph) != len(raw_graph):
+        raise ProjectionError("every vocabulary manifest graph item must be an object")
+    by_id: dict[str, dict[str, Any]] = {}
+    for node in graph:
+        node_id = str(node.get("@id") or "").strip()
+        if not node_id:
+            raise ProjectionError("every vocabulary manifest node needs @id")
+        if node_id in by_id:
+            raise ProjectionError(f"vocabulary manifest repeats node {node_id!r}")
+        if "rkaf:conceptStatus" in node:
+            raise ProjectionError(
+                f"{node_id}: rkaf:conceptStatus is retired; use release membership, lifecycle events, and attestations"
+            )
+        by_id[node_id] = node
+        for property_name in _SKOS_TEXT_PROPERTIES:
+            if property_name not in node:
+                continue
+            node[property_name] = _language_map(
+                node[property_name],
+                default_language=default_language,
+                label=f"{node_id}.{property_name}",
+                one_per_language=(property_name == "skos:prefLabel"),
+            )
+
+    rows = ReferenceRuntimeStore(directory).read_vocabulary_rows()
+    try:
+        labels = tuple(
+            ConceptLabel(
+                label_id=_clean(row.get("label_id")),
+                concept_iri=_clean(row.get("concept_iri")),
+                scheme_iri=_clean(row.get("scheme_iri")),
+                release_iri=_clean(row.get("release_iri")),
+                import_snapshot_id=_clean(row.get("import_snapshot_id")),
+                distribution_artifact_id=_clean(row.get("distribution_artifact_id")),
+                source_property_iri=_clean(row.get("source_property_iri")),
+                label_role=_clean(row.get("label_role")),
+                original_literal=_clean(row.get("original_literal")),
+                language_tag=_clean(row.get("language_tag")),
+                status=_clean(row.get("status")),
+                expression_id=_clean(row.get("expression_id")) or None,
+                migration_only=row.get("migration_only") is True,
+            )
+            for row in rows["concept_labels"]
+        )
+        relations = tuple(
+            ConceptRelation(
+                relation_id=_clean(row.get("relation_id")),
+                release_iri=_clean(row.get("release_iri")),
+                import_snapshot_id=_clean(row.get("import_snapshot_id")),
+                distribution_artifact_id=_clean(row.get("distribution_artifact_id")),
+                subject_concept_iri=_clean(row.get("subject_concept_iri")),
+                subject_scheme_iri=_clean(row.get("subject_scheme_iri")),
+                predicate_iri=_clean(row.get("predicate_iri")),
+                object_concept_iri=_clean(row.get("object_concept_iri")),
+                object_scheme_iri=_clean(row.get("object_scheme_iri")),
+                source_property_or_path=_clean(row.get("source_property_or_path")),
+                migration_only=row.get("migration_only") is True,
+            )
+            for row in rows["concept_relations"]
+        )
+        participants = tuple(
+            ConceptEventParticipant(
+                event_id=_clean(row.get("event_id")),
+                operation=_clean(row.get("operation")),
+                participant_role=_clean(row.get("participant_role")),
+                concept_iri=_clean(row.get("concept_iri")),
+                concept_kind=_clean(row.get("concept_kind")),
+                release_iri=_clean(row.get("release_iri")),
+                complete_membership=(row.get("complete_membership") is True),
+                ordinal=int(row.get("ordinal") or 0),
+                migration_only=row.get("migration_only") is True,
+            )
+            for row in rows["concept_event_participants"]
+        )
+    except (TypeError, ReferenceRuntimeError) as error:
+        raise ProjectionError(f"normalized vocabulary row is invalid: {error}") from error
+
+    releases = {
+        node_id: node for node_id, node in by_id.items() if node.get("@type") == "rkaf:ReferenceResourceRelease"
+    }
+    release_membership: dict[str, Mapping[str, Any]] = {}
+    for release_iri, release in releases.items():
+        members = release.get("prov:hadMember")
+        member_list = (
+            list(members) if isinstance(members, (list, tuple)) else ([members] if isinstance(members, str) else [])
+        )
+        release_membership[release_iri] = {
+            "completeMembership": (release.get("rkaf:membershipMode") == "rkaf:completeMembership"),
+            "members": member_list,
+        }
+    try:
+        assert_conforming_vocabulary_rows(
+            labels,
+            relations,
+            participants,
+            release_membership=release_membership,
+        )
+    except ReferenceRuntimeError as error:
+        raise ProjectionError(f"normalized vocabulary cannot support diagnostic candidate use: {error}") from error
+
+    labels_by_concept: dict[str, list[Any]] = {}
+    for row in labels:
+        labels_by_concept.setdefault(row.concept_iri, []).append(row)
+    relations_by_subject: dict[str, list[Any]] = {}
+    for row in relations:
+        relations_by_subject.setdefault(row.subject_concept_iri, []).append(row)
+
+    concepts: dict[str, VocabularyConcept] = {}
+    selector_rows: list[dict[str, Any]] = []
+    for concept_iri, authored_labels in sorted(labels_by_concept.items()):
+        concept_node = by_id.get(concept_iri)
+        if concept_node is None or concept_node.get("@type") not in {
+            "rkaf:LocalConcept",
+            "rkaf:RegisteredConcept",
+        }:
+            raise ProjectionError(
+                f"{concept_iri}: normalized labels do not resolve to a "
+                "LocalConcept or RegisteredConcept manifest record"
+            )
+        scheme_values = {row.scheme_iri for row in authored_labels}
+        release_values = {row.release_iri for row in authored_labels}
+        if len(scheme_values) != 1 or len(release_values) != 1:
+            raise ProjectionError(f"{concept_iri}: labels disagree on scheme or release")
+        scheme_iri = next(iter(scheme_values))
+        release_iri = next(iter(release_values))
+        if concept_node.get("skos:inScheme") != scheme_iri:
+            raise ProjectionError(f"{concept_iri}: manifest and concept_labels disagree on scheme")
+        release = releases.get(release_iri)
+        if release is None:
+            raise ProjectionError(f"{concept_iri}: release {release_iri!r} is absent from the manifest")
+        membership = release_membership[release_iri]
+        if membership["completeMembership"] is not True or concept_iri not in membership["members"]:
+            raise ProjectionError(f"{concept_iri}: assigned release must carry exact complete membership")
+        scheme = by_id.get(scheme_iri)
+        if scheme is None or scheme.get("@type") != "rkaf:ConceptScheme":
+            raise ProjectionError(f"{concept_iri}: scheme {scheme_iri!r} is absent from the manifest")
+        facet = _facet_name(scheme.get("rkaf:schemeFacet"))
+
+        role_values: dict[str, dict[str, list[str]]] = {
+            "preferred": {},
+            "alternate": {},
+            "hidden": {},
+        }
+        for row in authored_labels:
+            role_values[row.label_role].setdefault(
+                row.language_tag,
+                [],
+            ).append(row.original_literal)
+        preferred = _one_or_many_map(role_values["preferred"])
+        if not preferred or any(not isinstance(value, str) for value in preferred.values()):
+            raise ProjectionError(f"{concept_iri}: one preferred label per language is required")
+        alternate = _one_or_many_map(role_values["alternate"])
+        hidden = _one_or_many_map(role_values["hidden"])
+        concept_node["skos:prefLabel"] = dict(preferred)
+        if alternate:
+            concept_node["skos:altLabel"] = {
+                key: list(value) if isinstance(value, tuple) else value for key, value in alternate.items()
+            }
+        else:
+            concept_node.pop("skos:altLabel", None)
+        if hidden:
+            concept_node["skos:hiddenLabel"] = {
+                key: list(value) if isinstance(value, tuple) else value for key, value in hidden.items()
+            }
+        else:
+            concept_node.pop("skos:hiddenLabel", None)
+
+        for property_name in ("skos:broader", "skos:narrower", "skos:related"):
+            concept_node.pop(property_name, None)
+        for relation in relations_by_subject.get(concept_iri, []):
+            property_name = _RELATION_PROPERTY[relation.predicate_iri]
+            concept_node.setdefault(property_name, []).append(relation.object_concept_iri)
+
+        definition_raw = concept_node.get("skos:definition", {})
+        definitions = (
+            _one_or_many_map(
+                {
+                    language: (tuple(value) if isinstance(value, list) else (str(value),))
+                    for language, value in definition_raw.items()
+                }
+            )
+            if isinstance(definition_raw, Mapping)
+            else {}
+        )
+        vocabulary_concept = VocabularyConcept(
+            concept_iri=concept_iri,
+            scheme_iri=scheme_iri,
+            release_iri=release_iri,
+            facet=facet,
+            preferred_labels={language: str(value) for language, value in preferred.items()},
+            alternate_labels=alternate,
+            hidden_labels=hidden,
+            definitions=definitions,
+        )
+        concepts[concept_iri] = vocabulary_concept
+        status = "deprecated" if all(row.status == "deprecated" for row in authored_labels) else "active"
+        selector_rows.append(
+            {
+                "concept_id": concept_iri,
+                "facet": facet,
+                "source_vocabulary": scheme_iri,
+                "scheme": facet,
+                "pref_label": vocabulary_concept.display_label(default_language),
+                "alt_labels_json": canonical_json(
+                    [
+                        value
+                        for language in sorted(alternate)
+                        for value in (
+                            [alternate[language]] if isinstance(alternate[language], str) else list(alternate[language])
+                        )
+                    ]
+                ),
+                "definition": (
+                    _first_language_value(
+                        definitions,
+                        default_language=default_language,
+                    )
+                    if definitions
+                    else ""
+                ),
+                "status": status,
+                "external_ids_json": "[]",
+            }
+        )
+
+    if not concepts:
+        raise ProjectionError("normalized vocabulary has no authored concepts")
+    return NormalizedVocabulary(
+        selector_rows=tuple(selector_rows),
+        concepts=concepts,
+        manifest_nodes=tuple(graph),
+        content_sha256=_rows_digest(
+            required_paths[:3],
+            manifest,
+            default_language=default_language,
+        ),
+        default_language=default_language,
+    )
 
 
 def run_model_layer(
     artifact: SourceArtifact,
     *,
     model: Any,
-    registry_path: Path,
+    vocabulary_directory: Path,
+    vocabulary_manifest_path: Path | None,
+    vocabulary_default_language: str,
     run_directory: Path,
     evidence_field: str,
     artifact_iri: str,
@@ -1669,6 +2192,12 @@ def run_model_layer(
     the same grounding, and the same provider custody (``request.json`` and
     ``response.json`` per call under ``extraction/calls/``). Nothing about the
     prompt or the schema is redefined here.
+
+    This function has no accepted-output mode. It produces Rulespec
+    ``reviewQueueOnly`` candidates for diagnostic review. A separate caller
+    must use the RefSpec reference runtime to validate an exact
+    ``OutputProfile``, coverage report, configuration, evaluation result, and
+    deployment decision before any later accepted output.
     """
     from spicy_regs.docpipeline.extraction import (
         extraction_plan_facts,
@@ -1684,7 +2213,13 @@ def run_model_layer(
     )
     from spicy_regs.ontology.segmentation import TiktokenCounter
 
-    concepts, registry_sha256 = load_registry(registry_path)
+    vocabulary = load_normalized_vocabulary(
+        vocabulary_directory,
+        manifest_path=vocabulary_manifest_path,
+        default_language=vocabulary_default_language,
+    )
+    concepts = list(vocabulary.selector_rows)
+    vocabulary_sha256 = vocabulary.content_sha256
     counter = TiktokenCounter()
     settings = SegmentSettings.selected(tokenizer_version=counter.version)
     segmented = segment_artifact(artifact, settings=settings, counter=counter)
@@ -1731,7 +2266,8 @@ def run_model_layer(
         },
         segmentation=settings.identity(),
         vocabulary={
-            "registry_sha256": registry_sha256,
+            "vocabulary_sha256": vocabulary_sha256,
+            "vocabulary_default_language": vocabulary.default_language,
             "candidate_selector": ANCHORED_SELECTOR_VERSION,
             "prompt_concept_limit": prompt_concept_limit,
         },
@@ -1751,6 +2287,7 @@ def run_model_layer(
         rows,
         artifact_iri=artifact_iri,
         evidence_field=evidence_field,
+        vocabulary_concepts=vocabulary.concepts,
     )
     for row in task.rejection_rows(outcome.candidates):
         rejections.append(
@@ -1773,7 +2310,10 @@ def run_model_layer(
         run_directory=str(run_directory),
         receipt_sha256=str(receipt.get("receipt_sha256", "")),
         selector_version=ANCHORED_SELECTOR_VERSION,
-        registry_sha256=registry_sha256,
+        vocabulary_sha256=vocabulary_sha256,
+        vocabulary_default_language=vocabulary.default_language,
+        vocabulary_nodes=vocabulary.manifest_nodes,
+        vocabulary_concepts=vocabulary.concepts,
         candidate_concept_count=candidate_total,
         judgments=tuple(judgments),
         rejections=tuple(rejections),
@@ -1791,20 +2331,27 @@ def project_document(
     model: Any = None,
     model_run_directory: Path | None = None,
 ) -> ProjectionResult:
-    """Project one corpus document into RKAF, with or without the model layer."""
+    """Project one document into RKAF diagnostic output.
+
+    Model judgments never leave ``reviewQueueOnly`` on this path. This
+    function deliberately has no accepted-output option; RefSpec authorization
+    belongs to the separate reference-runtime decision chain.
+    """
     artifact, row = load_artifact(profile_id, subject_id, corpus_dir=settings.corpus_dir)
     tables = PublishedTables(settings.tables_dir)
     facts = build_profile_facts(artifact, row, tables=tables, partner=settings.partner)
     model_layer: ModelLayer | None = None
     if model is not None:
-        if settings.registry_path is None:
-            raise ProjectionError("the model layer needs a candidate concept registry")
+        if settings.vocabulary_directory is None:
+            raise ProjectionError("the model layer needs a normalized candidate vocabulary directory")
         if model_run_directory is None:
             raise ProjectionError("the model layer needs a run directory for provider custody")
         model_layer = run_model_layer(
             artifact,
             model=model,
-            registry_path=settings.registry_path,
+            vocabulary_directory=settings.vocabulary_directory,
+            vocabulary_manifest_path=settings.vocabulary_manifest_path,
+            vocabulary_default_language=settings.vocabulary_default_language,
             run_directory=model_run_directory,
             evidence_field=facts.evidence_field,
             artifact_iri=facts.artifact_iri,

@@ -1,9 +1,19 @@
 # Metadata ontology and Rulespec Level-0 mapping
 
-Spicy Regs is a Rulespec **L0 Vocabulary** consumer. Its carrier is flat Apache
-Parquet, not JSON-LD: compact identifiers and enum values expand
-deterministically to Rulespec terms, but the dataset does not claim Rulespec
-L1–L4 parsing, shape, constraint, or runtime conformance.
+The existing Spicy Regs published-table carrier is a Rulespec **L0
+Vocabulary** consumer. Its carrier is flat Apache Parquet, not JSON-LD:
+compact identifiers and enum values expand deterministically to Rulespec
+terms, but those tables do not claim Rulespec L1–L4 parsing, shape,
+constraint, or runtime conformance.
+
+The separate document-to-RKAF projection validates JSON-LD through the current
+sibling Rulespec L1–L4 implementation. Its controlled-vocabulary input uses
+the normalized label, relation, and lifecycle-participant tables described
+below. It does not treat the flat `concepts` table or fused registry as
+production authority. The sibling RefSpec application profile pins the exact
+tested local Rulespec revision and digest. This command does not hardcode that
+pair; each run requires the caller to supply the version and digest and may
+also record the exact revision.
 
 The implementation targets the repaired candidate US identifier and
 Experimental rulemaking contract whose content digest is
@@ -703,21 +713,42 @@ dictionary above publishes these tables yet. The anchor semantics are
 documented now so the published projection, when it lands, inherits them rather
 than inventing its own.
 
-## Local descriptive-tag terms
+## Legacy descriptive-tag tables
 
 `concepts.facet`, `source_vocabulary`, `status`, and `replaced_by`, along with
-event payloads, are retrieval-grade Spicy Regs carrier mechanics. `facet`
-controls profile tag policy; `source_vocabulary` records authority identity
-and is the only candidate for Rulespec `inScheme`. The deprecated `scheme`
-column mirrors `facet` on canonical v2 and newly written rows. Immutable
-`fused-concept-registry-v1` rows are the read-only exception: the compatibility
-reader interprets their external-valued `scheme` as `source_vocabulary` and
-infers `facet`. These fields intentionally do not claim decision-grade
-Rulespec concept-registry semantics. Promotion to a
-`rkaf:LocalConcept` or `rkaf:RegisteredConcept` remains a separate,
-human-reviewed, attested event.
+event payloads, are legacy development and migration mechanics. They cannot
+authorize conforming REF or Rulespec output. `facet` controls the old tag
+policy; `source_vocabulary` records the source key used during migration. The
+deprecated `scheme` column mirrors `facet` on v2 rows.
+`fused-concept-registry-v1` remains read-only migration input: its compatibility
+reader interprets an external-valued `scheme` as `source_vocabulary` and
+infers `facet`.
 
-The registry applies these invariants before publishing:
+The production RKAF projection instead requires:
+
+- `concept_labels`, one row per Unicode, language-preserving label expression;
+- `concept_relations`, one row per exact in-scheme hierarchy relation;
+- `concept_event_participants`, one row per predecessor or successor; and
+- an authoritative JSON-LD manifest carrying the exact concept, scheme,
+  release, distribution, and complete-membership records.
+
+The projection rejects `registry.parquet`, retired inline concept status, a
+hierarchy target outside the exact scheme and release, and any assignment
+without complete release membership. A legacy proposal becomes a
+`rkaf:LocalConcept` or `rkaf:RegisteredConcept` only through a separate,
+reviewed and attested governance action.
+
+The current document projection is a diagnostic review path, not an accepted
+REF enrichment-output path. Every model assignment carries
+`rkaf:reviewQueueOnly`. Its run record states that RefSpec candidate and
+accepted-output authorization were not evaluated because this command does not
+accept an `OutputProfile`, coverage report, evaluated configuration, or
+deployment decision. The command also requires the exact Rulespec semantic
+version and constraint digest. A missing source revision is recorded as a
+local candidate and cannot support an immutable conformance claim.
+
+The migration view applies these invariants before materializing a
+development snapshot:
 
 - prior concepts and assignments cannot disappear;
 - assignment revisions append a row linked by `supersedes_id`;
@@ -725,7 +756,7 @@ The registry applies these invariants before publishing:
 - every replacement resolves to an existing concept;
 - every LLM, embedding, or human row has complete provenance.
 
-## Operating the tagging loop
+## Operating the legacy tagging loop
 
 One materialized-dataset DAG runs the registry stages in dependency order:
 `concepts` refreshes Federal Register Thesaurus seeds and performs
@@ -734,7 +765,9 @@ and validates a stable sample; `concept_events` performs an idempotent audit-log
 reconciliation. The nine identity and ontology tables are uploaded under one
 immutable snapshot prefix, then one `materialized/ontology/latest.json` pointer
 is replaced. Candidate concepts, events, and assignments therefore become
-visible as one generation rather than through independently scheduled jobs.
+visible as one development generation rather than through independently
+scheduled jobs. That snapshot is not a conforming registry, evaluation, or
+publication authority.
 
 An absent `OPENAI_API_KEY` makes model generation and validation a no-op; all
 deterministic seeds and convergence checks still run. The optional model

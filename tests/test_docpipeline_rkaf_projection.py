@@ -13,6 +13,8 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +34,7 @@ from spicy_regs.docpipeline.rkaf_projection import (
     encode_for_uri,
     fragment_urn,
     ground_literal,
+    load_normalized_vocabulary,
     load_artifact,
     project_document,
     verify_candidate_rows,
@@ -41,6 +44,11 @@ from spicy_regs.docpipeline.source import (
     SourceRecord,
     build_source_artifact,
     profile_for_table,
+)
+from spicy_regs.enrichment.reference_runtime import (
+    ConceptLabel,
+    ConceptRelation,
+    ReferenceRuntimeStore,
 )
 from spicy_regs.ontology.attestations import DECISION_APPROVED, DECISIONS
 
@@ -156,37 +164,157 @@ def tables(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def registry(tmp_path: Path) -> Path:
-    path = tmp_path / "registry.parquet"
-    _write(
-        path,
-        [
+def normalized_vocabulary(tmp_path: Path) -> Path:
+    directory = tmp_path / "normalized-vocabulary"
+    scheme = "urn:test:vocabulary:scheme:subjects"
+    release = "urn:test:vocabulary:release:2026-07"
+    distribution = "urn:test:vocabulary:distribution:2026-07"
+    import_snapshot = "urn:test:vocabulary:import:2026-07"
+    concepts = {
+        "poultry": "urn:test:vocabulary:concept:poultry",
+        "inspection": "urn:test:vocabulary:concept:inspection",
+        "environment": "urn:test:vocabulary:concept:environment",
+    }
+
+    def label(
+        label_id: str,
+        concept: str,
+        literal: str,
+        language: str,
+        *,
+        role: str = "preferred",
+    ) -> ConceptLabel:
+        return ConceptLabel(
+            label_id=label_id,
+            concept_iri=concept,
+            scheme_iri=scheme,
+            release_iri=release,
+            import_snapshot_id=import_snapshot,
+            distribution_artifact_id=distribution,
+            source_property_iri={
+                "preferred": "http://www.w3.org/2004/02/skos/core#prefLabel",
+                "alternate": "http://www.w3.org/2004/02/skos/core#altLabel",
+                "hidden": "http://www.w3.org/2004/02/skos/core#hiddenLabel",
+            }[role],
+            label_role=role,
+            original_literal=literal,
+            language_tag=language,
+        )
+
+    labels = (
+        label("poultry-en", concepts["poultry"], "Poultry and poultry products", "en"),
+        label("poultry-es", concepts["poultry"], "Aves y productos avícolas", "es"),
+        label("poultry-zh", concepts["poultry"], "家禽及家禽产品", "zh-Hant"),
+        label("poultry-alt-en", concepts["poultry"], "poultry", "en", role="alternate"),
+        label("inspection-en", concepts["inspection"], "Meat inspection", "en"),
+        label(
+            "inspection-alt-en",
+            concepts["inspection"],
+            "slaughter inspection",
+            "en",
+            role="alternate",
+        ),
+        label("environment-en", concepts["environment"], "Environment", "en"),
+    )
+    relations = (
+        ConceptRelation(
+            relation_id="poultry-broader-environment",
+            release_iri=release,
+            import_snapshot_id=import_snapshot,
+            distribution_artifact_id=distribution,
+            subject_concept_iri=concepts["poultry"],
+            subject_scheme_iri=scheme,
+            predicate_iri="http://www.w3.org/2004/02/skos/core#broader",
+            object_concept_iri=concepts["environment"],
+            object_scheme_iri=scheme,
+            source_property_or_path="skos:broader",
+        ),
+    )
+    members = list(concepts.values())
+    ReferenceRuntimeStore(directory).write_vocabulary_rows(
+        labels=labels,
+        relations=relations,
+        participants=(),
+        release_membership={
+            release: {
+                "completeMembership": True,
+                "members": members,
+            }
+        },
+    )
+    manifest = {
+        "@context": "https://rulespec.org/context/rkaf-context.jsonld",
+        "@graph": [
             {
-                "concept_id": "concept_poultry",
-                "scheme": "subject",
-                "pref_label": "Poultry and poultry products",
-                "alt_labels_json": json.dumps(["poultry"]),
-                "definition": "Topic covering poultry and poultry products.",
-                "status": "active",
+                "@id": scheme,
+                "@type": "rkaf:ConceptScheme",
+                "skos:prefLabel": "Test subject vocabulary",
+                "rkaf:schemeFacet": "urn:ref:facet:subject",
+                "rkaf:definedInScope": "urn:test:workspace:vocabulary",
+            },
+            *[
+                {
+                    "@id": concept,
+                    "@type": "rkaf:LocalConcept",
+                    "skos:prefLabel": "Materialized from concept_labels",
+                    "skos:definition": (
+                        "Topic covering poultry and poultry products."
+                        if name == "poultry"
+                        else f"Topic covering {name}."
+                    ),
+                    "skos:inScheme": scheme,
+                    "rkaf:definedInScope": "urn:test:workspace:vocabulary",
+                    "rkaf:conceptScope": "urn:test:scope:document-projection",
+                }
+                for name, concept in concepts.items()
+            ],
+            {
+                "@id": release,
+                "@type": "rkaf:ReferenceResourceRelease",
+                "dcterms:isVersionOf": scheme,
+                "dcat:version": "2026.07",
+                "dcterms:type": "skos:ConceptScheme",
+                "rkaf:membershipMode": "rkaf:completeMembership",
+                "prov:hadMember": members,
+                "dcat:distribution": [distribution],
+                "rkaf:referenceReleaseDigest": (
+                    "sha256:44abeb66a292d34bc7a3cd5e5a326421e798c2de4b88cdef61b6f2cd32df1835"
+                ),
             },
             {
-                "concept_id": "concept_inspection",
-                "scheme": "subject",
-                "pref_label": "Meat inspection",
-                "alt_labels_json": json.dumps(["slaughter inspection"]),
-                "definition": "Topic covering meat and poultry inspection.",
-                "status": "active",
+                "@id": distribution,
+                "@type": "rkaf:Artifact",
+                "rkaf:hasArtifactIdentifier": [distribution],
+                "rkaf:artifactIdentifierScheme": ["rkaf:partner-defined"],
+                "dcterms:format": "application/ld+json",
+                "rkaf:hasContentDigest": "sha256:" + "6" * 64,
             },
         ],
+    }
+    (directory / "vocabulary-manifest.jsonld").write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
     )
-    return path
+    return directory
 
 
-def _settings(corpus: Path, tables: Path, registry: Path | None = None) -> ProjectionSettings:
+def _settings(
+    corpus: Path,
+    tables: Path,
+    normalized_vocabulary: Path | None = None,
+    *,
+    rulespec_version: str = "0.0.0-test",
+    rulespec_constraint_digest: str = "sha256:" + "a" * 64,
+    rulespec_source_revision: str | None = None,
+) -> ProjectionSettings:
     return ProjectionSettings(
         corpus_dir=corpus,
         tables_dir=tables,
-        registry_path=registry,
+        rulespec_version=rulespec_version,
+        rulespec_constraint_digest=rulespec_constraint_digest,
+        rulespec_source_revision=rulespec_source_revision,
+        vocabulary_directory=normalized_vocabulary,
+        vocabulary_default_language="en",
         asserted_at="2026-07-28T00:00:00Z",
         prompt_concept_limit=4,
     )
@@ -194,6 +322,26 @@ def _settings(corpus: Path, tables: Path, registry: Path | None = None) -> Proje
 
 def _fr_artifact(corpus: Path):
     return load_artifact("federal-register-document-v1", "2026-00001", corpus_dir=corpus)
+
+
+def test_projection_settings_require_an_honest_rulespec_reference(
+    corpus: Path,
+    tables: Path,
+) -> None:
+    with pytest.raises(ProjectionError, match="exact semantic version"):
+        _settings(corpus, tables, rulespec_version="working-tree")
+    with pytest.raises(ProjectionError, match="sha256"):
+        _settings(
+            corpus,
+            tables,
+            rulespec_constraint_digest="sha256:not-a-digest",
+        )
+    with pytest.raises(ProjectionError, match="40-character"):
+        _settings(
+            corpus,
+            tables,
+            rulespec_source_revision="062fa79",
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -244,7 +392,7 @@ def _tag(
     payload: dict[str, Any],
     *,
     quote: str,
-    concept_id: str | None = "concept_poultry",
+    concept_id: str | None = "urn:test:vocabulary:concept:poultry",
     role: str = "primary",
     proposed_label: str | None = None,
     definition: str | None = None,
@@ -460,10 +608,28 @@ def test_the_landed_contract_findings_are_what_the_projection_emits(corpus: Path
     assert "rkaf:hasDocket" in {n["rkaf:assertsPredicate"] for n in assertions}
 
     flags = result.run_record["contract_flags"]
+    assert flags["rulespec_version"] == "0.0.0-test"
+    assert flags["rulespec_source_revision"] is None
+    assert flags["rulespec_constraint_digest"] == "sha256:" + "a" * 64
+    assert flags["rulespec_pin_state"] == "localCandidate"
     assert flags["assertion_origin_deterministic"] == "rkaf:deterministicExtraction"
     assert flags["request_contract_digest_required_for"] == ["rkaf:modelExtraction"]
     assert flags["emit_document_docket_edge"] is True
     assert flags["emit_profile_edge_projections"] is True
+
+    authorization = result.run_record["refspec_authorization"]
+    assert authorization == {
+        "state": "notEvaluated",
+        "mode": "diagnosticReviewQueue",
+        "output_profile": None,
+        "coverage_report": None,
+        "configuration": None,
+        "evaluation_result": None,
+        "deployment_decision": None,
+        "candidate_use_authorized": False,
+        "accepted_output_authorized": False,
+        "usage_ceiling": "rkaf:reviewQueueOnly",
+    }
 
 
 def test_the_contract_findings_are_configuration_not_code(corpus: Path, tables: Path, monkeypatch: Any) -> None:
@@ -658,32 +824,55 @@ def test_missing_published_tables_degrade_to_artifact_only(corpus: Path, tmp_pat
 
 
 def _project_with_model(
-    corpus: Path, tables: Path, registry: Path, tmp_path: Path, model: FakeModel, *, name: str = "run"
+    corpus: Path,
+    tables: Path,
+    normalized_vocabulary: Path,
+    tmp_path: Path,
+    model: FakeModel,
+    *,
+    name: str = "run",
+    settings: ProjectionSettings | None = None,
 ):
     return project_document(
         "federal-register-document-v1",
         "2026-00001",
-        settings=_settings(corpus, tables, registry),
+        settings=(settings if settings is not None else _settings(corpus, tables, normalized_vocabulary)),
         model=model,
         model_run_directory=tmp_path / name,
     )
 
 
 def test_a_verified_judgment_becomes_a_concept_assignment(
-    corpus: Path, tables: Path, registry: Path, tmp_path: Path
+    corpus: Path,
+    tables: Path,
+    normalized_vocabulary: Path,
+    tmp_path: Path,
 ) -> None:
     model = FakeModel(lambda payload: [t for t in [_tag(payload, quote="poultry slaughter inspection")] if t])
 
-    result = _project_with_model(corpus, tables, registry, tmp_path, model)
+    result = _project_with_model(
+        corpus,
+        tables,
+        normalized_vocabulary,
+        tmp_path,
+        model,
+    )
 
     assignments = [n for n in result.document["@graph"] if n["@type"] == "rkaf:ConceptAssignment"]
     assert len(assignments) == 1
     assignment = assignments[0]
-    assert assignment["rkaf:assignmentRole"] == ASSIGNMENT_ROLE_IRIS["primary"]
-    assert assignment["rkaf:assignmentDerivation"] == "rkaf:directAssignment"
-    assert assignment["rkaf:assignmentEvidenceScheme"] == "rkaf:carrier-local-fragment"
+    assert assignment["rkaf:assertsPredicate"] == ASSIGNMENT_ROLE_IRIS["primary"]
+    assert assignment["rkaf:assertsObject"] == "urn:test:vocabulary:concept:poultry"
+    assert assignment["rkaf:assignedConceptRelease"] == "urn:test:vocabulary:release:2026-07"
     assert assignment["rkaf:assertionOrigin"] == "rkaf:aiSuggested"
-    evidence = assignment["rkaf:assignmentEvidence"][0]
+    assert assignment["rkaf:usageEligibility"] == "rkaf:reviewQueueOnly"
+    assert result.run_record["refspec_authorization"]["accepted_output_authorized"] is False
+    binding = next(
+        node
+        for node in result.document["@graph"]
+        if node.get("@type") == "rkaf:EvidenceBinding" and node.get("rkaf:bindsAssertion") == assignment["@id"]
+    )
+    evidence = binding["rkaf:bindsSourceFragment"][0]
     assert FRAGMENT_URN_PATTERN.match(evidence)
     # The cited URN must be materialized as a real fragment node: sh:class
     # rkaf:SourceFragment on rkaf:assignmentEvidence.
@@ -692,13 +881,66 @@ def test_a_verified_judgment_becomes_a_concept_assignment(
     assert len(lineage) == 1, "rkaf:aiSuggested requires rkaf:hasAILineage"
     assert assignment["rkaf:hasAILineage"] == lineage[0]["@id"]
 
+    concept = next(
+        node for node in result.document["@graph"] if node.get("@id") == "urn:test:vocabulary:concept:poultry"
+    )
+    assert concept["skos:prefLabel"] == {
+        "en": "Poultry and poultry products",
+        "es": "Aves y productos avícolas",
+        "zh-Hant": "家禽及家禽产品",
+    }
+    assert concept["skos:definition"] == {"en": "Topic covering poultry and poultry products."}
+    assert concept["skos:broader"] == ["urn:test:vocabulary:concept:environment"]
+    assert "rkaf:conceptStatus" not in json.dumps(result.document)
+    scheme = next(
+        node for node in result.document["@graph"] if node.get("@id") == "urn:test:vocabulary:scheme:subjects"
+    )
+    assert scheme["skos:prefLabel"] == {"en": "Test subject vocabulary"}
+
+
+def test_retired_inline_concept_status_cannot_enter_the_projection(
+    normalized_vocabulary: Path,
+) -> None:
+    manifest_path = normalized_vocabulary / "vocabulary-manifest.jsonld"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    concept = next(node for node in manifest["@graph"] if node.get("@type") == "rkaf:LocalConcept")
+    concept["rkaf:conceptStatus"] = "rkaf:active"
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ProjectionError, match="conceptStatus is retired"):
+        load_normalized_vocabulary(normalized_vocabulary)
+
+
+def test_all_three_normalized_vocabulary_tables_are_required(
+    normalized_vocabulary: Path,
+) -> None:
+    (normalized_vocabulary / "concept_event_participants.parquet").unlink()
+
+    with pytest.raises(
+        ProjectionError,
+        match="normalized vocabulary input is incomplete",
+    ):
+        load_normalized_vocabulary(normalized_vocabulary)
+
 
 def test_the_model_attests_production_and_never_approval(
-    corpus: Path, tables: Path, registry: Path, tmp_path: Path
+    corpus: Path,
+    tables: Path,
+    normalized_vocabulary: Path,
+    tmp_path: Path,
 ) -> None:
     model = FakeModel(lambda payload: [t for t in [_tag(payload, quote="poultry slaughter inspection")] if t])
 
-    result = _project_with_model(corpus, tables, registry, tmp_path, model)
+    result = _project_with_model(
+        corpus,
+        tables,
+        normalized_vocabulary,
+        tmp_path,
+        model,
+    )
 
     attestations = [n for n in result.document["@graph"] if n["@type"] == "rkaf:Attestation"]
     assert len(attestations) == 1
@@ -714,7 +956,10 @@ def test_the_model_attests_production_and_never_approval(
 
 
 def test_a_model_invented_concept_id_is_rejected_not_minted(
-    corpus: Path, tables: Path, registry: Path, tmp_path: Path
+    corpus: Path,
+    tables: Path,
+    normalized_vocabulary: Path,
+    tmp_path: Path,
 ) -> None:
     model = FakeModel(
         lambda payload: [
@@ -724,7 +969,13 @@ def test_a_model_invented_concept_id_is_rejected_not_minted(
         ]
     )
 
-    result = _project_with_model(corpus, tables, registry, tmp_path, model)
+    result = _project_with_model(
+        corpus,
+        tables,
+        normalized_vocabulary,
+        tmp_path,
+        model,
+    )
 
     assert not [n for n in result.document["@graph"] if n["@type"] == "rkaf:ConceptAssignment"]
     reasons = [row["reason"] for row in result.run_record["judgments"]["rejected"]]
@@ -733,7 +984,10 @@ def test_a_model_invented_concept_id_is_rejected_not_minted(
 
 
 def test_a_novel_concept_proposal_is_refused_because_the_model_never_mints_identity(
-    corpus: Path, tables: Path, registry: Path, tmp_path: Path
+    corpus: Path,
+    tables: Path,
+    normalized_vocabulary: Path,
+    tmp_path: Path,
 ) -> None:
     model = FakeModel(
         lambda payload: [
@@ -751,16 +1005,25 @@ def test_a_novel_concept_proposal_is_refused_because_the_model_never_mints_ident
         ]
     )
 
-    result = _project_with_model(corpus, tables, registry, tmp_path, model)
+    result = _project_with_model(
+        corpus,
+        tables,
+        normalized_vocabulary,
+        tmp_path,
+        model,
+    )
 
     assert not [n for n in result.document["@graph"] if n["@type"] == "rkaf:ConceptAssignment"]
     assert [row["reason"] for row in result.run_record["judgments"]["rejected"]] == [
-        "model_proposed_concept_not_in_registry"
+        "model_proposed_concept_not_in_normalized_vocabulary"
     ]
 
 
 def test_an_unresolvable_quote_becomes_a_rejection_row(
-    corpus: Path, tables: Path, registry: Path, tmp_path: Path
+    corpus: Path,
+    tables: Path,
+    normalized_vocabulary: Path,
+    tmp_path: Path,
 ) -> None:
     def tags(payload: dict[str, Any]) -> list[dict[str, Any]]:
         good = _tag(payload, quote="poultry slaughter inspection")
@@ -772,7 +1035,13 @@ def test_an_unresolvable_quote_becomes_a_rejection_row(
         invented["evidence_end"] = len(invented["evidence_text"])
         return [good, invented]
 
-    result = _project_with_model(corpus, tables, registry, tmp_path, FakeModel(tags))
+    result = _project_with_model(
+        corpus,
+        tables,
+        normalized_vocabulary,
+        tmp_path,
+        FakeModel(tags),
+    )
 
     assert len([n for n in result.document["@graph"] if n["@type"] == "rkaf:ConceptAssignment"]) == 1
     assert "ungrounded_evidence" in [row["reason"] for row in result.run_record["judgments"]["rejected"]]
@@ -846,11 +1115,21 @@ def test_parser_derived_evidence_never_earns_a_carrier_local_urn(corpus: Path) -
 
 
 def test_the_model_run_keeps_request_and_response_custody(
-    corpus: Path, tables: Path, registry: Path, tmp_path: Path
+    corpus: Path,
+    tables: Path,
+    normalized_vocabulary: Path,
+    tmp_path: Path,
 ) -> None:
     model = FakeModel(lambda payload: [t for t in [_tag(payload, quote="poultry slaughter inspection")] if t])
 
-    result = _project_with_model(corpus, tables, registry, tmp_path, model, name="custody")
+    result = _project_with_model(
+        corpus,
+        tables,
+        normalized_vocabulary,
+        tmp_path,
+        model,
+        name="custody",
+    )
 
     run_directory = Path(result.run_record["model"]["extraction_run_directory"])
     calls = sorted((run_directory / "extraction" / "calls").iterdir())
@@ -860,7 +1139,88 @@ def test_the_model_run_keeps_request_and_response_custody(
             assert (call / name).is_file(), f"{name} missing for {call.name}"
     assert result.run_record["model"]["extraction_receipt_sha256"]
     assert result.run_record["model"]["candidate_selector_version"] == "anchored-hybrid-v2"
-    assert result.run_record["model"]["candidate_registry_sha256"] == hashlib.sha256(registry.read_bytes()).hexdigest()
+    assert len(result.run_record["model"]["candidate_vocabulary_sha256"]) == 64
+
+
+def test_model_projection_passes_the_current_sibling_rulespec(
+    corpus: Path,
+    tables: Path,
+    normalized_vocabulary: Path,
+    tmp_path: Path,
+) -> None:
+    rulespec_root = Path(__file__).resolve().parents[2] / "rulespec"
+    validator = rulespec_root / "tools" / "ci_validate.py"
+    context = rulespec_root / "context" / "rkaf-context.jsonld"
+    if not validator.is_file() or not context.is_file() or shutil.which("uv") is None:
+        pytest.skip("the sibling Rulespec checkout and uv are required")
+
+    digest_result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "--python",
+            "3.12",
+            "--with-requirements",
+            "requirements.txt",
+            "python",
+            "tools/l0_mapping_audit.py",
+            "--print-contract-version",
+        ],
+        cwd=rulespec_root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert digest_result.returncode == 0, digest_result.stdout + digest_result.stderr
+    live_version = (rulespec_root / "VERSION").read_text(encoding="utf-8").strip()
+    live_digest = digest_result.stdout.strip()
+    model = FakeModel(lambda payload: [tag for tag in [_tag(payload, quote="poultry slaughter inspection")] if tag])
+    result = _project_with_model(
+        corpus,
+        tables,
+        normalized_vocabulary,
+        tmp_path,
+        model,
+        name="rulespec-e2e",
+        settings=_settings(
+            corpus,
+            tables,
+            normalized_vocabulary,
+            rulespec_version=live_version,
+            rulespec_constraint_digest=live_digest,
+        ),
+    )
+    live_flags = result.run_record["contract_flags"]
+    assert live_flags["rulespec_version"] == live_version
+    assert live_flags["rulespec_source_revision"] is None
+    assert live_flags["rulespec_constraint_digest"] == live_digest
+    assert live_flags["rulespec_pin_state"] == "localCandidate"
+    output = tmp_path / "rulespec-e2e-output"
+    output.mkdir()
+    document = output / "projection.jsonld"
+    document.write_text(
+        json.dumps(result.document, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    shutil.copyfile(context, output / "rkaf-context.jsonld")
+    completed = subprocess.run(
+        [
+            "uv",
+            "run",
+            "--python",
+            "3.12",
+            "--with-requirements",
+            "requirements.txt",
+            "python",
+            "tools/ci_validate.py",
+            str(document),
+        ],
+        cwd=rulespec_root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
 
 
 def test_the_cli_reaches_both_provider_arms_without_a_credential(monkeypatch: Any) -> None:
@@ -876,6 +1236,22 @@ def test_the_cli_reaches_both_provider_arms_without_a_credential(monkeypatch: An
     assert spec is not None and spec.loader is not None
     cli = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(cli)
+    assert not hasattr(cli, "DEFAULT_REGISTRY")
+
+    with pytest.raises(SystemExit):
+        cli.main(
+            [
+                "--profile",
+                "federal-register-document-v1",
+                "--subject",
+                "2026-00001",
+                "--output-dir",
+                "unused",
+                "--no-model",
+                "--registry-file",
+                "legacy-registry.parquet",
+            ]
+        )
 
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
@@ -890,10 +1266,17 @@ def test_the_cli_reaches_both_provider_arms_without_a_credential(monkeypatch: An
         cli.build_model("nonesuch", None)
 
 
-def test_the_model_layer_needs_a_registry_and_a_custody_directory(corpus: Path, tables: Path, tmp_path: Path) -> None:
+def test_the_model_layer_needs_normalized_vocabulary_and_a_custody_directory(
+    corpus: Path,
+    tables: Path,
+    tmp_path: Path,
+) -> None:
     model = FakeModel([])
 
-    with pytest.raises(ProjectionError, match="candidate concept registry"):
+    with pytest.raises(
+        ProjectionError,
+        match="normalized candidate vocabulary directory",
+    ):
         project_document(
             "federal-register-document-v1",
             "2026-00001",

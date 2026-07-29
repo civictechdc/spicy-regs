@@ -12,7 +12,7 @@ Deterministic layer only:
 With the model layer (concept assignments only; identity stays deterministic):
 
     python3 tools/project_document_to_rkaf.py ... \
-        --registry-file output/fused-concept-registry-v1/registry.parquet \
+        --vocabulary-dir output/normalized-vocabulary-v1 \
         --provider openai --model gpt-5.6-sol
 
 Writes ``<output-dir>/<slug>.rulespec.jsonld``, ``projection-run.json``,
@@ -20,6 +20,11 @@ Writes ``<output-dir>/<slug>.rulespec.jsonld``, ``projection-run.json``,
 document is self-contained for JSON-LD/SHACL processing. With the model layer it
 also writes ``<output-dir>/extraction-run/`` — the full docpipeline run,
 including ``request.json`` and ``response.json`` for every provider call.
+
+Every run requires the exact Rulespec version and constraint digest. Supply
+``--rulespec-revision`` only for a tested committed revision; omitting it
+records an honest local candidate and cannot support an immutable conformance
+claim. Model results on this command remain diagnostic review-queue candidates.
 """
 
 from __future__ import annotations
@@ -44,7 +49,6 @@ from spicy_regs.docpipeline.rkaf_projection import (  # noqa: E402
 
 DEFAULT_CORPUS_DIR = REPO_ROOT / "output" / "segmented-real-data-evaluation-v2"
 DEFAULT_TABLES_DIR = REPO_ROOT / "output" / "rulespec-stabilization-candidate-final"
-DEFAULT_REGISTRY = REPO_ROOT / "output" / "fused-concept-registry-v1" / "registry.parquet"
 CONTEXT_NAME = "rkaf-context.jsonld"
 
 
@@ -106,11 +110,46 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--corpus-dir", type=Path, default=DEFAULT_CORPUS_DIR)
     parser.add_argument("--tables-dir", type=Path, default=DEFAULT_TABLES_DIR)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument(
+        "--rulespec-version",
+        required=True,
+        help="Exact Rulespec semantic version used by this projection.",
+    )
+    parser.add_argument(
+        "--rulespec-constraint-digest",
+        required=True,
+        help="Exact sha256:<64 lowercase hex> Rulespec constraint digest.",
+    )
+    parser.add_argument(
+        "--rulespec-revision",
+        default=None,
+        help=("Exact tested 40-character Git revision. Omit only for a local uncommitted candidate."),
+    )
     parser.add_argument("--no-model", action="store_true", help="Deterministic projection; zero API calls.")
     parser.add_argument("--provider", default="openai", choices=("openai", "anthropic", "openai-compatible"))
     parser.add_argument("--model", default=None, help="Provider model id; defaults to the arm's pinned model.")
     parser.add_argument("--compat-provider", default="", help="Named profile for --provider openai-compatible.")
-    parser.add_argument("--registry-file", type=Path, default=DEFAULT_REGISTRY)
+    parser.add_argument(
+        "--vocabulary-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Directory containing concept_labels.parquet, "
+            "concept_relations.parquet, concept_event_participants.parquet, "
+            "and vocabulary-manifest.jsonld. Required with the model layer."
+        ),
+    )
+    parser.add_argument(
+        "--vocabulary-manifest",
+        type=Path,
+        default=None,
+        help=("Authoritative RKAF JSON-LD manifest; defaults to <vocabulary-dir>/vocabulary-manifest.jsonld."),
+    )
+    parser.add_argument(
+        "--vocabulary-default-language",
+        default="en",
+        help=("BCP 47 language materialized on any scalar authored vocabulary text (default: en)."),
+    )
     parser.add_argument("--prompt-concept-limit", type=int, default=12)
     parser.add_argument(
         "--max-segments",
@@ -133,25 +172,32 @@ def main(argv: list[str] | None = None) -> int:
         shutil.rmtree(output_dir)
     output_dir.mkdir(parents=True)
 
-    settings = ProjectionSettings(
-        corpus_dir=args.corpus_dir,
-        tables_dir=args.tables_dir,
-        partner=args.partner,
-        scope=args.scope,
-        context_ref=f"./{CONTEXT_NAME}",
-        asserted_at=args.asserted_at,
-        registry_path=None if args.no_model else args.registry_file,
-        prompt_concept_limit=args.prompt_concept_limit,
-        max_segments=args.max_segments,
-    )
-
-    model = None
-    model_run_directory = None
-    if not args.no_model:
-        model = build_model(args.provider, args.model, compat_provider=args.compat_provider)
-        model_run_directory = output_dir / "extraction-run"
-
     try:
+        settings = ProjectionSettings(
+            corpus_dir=args.corpus_dir,
+            tables_dir=args.tables_dir,
+            rulespec_version=args.rulespec_version,
+            rulespec_constraint_digest=args.rulespec_constraint_digest,
+            rulespec_source_revision=args.rulespec_revision,
+            partner=args.partner,
+            scope=args.scope,
+            context_ref=f"./{CONTEXT_NAME}",
+            asserted_at=args.asserted_at,
+            vocabulary_directory=None if args.no_model else args.vocabulary_dir,
+            vocabulary_manifest_path=(None if args.no_model else args.vocabulary_manifest),
+            vocabulary_default_language=args.vocabulary_default_language,
+            prompt_concept_limit=args.prompt_concept_limit,
+            max_segments=args.max_segments,
+        )
+        model = None
+        model_run_directory = None
+        if not args.no_model:
+            model = build_model(
+                args.provider,
+                args.model,
+                compat_provider=args.compat_provider,
+            )
+            model_run_directory = output_dir / "extraction-run"
         result = project_document(
             args.profile,
             args.subject,
