@@ -50,7 +50,13 @@ from tests.managed_release_support import build_selected_managed_bundle
 from refspec import (
     ConceptLabel,
     ConceptRelation,
+    ManagedReleaseConceptMapping,
     ReferenceRuntimeStore,
+)
+from refspec.registry import (
+    ConceptDomainBridge,
+    ConceptDomainSourceConcept,
+    ConceptDomainSourceSnapshot,
 )
 from spicy_regs.ontology.attestations import DECISION_APPROVED, DECISIONS
 
@@ -908,7 +914,135 @@ def test_managed_release_drives_the_real_model_path_without_output_authority(
     assert authorization["candidate_permission"]["facet"] == ("urn:ref:facet:general-subject")
     assert authorization["candidate_permission"]["assignmentRole"] == ("https://rulespec.org/ns/v1#assignmentPrimary")
     assert authorization["candidate_permission"]["resourceRoute"] == "document"
+    judgment = result.run_record["judgments"]["accepted"][0]
+    assert judgment["candidate_channels"] == ["lexical"]
+    assert judgment["candidate_rank"] == 1
+    assert judgment["candidate_score"] is None
+    assert judgment["candidate_score_state"] == "notProduced"
+    assert judgment["mapping_paths"] == []
+    assert judgment["selected_channel"] == "lexical"
+    assert judgment["selected_mapping_path"] is None
+    assert result.run_record["model"]["candidate_selection_sha256"]
+    assert result.run_record["model"]["candidate_selection_ledger"]
     assert len(model.calls) == 1
+
+
+def test_mapped_candidate_keeps_its_exact_selection_path(
+    corpus: Path,
+    tables: Path,
+    tmp_path: Path,
+) -> None:
+    source = _managed_release_candidate_source(tmp_path / "managed-release")
+    member_iri = next(
+        expression.member_iri
+        for expression in source.iter_expressions()
+        if expression.original_literal == "Eligibility policy"
+    )
+    source_release = "urn:test:source-release:inspection"
+    source_concept = "urn:test:source-concept:inspection"
+    mapping = ManagedReleaseConceptMapping(
+        mapping_iri="urn:test:mapping:inspection",
+        source_member_iri=source_concept,
+        relation_iri="skos:closeMatch",
+        target_member_iri=member_iri,
+        source_release_iri=source_release,
+        target_release_iri=source.lookup_member(member_iri).release_iri,
+        record={},
+    )
+    bridge = ConceptDomainBridge(
+        development_only=True,
+        source_snapshot=ConceptDomainSourceSnapshot(
+            url="https://example.test/inspection-source.json",
+            revision="test",
+            sha256="sha256:" + "a" * 64,
+        ),
+        source_scheme_iri="urn:test:source-scheme:inspection",
+        source_release_iri=source_release,
+        target_release_iri=source.lookup_member(member_iri).release_iri,
+        source_concepts=(
+            ConceptDomainSourceConcept(
+                concept_iri=source_concept,
+                preferred_labels={"en": "Broiler plant oversight"},
+                alternate_labels={
+                    "en": ("poultry slaughter inspection",)
+                },
+                definitions={},
+                evidence_url=(
+                    "https://example.test/source-concept/inspection"
+                ),
+                record={},
+            ),
+        ),
+        mappings=(mapping,),
+        artifact_sha256="sha256:" + "b" * 64,
+        record={},
+    )
+    model = FakeModel(
+        lambda payload: [
+            tag
+            for tag in [
+                _tag(
+                    payload,
+                    quote="poultry slaughter inspection",
+                    concept_id=member_iri,
+                )
+            ]
+            if tag
+        ]
+    )
+
+    result = project_document(
+        "federal-register-document-v1",
+        "2026-00001",
+        settings=_settings(corpus, tables),
+        model=model,
+        model_run_directory=tmp_path / "mapped-model-run",
+        managed_release_source=source,
+        concept_domain_bridges=(bridge,),
+    )
+
+    judgment = result.run_record["judgments"]["accepted"][0]
+    assert judgment["concept_id"] == member_iri
+    assert judgment["candidate_rank"] == 2
+    assert judgment["candidate_score_state"] == "produced"
+    assert judgment["candidate_channels"] == [
+        "mappedNeighbor",
+        "lexical",
+    ]
+    assert judgment["mapping_paths"] == [
+        {
+            "mapping_iri": mapping.mapping_iri,
+            "relation_iri": mapping.relation_iri,
+            "source_member_iri": mapping.source_member_iri,
+            "target_member_iri": mapping.target_member_iri,
+            "source_release_iri": mapping.source_release_iri,
+            "target_release_iri": mapping.target_release_iri,
+            "direction": "sourceToTarget",
+            "bridge_artifact_sha256": bridge.artifact_sha256,
+            "mapping_set_sha256": (
+                "sha256:"
+                + result.run_record["model"][
+                    "concept_domain_mapping_sha256"
+                ]
+            ),
+        }
+    ]
+    assert judgment["selected_channel"] == "mappedNeighbor"
+    assert (
+        judgment["selected_mapping_path"]
+        == judgment["mapping_paths"][0]
+    )
+    ledger = result.run_record["model"][
+        "candidate_selection_ledger"
+    ]
+    selected = next(
+        row for row in ledger if row["concept_id"] == member_iri
+    )
+    assert selected["mapping_paths"] == judgment["mapping_paths"]
+    assert all(
+        node.get("@id") != source_concept
+        for node in result.document["@graph"]
+    )
 
 
 def test_managed_release_rejects_model_role_outside_exact_permission(

@@ -50,6 +50,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from refspec.registry import ConceptDomainBridge
+
     from spicy_regs.enrichment.managed_release import (
         ManagedReleaseCandidateSource,
     )
@@ -1003,6 +1005,14 @@ class ConceptJudgment:
     candidate_id: str
     evidence_text: str
     alignment_method: str
+    candidate_channels: tuple[str, ...]
+    candidate_rank: int | None
+    candidate_score: float | None
+    candidate_score_state: str
+    indexed_representation_version: str
+    mapping_paths: tuple[Mapping[str, str], ...]
+    selected_channel: str
+    selected_mapping_path: Mapping[str, str] | None
 
 
 @dataclass(frozen=True)
@@ -1025,6 +1035,9 @@ class ModelLayer:
     rejections: tuple[Mapping[str, Any], ...]
     call_count: int
     candidate_permission: Mapping[str, Any] | None = None
+    concept_domain_mapping_sha256: str | None = None
+    candidate_selection_sha256: str = ""
+    candidate_selection_ledger: tuple[Mapping[str, Any], ...] = ()
     segment_count: int = 0
     segments_projected: int = 0
     temperature: float = 0.0
@@ -1055,9 +1068,13 @@ class NormalizedVocabulary:
     """Validated normalized tables plus their authoritative JSON-LD manifest."""
 
     selector_rows: tuple[dict[str, Any], ...]
+    lookup_rows: tuple[dict[str, Any], ...]
     concepts: Mapping[str, VocabularyConcept]
+    candidate_mappings: tuple[Any, ...]
+    mapping_artifact_sha256_by_id: Mapping[str, str]
     manifest_nodes: tuple[Mapping[str, Any], ...]
     content_sha256: str
+    mapping_sha256: str | None
     default_language: str
 
 
@@ -1182,6 +1199,55 @@ def verify_candidate_rows(
             alternate_labels = vocabulary_concept.alternate_labels
             hidden_labels = vocabulary_concept.hidden_labels
             definitions = vocabulary_concept.definitions
+        raw_channels = row.get("candidate_channels")
+        candidate_channels = (
+            tuple(
+                _clean(value)
+                for value in raw_channels
+                if _clean(value)
+            )
+            if isinstance(raw_channels, Sequence)
+            and not isinstance(raw_channels, (str, bytes))
+            else ()
+        )
+        raw_paths = row.get("mapping_paths")
+        mapping_paths = (
+            tuple(
+                {
+                    str(key): str(value)
+                    for key, value in path.items()
+                }
+                for path in raw_paths
+                if isinstance(path, Mapping)
+            )
+            if isinstance(raw_paths, Sequence)
+            and not isinstance(raw_paths, (str, bytes))
+            else ()
+        )
+        raw_rank = row.get("candidate_rank")
+        candidate_rank = (
+            int(raw_rank)
+            if isinstance(raw_rank, int)
+            and not isinstance(raw_rank, bool)
+            and raw_rank > 0
+            else None
+        )
+        raw_score = row.get("candidate_score")
+        candidate_score = (
+            float(raw_score)
+            if isinstance(raw_score, (int, float))
+            and not isinstance(raw_score, bool)
+            else None
+        )
+        raw_selected_path = row.get("selected_mapping_path")
+        selected_mapping_path = (
+            {
+                str(key): str(value)
+                for key, value in raw_selected_path.items()
+            }
+            if isinstance(raw_selected_path, Mapping)
+            else None
+        )
         judgments.append(
             ConceptJudgment(
                 concept_id=concept_id,
@@ -1200,6 +1266,21 @@ def verify_candidate_rows(
                 candidate_id=_clean(row.get("candidate_id")),
                 evidence_text=str(row.get("evidence_text") or ""),
                 alignment_method=_clean(row.get("evidence_alignment_method")),
+                candidate_channels=candidate_channels,
+                candidate_rank=candidate_rank,
+                candidate_score=candidate_score,
+                candidate_score_state=(
+                    _clean(row.get("candidate_score_state"))
+                    or "notRecorded"
+                ),
+                indexed_representation_version=_clean(
+                    row.get("indexed_representation_version")
+                ),
+                mapping_paths=mapping_paths,
+                selected_channel=_clean(
+                    row.get("selected_channel")
+                ),
+                selected_mapping_path=selected_mapping_path,
             )
         )
     return judgments, rejections
@@ -1574,6 +1655,19 @@ def assemble(
                         "selector_version": model_layer.selector_version,
                         "vocabulary_sha256": model_layer.vocabulary_sha256,
                         "vocabulary_default_language": (model_layer.vocabulary_default_language),
+                        "candidate_selection_sha256": (
+                            model_layer.candidate_selection_sha256
+                        ),
+                        **(
+                            {
+                                "concept_domain_mapping_sha256": (
+                                    model_layer.concept_domain_mapping_sha256
+                                )
+                            }
+                            if model_layer.concept_domain_mapping_sha256
+                            is not None
+                            else {}
+                        ),
                     },
                     model_ref=f"{partner}:model:{model_layer.model_id}",
                     prompt_ref=f"{partner}:prompt:concept-tags-v1:{model_layer.instructions_sha256[:16]}",
@@ -1631,6 +1725,26 @@ def assemble(
                     "evidence_urn": judgment.fragment.urn,
                     "evidence_text": judgment.evidence_text,
                     "alignment_method": judgment.alignment_method,
+                    "candidate_channels": list(
+                        judgment.candidate_channels
+                    ),
+                    "candidate_rank": judgment.candidate_rank,
+                    "candidate_score": judgment.candidate_score,
+                    "candidate_score_state": (
+                        judgment.candidate_score_state
+                    ),
+                    "indexed_representation_version": (
+                        judgment.indexed_representation_version
+                    ),
+                    "mapping_paths": [
+                        dict(path) for path in judgment.mapping_paths
+                    ],
+                    "selected_channel": judgment.selected_channel,
+                    "selected_mapping_path": (
+                        dict(judgment.selected_mapping_path)
+                        if judgment.selected_mapping_path is not None
+                        else None
+                    ),
                     "verified": True,
                 }
             )
@@ -1797,10 +1911,21 @@ def assemble(
             "candidate_vocabulary_sha256": model_layer.vocabulary_sha256,
             "candidate_vocabulary_default_language": (model_layer.vocabulary_default_language),
             "candidate_concept_count": model_layer.candidate_concept_count,
+            "candidate_selection_sha256": (
+                model_layer.candidate_selection_sha256
+            ),
+            "candidate_selection_ledger": [
+                dict(record)
+                for record in model_layer.candidate_selection_ledger
+            ],
             "provider_call_count": model_layer.call_count,
             "segment_count": model_layer.segment_count,
             "segments_projected": model_layer.segments_projected,
         }
+        if model_layer.concept_domain_mapping_sha256 is not None:
+            run_record["model"]["concept_domain_mapping_sha256"] = (
+                model_layer.concept_domain_mapping_sha256
+            )
         if model_layer.segments_projected < model_layer.segment_count:
             run_record["notes"].append(
                 f"only {model_layer.segments_projected} of {model_layer.segment_count} segments were sent "
@@ -1928,9 +2053,11 @@ def managed_release_candidate_vocabulary(
     source: "ManagedReleaseCandidateSource",
     *,
     default_language: str,
+    concept_domain_bridges: Sequence["ConceptDomainBridge"] = (),
 ) -> NormalizedVocabulary:
-    """Build a selector view from one RefSpec-authorized managed release."""
+    """Build an output view plus optional RefSpec-owned search anchors."""
 
+    from refspec.registry import ConceptDomainBridge
     from spicy_regs.enrichment.managed_release import (
         ManagedReleaseCandidateSource,
     )
@@ -2039,18 +2166,139 @@ def managed_release_candidate_vocabulary(
 
     if not concepts:
         raise ProjectionError("managed release has no language-tagged preferred-label candidates")
+    lookup_rows = list(selector_rows)
+    candidate_mappings: list[Any] = []
+    mapping_artifact_sha256_by_id: dict[str, str] = {}
+    bridge_pins: list[dict[str, Any]] = []
+    lookup_ids = {str(row["concept_id"]) for row in lookup_rows}
+    for bridge in concept_domain_bridges:
+        if not isinstance(bridge, ConceptDomainBridge):
+            raise ProjectionError(
+                "concept-domain lookup requires a RefSpec ConceptDomainBridge"
+            )
+        if not bridge.development_only:
+            raise ProjectionError(
+                "the experimental concept-domain bridge must remain "
+                "developmentOnly"
+            )
+        for mapping in bridge.mappings:
+            if (
+                mapping.target_release_iri != bridge.target_release_iri
+                or mapping.target_member_iri not in concepts
+            ):
+                raise ProjectionError(
+                    f"mapping {mapping.mapping_iri!r} does not target the "
+                    "authorized managed release"
+                )
+        for anchor in bridge.source_concepts:
+            if anchor.concept_iri in lookup_ids:
+                raise ProjectionError(
+                    f"concept-domain lookup repeats {anchor.concept_iri!r}"
+                )
+            preferred = dict(anchor.preferred_labels)
+            alternate = dict(anchor.alternate_labels)
+            definitions = dict(anchor.definitions)
+            lookup_rows.append(
+                {
+                    "concept_id": anchor.concept_iri,
+                    "facet": selector_facet,
+                    "source_vocabulary": bridge.source_scheme_iri,
+                    "scheme": selector_facet,
+                    "pref_label": (
+                        preferred[default_language]
+                        if default_language in preferred
+                        else preferred[sorted(preferred)[0]]
+                    ),
+                    "alt_labels_json": canonical_json(
+                        [
+                            value
+                            for language in sorted(alternate)
+                            for value in alternate[language]
+                        ]
+                    ),
+                    "definition": (
+                        definitions[
+                            (
+                                default_language
+                                if default_language in definitions
+                                else sorted(definitions)[0]
+                            )
+                        ][0]
+                        if definitions
+                        else ""
+                    ),
+                    "status": "active",
+                    "external_ids_json": canonical_json(
+                        [
+                            {
+                                "scheme": "sourceConcept",
+                                "value": anchor.concept_iri,
+                                "iri": anchor.evidence_url,
+                            }
+                        ]
+                    ),
+                }
+            )
+            lookup_ids.add(anchor.concept_iri)
+        for mapping in bridge.mappings:
+            if mapping.mapping_iri in mapping_artifact_sha256_by_id:
+                raise ProjectionError(
+                    f"concept-domain mapping {mapping.mapping_iri!r} "
+                    "appears in more than one bridge"
+                )
+            candidate_mappings.append(mapping)
+            mapping_artifact_sha256_by_id[mapping.mapping_iri] = (
+                bridge.artifact_sha256
+            )
+        bridge_pins.append(
+            {
+                "artifactSha256": bridge.artifact_sha256,
+                "sourceRelease": bridge.source_release_iri,
+                "targetRelease": bridge.target_release_iri,
+            }
+        )
+
+    mapping_identity = [
+        {
+            "mapping": mapping.mapping_iri,
+            "relation": mapping.relation_iri,
+            "source": mapping.source_member_iri,
+            "target": mapping.target_member_iri,
+            "sourceRelease": mapping.source_release_iri,
+            "targetRelease": mapping.target_release_iri,
+        }
+        for mapping in sorted(
+            candidate_mappings,
+            key=lambda item: item.mapping_iri,
+        )
+    ]
+    mapping_sha256 = (
+        hashlib.sha256(
+            canonical_json(mapping_identity).encode("utf-8")
+        ).hexdigest()
+        if mapping_identity
+        else None
+    )
     content_identity = {
         "expressionCorpusSnapshot": dict(source.expression_corpus_snapshot),
         "lookupIndexManifest": dict(source.lookup_index_manifest),
         "defaultLanguage": default_language,
         "permissionFacet": permission_facet,
         "selectorFacet": selector_facet,
+        "conceptDomainBridges": bridge_pins,
+        "mappingSha256": mapping_sha256,
     }
     return NormalizedVocabulary(
         selector_rows=tuple(selector_rows),
+        lookup_rows=tuple(lookup_rows),
         concepts=concepts,
+        candidate_mappings=tuple(candidate_mappings),
+        mapping_artifact_sha256_by_id=(
+            mapping_artifact_sha256_by_id
+        ),
         manifest_nodes=tuple(concept_nodes),
         content_sha256=hashlib.sha256(canonical_json(content_identity).encode("utf-8")).hexdigest(),
+        mapping_sha256=mapping_sha256,
         default_language=default_language,
     )
 
@@ -2328,13 +2576,17 @@ def load_migration_normalized_vocabulary_directory(
         raise ProjectionError("normalized vocabulary has no authored concepts")
     return NormalizedVocabulary(
         selector_rows=tuple(selector_rows),
+        lookup_rows=tuple(selector_rows),
         concepts=concepts,
+        candidate_mappings=(),
+        mapping_artifact_sha256_by_id={},
         manifest_nodes=tuple(graph),
         content_sha256=_rows_digest(
             required_paths[:3],
             manifest,
             default_language=default_language,
         ),
+        mapping_sha256=None,
         default_language=default_language,
     )
 
@@ -2384,12 +2636,14 @@ def run_managed_release_model_layer(
     artifact_iri: str,
     prompt_concept_limit: int = 12,
     max_segments: int = 0,
+    concept_domain_bridges: Sequence["ConceptDomainBridge"] = (),
 ) -> ModelLayer:
     """Run candidate lookup only through a verified managed-release source."""
 
     vocabulary = managed_release_candidate_vocabulary(
         candidate_source,
         default_language=vocabulary_default_language,
+        concept_domain_bridges=concept_domain_bridges,
     )
     selector_facets = {str(row["facet"]) for row in vocabulary.selector_rows}
     if len(selector_facets) != 1:
@@ -2464,6 +2718,11 @@ def _run_model_layer_with_vocabulary(
     from spicy_regs.docpipeline.runtime import RunPlan
     from spicy_regs.docpipeline.segments import SegmentSettings, segment_artifact
     from spicy_regs.docpipeline.tag_task import TagExtractionTask, tag_unit
+    from spicy_regs.enrichment.connected_concepts import (
+        CONNECTED_INDEXED_REPRESENTATION_VERSION,
+        CONNECTED_SELECTOR_VERSION,
+        select_connected_candidate_concepts,
+    )
     from spicy_regs.ontology.concepts import (
         ANCHORED_SELECTOR_VERSION,
         select_candidate_concepts_anchored_v2,
@@ -2471,7 +2730,13 @@ def _run_model_layer_with_vocabulary(
     from spicy_regs.ontology.segmentation import TiktokenCounter
 
     concepts = list(vocabulary.selector_rows)
+    lookup_concepts = list(vocabulary.lookup_rows)
     vocabulary_sha256 = vocabulary.content_sha256
+    selector_version = (
+        CONNECTED_SELECTOR_VERSION
+        if vocabulary.candidate_mappings
+        else ANCHORED_SELECTOR_VERSION
+    )
     counter = TiktokenCounter()
     settings = SegmentSettings.selected(tokenizer_version=counter.version)
     segmented = segment_artifact(artifact, settings=settings, counter=counter)
@@ -2489,20 +2754,158 @@ def _run_model_layer_with_vocabulary(
     task = TagExtractionTask()
     units = []
     candidate_total = 0
+    candidate_selection_ledger: list[dict[str, Any]] = []
+    candidate_selection_by_key: dict[
+        tuple[str, str],
+        dict[str, Any],
+    ] = {}
     for segment in segments:
         text = "\n".join(slice_.text for slice_ in segment.slices)
-        candidates = select_candidate_concepts_anchored_v2(
-            text,
-            concepts,
-            allowed_facets=tuple(allowed_facets),
-            limit=prompt_concept_limit,
+        candidates = (
+            select_connected_candidate_concepts(
+                text,
+                lookup_concepts=lookup_concepts,
+                output_concepts=concepts,
+                mappings=vocabulary.candidate_mappings,
+                allowed_facets=tuple(allowed_facets),
+                limit=prompt_concept_limit,
+            )
+            if vocabulary.candidate_mappings
+            else select_candidate_concepts_anchored_v2(
+                text,
+                concepts,
+                allowed_facets=tuple(allowed_facets),
+                limit=prompt_concept_limit,
+            )
         )
         if not candidates:
             continue
+        for rank, candidate in enumerate(candidates, start=1):
+            concept_id = _clean(candidate.get("concept_id"))
+            concept = vocabulary.concepts.get(concept_id)
+            if concept is None:
+                raise ProjectionError(
+                    f"candidate selector returned unauthorized concept "
+                    f"{concept_id!r}"
+                )
+            raw_paths = candidate.get("mapping_paths")
+            mapping_paths: list[dict[str, str]] = []
+            if isinstance(raw_paths, Sequence) and not isinstance(
+                raw_paths,
+                (str, bytes),
+            ):
+                for raw_path in raw_paths:
+                    if not isinstance(raw_path, Mapping):
+                        raise ProjectionError(
+                            "candidate mapping path must be an object"
+                        )
+                    path = {
+                        str(key): str(value)
+                        for key, value in raw_path.items()
+                    }
+                    mapping_id = path.get("mapping_iri", "")
+                    artifact_sha256 = (
+                        vocabulary.mapping_artifact_sha256_by_id.get(
+                            mapping_id
+                        )
+                    )
+                    if not artifact_sha256:
+                        raise ProjectionError(
+                            f"candidate mapping {mapping_id!r} lost its "
+                            "RefSpec bridge artifact"
+                        )
+                    path["bridge_artifact_sha256"] = artifact_sha256
+                    if vocabulary.mapping_sha256 is not None:
+                        path["mapping_set_sha256"] = (
+                            "sha256:" + vocabulary.mapping_sha256
+                        )
+                    mapping_paths.append(path)
+            raw_selected_path = candidate.get(
+                "selected_mapping_path"
+            )
+            selected_mapping_path: dict[str, str] | None = None
+            if isinstance(raw_selected_path, Mapping):
+                selected_mapping_id = _clean(
+                    raw_selected_path.get("mapping_iri")
+                )
+                selected_mapping_path = next(
+                    (
+                        path
+                        for path in mapping_paths
+                        if path.get("mapping_iri")
+                        == selected_mapping_id
+                    ),
+                    None,
+                )
+                if selected_mapping_path is None:
+                    raise ProjectionError(
+                        f"selected mapping {selected_mapping_id!r} "
+                        "is absent from the candidate path set"
+                    )
+            raw_channels = candidate.get("candidate_channels")
+            channels = (
+                [
+                    _clean(value)
+                    for value in raw_channels
+                    if _clean(value)
+                ]
+                if isinstance(raw_channels, Sequence)
+                and not isinstance(raw_channels, (str, bytes))
+                else ["lexical"]
+            )
+            raw_score = candidate.get("candidate_score")
+            score = (
+                float(raw_score)
+                if isinstance(raw_score, (int, float))
+                and not isinstance(raw_score, bool)
+                else None
+            )
+            record = {
+                "segment_id": segment.segment_id,
+                "concept_id": concept_id,
+                "scheme_iri": concept.scheme_iri,
+                "release_iri": concept.release_iri,
+                "candidate_channels": channels,
+                "candidate_rank": rank,
+                "candidate_score": score,
+                "candidate_score_state": (
+                    _clean(candidate.get("candidate_score_state"))
+                    or "notProduced"
+                ),
+                "indexed_representation_version": (
+                    _clean(
+                        candidate.get(
+                            "indexed_representation_version"
+                        )
+                    )
+                    or (
+                        CONNECTED_INDEXED_REPRESENTATION_VERSION
+                        if vocabulary.candidate_mappings
+                        else f"{selector_version}:normalized-labels"
+                    )
+                ),
+                "mapping_paths": mapping_paths,
+                "selected_channel": (
+                    _clean(candidate.get("selected_channel"))
+                    or channels[0]
+                ),
+                "selected_mapping_path": selected_mapping_path,
+            }
+            key = (segment.segment_id, concept_id)
+            if key in candidate_selection_by_key:
+                raise ProjectionError(
+                    f"candidate selector repeated {concept_id!r} in "
+                    f"segment {segment.segment_id!r}"
+                )
+            candidate_selection_by_key[key] = record
+            candidate_selection_ledger.append(record)
         candidate_total += len(candidates)
         units.append(tag_unit(artifact, segment, candidates))
     if not units:
         raise ProjectionError("the candidate selector offered no concepts for any segment")
+    candidate_selection_sha256 = text_digest(
+        canonical_json(candidate_selection_ledger)
+    )
 
     items = plan_extraction_items(task, model, units)
     provider = getattr(model, "run_configuration", None)
@@ -2520,8 +2923,23 @@ def _run_model_layer_with_vocabulary(
         vocabulary={
             "vocabulary_sha256": vocabulary_sha256,
             "vocabulary_default_language": vocabulary.default_language,
-            "candidate_selector": ANCHORED_SELECTOR_VERSION,
+            "candidate_selector": selector_version,
             "prompt_concept_limit": prompt_concept_limit,
+            **(
+                {
+                    "concept_domain_mapping_sha256": (
+                        vocabulary.mapping_sha256
+                    )
+                }
+                if vocabulary.mapping_sha256 is not None
+                else {}
+            ),
+        },
+        retrieval={
+            "candidate_selection_sha256": (
+                candidate_selection_sha256
+            ),
+            "candidate_selection_ledger": candidate_selection_ledger,
         },
         extraction=extraction_plan_facts(task, units),
         provider=(
@@ -2534,6 +2952,44 @@ def _run_model_layer_with_vocabulary(
         raise ProjectionError(f"the concept-tag extraction run did not pass: {outcome.outcome.final_state}")
 
     rows = task.candidate_rows(outcome.candidates)
+    for row in rows:
+        concept_id = _clean(row.get("concept_id"))
+        if not concept_id:
+            continue
+        selection = candidate_selection_by_key.get(
+            (_clean(row.get("segment_id")), concept_id)
+        )
+        if selection is None:
+            raise ProjectionError(
+                f"model candidate {concept_id!r} has no recorded "
+                "selection path"
+            )
+        row.update(
+            {
+                "candidate_channels": list(
+                    selection["candidate_channels"]
+                ),
+                "candidate_rank": selection["candidate_rank"],
+                "candidate_score": selection["candidate_score"],
+                "candidate_score_state": selection[
+                    "candidate_score_state"
+                ],
+                "indexed_representation_version": selection[
+                    "indexed_representation_version"
+                ],
+                "mapping_paths": [
+                    dict(path)
+                    for path in selection["mapping_paths"]
+                ],
+                "selected_channel": selection["selected_channel"],
+                "selected_mapping_path": (
+                    dict(selection["selected_mapping_path"])
+                    if selection["selected_mapping_path"]
+                    is not None
+                    else None
+                ),
+            }
+        )
     judgments, rejections = verify_candidate_rows(
         artifact,
         rows,
@@ -2562,7 +3018,7 @@ def _run_model_layer_with_vocabulary(
         input_context_sha256=text_digest(canonical_json([dict(unit.input) for unit in units])),
         run_directory=str(run_directory),
         receipt_sha256=str(receipt.get("receipt_sha256", "")),
-        selector_version=ANCHORED_SELECTOR_VERSION,
+        selector_version=selector_version,
         vocabulary_sha256=vocabulary_sha256,
         vocabulary_default_language=vocabulary.default_language,
         vocabulary_nodes=vocabulary.manifest_nodes,
@@ -2572,6 +3028,11 @@ def _run_model_layer_with_vocabulary(
         rejections=tuple(rejections),
         call_count=len(units),
         candidate_permission=candidate_permission,
+        concept_domain_mapping_sha256=vocabulary.mapping_sha256,
+        candidate_selection_sha256=candidate_selection_sha256,
+        candidate_selection_ledger=tuple(
+            candidate_selection_ledger
+        ),
         segment_count=segment_count,
         segments_projected=len(segments),
     )
@@ -2585,6 +3046,7 @@ def project_document(
     model: Any = None,
     model_run_directory: Path | None = None,
     managed_release_source: "ManagedReleaseCandidateSource | None" = None,
+    concept_domain_bridges: Sequence["ConceptDomainBridge"] = (),
 ) -> ProjectionResult:
     """Project one document into RKAF diagnostic output.
 
@@ -2597,6 +3059,11 @@ def project_document(
     facts = build_profile_facts(artifact, row, tables=tables, partner=settings.partner)
     model_layer: ModelLayer | None = None
     if model is not None:
+        if concept_domain_bridges and managed_release_source is None:
+            raise ProjectionError(
+                "concept_domain_bridges require a managed-release "
+                "candidate source"
+            )
         if managed_release_source is not None and settings.migration_vocabulary_directory is not None:
             raise ProjectionError(
                 "choose either the managed-release candidate source or the migration-only vocabulary directory"
@@ -2620,6 +3087,7 @@ def project_document(
                 artifact_iri=facts.artifact_iri,
                 prompt_concept_limit=settings.prompt_concept_limit,
                 max_segments=settings.max_segments,
+                concept_domain_bridges=concept_domain_bridges,
             )
         else:
             assert settings.migration_vocabulary_directory is not None
@@ -2635,6 +3103,9 @@ def project_document(
                 prompt_concept_limit=settings.prompt_concept_limit,
                 max_segments=settings.max_segments,
             )
-    elif managed_release_source is not None:
-        raise ProjectionError("managed_release_source is only used by the diagnostic model layer")
+    elif managed_release_source is not None or concept_domain_bridges:
+        raise ProjectionError(
+            "managed_release_source and concept_domain_bridges are only "
+            "used by the diagnostic model layer"
+        )
     return assemble(artifact, facts, settings=settings, model_layer=model_layer)

@@ -30,6 +30,7 @@ claim. Model results on this command remain diagnostic review-queue candidates.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import shutil
@@ -41,19 +42,124 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "src"))
 
+from refspec import ManagedReleaseError  # noqa: E402
+from refspec.registry import (  # noqa: E402
+    ConceptDomainBridgeError,
+    load_concept_domain_bridge,
+)
 from spicy_regs.docpipeline.rkaf_projection import (  # noqa: E402
     ProjectionError,
     ProjectionSettings,
     project_document,
 )
+from spicy_regs.enrichment import (  # noqa: E402
+    ManagedReleaseCandidateSource,
+    ManagedReleaseConsumerError,
+)
 
 DEFAULT_CORPUS_DIR = REPO_ROOT / "output" / "segmented-real-data-evaluation-v2"
 DEFAULT_TABLES_DIR = REPO_ROOT / "output" / "rulespec-stabilization-candidate-final"
 CONTEXT_NAME = "rkaf-context.jsonld"
+DEFAULT_MANAGED_RELEASE_FACET = "urn:ref:facet:general-subject"
+DEFAULT_MANAGED_RELEASE_ASSIGNMENT_ROLE = (
+    "https://rulespec.org/ns/v1#assignmentPrimary"
+)
+DEFAULT_MANAGED_RELEASE_RESOURCE_ROUTE = "document"
 
 
 def _slug(value: str) -> str:
     return re.sub(r"[^A-Za-z0-9]+", "-", value).strip("-").lower() or "document"
+
+
+def _managed_lookup_index_manifest(
+    *,
+    managed_release_manifest_digest: str,
+    concept_domain_bridge_digest: str | None,
+    permission_facet_iri: str,
+    permission_assignment_role_iri: str,
+    permission_resource_route: str,
+    default_language: str,
+) -> dict[str, str]:
+    """Derive the in-memory lookup index pin from every behavior input."""
+
+    identity = {
+        "schemaVersion": "managed-release-candidate-lookup-index/v1",
+        "lookupAdapter": "spicy-regs-managed-release-candidate-vocabulary/v1",
+        "managedReleaseManifestDigest": managed_release_manifest_digest,
+        "conceptDomainBridgeDigests": (
+            [concept_domain_bridge_digest]
+            if concept_domain_bridge_digest is not None
+            else []
+        ),
+        "permission": {
+            "facet": permission_facet_iri,
+            "assignmentRole": permission_assignment_role_iri,
+            "resourceRoute": permission_resource_route,
+        },
+        "defaultLanguage": default_language,
+    }
+    encoded = json.dumps(
+        identity,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    digest = "sha256:" + hashlib.sha256(encoded).hexdigest()
+    return {
+        "id": (
+            "urn:spicy-regs:lookup-index:"
+            f"{digest.removeprefix('sha256:')}"
+        ),
+        "digest": digest,
+    }
+
+
+def _validate_vocabulary_arguments(
+    args: argparse.Namespace,
+    parser: argparse.ArgumentParser,
+) -> None:
+    managed_manifest_present = (
+        args.managed_release_manifest is not None
+    )
+    managed_digest_present = (
+        args.managed_release_manifest_digest is not None
+    )
+    if managed_manifest_present != managed_digest_present:
+        parser.error(
+            "--managed-release-manifest and "
+            "--managed-release-manifest-digest must be supplied together"
+        )
+
+    bridge_path_present = args.concept_domain_bridge is not None
+    bridge_digest_present = (
+        args.concept_domain_bridge_digest is not None
+    )
+    if bridge_path_present != bridge_digest_present:
+        parser.error(
+            "--concept-domain-bridge and "
+            "--concept-domain-bridge-digest must be supplied together"
+        )
+    if bridge_path_present and not managed_manifest_present:
+        parser.error(
+            "--concept-domain-bridge requires --managed-release-manifest"
+        )
+
+    migration_present = (
+        args.migration_vocabulary_dir is not None
+        or args.migration_vocabulary_manifest is not None
+    )
+    if managed_manifest_present and migration_present:
+        parser.error(
+            "choose either the managed release or the migration-only "
+            "vocabulary, not both"
+        )
+    if args.no_model and (
+        managed_manifest_present or bridge_path_present
+    ):
+        parser.error(
+            "managed releases and concept-domain bridges are used only by "
+            "the diagnostic model layer; remove --no-model"
+        )
 
 
 def build_model(provider: str, model_id: str | None, *, compat_provider: str = "") -> Any:
@@ -149,6 +255,65 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--managed-release-manifest",
+        type=Path,
+        default=None,
+        help=(
+            "Exact RefSpec managed-release bundle manifest for candidate "
+            "lookup. Requires its digest; permission selectors have "
+            "candidate-only defaults below."
+        ),
+    )
+    parser.add_argument(
+        "--managed-release-manifest-digest",
+        default=None,
+        help=(
+            "Exact sha256:<64 lowercase hex> digest of "
+            "--managed-release-manifest."
+        ),
+    )
+    parser.add_argument(
+        "--managed-release-permission-facet",
+        default=DEFAULT_MANAGED_RELEASE_FACET,
+        help=(
+            "Exact RefSpec facet IRI authorized for candidate use "
+            f"(default: {DEFAULT_MANAGED_RELEASE_FACET})."
+        ),
+    )
+    parser.add_argument(
+        "--managed-release-permission-assignment-role",
+        default=DEFAULT_MANAGED_RELEASE_ASSIGNMENT_ROLE,
+        help=(
+            "Exact Rulespec assignment-role IRI authorized for candidate use "
+            f"(default: {DEFAULT_MANAGED_RELEASE_ASSIGNMENT_ROLE})."
+        ),
+    )
+    parser.add_argument(
+        "--managed-release-permission-resource-route",
+        default=DEFAULT_MANAGED_RELEASE_RESOURCE_ROUTE,
+        help=(
+            "Exact EnrichmentProfile resource route authorized for candidate "
+            f"use (default: {DEFAULT_MANAGED_RELEASE_RESOURCE_ROUTE})."
+        ),
+    )
+    parser.add_argument(
+        "--concept-domain-bridge",
+        type=Path,
+        default=None,
+        help=(
+            "Pinned development-only RefSpec concept-domain bridge used to "
+            "expand managed-release candidate lookup."
+        ),
+    )
+    parser.add_argument(
+        "--concept-domain-bridge-digest",
+        default=None,
+        help=(
+            "Exact sha256:<64 lowercase hex> digest of "
+            "--concept-domain-bridge."
+        ),
+    )
+    parser.add_argument(
         "--vocabulary-default-language",
         default="en",
         help=("BCP 47 language materialized on any scalar authored vocabulary text (default: en)."),
@@ -166,6 +331,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--context-file", type=Path, default=None, help="rkaf-context.jsonld to copy alongside.")
     parser.add_argument("--force", action="store_true", help="Overwrite an existing output directory.")
     args = parser.parse_args(argv)
+    _validate_vocabulary_arguments(args, parser)
 
     output_dir = args.output_dir
     if output_dir.exists():
@@ -200,7 +366,64 @@ def main(argv: list[str] | None = None) -> int:
         )
         model = None
         model_run_directory = None
+        managed_release_source = None
+        concept_domain_bridges = ()
         if not args.no_model:
+            if args.managed_release_manifest is not None:
+                assert (
+                    args.managed_release_manifest_digest is not None
+                )
+                lookup_index_manifest = (
+                    _managed_lookup_index_manifest(
+                        managed_release_manifest_digest=(
+                            args.managed_release_manifest_digest
+                        ),
+                        concept_domain_bridge_digest=(
+                            args.concept_domain_bridge_digest
+                        ),
+                        permission_facet_iri=(
+                            args.managed_release_permission_facet
+                        ),
+                        permission_assignment_role_iri=(
+                            args.managed_release_permission_assignment_role
+                        ),
+                        permission_resource_route=(
+                            args.managed_release_permission_resource_route
+                        ),
+                        default_language=(
+                            args.vocabulary_default_language
+                        ),
+                    )
+                )
+                managed_release_source = (
+                    ManagedReleaseCandidateSource.open(
+                        args.managed_release_manifest,
+                        expected_manifest_digest=(
+                            args.managed_release_manifest_digest
+                        ),
+                        lookup_index_manifest=lookup_index_manifest,
+                        permission_facet_iri=(
+                            args.managed_release_permission_facet
+                        ),
+                        permission_assignment_role_iri=(
+                            args.managed_release_permission_assignment_role
+                        ),
+                        permission_resource_route=(
+                            args.managed_release_permission_resource_route
+                        ),
+                    )
+                )
+                if args.concept_domain_bridge is not None:
+                    assert args.concept_domain_bridge_digest is not None
+                    concept_domain_bridges = (
+                        load_concept_domain_bridge(
+                            args.concept_domain_bridge,
+                            expected_sha256=(
+                                args.concept_domain_bridge_digest
+                            ),
+                            target_view=managed_release_source.view,
+                        ),
+                    )
             model = build_model(
                 args.provider,
                 args.model,
@@ -213,8 +436,15 @@ def main(argv: list[str] | None = None) -> int:
             settings=settings,
             model=model,
             model_run_directory=model_run_directory,
+            managed_release_source=managed_release_source,
+            concept_domain_bridges=concept_domain_bridges,
         )
-    except ProjectionError as error:
+    except (
+        ConceptDomainBridgeError,
+        ManagedReleaseConsumerError,
+        ManagedReleaseError,
+        ProjectionError,
+    ) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 1
 
