@@ -1,0 +1,1002 @@
+{
+  "schemaVersion": "1.0",
+  "datasetId": "elsst-r6-forward-development-v1-proposal",
+  "rows": [
+    {
+      "rowId": "life-morbidity",
+      "partition": "developmentOnly",
+      "reviewStatus": "proposedUnsealed",
+      "challenge": "lifecycleReplacement",
+      "sourceArtifactId": "cfr29",
+      "mention": {
+        "startChar": 223876,
+        "endChar": 223885,
+        "text": "Morbidity",
+        "language": "en",
+        "digest": "sha256:5e6844e3e14505d9ddb7a2854934f274ce94b0636427b0b8eaf4837232e6d41f"
+      },
+      "evidence": {
+        "startChar": 223775,
+        "endChar": 224041,
+        "text": "process. Relevant toxic effects in humans and/or animals include, but are not limited to:</P>\n<P>(a) Morbidity resulting from single exposure;</P>\n<P>(b) Significant functional changes, more than transient in nature, in the respiratory system, central or peripheral ",
+        "digest": "sha256:979be8820e4c18837a037112c65f4010ebe18469e689b0c932be4d7787877233"
+      },
+      "segment": {
+        "configId": "structure-first-1200",
+        "segmentId": "experiment_segment_3e8436280a070898c148d959",
+        "ordinal": 45,
+        "sourceSliceStartChar": 223869,
+        "sourceSliceEndChar": 223922
+      },
+      "expectedOutcome": "target",
+      "target": {
+        "releaseConceptIri": "https://elsst.cessda.eu/id/6/a240475a-711e-48ce-9f48-e4f172259040",
+        "stableConceptIri": "https://elsst.cessda.eu/id/a240475a-711e-48ce-9f48-e4f172259040",
+        "prefLabel": {
+          "en": "ILL HEALTH"
+        },
+        "matchedExpression": {
+          "predicate": "http://www.w3.org/2004/02/skos/core#altLabel",
+          "language": "en",
+          "value": "MORBIDITY"
+        },
+        "active": true,
+        "directBroader": [
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/91c1b36f-85ff-4345-9678-86a4950fe57a",
+            "stableConceptIri": "https://elsst.cessda.eu/id/91c1b36f-85ff-4345-9678-86a4950fe57a",
+            "prefLabel": {
+              "en": "HEALTH"
+            }
+          }
+        ]
+      },
+      "lifecycle": {
+        "operation": "replacement",
+        "replacementPredicate": "http://purl.org/dc/terms/isReplacedBy",
+        "forbiddenPredecessor": {
+          "releaseConceptIri": "https://elsst.cessda.eu/id/6/c0444747-51c4-4242-8fe2-06c1a4db659c",
+          "stableConceptIri": "https://elsst.cessda.eu/id/c0444747-51c4-4242-8fe2-06c1a4db659c",
+          "prefLabel": {
+            "en": "MORBIDITY"
+          },
+          "deprecated": true
+        },
+        "requiredSuccessor": "https://elsst.cessda.eu/id/6/a240475a-711e-48ce-9f48-e4f172259040"
+      }
+    },
+    {
+      "rowId": "life-environmental-degradation",
+      "partition": "developmentOnly",
+      "reviewStatus": "proposedUnsealed",
+      "challenge": "lifecycleReplacement",
+      "sourceArtifactId": "bill8862",
+      "mention": {
+        "startChar": 265143,
+        "endChar": 265168,
+        "text": "environmental degradation",
+        "language": "en",
+        "digest": "sha256:2220493ab6c5ec913430807f1024645cbaca2c4765dc1d50f8a4dc55c4d9b397"
+      },
+      "evidence": {
+        "startChar": 265037,
+        "endChar": 265320,
+        "text": "id=\"H4865102EA35D41E4A0C1DF7D27C9DB91\" commented=\"no\"><enum>(B)</enum><text>is sensitive to human-induced environmental degradation;</text></subparagraph> \n<subparagraph id=\"H75A5107C6942450AB70315A797C32522\" commented=\"no\"><enum>(C)</enum><text>is or will be significantly stressed ",
+        "digest": "sha256:91bdc2f37f3c7a9afd35f94281b052ccb517d174833ade8635e5377881aeecc2"
+      },
+      "segment": {
+        "configId": "structure-first-1200",
+        "segmentId": "experiment_segment_81179c54d7b305899f92c12f",
+        "ordinal": 67,
+        "sourceSliceStartChar": 261732,
+        "sourceSliceEndChar": 265608
+      },
+      "expectedOutcome": "target",
+      "target": {
+        "releaseConceptIri": "https://elsst.cessda.eu/id/6/5a40a735-1eca-4afa-930c-0b131f06e8af",
+        "stableConceptIri": "https://elsst.cessda.eu/id/5a40a735-1eca-4afa-930c-0b131f06e8af",
+        "prefLabel": {
+          "en": "ENVIRONMENTAL CHANGES"
+        },
+        "matchedExpression": {
+          "predicate": "http://www.w3.org/2004/02/skos/core#altLabel",
+          "language": "en",
+          "value": "ENVIRONMENTAL DEGRADATION"
+        },
+        "active": true,
+        "directBroader": [
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/a74cd285-d1c6-4e55-8c0d-faf0fe94399f",
+            "stableConceptIri": "https://elsst.cessda.eu/id/a74cd285-d1c6-4e55-8c0d-faf0fe94399f",
+            "prefLabel": {
+              "en": "ENVIRONMENT"
+            }
+          }
+        ]
+      },
+      "lifecycle": {
+        "operation": "replacement",
+        "replacementPredicate": "http://purl.org/dc/terms/isReplacedBy",
+        "forbiddenPredecessor": {
+          "releaseConceptIri": "https://elsst.cessda.eu/id/6/bfde4f9b-6466-4c39-8680-39218dbb3580",
+          "stableConceptIri": "https://elsst.cessda.eu/id/bfde4f9b-6466-4c39-8680-39218dbb3580",
+          "prefLabel": {
+            "en": "ENVIRONMENTAL DEGRADATION"
+          },
+          "deprecated": true
+        },
+        "requiredSuccessor": "https://elsst.cessda.eu/id/6/5a40a735-1eca-4afa-930c-0b131f06e8af"
+      }
+    },
+    {
+      "rowId": "alias-otc-drugs",
+      "partition": "developmentOnly",
+      "reviewStatus": "proposedUnsealed",
+      "challenge": "aliasHierarchy",
+      "sourceArtifactId": "cfr29",
+      "mention": {
+        "startChar": 9618,
+        "endChar": 9640,
+        "text": "over-the-counter drugs",
+        "language": "en",
+        "digest": "sha256:d8efb2c6c6c92a705f95d69dc7446da1d46ad472c3c4579040ca800e8704cad8"
+      },
+      "evidence": {
+        "startChar": 9509,
+        "endChar": 9794,
+        "text": "drugs which are packaged by the chemical manufacturer for sale to consumers in a retail establishment (e.g., over-the-counter drugs); and drugs intended for personal consumption by employees while in the workplace (e.g., first aid supplies);</P>\n<P>(viii) Cosmetics which are packaged ",
+        "digest": "sha256:ebb76b330892eece84302901fd15d68d06aa3b34a71dc97ee9d087dc415ea732"
+      },
+      "segment": {
+        "configId": "structure-first-1200",
+        "segmentId": "experiment_segment_988b78ad3d569ae2ecad4ba6",
+        "ordinal": 1,
+        "sourceSliceStartChar": 9291,
+        "sourceSliceEndChar": 9755
+      },
+      "expectedOutcome": "target",
+      "target": {
+        "releaseConceptIri": "https://elsst.cessda.eu/id/6/9f1783d7-154d-407d-be2f-9b80537dd56a",
+        "stableConceptIri": "https://elsst.cessda.eu/id/9f1783d7-154d-407d-be2f-9b80537dd56a",
+        "prefLabel": {
+          "en": "NON-PRESCRIPTION DRUGS"
+        },
+        "matchedExpression": {
+          "predicate": "http://www.w3.org/2004/02/skos/core#altLabel",
+          "language": "en",
+          "value": "OVER-THE-COUNTER DRUGS"
+        },
+        "active": true,
+        "directBroader": [
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/5cb83341-1c8a-4925-974d-7bff5be8c9d5",
+            "stableConceptIri": "https://elsst.cessda.eu/id/5cb83341-1c8a-4925-974d-7bff5be8c9d5",
+            "prefLabel": {
+              "en": "MEDICAL SELF-TREATMENT"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "rowId": "alias-employer-contributions",
+      "partition": "developmentOnly",
+      "reviewStatus": "proposedUnsealed",
+      "challenge": "aliasHierarchy",
+      "sourceArtifactId": "cfr26",
+      "mention": {
+        "startChar": 7857,
+        "endChar": 7879,
+        "text": "employer contributions",
+        "language": "en",
+        "digest": "sha256:bafe69d071ba88bedd02ef8444c0f52d0f10502301494be5dbb24aa791bdaeab"
+      },
+      "evidence": {
+        "startChar": 7753,
+        "endChar": 8033,
+        "text": "plan to receive accruals or other benefits (including no benefits) under such plans. Thus, for example, employer contributions made pursuant to a one-time irrevocable election described in this paragraph are not treated as having been made pursuant to a cash or deferred election ",
+        "digest": "sha256:1b7ddd6e2f8f89dffb6320d336d26703e86752127f113af931211007b8158718"
+      },
+      "segment": {
+        "configId": "structure-first-1200",
+        "segmentId": "experiment_segment_589b8e51c0cc88aff8eba1b5",
+        "ordinal": 1,
+        "sourceSliceStartChar": 6850,
+        "sourceSliceEndChar": 8196
+      },
+      "expectedOutcome": "target",
+      "target": {
+        "releaseConceptIri": "https://elsst.cessda.eu/id/6/548388c5-9045-47a6-8b0d-a5af87c3f97c",
+        "stableConceptIri": "https://elsst.cessda.eu/id/548388c5-9045-47a6-8b0d-a5af87c3f97c",
+        "prefLabel": {
+          "en": "PENSION CONTRIBUTIONS"
+        },
+        "matchedExpression": {
+          "predicate": "http://www.w3.org/2004/02/skos/core#altLabel",
+          "language": "en",
+          "value": "EMPLOYER CONTRIBUTIONS"
+        },
+        "active": true,
+        "directBroader": [
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/18df8314-c607-41c1-a1f7-c3749324d45b",
+            "stableConceptIri": "https://elsst.cessda.eu/id/18df8314-c607-41c1-a1f7-c3749324d45b",
+            "prefLabel": {
+              "en": "FINANCE"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "rowId": "alias-health-care-services",
+      "partition": "developmentOnly",
+      "reviewStatus": "proposedUnsealed",
+      "challenge": "aliasHierarchy",
+      "sourceArtifactId": "acf",
+      "mention": {
+        "startChar": 37549,
+        "endChar": 37569,
+        "text": "health care services",
+        "language": "en",
+        "digest": "sha256:7e5a04b1f1cb0c1f8050db08ced029eeac4154fe2498757f018e4180dc651fa5"
+      },
+      "evidence": {
+        "startChar": 37445,
+        "endChar": 37722,
+        "text": "this final rule to explicitly \nexclude, by definition, conversion \ntherapy from allowable services and \nhealth care services. Additionally, we \nhave revised the final rule by adding a \nnew § 1351.16(b) . . . .’’ Runaway and \nHomeless Youth, 81 FR 93030, 93045 \n(Dec. 20, 2016).",
+        "digest": "sha256:418bcb313b63be470aa865e2172233ad02f1aa7762f92dbb942a42e2d790bcb0"
+      },
+      "segment": {
+        "configId": "structure-first-1200",
+        "segmentId": "experiment_segment_be6009ecef957c2a8a9e4749",
+        "ordinal": 8,
+        "sourceSliceStartChar": 36116,
+        "sourceSliceEndChar": 41049
+      },
+      "expectedOutcome": "target",
+      "target": {
+        "releaseConceptIri": "https://elsst.cessda.eu/id/6/38854495-5f8e-4a5f-aed7-8819d1b14473",
+        "stableConceptIri": "https://elsst.cessda.eu/id/38854495-5f8e-4a5f-aed7-8819d1b14473",
+        "prefLabel": {
+          "en": "HEALTH SERVICES"
+        },
+        "matchedExpression": {
+          "predicate": "http://www.w3.org/2004/02/skos/core#altLabel",
+          "language": "en",
+          "value": "HEALTH CARE SERVICES"
+        },
+        "active": true,
+        "directBroader": [
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/e8f7adb4-1c6e-499a-bf6b-bc7fcfc249f0",
+            "stableConceptIri": "https://elsst.cessda.eu/id/e8f7adb4-1c6e-499a-bf6b-bc7fcfc249f0",
+            "prefLabel": {
+              "en": "SOCIAL WELFARE"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "rowId": "alias-offshore-wind-farms",
+      "partition": "developmentOnly",
+      "reviewStatus": "proposedUnsealed",
+      "challenge": "aliasHierarchy",
+      "sourceArtifactId": "fws",
+      "mention": {
+        "startChar": 385713,
+        "endChar": 385732,
+        "text": "offshore wind farms",
+        "language": "en",
+        "digest": "sha256:b2ea4bce12e33a41577054873f26fc3ac931bab5f84e8f5948b90f0a17060e5a"
+      },
+      "evidence": {
+        "startChar": 385603,
+        "endChar": 385883,
+        "text": "including (but not limited to) off-road \nuse and hunting using archery \nequipment; renewable energy (such as \noffshore wind farms); transportation; \nutility projects; forest management and \nwater quality improvements, including \npotential impacts to adjacent soils or \nvegetation ",
+        "digest": "sha256:4ea79f8e995806809f7434784b5c231e827032e4a2f8a76825e168e82ff26489"
+      },
+      "segment": {
+        "configId": "structure-first-1200",
+        "segmentId": "experiment_segment_e00cc5b5dcb4e757e16f1637",
+        "ordinal": 84,
+        "sourceSliceStartChar": 384729,
+        "sourceSliceEndChar": 390069
+      },
+      "expectedOutcome": "target",
+      "target": {
+        "releaseConceptIri": "https://elsst.cessda.eu/id/6/e98487af-c141-4523-93c0-f9591e2b7636",
+        "stableConceptIri": "https://elsst.cessda.eu/id/e98487af-c141-4523-93c0-f9591e2b7636",
+        "prefLabel": {
+          "en": "WIND TURBINES"
+        },
+        "matchedExpression": {
+          "predicate": "http://www.w3.org/2004/02/skos/core#altLabel",
+          "language": "en",
+          "value": "OFFSHORE WIND FARMS"
+        },
+        "active": true,
+        "directBroader": [
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/5e7c5a38-58c5-4bbd-a5cb-cc2c64f0c7de",
+            "stableConceptIri": "https://elsst.cessda.eu/id/5e7c5a38-58c5-4bbd-a5cb-cc2c64f0c7de",
+            "prefLabel": {
+              "en": "POWER PLANTS"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "rowId": "alias-extreme-weather",
+      "partition": "developmentOnly",
+      "reviewStatus": "proposedUnsealed",
+      "challenge": "aliasHierarchy",
+      "sourceArtifactId": "bill598",
+      "mention": {
+        "startChar": 3441,
+        "endChar": 3456,
+        "text": "extreme weather",
+        "language": "en",
+        "digest": "sha256:776eba98477e9afddafd7e39c95b110446eb36d32a1cd823c1b9a74e6068260e"
+      },
+      "evidence": {
+        "startChar": 3383,
+        "endChar": 3608,
+        "text": "United States is already seeing climate change exacerbate extreme weather events, with—</text><subparagraph id=\"HD67A3F3B611D48C79D7CB299D0453768\"><enum>(A)</enum><text>the year 2020 seeing the most active Atlantic hurricane ",
+        "digest": "sha256:4a81ae517c4c47841f18d882a556700e3e88a7f947a155741c5b5a07e2d63012"
+      },
+      "segment": {
+        "configId": "structure-first-1200",
+        "segmentId": "experiment_segment_2bba079deff8ad92351bd40c",
+        "ordinal": 0,
+        "sourceSliceStartChar": 3373,
+        "sourceSliceEndChar": 3530
+      },
+      "expectedOutcome": "target",
+      "target": {
+        "releaseConceptIri": "https://elsst.cessda.eu/id/6/a1305030-6523-4ac2-bdca-779ef683a7e2",
+        "stableConceptIri": "https://elsst.cessda.eu/id/a1305030-6523-4ac2-bdca-779ef683a7e2",
+        "prefLabel": {
+          "en": "WEATHER HAZARDS"
+        },
+        "matchedExpression": {
+          "predicate": "http://www.w3.org/2004/02/skos/core#altLabel",
+          "language": "en",
+          "value": "EXTREME WEATHER"
+        },
+        "active": true,
+        "directBroader": [
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/0d088060-b858-4e45-a0d1-77f890b4aecd",
+            "stableConceptIri": "https://elsst.cessda.eu/id/0d088060-b858-4e45-a0d1-77f890b4aecd",
+            "prefLabel": {
+              "en": "WEATHER"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "rowId": "alias-civil-aviation",
+      "partition": "developmentOnly",
+      "reviewStatus": "proposedUnsealed",
+      "challenge": "aliasHierarchy",
+      "sourceArtifactId": "gao107",
+      "mention": {
+        "startChar": 122921,
+        "endChar": 122935,
+        "text": "civil aviation",
+        "language": "en",
+        "digest": "sha256:ed6029a995390a979b7940d99dd170548a02799ef75f3a0326557c0abc5025b9"
+      },
+      "evidence": {
+        "startChar": 122812,
+        "endChar": 123087,
+        "text": "cybersecurity. The act\r\nalso includes a provision for GAO to review FAA’s framework for mitigating\r\nrisks to civil aviation, the agency’s information systems, and the NAS (the FAA\r\nCybersecurity Strategy), as well as the budgets of the entities responsible for\r\nimplementing ",
+        "digest": "sha256:458250cde220831513a87c950b5136bfcb0b21f21ef79e67c46d6c804b6f2b03"
+      },
+      "segment": {
+        "configId": "structure-first-1200",
+        "segmentId": "experiment_segment_3f370fadc33be2d98cd8f142",
+        "ordinal": 34,
+        "sourceSliceStartChar": 122597,
+        "sourceSliceEndChar": 123109
+      },
+      "expectedOutcome": "target",
+      "target": {
+        "releaseConceptIri": "https://elsst.cessda.eu/id/6/1bba4ea5-87b4-4e6e-ae62-128f28f2b756",
+        "stableConceptIri": "https://elsst.cessda.eu/id/1bba4ea5-87b4-4e6e-ae62-128f28f2b756",
+        "prefLabel": {
+          "en": "AIR TRANSPORT"
+        },
+        "matchedExpression": {
+          "predicate": "http://www.w3.org/2004/02/skos/core#altLabel",
+          "language": "en",
+          "value": "CIVIL AVIATION"
+        },
+        "active": true,
+        "directBroader": [
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/afcc48bb-f0b2-4d75-ab1c-a2b2818fb831",
+            "stableConceptIri": "https://elsst.cessda.eu/id/afcc48bb-f0b2-4d75-ab1c-a2b2818fb831",
+            "prefLabel": {
+              "en": "TRANSPORT"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "rowId": "alias-remote-workers",
+      "partition": "developmentOnly",
+      "reviewStatus": "proposedUnsealed",
+      "challenge": "aliasHierarchy",
+      "sourceArtifactId": "gao108",
+      "mention": {
+        "startChar": 126280,
+        "endChar": 126294,
+        "text": "remote workers",
+        "language": "en",
+        "digest": "sha256:5e742df5a62b28ed327f54fa3f28c181f6193d13a47dc57947be0cba7690c10f"
+      },
+      "evidence": {
+        "startChar": 126175,
+        "endChar": 126449,
+        "text": "offices in the\r\nWashington, D.C. area and into the DOT headquarters complex and excluded over\r\n2,000 DOT remote workers because telework and remote work policies were in\r\nplace during its development. Due to recent changes to DOT personnel numbers,\r\nexecutive branch agency ",
+        "digest": "sha256:03cf996a2249fab255a4db268b1ab1620f1e4a11a99465485f6c0d90f1688a07"
+      },
+      "segment": {
+        "configId": "structure-first-1200",
+        "segmentId": "experiment_segment_9b368c37bf6935c947a75fe6",
+        "ordinal": 34,
+        "sourceSliceStartChar": 125589,
+        "sourceSliceEndChar": 126800
+      },
+      "expectedOutcome": "target",
+      "target": {
+        "releaseConceptIri": "https://elsst.cessda.eu/id/6/54ea820a-5b91-4650-8844-1f77ae4e083a",
+        "stableConceptIri": "https://elsst.cessda.eu/id/54ea820a-5b91-4650-8844-1f77ae4e083a",
+        "prefLabel": {
+          "en": "TELEWORKERS"
+        },
+        "matchedExpression": {
+          "predicate": "http://www.w3.org/2004/02/skos/core#altLabel",
+          "language": "en",
+          "value": "REMOTE WORKERS"
+        },
+        "active": true,
+        "directBroader": [
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/ef2196f7-060e-4ad7-a583-09c14919cfd2",
+            "stableConceptIri": "https://elsst.cessda.eu/id/ef2196f7-060e-4ad7-a583-09c14919cfd2",
+            "prefLabel": {
+              "en": "WORKERS"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "rowId": "alias-child-sex-abuse",
+      "partition": "developmentOnly",
+      "reviewStatus": "proposedUnsealed",
+      "challenge": "aliasHierarchy",
+      "sourceArtifactId": "crs47613",
+      "mention": {
+        "startChar": 60821,
+        "endChar": 60836,
+        "text": "child sex abuse",
+        "language": "en",
+        "digest": "sha256:649e517018e5ca73e52337e0e1069e62f70c54875f6a98c08c0479b2c995ccfd"
+      },
+      "evidence": {
+        "startChar": 60720,
+        "endChar": 60986,
+        "text": "\nclaim.120 The school contended that it fired her for belatedly (rather than immediately) reporting \nchild sex abuse contrary to its own policies and Canon Law, and argued that allowing her claim to \nproceed would be inconsistent with those religious tenets.121 The ",
+        "digest": "sha256:5ba6f7e5cefb8549cda0a341ea98ecf0af2f2091f2a5964f3480507e687126bd"
+      },
+      "segment": {
+        "configId": "structure-first-1200",
+        "segmentId": "experiment_segment_06f11d1afdefacea145261bf",
+        "ordinal": 13,
+        "sourceSliceStartChar": 59199,
+        "sourceSliceEndChar": 61111
+      },
+      "expectedOutcome": "target",
+      "target": {
+        "releaseConceptIri": "https://elsst.cessda.eu/id/6/814937d3-553d-44ff-a548-33444caf21f1",
+        "stableConceptIri": "https://elsst.cessda.eu/id/814937d3-553d-44ff-a548-33444caf21f1",
+        "prefLabel": {
+          "en": "CHILD SEXUAL ABUSE"
+        },
+        "matchedExpression": {
+          "predicate": "http://www.w3.org/2004/02/skos/core#altLabel",
+          "language": "en",
+          "value": "CHILD SEX ABUSE"
+        },
+        "active": true,
+        "directBroader": [
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/0e775bb3-2932-403d-8290-789d30847829",
+            "stableConceptIri": "https://elsst.cessda.eu/id/0e775bb3-2932-403d-8290-789d30847829",
+            "prefLabel": {
+              "en": "SEXUAL ABUSE"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "rowId": "alias-medical-advice",
+      "partition": "developmentOnly",
+      "reviewStatus": "proposedUnsealed",
+      "challenge": "aliasHierarchy",
+      "sourceArtifactId": "cfr29",
+      "mention": {
+        "startChar": 349933,
+        "endChar": 349947,
+        "text": "medical advice",
+        "language": "en",
+        "digest": "sha256:2d3fc961b4baccf68eb7e57a739075b3aeb907c436a2c471154601fc57e85e51"
+      },
+      "evidence": {
+        "startChar": 349830,
+        "endChar": 350101,
+        "text": "statements relating to medical response, <I>e.g.</I>, calling a poison center/doctor/. . . and getting medical advice/attention.</P>\n<P>In general, the following principles should be applied:</P>\n<P>(a) Where the classification of a substance or mixture triggers several ",
+        "digest": "sha256:14096239e8cd4fc49eafe066d500957e20bbdd19aec3e0f0220fd1d19b78479a"
+      },
+      "segment": {
+        "configId": "structure-first-1200",
+        "segmentId": "experiment_segment_af1864bf56f8f1e5cf7620bc",
+        "ordinal": 72,
+        "sourceSliceStartChar": 349703,
+        "sourceSliceEndChar": 349963
+      },
+      "expectedOutcome": "target",
+      "target": {
+        "releaseConceptIri": "https://elsst.cessda.eu/id/6/b06fa4cb-e156-4acc-a79a-5cd2ad75570d",
+        "stableConceptIri": "https://elsst.cessda.eu/id/b06fa4cb-e156-4acc-a79a-5cd2ad75570d",
+        "prefLabel": {
+          "en": "HEALTH ADVICE"
+        },
+        "matchedExpression": {
+          "predicate": "http://www.w3.org/2004/02/skos/core#altLabel",
+          "language": "en",
+          "value": "MEDICAL ADVICE"
+        },
+        "active": true,
+        "directBroader": [
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/5b0b0ebb-c563-4ae8-ab95-fbc462ecff01",
+            "stableConceptIri": "https://elsst.cessda.eu/id/5b0b0ebb-c563-4ae8-ab95-fbc462ecff01",
+            "prefLabel": {
+              "en": "HEALTH PROMOTION"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "rowId": "alias-military-forces",
+      "partition": "developmentOnly",
+      "reviewStatus": "proposedUnsealed",
+      "challenge": "aliasNoBroader",
+      "sourceArtifactId": "bill3103",
+      "mention": {
+        "startChar": 27748,
+        "endChar": 27763,
+        "text": "military forces",
+        "language": "en",
+        "digest": "sha256:515127d933655d18c7dcfcac1e82ab0b862a6792655266f94d3517713d7995c7"
+      },
+      "evidence": {
+        "startChar": 27638,
+        "endChar": 27914,
+        "text": "the nature and extent of detention, interrogation, abuse, or ill treatment of Palestinian children by Israeli military forces or police in violation of international humanitarian law;</text></paragraph><paragraph id=\"H5C071E9139FC48A494A6CAC5B22F5D14\"><enum>(2)</enum><text>a ",
+        "digest": "sha256:21eda3eaaf4704b27cb5f829418d05fec5914bb564a736d4bc6c064277e05f84"
+      },
+      "segment": {
+        "configId": "structure-first-1200",
+        "segmentId": "experiment_segment_62ca36a51d8ecf6aeb5d8e19",
+        "ordinal": 6,
+        "sourceSliceStartChar": 27615,
+        "sourceSliceEndChar": 27840
+      },
+      "expectedOutcome": "target",
+      "target": {
+        "releaseConceptIri": "https://elsst.cessda.eu/id/6/35470103-8d3b-420f-b6e9-e8d1d73ee9cc",
+        "stableConceptIri": "https://elsst.cessda.eu/id/35470103-8d3b-420f-b6e9-e8d1d73ee9cc",
+        "prefLabel": {
+          "en": "ARMED FORCES"
+        },
+        "matchedExpression": {
+          "predicate": "http://www.w3.org/2004/02/skos/core#altLabel",
+          "language": "en",
+          "value": "MILITARY FORCES"
+        },
+        "active": true,
+        "directBroader": []
+      }
+    },
+    {
+      "rowId": "alias-poverty-level",
+      "partition": "developmentOnly",
+      "reviewStatus": "proposedUnsealed",
+      "challenge": "aliasHierarchy",
+      "sourceArtifactId": "crs11830",
+      "mention": {
+        "startChar": 726,
+        "endChar": 739,
+        "text": "poverty level",
+        "language": "en",
+        "digest": "sha256:20894e94470facfa45fee2f32a41d4beb07751d9906e7f09e1789d4665ade244"
+      },
+      "evidence": {
+        "startChar": 616,
+        "endChar": 895,
+        "text": "optional for states to expand Medicaid \ncoverage to non-elderly adults with income up to 133% of \nthe federal poverty level beginning in 2014. In states that \nexpanded Medicaid, many individuals transitioning into and \nout of incarceration—a population that tends to have higher ",
+        "digest": "sha256:5e5735bcb3fa831aa5f48f0cb4618dd2002c0a3d777db29127e32593c7322b85"
+      },
+      "segment": {
+        "configId": "structure-first-1200",
+        "segmentId": "experiment_segment_8e7d6da5c59fe8e6c63760ac",
+        "ordinal": 1,
+        "sourceSliceStartChar": 0,
+        "sourceSliceEndChar": 5875
+      },
+      "expectedOutcome": "target",
+      "target": {
+        "releaseConceptIri": "https://elsst.cessda.eu/id/6/dab48525-c485-459b-bb41-730756f1dd65",
+        "stableConceptIri": "https://elsst.cessda.eu/id/dab48525-c485-459b-bb41-730756f1dd65",
+        "prefLabel": {
+          "en": "POVERTY"
+        },
+        "matchedExpression": {
+          "predicate": "http://www.w3.org/2004/02/skos/core#altLabel",
+          "language": "en",
+          "value": "POVERTY LEVEL"
+        },
+        "active": true,
+        "directBroader": [
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/2151bf48-4918-4dbe-9f09-d8d5c9e08641",
+            "stableConceptIri": "https://elsst.cessda.eu/id/2151bf48-4918-4dbe-9f09-d8d5c9e08641",
+            "prefLabel": {
+              "en": "SOCIAL DISADVANTAGE"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "rowId": "alias-continuing-education",
+      "partition": "developmentOnly",
+      "reviewStatus": "proposedUnsealed",
+      "challenge": "aliasHierarchy",
+      "sourceArtifactId": "fr03227",
+      "mention": {
+        "startChar": 117588,
+        "endChar": 117608,
+        "text": "continuing education",
+        "language": "en",
+        "digest": "sha256:38ab77708ec0421bc160a5b30b04846f0614e03d42f8391de4663e6f5969cf18"
+      },
+      "evidence": {
+        "startChar": 117481,
+        "endChar": 117761,
+        "text": "new employees hired as a result of the proposed rule. This PRIA assumes that the cost of initial training, continuing education, and initial training due to turnover are similar to the cost of training production employees in HACCP. The Agency seeks comments on the type and cost ",
+        "digest": "sha256:e8ba36d1296199a70af33fd231a13b4e3bb693de17379d9688dbe4cac23fe9e5"
+      },
+      "segment": {
+        "configId": "structure-first-1200",
+        "segmentId": "experiment_segment_29d985d9d156c678b625f1e9",
+        "ordinal": 26,
+        "sourceSliceStartChar": 117357,
+        "sourceSliceEndChar": 118644
+      },
+      "expectedOutcome": "target",
+      "target": {
+        "releaseConceptIri": "https://elsst.cessda.eu/id/6/108718cf-54be-4372-a568-960c01a1101e",
+        "stableConceptIri": "https://elsst.cessda.eu/id/108718cf-54be-4372-a568-960c01a1101e",
+        "prefLabel": {
+          "en": "LIFELONG EDUCATION"
+        },
+        "matchedExpression": {
+          "predicate": "http://www.w3.org/2004/02/skos/core#altLabel",
+          "language": "en",
+          "value": "CONTINUING EDUCATION"
+        },
+        "active": true,
+        "directBroader": [
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/43004ccc-1235-4a23-87e0-a9c2277fadd0",
+            "stableConceptIri": "https://elsst.cessda.eu/id/43004ccc-1235-4a23-87e0-a9c2277fadd0",
+            "prefLabel": {
+              "en": "EDUCATIONAL SYSTEMS"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "rowId": "alias-deforestation",
+      "partition": "developmentOnly",
+      "reviewStatus": "proposedUnsealed",
+      "challenge": "aliasHierarchy",
+      "sourceArtifactId": "fws",
+      "mention": {
+        "startChar": 139162,
+        "endChar": 139175,
+        "text": "deforestation",
+        "language": "en",
+        "digest": "sha256:d1d2451ac107a345f6611a80ed9fa0d6cb61cdb8fde3cf97babc732a0fad4a4d"
+      },
+      "evidence": {
+        "startChar": 139057,
+        "endChar": 139329,
+        "text": "it faces, such as \ndepredation by nonnative animals, \ndisturbance at roost caves, and habitat \nloss from deforestation and overgrazing \nby ungulates (Service 2023a, pp. 10, 41– \n43, 63). Therefore, we have determined \nthat the area currently occupied by this \nsubspecies, ",
+        "digest": "sha256:4fbcbe4c370c79383da7f1f02fc5344918d37da4cdf81cfda316d3f6c8f64410"
+      },
+      "segment": {
+        "configId": "structure-first-1200",
+        "segmentId": "experiment_segment_af345eccb93d4c334cd2e958",
+        "ordinal": 33,
+        "sourceSliceStartChar": 138272,
+        "sourceSliceEndChar": 143018
+      },
+      "expectedOutcome": "target",
+      "target": {
+        "releaseConceptIri": "https://elsst.cessda.eu/id/6/0418020c-5658-4475-938e-d0268c9f8161",
+        "stableConceptIri": "https://elsst.cessda.eu/id/0418020c-5658-4475-938e-d0268c9f8161",
+        "prefLabel": {
+          "en": "FOREST MANAGEMENT"
+        },
+        "matchedExpression": {
+          "predicate": "http://www.w3.org/2004/02/skos/core#altLabel",
+          "language": "en",
+          "value": "DEFORESTATION"
+        },
+        "active": true,
+        "directBroader": [
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/36072c62-6938-40bc-b0d9-65ea35ad7503",
+            "stableConceptIri": "https://elsst.cessda.eu/id/36072c62-6938-40bc-b0d9-65ea35ad7503",
+            "prefLabel": {
+              "en": "ENVIRONMENTAL MANAGEMENT"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "rowId": "missing-clean-fuel-credit",
+      "partition": "developmentOnly",
+      "reviewStatus": "proposedUnsealed",
+      "challenge": "notRepresented",
+      "sourceArtifactId": "irs",
+      "mention": {
+        "startChar": 421,
+        "endChar": 449,
+        "text": "clean fuel production credit",
+        "language": "en",
+        "digest": "sha256:eceabf2061920f6d63650daf58ff602eb41f4bc5bf3b8e5b5bb518528688a2c2"
+      },
+      "evidence": {
+        "startChar": 319,
+        "endChar": 599,
+        "text": "rulemaking \nand public hearing. \nSUMMARY: This document contains \nproposed regulations regarding the \nclean fuel production credit enacted by \nthe Inflation Reduction Act of 2022 and \namended by the One, Big, Beautiful Bill \nAct (OBBBA). These proposed \nregulations would provide ",
+        "digest": "sha256:dce107fc6b3f0184700ce8cfafe0ef92c6aea4368e74fd021f54b4f8a94ec726"
+      },
+      "segment": {
+        "configId": "structure-first-1200",
+        "segmentId": "experiment_segment_483ad3269640a9415282fb38",
+        "ordinal": 1,
+        "sourceSliceStartChar": 0,
+        "sourceSliceEndChar": 4974
+      },
+      "expectedOutcome": "notRepresented",
+      "notRepresented": {
+        "verifiedAbsentPredicates": [
+          "http://www.w3.org/2004/02/skos/core#prefLabel",
+          "http://www.w3.org/2004/02/skos/core#altLabel",
+          "http://www.w3.org/2004/02/skos/core#hiddenLabel"
+        ],
+        "nearConceptsNotAccepted": [
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/c14000ee-71e6-4d3a-bf79-e848be508265",
+            "stableConceptIri": "https://elsst.cessda.eu/id/c14000ee-71e6-4d3a-bf79-e848be508265",
+            "prefLabel": {
+              "en": "CREDIT"
+            }
+          },
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/debb168f-2f44-412c-900f-bfcf5a74e847",
+            "stableConceptIri": "https://elsst.cessda.eu/id/debb168f-2f44-412c-900f-bfcf5a74e847",
+            "prefLabel": {
+              "en": "PRODUCTION"
+            }
+          },
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/2fefa2b9-a87f-429e-ad90-6d5db701bd9b",
+            "stableConceptIri": "https://elsst.cessda.eu/id/2fefa2b9-a87f-429e-ad90-6d5db701bd9b",
+            "prefLabel": {
+              "en": "BIOFUELS"
+            }
+          }
+        ],
+        "requiredRoutes": [
+          "openLabel",
+          "proposal",
+          "abstention"
+        ],
+        "includedInReachableCandidateRecallDenominator": false
+      }
+    },
+    {
+      "rowId": "missing-hazard-communication",
+      "partition": "developmentOnly",
+      "reviewStatus": "proposedUnsealed",
+      "challenge": "notRepresented",
+      "sourceArtifactId": "cfr29",
+      "mention": {
+        "startChar": 245,
+        "endChar": 265,
+        "text": "Hazard communication",
+        "language": "en",
+        "digest": "sha256:0aaec1f656500be0766082ac61aa67dae34937882d3e540f6735de222f8e352b"
+      },
+      "evidence": {
+        "startChar": 204,
+        "endChar": 417,
+        "text": "CFR 1910.1200&quot;}\">\n<HEAD>§ 1910.1200 Hazard communication.</HEAD>\n<P>(a) <I>Purpose.</I> (1) The purpose of this section is to ensure that the hazards of all chemicals produced or imported are classified, and ",
+        "digest": "sha256:3ee73d73982ab97b801e27cbcb026e396e615ff088601f825d1e70b231a2d27c"
+      },
+      "segment": {
+        "configId": "structure-first-1200",
+        "segmentId": "experiment_segment_408019a36b44a03fd2684abf",
+        "ordinal": 0,
+        "sourceSliceStartChar": 0,
+        "sourceSliceEndChar": 274
+      },
+      "expectedOutcome": "notRepresented",
+      "notRepresented": {
+        "verifiedAbsentPredicates": [
+          "http://www.w3.org/2004/02/skos/core#prefLabel",
+          "http://www.w3.org/2004/02/skos/core#altLabel",
+          "http://www.w3.org/2004/02/skos/core#hiddenLabel"
+        ],
+        "nearConceptsNotAccepted": [
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/50b97635-5faf-4ed1-baae-2b8a3550e747",
+            "stableConceptIri": "https://elsst.cessda.eu/id/50b97635-5faf-4ed1-baae-2b8a3550e747",
+            "prefLabel": {
+              "en": "OCCUPATIONAL SAFETY"
+            }
+          },
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/690824b6-2661-46c3-9ebb-3227e6725bd3",
+            "stableConceptIri": "https://elsst.cessda.eu/id/690824b6-2661-46c3-9ebb-3227e6725bd3",
+            "prefLabel": {
+              "en": "RISK"
+            }
+          }
+        ],
+        "requiredRoutes": [
+          "openLabel",
+          "proposal",
+          "abstention"
+        ],
+        "includedInReachableCandidateRecallDenominator": false
+      }
+    },
+    {
+      "rowId": "missing-qualified-cash-arrangement",
+      "partition": "developmentOnly",
+      "reviewStatus": "proposedUnsealed",
+      "challenge": "notRepresented",
+      "sourceArtifactId": "cfr26",
+      "mention": {
+        "startChar": 14820,
+        "endChar": 14858,
+        "text": "qualified cash or deferred arrangement",
+        "language": "en",
+        "digest": "sha256:a615ddeaa714c3fd8ff22f76b755d8ff33ecb0bcf671ce5e22d491cd764203f3"
+      },
+      "evidence": {
+        "startChar": 14716,
+        "endChar": 15009,
+        "text": "eligible to participate under another plan of the employer.</P></EXAMPLE>\n<P>(4) <I>Rules applicable to qualified cash or deferred arrangements</I>—(i) <I>Definition of qualified cash or deferred arrangement.</I> A qualified cash or deferred arrangement is a cash or deferred arrangement that ",
+        "digest": "sha256:b8258f9c5d45ac98841e0104bbac9fd5003c8dc5a76e909a050271337dc524bd"
+      },
+      "segment": {
+        "configId": "structure-first-1200",
+        "segmentId": "experiment_segment_cc5ea0de70ead175cc523ebd",
+        "ordinal": 2,
+        "sourceSliceStartChar": 14790,
+        "sourceSliceEndChar": 15094
+      },
+      "expectedOutcome": "notRepresented",
+      "notRepresented": {
+        "verifiedAbsentPredicates": [
+          "http://www.w3.org/2004/02/skos/core#prefLabel",
+          "http://www.w3.org/2004/02/skos/core#altLabel",
+          "http://www.w3.org/2004/02/skos/core#hiddenLabel"
+        ],
+        "nearConceptsNotAccepted": [
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/53617a23-ffaa-4da0-9efe-8819180522f1",
+            "stableConceptIri": "https://elsst.cessda.eu/id/53617a23-ffaa-4da0-9efe-8819180522f1",
+            "prefLabel": {
+              "en": "PENSIONS"
+            }
+          },
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/548388c5-9045-47a6-8b0d-a5af87c3f97c",
+            "stableConceptIri": "https://elsst.cessda.eu/id/548388c5-9045-47a6-8b0d-a5af87c3f97c",
+            "prefLabel": {
+              "en": "PENSION CONTRIBUTIONS"
+            }
+          }
+        ],
+        "requiredRoutes": [
+          "openLabel",
+          "proposal",
+          "abstention"
+        ],
+        "includedInReachableCandidateRecallDenominator": false
+      }
+    },
+    {
+      "rowId": "missing-critical-habitat",
+      "partition": "developmentOnly",
+      "reviewStatus": "proposedUnsealed",
+      "challenge": "notRepresented",
+      "sourceArtifactId": "fws",
+      "mention": {
+        "startChar": 569,
+        "endChar": 585,
+        "text": "critical habitat",
+        "language": "en",
+        "digest": "sha256:d8f5c43ed1f1a8230ca6a750be1f6b175243b649051e933157cf56ce3c63db0f"
+      },
+      "evidence": {
+        "startChar": 462,
+        "endChar": 735,
+        "text": "\nACTION: Proposed rule. \nSUMMARY: We, the U.S. Fish and \nWildlife Service (Service), propose to \ndesignate critical habitat for 9 animal \nspecies and 13 plant species from the \nMariana Islands (the U.S. Territory of \nGuam and the Commonwealth of \nNorthern Mariana Islands) ",
+        "digest": "sha256:e8fa09b1248128b4b93eeb431636483edc09f68e7b094b8d4024047d5b4a3722"
+      },
+      "segment": {
+        "configId": "structure-first-1200",
+        "segmentId": "experiment_segment_3f26b6fe491023d92732ce36",
+        "ordinal": 1,
+        "sourceSliceStartChar": 0,
+        "sourceSliceEndChar": 4502
+      },
+      "expectedOutcome": "notRepresented",
+      "notRepresented": {
+        "verifiedAbsentPredicates": [
+          "http://www.w3.org/2004/02/skos/core#prefLabel",
+          "http://www.w3.org/2004/02/skos/core#altLabel",
+          "http://www.w3.org/2004/02/skos/core#hiddenLabel"
+        ],
+        "nearConceptsNotAccepted": [
+          {
+            "releaseConceptIri": "https://elsst.cessda.eu/id/6/e8fab301-605f-4e17-abb0-9fa86538a228",
+            "stableConceptIri": "https://elsst.cessda.eu/id/e8fab301-605f-4e17-abb0-9fa86538a228",
+            "prefLabel": {
+              "en": "HABITATS"
+            }
+          }
+        ],
+        "requiredRoutes": [
+          "openLabel",
+          "proposal",
+          "abstention"
+        ],
+        "includedInReachableCandidateRecallDenominator": false
+      }
+    }
+  ]
+}

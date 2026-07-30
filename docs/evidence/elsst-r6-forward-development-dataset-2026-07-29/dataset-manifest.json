@@ -1,0 +1,102 @@
+{
+  "schemaVersion": "1.0",
+  "datasetId": "elsst-r6-forward-development-v1-proposal",
+  "createdOn": "2026-07-29",
+  "partition": "developmentOnly",
+  "reviewStatus": "proposedUnsealed",
+  "rowCount": 19,
+  "offsetConvention": {
+    "unit": "unicodeCodePoint",
+    "base": 0,
+    "end": "exclusive",
+    "scope": "exact named Parquet source field",
+    "nativeFileByteOffsets": false
+  },
+  "inputs": {
+    "sourceCorpus": {
+      "id": "segmented-real-data-evaluation-v1",
+      "root": "output/segmented-real-data-evaluation-v1",
+      "sourceArtifactsManifest": "source-artifacts.json"
+    },
+    "segmentation": {
+      "id": "segmentation-experiment-document-deterministic-v3",
+      "root": "output/segmentation-experiment-document-deterministic-v3",
+      "segmentsFile": "experiment_segments.parquet",
+      "configId": "structure-first-1200"
+    },
+    "vocabulary": {
+      "id": "ELSST R6",
+      "releaseNumber": "6",
+      "distributionUrl": "https://storage.googleapis.com/cessda-elsst-datadump/2025/ELSST_R6.ttl",
+      "distributionDigest": "sha256:c362aec545db916ecb67af0eb9b8b4cecac1cb2118a717b69d8e6dad5591aa95",
+      "byteLength": 19915491,
+      "localContentAddressedPath": "output/elsst-source-store/sha256/c362aec545db916ecb67af0eb9b8b4cecac1cb2118a717b69d8e6dad5591aa95/ELSST_R6.ttl",
+      "language": "en",
+      "authoredExpressionPredicates": [
+        "http://www.w3.org/2004/02/skos/core#prefLabel",
+        "http://www.w3.org/2004/02/skos/core#altLabel",
+        "http://www.w3.org/2004/02/skos/core#hiddenLabel"
+      ]
+    }
+  },
+  "rowsManifest": "rows.json",
+  "derivation": {
+    "method": "directSourceAndPinnedVocabulary",
+    "usesFusedRegistry": false,
+    "usesPriorRegistryJudgments": false,
+    "excludedInputs": [
+      "fused registry files",
+      "fused registry candidate rankings",
+      "fused registry adjudication verdicts"
+    ]
+  },
+  "rightsHandling": {
+    "rightsNotesRecordedInSourceManifest": true,
+    "rightsNotesRestrictDatasetUse": false
+  },
+  "requiredRoutesForNotRepresented": [
+    "openLabel",
+    "proposal",
+    "abstention"
+  ],
+  "reviewBlockers": [
+    {
+      "id": "independent-application-review",
+      "blocksSealing": true,
+      "detail": "An authored ELSST alternate label proves release-specific lookup, not the final application adequacy grade."
+    },
+    {
+      "id": "managed-vocabulary-identities",
+      "blocksSealing": true,
+      "detail": "Managed release, import snapshot, expression corpus, and indexed-expression identities are not assigned yet."
+    },
+    {
+      "id": "lifecycle-successor-only",
+      "blocksSealing": true,
+      "detail": "Lifecycle cases must forbid their deprecated predecessor and accept only the active successor."
+    },
+    {
+      "id": "not-represented-routing",
+      "blocksSealing": true,
+      "detail": "notRepresented cases must route to openLabel, proposal, or abstention and stay out of reachable-candidate recall."
+    },
+    {
+      "id": "holdout-leakage",
+      "blocksHoldoutUse": true,
+      "detail": "Every row uses a source artifact already exposed during development."
+    }
+  ],
+  "validation": {
+    "test": "tests/test_elsst_r6_forward_development_dataset.py",
+    "checks": [
+      "source artifact and source-field digests",
+      "exact mention and evidence substrings",
+      "one exact structure-first-1200 segment containment",
+      "release-specific target and authored English alternate label",
+      "stable identity and direct broader relations",
+      "deprecated predecessor exclusion and replacement",
+      "notRepresented absence across English SKOS label predicates",
+      "required notRepresented route and recall-denominator exclusion"
+    ]
+  }
+}
