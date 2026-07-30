@@ -8,13 +8,14 @@ from pathlib import Path
 
 import pyarrow.parquet as pq
 from loguru import logger
+from refspec.registry.federal_register_thesaurus_2025 import (
+    federal_register_thesaurus_2025_concept_iri,
+    load_packaged_federal_register_thesaurus_2025,
+)
 
 from spicy_regs.ontology.checkpoint import BatchCheckpoint
 from spicy_regs.ontology.common import (
-    JsonReadStats,
     RunContext,
-    iter_parquet_rows,
-    parse_json_list,
     read_parquet_rows,
     write_parquet_rows,
 )
@@ -25,7 +26,7 @@ from spicy_regs.ontology.concepts import (
     merge_pass,
     merge_seed_registry,
     rescore_candidates,
-    seed_concept,
+    seed_federal_register_thesaurus_2025_concept,
 )
 from spicy_regs.ontology.concept_dimensions import concept_facet, concept_source_vocabulary
 from spicy_regs.ontology.invariants import assert_concept_graphs
@@ -64,7 +65,6 @@ def build_concepts(
     if not fr_file.exists():
         raise FileNotFoundError(f"federal_register.parquet not found in {output_dir}")
     context = RunContext.resolve(run_id=run_id, asserted_at=asserted_at, prefix="concepts")
-    json_stats = JsonReadStats()
 
     # When the pipeline primes a published registry it lands at the normal
     # output name. Tests and orchestrators may instead provide _concepts_prior.
@@ -73,21 +73,37 @@ def build_concepts(
         prior_file = output_dir / OUTPUT
     prior = read_parquet_rows(prior_file)
 
-    seeds: list[dict] = []
-    for row in iter_parquet_rows(fr_file, columns=("document_number", "topics_json")):
-        topics = parse_json_list(
-            row.get("topics_json"),
-            stats=json_stats,
-            table="federal_register",
-            row_id=row.get("document_number"),
-            column="topics_json",
-        )
-        if topics is None:
+    # Current FederalRegister.gov Topics remain mutable, source-assigned
+    # document metadata. They are not a concept registry. Normal builds seed
+    # the exact official terms and only globally unambiguous variants from the
+    # packaged April 1, 2025 thesaurus.
+    thesaurus = load_packaged_federal_register_thesaurus_2025()
+    variants_by_target: dict[str, set[str]] = {}
+    for variant in thesaurus.variants:
+        if (
+            variant.resolution_status != "recognizedVariant"
+            or len(variant.target_concept_ids) != 1
+        ):
             continue
-        for topic in topics:
-            concept = seed_concept(topic, context)
-            if concept is not None:
-                seeds.append(concept)
+        variants_by_target.setdefault(
+            variant.target_concept_ids[0],
+            set(),
+        ).add(variant.label)
+    seeds = [
+        seed_federal_register_thesaurus_2025_concept(
+            concept_id=term.concept_id,
+            concept_iri=federal_register_thesaurus_2025_concept_iri(
+                term.concept_id
+            ),
+            preferred_label=term.label,
+            alternate_labels=sorted(
+                variants_by_target.get(term.concept_id, set()),
+                key=lambda value: (value.casefold(), value),
+            ),
+            context=context,
+        )
+        for term in thesaurus.official_terms
+    ]
     concepts = merge_seed_registry(prior, seeds)
 
     assignments_file = output_dir / "_concept_assignments_prior.parquet"
@@ -203,7 +219,6 @@ def build_concepts(
     )
     (output_dir / "_concept_events_pending.jsonl").unlink(missing_ok=True)
 
-    json_stats.log("concepts")
     logger.info(
         "Concepts: {:,} rows ({:,} active, {:,} candidate, {:,} deprecated); {:,} merge-review items",
         len(concepts),

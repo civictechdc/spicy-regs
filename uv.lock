@@ -3957,6 +3957,7 @@ source = { editable = "RefSpec" }
 dependencies = [
     { name = "jsonschema" },
     { name = "pyarrow" },
+    { name = "pypdf" },
     { name = "rdflib" },
     { name = "referencing" },
     { name = "typing-extensions" },
@@ -3966,6 +3967,7 @@ dependencies = [
 requires-dist = [
     { name = "jsonschema", specifier = ">=4.26,<5" },
     { name = "pyarrow", specifier = "==23.0.0" },
+    { name = "pypdf", specifier = ">=6,<7" },
     { name = "rdflib", specifier = ">=7.1,<8" },
     { name = "referencing", specifier = ">=0.37,<1" },
     { name = "typing-extensions", specifier = ">=4.12,<5" },

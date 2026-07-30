@@ -8,7 +8,15 @@ from typing import Any
 
 FACETS = frozenset({"subject", "regulated_entity"})
 LOCAL_SOURCE_VOCABULARY = "spicy-regs-local"
+# Compatibility identity used by older experiment fixtures and fused
+# registries. New Federal Register seeds use the dated scheme below.
 FEDERAL_REGISTER_SOURCE_VOCABULARY = "federal-register-thesaurus"
+FEDERAL_REGISTER_THESAURUS_2025_SOURCE_VOCABULARY = (
+    "urn:ref:federal-register-thesaurus:2025-04-01:scheme"
+)
+FEDERAL_REGISTER_TOPICS_SOURCE_VOCABULARY = (
+    "federal-register-api-topics"
+)
 FEDERAL_REGISTER_EXTERNAL_ID_MARKERS = frozenset(
     {
         # Base seed rows.
@@ -22,6 +30,8 @@ FEDERAL_REGISTER_EXTERNAL_ID_MARKERS = frozenset(
 # Reading them is a compatibility path, not the shape written by new fusion.
 LEGACY_EXTERNAL_SCHEME_FACETS = {
     FEDERAL_REGISTER_SOURCE_VOCABULARY: "subject",
+    FEDERAL_REGISTER_THESAURUS_2025_SOURCE_VOCABULARY: "subject",
+    FEDERAL_REGISTER_TOPICS_SOURCE_VOCABULARY: "subject",
     "crs-subjects": "subject",
     "crs-policy-areas": "subject",
     "epa-tsca": "regulated_entity",

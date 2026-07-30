@@ -2769,6 +2769,7 @@ def _run_model_layer_with_vocabulary(
                 mappings=vocabulary.candidate_mappings,
                 allowed_facets=tuple(allowed_facets),
                 limit=prompt_concept_limit,
+                profile_id=artifact.profile_id,
             )
             if vocabulary.candidate_mappings
             else select_candidate_concepts_anchored_v2(
@@ -2776,6 +2777,7 @@ def _run_model_layer_with_vocabulary(
                 concepts,
                 allowed_facets=tuple(allowed_facets),
                 limit=prompt_concept_limit,
+                profile_id=artifact.profile_id,
             )
         )
         if not candidates:

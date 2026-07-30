@@ -506,6 +506,7 @@ def load_testbed_inputs(
                 concepts,
                 allowed_facets=artifact.allowed_schemes,
                 limit=PROMPT_CONCEPT_LIMIT,
+                profile_id=artifact.profile_id,
             )
         else:
             prompt_concepts = select_candidate_concepts_for_text(

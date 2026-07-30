@@ -179,6 +179,7 @@ def select_connected_candidate_concepts(
     mappings: Sequence[object],
     allowed_facets: Sequence[str] = ("subject",),
     limit: int = 12,
+    profile_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """Return authorized concepts reached directly or through one mapping.
 
@@ -249,6 +250,7 @@ def select_connected_candidate_concepts(
         lookup_concepts,
         allowed_facets=allowed_facets,
         limit=max(24, limit * 4),
+        profile_id=profile_id,
     )
     selected: list[dict[str, Any]] = []
     selected_by_id: dict[str, dict[str, Any]] = {}

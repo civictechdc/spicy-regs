@@ -24,8 +24,12 @@ from spicy_regs.ontology.concepts import (
     ANCHOR_RRF_K,
     ANCHOR_SCHEME_QUOTAS,
     ANCHOR_WILDCARD_SLOTS,
+    FEDERAL_REGISTER_DOCUMENT_PROFILE_ID,
     clear_anchored_conditioning_cache,
     select_candidate_concepts_anchored_v2,
+)
+from spicy_regs.ontology.concept_dimensions import (
+    FEDERAL_REGISTER_THESAURUS_2025_SOURCE_VOCABULARY,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -255,6 +259,67 @@ def test_limit_below_the_quota_total_falls_back_to_fused_ranking():
     registry = _quota_registry()
     selected = select_candidate_concepts_anchored_v2("Beryllium exposure control limits.", registry, limit=4)
     assert len(selected) == 4
+
+
+def test_current_thesaurus_has_strong_priority_only_for_fr_documents():
+    crs = [
+        {
+            **concept(
+                f"concept_a_crs_{index}",
+                "Beryllium exposure",
+                scheme="crs-subjects",
+            ),
+        }
+        for index in range(8)
+    ]
+    current = [
+        {
+            **concept(
+                f"concept_z_fr25_{index}",
+                "Beryllium exposure",
+            ),
+            "source_vocabulary": (
+                FEDERAL_REGISTER_THESAURUS_2025_SOURCE_VOCABULARY
+            ),
+        }
+        for index in range(8)
+    ]
+    registry = [*crs, *current]
+
+    balanced = select_candidate_concepts_anchored_v2(
+        "Beryllium exposure.",
+        registry,
+        limit=12,
+    )
+    federal_register = select_candidate_concepts_anchored_v2(
+        "Beryllium exposure.",
+        registry,
+        limit=12,
+        profile_id=FEDERAL_REGISTER_DOCUMENT_PROFILE_ID,
+    )
+
+    assert (
+        sum(
+            row["source_vocabulary"]
+            == FEDERAL_REGISTER_THESAURUS_2025_SOURCE_VOCABULARY
+            for row in federal_register
+        )
+        >= 6
+    )
+    assert (
+        sum(
+            row["source_vocabulary"]
+            == FEDERAL_REGISTER_THESAURUS_2025_SOURCE_VOCABULARY
+            for row in balanced
+        )
+        < 6
+    )
+    assert {row["selector_profile"] for row in federal_register} == {
+        FEDERAL_REGISTER_DOCUMENT_PROFILE_ID
+    }
+    assert {row["selector_profile"] for row in balanced} == {
+        "balanced-default"
+    }
 
 
 # --- contract ---------------------------------------------------------------

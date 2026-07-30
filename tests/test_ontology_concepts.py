@@ -1002,7 +1002,7 @@ def test_assignment_model_failure_aborts_without_partial_output(tmp_path):
     assert not (tmp_path / "concept_assignments.parquet").exists()
 
 
-def test_concept_registry_seeds_from_topics_and_event_log_is_idempotent(
+def test_concept_registry_seeds_from_2025_release_not_mutable_topics(
     tmp_path,
     monkeypatch,
 ):
@@ -1013,7 +1013,7 @@ def test_concept_registry_seeds_from_topics_and_event_log_is_idempotent(
         rows=[
             {
                 "document_number": "2026-00001",
-                "topics_json": '[{"name":"Air Pollution Control","slug":"air-pollution-control"}]',
+                "topics_json": '[{"name":"Project-only Topic","slug":"project-only-topic"}]',
                 "title": "Air rule",
                 "abstract": "Air pollution control.",
             }
@@ -1037,15 +1037,25 @@ def test_concept_registry_seeds_from_topics_and_event_log_is_idempotent(
         discovery_limit=0,
     )
     concepts = pq.read_table(concepts_file).to_pylist()
-    assert len(concepts) == 1
-    assert concepts[0]["pref_label"] == "Air Pollution Control"
-    assert concepts[0]["status"] == "active"
+    assert len(concepts) == 705
+    assert all(concept["status"] == "active" for concept in concepts)
+    assert all(
+        concept["source_vocabulary"]
+        == "urn:ref:federal-register-thesaurus:2025-04-01:scheme"
+        for concept in concepts
+    )
+    assert "Air pollution control" in {
+        concept["pref_label"] for concept in concepts
+    }
+    assert "Project-only Topic" not in {
+        concept["pref_label"] for concept in concepts
+    }
 
     # Seed/convergence events are materialized during the concepts rollup so
     # their exact payload survives the ephemeral workflow workspace.
     materialized_events = pq.read_table(tmp_path / "concept_events.parquet").to_pylist()
-    assert len(materialized_events) == 1
-    assert materialized_events[0]["event_type"] == "seed"
+    assert len(materialized_events) == 705
+    assert {event["event_type"] for event in materialized_events} == {"seed"}
 
     events_file = build_concept_events(
         tmp_path,
@@ -1053,8 +1063,8 @@ def test_concept_registry_seeds_from_topics_and_event_log_is_idempotent(
         asserted_at="2026-07-23T12:05:00Z",
     )
     before = pq.read_table(events_file).to_pylist()
-    assert len(before) == 1
-    assert before[0]["event_type"] == "seed"
+    assert len(before) == 705
+    assert {event["event_type"] for event in before} == {"seed"}
     build_concept_events(
         tmp_path,
         run_id="event-run",

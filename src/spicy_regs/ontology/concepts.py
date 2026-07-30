@@ -23,6 +23,7 @@ from spicy_regs.ontology.common import (
 from spicy_regs.ontology.concept_dimensions import (
     FACETS,
     FEDERAL_REGISTER_SOURCE_VOCABULARY,
+    FEDERAL_REGISTER_THESAURUS_2025_SOURCE_VOCABULARY,
     LOCAL_SOURCE_VOCABULARY,
     concept_facet,
     concept_source_vocabulary,
@@ -85,6 +86,9 @@ CONCEPT_STATUSES = frozenset({"active", "deprecated", "candidate"})
 EVENT_TYPES = frozenset({"merge", "split", "rename", "deprecate", "promote", "seed"})
 
 SEED_ACTOR = "federal-register-thesaurus:v1"
+FEDERAL_REGISTER_THESAURUS_2025_SEED_ACTOR = (
+    "federal-register-thesaurus:2025-04-01:v1"
+)
 MERGE_ACTOR = "spicy-regs:concept-convergence:v1"
 CANDIDATE_REGISTRY_MAX_TOKENS = 2_400
 
@@ -121,7 +125,13 @@ def _topic_parts(topic: object) -> tuple[str | None, str | None]:
 
 
 def seed_concept(topic: object, context: RunContext) -> dict | None:
-    """Create one stable active subject concept from an FR Thesaurus topic."""
+    """Create a legacy fixture concept from one topic-shaped value.
+
+    Normal Federal Register registry builds use the packaged 2025 thesaurus.
+    This helper remains for historical experiment fixtures; it does not resolve
+    Lists of Subjects and must not be used to mint managed concepts from
+    source-assigned Topics.
+    """
     label, slug = _topic_parts(topic)
     if not label:
         return None
@@ -144,6 +154,48 @@ def seed_concept(topic: object, context: RunContext) -> dict | None:
         "replaced_by": None,
         "external_ids_json": canonical_json(external),
         **context.provenance(method="deterministic", actor_id=SEED_ACTOR),
+    }
+
+
+def seed_federal_register_thesaurus_2025_concept(
+    *,
+    concept_id: str,
+    concept_iri: str,
+    preferred_label: str,
+    alternate_labels: Sequence[str],
+    context: RunContext,
+) -> dict:
+    """Create one active registry row from an official 2025 managed member."""
+
+    return {
+        "concept_id": concept_iri,
+        "facet": "subject",
+        "source_vocabulary": (
+            FEDERAL_REGISTER_THESAURUS_2025_SOURCE_VOCABULARY
+        ),
+        "scheme": "subject",
+        "pref_label": preferred_label,
+        "alt_labels_json": canonical_json(list(alternate_labels)),
+        "definition": (
+            "Official April 1, 2025 Federal Register indexing term: "
+            f"{preferred_label}."
+        ),
+        "broader_id": None,
+        "status": "active",
+        "replaced_by": None,
+        "external_ids_json": canonical_json(
+            [
+                {
+                    "scheme": "federal-register-thesaurus-2025",
+                    "value": concept_id,
+                    "iri": concept_iri,
+                }
+            ]
+        ),
+        **context.provenance(
+            method="deterministic",
+            actor_id=FEDERAL_REGISTER_THESAURUS_2025_SEED_ACTOR,
+        ),
     }
 
 
@@ -363,6 +415,8 @@ ANCHOR_SOURCE_VOCABULARY_QUOTAS: dict[str, int] = {
     "epa-tsca": 1,
     "fast-topical": 2,
 }
+FEDERAL_REGISTER_DOCUMENT_PROFILE_ID = "federal-register-document-v1"
+FEDERAL_REGISTER_THESAURUS_2025_MINIMUM_SHARE = 0.5
 # Compatibility name for experiment code written against fused-registry v1.
 ANCHOR_SCHEME_QUOTAS = ANCHOR_SOURCE_VOCABULARY_QUOTAS
 ANCHOR_WILDCARD_SLOTS = 2
@@ -601,8 +655,35 @@ def _apply_source_vocabulary_quotas(
     conditioning: _RegistryConditioning,
     *,
     limit: int,
+    profile_id: str | None = None,
 ) -> list[int]:
     """Fill by source-vocabulary quota, ceding empty sources to wildcards."""
+    if (
+        profile_id == FEDERAL_REGISTER_DOCUMENT_PROFILE_ID
+        and FEDERAL_REGISTER_THESAURUS_2025_SOURCE_VOCABULARY
+        in conditioning.source_vocabulary_set
+    ):
+        current_quota = max(
+            1,
+            math.ceil(
+                limit
+                * FEDERAL_REGISTER_THESAURUS_2025_MINIMUM_SHARE
+            ),
+        )
+        chosen = [
+            index
+            for index in ranked
+            if conditioning.source_vocabularies[index]
+            == FEDERAL_REGISTER_THESAURUS_2025_SOURCE_VOCABULARY
+        ][:current_quota]
+        taken = set(chosen)
+        chosen.extend(
+            index
+            for index in ranked
+            if index not in taken
+        )
+        order = {index: rank for rank, index in enumerate(ranked)}
+        return sorted(chosen[:limit], key=lambda index: order[index])
     quota_applies = (
         limit >= ANCHOR_QUOTA_TOTAL and set(ANCHOR_SOURCE_VOCABULARY_QUOTAS) <= conditioning.source_vocabulary_set
     )
@@ -656,6 +737,7 @@ def select_candidate_concepts_anchored_v2(
     *,
     allowed_facets: Sequence[str] = tuple(sorted(FACETS)),
     limit: int = ANCHOR_QUOTA_TOTAL,
+    profile_id: str | None = None,
 ) -> list[dict]:
     """Select candidates by anchored lexical + char-ngram retrieval, fused.
 
@@ -695,11 +777,13 @@ def select_candidate_concepts_anchored_v2(
         allowed,
         conditioning,
         limit=limit,
+        profile_id=profile_id,
     )
     candidates = [
         {
             **with_concept_dimensions(conditioning.concepts[index]),
             "selector_version": ANCHORED_SELECTOR_VERSION,
+            "selector_profile": profile_id or "balanced-default",
         }
         for index in selected
     ]
