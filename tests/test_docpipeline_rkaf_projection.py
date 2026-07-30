@@ -13,11 +13,10 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
-import runpy
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any, Callable, cast
+from typing import Any
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -47,6 +46,7 @@ from spicy_regs.docpipeline.source import (
     profile_for_table,
 )
 from spicy_regs.enrichment import ManagedReleaseCandidateSource
+from tests.managed_release_support import build_selected_managed_bundle
 from refspec import (
     ConceptLabel,
     ConceptRelation,
@@ -847,19 +847,8 @@ def _project_with_model(
 def _managed_release_candidate_source(
     root: Path,
 ) -> ManagedReleaseCandidateSource:
-    support = runpy.run_path(
-        str(
-            Path(__file__).resolve().parents[1]
-            / "RefSpec"
-            / "tests"
-            / "test_managed_release_view.py"
-        )
-    )
-    builder = cast(Callable[[Path], Path], support["build_bundle"])
-    manifest_path = builder(root)
-    manifest_digest = (
-        "sha256:" + hashlib.sha256(manifest_path.read_bytes()).hexdigest()
-    )
+    _, manifest_path = build_selected_managed_bundle(root)
+    manifest_digest = "sha256:" + hashlib.sha256(manifest_path.read_bytes()).hexdigest()
     return ManagedReleaseCandidateSource.open(
         manifest_path,
         expected_manifest_digest=manifest_digest,
@@ -867,6 +856,9 @@ def _managed_release_candidate_source(
             "id": "urn:test:lookup-index:managed-release:v1",
             "digest": "sha256:" + "c" * 64,
         },
+        permission_facet_iri="urn:ref:facet:general-subject",
+        permission_assignment_role_iri=("https://rulespec.org/ns/v1#assignmentPrimary"),
+        permission_resource_route="document",
     )
 
 
@@ -875,10 +867,12 @@ def test_managed_release_drives_the_real_model_path_without_output_authority(
     tables: Path,
     tmp_path: Path,
 ) -> None:
-    source = _managed_release_candidate_source(
-        tmp_path / "managed-release"
+    source = _managed_release_candidate_source(tmp_path / "managed-release")
+    member_iri = next(
+        expression.member_iri
+        for expression in source.iter_expressions()
+        if expression.original_literal == "Poultry slaughter inspection"
     )
-    member_iri = "urn:rkaf:fixture:concept:income"
     model = FakeModel(
         lambda payload: [
             tag
@@ -902,24 +896,59 @@ def test_managed_release_drives_the_real_model_path_without_output_authority(
         managed_release_source=source,
     )
 
-    assignment = next(
-        node
-        for node in result.document["@graph"]
-        if node.get("@type") == "rkaf:ConceptAssignment"
-    )
+    assignment = next(node for node in result.document["@graph"] if node.get("@type") == "rkaf:ConceptAssignment")
     assert assignment["rkaf:assertsObject"] == member_iri
-    assert assignment["rkaf:assignedConceptRelease"] == (
-        "urn:rkaf:fixture:release:digest-vector"
-    )
+    assert assignment["rkaf:assignedConceptRelease"] == (source.lookup_member(member_iri).release_iri)
     assert assignment["rkaf:usageEligibility"] == "rkaf:reviewQueueOnly"
     assert source.usage_ceiling == "candidateUseOnly"
-    assert (
-        result.run_record["refspec_authorization"][
-            "accepted_output_authorized"
-        ]
-        is False
-    )
+    authorization = result.run_record["refspec_authorization"]
+    assert authorization["state"] == "candidateUseAuthorized"
+    assert authorization["candidate_use_authorized"] is True
+    assert authorization["accepted_output_authorized"] is False
+    assert authorization["candidate_permission"]["facet"] == ("urn:ref:facet:general-subject")
+    assert authorization["candidate_permission"]["assignmentRole"] == ("https://rulespec.org/ns/v1#assignmentPrimary")
+    assert authorization["candidate_permission"]["resourceRoute"] == "document"
     assert len(model.calls) == 1
+
+
+def test_managed_release_rejects_model_role_outside_exact_permission(
+    corpus: Path,
+    tables: Path,
+    tmp_path: Path,
+) -> None:
+    source = _managed_release_candidate_source(tmp_path / "managed-release")
+    member_iri = next(
+        expression.member_iri
+        for expression in source.iter_expressions()
+        if expression.original_literal == "Poultry slaughter inspection"
+    )
+    model = FakeModel(
+        lambda payload: [
+            tag
+            for tag in [
+                _tag(
+                    payload,
+                    quote="poultry slaughter inspection",
+                    concept_id=member_iri,
+                    role="mention",
+                )
+            ]
+            if tag
+        ]
+    )
+
+    result = project_document(
+        "federal-register-document-v1",
+        "2026-00001",
+        settings=_settings(corpus, tables),
+        model=model,
+        model_run_directory=tmp_path / "managed-model-run",
+        managed_release_source=source,
+    )
+
+    assert not [node for node in result.document["@graph"] if node.get("@type") == "rkaf:ConceptAssignment"]
+    assert [row["reason"] for row in result.run_record["judgments"]["rejected"]] == ["assignment_role_not_authorized"]
+    assert result.run_record["refspec_authorization"]["candidate_use_authorized"] is True
 
 
 def test_a_verified_judgment_becomes_a_concept_assignment(
@@ -991,9 +1020,7 @@ def test_retired_inline_concept_status_cannot_enter_the_projection(
     )
 
     with pytest.raises(ProjectionError, match="conceptStatus is retired"):
-        load_migration_normalized_vocabulary_directory(
-            normalized_vocabulary
-        )
+        load_migration_normalized_vocabulary_directory(normalized_vocabulary)
 
 
 def test_all_three_normalized_vocabulary_tables_are_required(
@@ -1005,9 +1032,7 @@ def test_all_three_normalized_vocabulary_tables_are_required(
         ProjectionError,
         match="normalized vocabulary input is incomplete",
     ):
-        load_migration_normalized_vocabulary_directory(
-            normalized_vocabulary
-        )
+        load_migration_normalized_vocabulary_directory(normalized_vocabulary)
 
 
 def test_the_model_attests_production_and_never_approval(

@@ -71,6 +71,10 @@ OTHER_SCHEME = "urn:test:scheme:specialists"
 RELEASE = "urn:test:release:subjects"
 IMPORT = "urn:test:import:subjects"
 DISTRIBUTION = "urn:test:artifact:subjects"
+LOCAL_CONCEPT_TYPE = "https://rulespec.org/ns/v1#LocalConcept"
+REGISTERED_CONCEPT_TYPE = "https://rulespec.org/ns/v1#RegisteredConcept"
+RIGHTS_ASSESSMENT_ID = "urn:test:rights-assessment:subjects"
+ADOPTED_POLICY_IRI = "urn:test:policy:external-vocabulary-use"
 
 
 def digest_ref(name: str, digest: str = DIGEST_A) -> dict[str, str]:
@@ -213,8 +217,16 @@ def lifecycle_rows(operation: str) -> tuple[ConceptEventParticipant, ...]:
         "split": (1, 2),
         "merge": (2, 1),
     }[operation]
-    predecessor_kind = "local" if operation == "promotion" else "registered"
-    successor_kind = "local" if operation == "demotion" else "registered"
+    predecessor_type = (
+        LOCAL_CONCEPT_TYPE
+        if operation == "promotion"
+        else REGISTERED_CONCEPT_TYPE
+    )
+    successor_type = (
+        LOCAL_CONCEPT_TYPE
+        if operation == "demotion"
+        else REGISTERED_CONCEPT_TYPE
+    )
     event = f"event-{operation}"
     predecessors = tuple(
         ConceptEventParticipant(
@@ -222,7 +234,7 @@ def lifecycle_rows(operation: str) -> tuple[ConceptEventParticipant, ...]:
             operation=operation,
             participant_role="predecessor",
             concept_iri=f"urn:test:concept:{operation}:before:{index}",
-            concept_kind=predecessor_kind,
+            concept_type_iri=predecessor_type,
             release_iri=f"urn:test:release:{operation}:before",
             complete_membership=True,
             ordinal=index,
@@ -235,7 +247,7 @@ def lifecycle_rows(operation: str) -> tuple[ConceptEventParticipant, ...]:
             operation=operation,
             participant_role="successor",
             concept_iri=f"urn:test:concept:{operation}:after:{index}",
-            concept_kind=successor_kind,
+            concept_type_iri=successor_type,
             release_iri=f"urn:test:release:{operation}:after",
             complete_membership=True,
             ordinal=index,
@@ -505,6 +517,65 @@ def coverage_report() -> RegistryImportCoverageReport:
     )
 
 
+def registry_import_snapshot_record() -> dict[str, Any]:
+    return seal_payload(
+        {
+            "id": IMPORT,
+            "type": "urn:ref:type:RegistryImportSnapshot",
+            "recordedAt": NOW,
+            "recordedBy": ACTOR,
+            "schemaVersion": "1.0",
+            "operationalState": "complete",
+            "inventoryCoverageComponent": (
+                "urn:test:inventory-coverage:subjects"
+            ),
+            "importProfile": versioned_ref("import-profile:skos"),
+            "captures": [],
+            "externalReferences": [
+                "https://example.test/vocabularies/subjects"
+            ],
+            "referenceResourceRelease": versioned_ref(
+                "release:subjects"
+            ),
+            "distributionArtifacts": [
+                digest_ref("artifact:subjects")
+            ],
+            "rightsAssessment": {
+                "id": RIGHTS_ASSESSMENT_ID,
+                "digest": DIGEST_B,
+            },
+            "adoptedPolicyRefs": [ADOPTED_POLICY_IRI],
+            "transformation": component_pin("source-parser"),
+            "exclusions": [],
+            "failures": [],
+            "rulespecValidationResult": digest_ref(
+                "validation:rulespec"
+            ),
+            "refValidationResult": digest_ref("validation:refspec"),
+            "expectedRefreshCadence": "monthly",
+            "activity": ACTIVITY,
+            "receipt": "urn:test:receipt:import-subjects",
+        }
+    )
+
+
+def deployment_coverage_record(
+    import_snapshot: Mapping[str, Any],
+    *,
+    report_status: str = "pass",
+) -> dict[str, Any]:
+    return replace(
+        coverage_report(),
+        import_snapshot={
+            "id": str(import_snapshot["id"]),
+            "digest": str(
+                import_snapshot["canonicalPayloadDigest"]
+            ),
+        },
+        report_status=report_status,
+    ).sealed_payload()
+
+
 def mapping_coverage_report() -> RegistryImportCoverageReport:
     feature_rows = tuple(
         replace(
@@ -567,10 +638,11 @@ def test_coverage_allows_explained_equal_count_digest_transforms() -> None:
 
 def registry_deployment_decision(
     *,
-    coverage: Mapping[str, Any] | None = None,
+    import_snapshot: Mapping[str, Any],
+    coverage: Mapping[str, Any],
     profile: Mapping[str, Any] | None = None,
 ) -> RegistryDeploymentDecision:
-    coverage_record = coverage or coverage_report().sealed_payload()
+    coverage_record = coverage
     profile_record = profile or output_profile().sealed_payload()
     return RegistryDeploymentDecision(
         decision_id="urn:test:registry-deployment:subjects",
@@ -581,7 +653,17 @@ def registry_deployment_decision(
             "id": "urn:test:environment:production",
             "classification": "production",
         },
-        registry_import_snapshot=dict(coverage_record["registryImportSnapshot"]),
+        registry_import_snapshot={
+            "id": str(import_snapshot["id"]),
+            "digest": str(
+                import_snapshot["canonicalPayloadDigest"]
+            ),
+        },
+        rights_assessment=dict(import_snapshot["rightsAssessment"]),
+        adopted_policy_refs=tuple(
+            str(value)
+            for value in import_snapshot["adoptedPolicyRefs"]
+        ),
         reference_resource_release=dict(coverage_record["referenceResourceRelease"]),
         coverage_report={
             "id": coverage_record["id"],
@@ -620,13 +702,16 @@ def registry_deployment_decision(
 
 
 def test_registry_deployment_selects_only_exact_passing_coverage() -> None:
-    coverage = coverage_report().sealed_payload()
+    import_snapshot = registry_import_snapshot_record()
+    coverage = deployment_coverage_record(import_snapshot)
     profile = output_profile().sealed_payload()
     decision = registry_deployment_decision(
+        import_snapshot=import_snapshot,
         coverage=coverage,
         profile=profile,
     )
     payload = decision.sealed_payload(
+        import_snapshot_record=import_snapshot,
         coverage_report_record=coverage,
         output_profile_record=profile,
     )
@@ -636,25 +721,29 @@ def test_registry_deployment_selects_only_exact_passing_coverage() -> None:
     with pytest.raises(ReferenceRuntimeError, match="supplied exact"):
         decision.payload()
 
-    failing_coverage = replace(
-        coverage_report(),
+    failing_coverage = deployment_coverage_record(
+        import_snapshot,
         report_status="fail",
-    ).sealed_payload()
+    )
     failing_decision = registry_deployment_decision(
+        import_snapshot=import_snapshot,
         coverage=failing_coverage,
         profile=profile,
     )
     with pytest.raises(ReferenceRuntimeError, match="passing import coverage"):
         failing_decision.payload(
+            import_snapshot_record=import_snapshot,
             coverage_report_record=failing_coverage,
             output_profile_record=profile,
         )
 
 
 def test_registry_deployment_caller_authorization_claims_are_non_authoritative() -> None:
-    coverage = coverage_report().sealed_payload()
+    import_snapshot = registry_import_snapshot_record()
+    coverage = deployment_coverage_record(import_snapshot)
     profile = output_profile().sealed_payload()
     decision = registry_deployment_decision(
+        import_snapshot=import_snapshot,
         coverage=coverage,
         profile=profile,
     )
@@ -663,6 +752,7 @@ def test_registry_deployment_caller_authorization_claims_are_non_authoritative()
         authorization_validations=decision.authorization_validations[:1],
     )
     caller_payload = caller_claim.sealed_payload(
+        import_snapshot_record=import_snapshot,
         coverage_report_record=coverage,
         output_profile_record=profile,
     )
@@ -670,6 +760,7 @@ def test_registry_deployment_caller_authorization_claims_are_non_authoritative()
         decision,
         authorization_validations=(),
     ).sealed_payload(
+        import_snapshot_record=import_snapshot,
         coverage_report_record=coverage,
         output_profile_record=profile,
     )
@@ -684,7 +775,10 @@ def expression(
     *,
     scheme: str = SCHEME,
     member: str = "urn:test:concept:water",
-    source: str = "http://www.w3.org/2004/02/skos/core#prefLabel",
+    semantic_property: str = (
+        "http://www.w3.org/2004/02/skos/core#prefLabel"
+    ),
+    source: str = "/native/labels/0",
     literal: str = "水政策",
     language: str | None = "zh-Hant",
     datatype: str | None = None,
@@ -699,6 +793,7 @@ def expression(
         distribution_artifact=distribution_pin,
         scheme_iri=scheme,
         member_iri=member,
+        semantic_property_iri=semantic_property,
         source_property_or_path=source,
         original_literal=literal,
         language_tag=language,
@@ -715,6 +810,7 @@ def expression(
         distribution_artifact=distribution_pin,
         scheme_iri=scheme,
         member_iri=member,
+        semantic_property_iri=semantic_property,
         source_property_or_path=source,
         original_literal=literal,
         language_tag=language,
@@ -736,14 +832,21 @@ def test_indexed_expression_preserves_unicode_and_exact_identity() -> None:
     assert payload["originalLiteral"] == "水政策"
     assert payload["language"] == "zh-Hant"
     assert payload["indexedText"] == "水政策"
+    assert payload["semanticProperty"].endswith("#prefLabel")
+    assert payload["sourcePath"] == "/native/labels/0"
     require_payload_digest(payload)
     assert expression(scheme=SCHEME).expression_id != expression(scheme=OTHER_SCHEME).expression_id
     assert expression(member="urn:test:concept:other").expression_id != expression().expression_id
     assert expression(source="/native/label").expression_id != expression().expression_id
+    assert expression(
+        semantic_property="http://www.w3.org/2004/02/skos/core#altLabel"
+    ).expression_id != expression().expression_id
 
 
 def test_indexed_expression_requires_exactly_one_language_or_datatype() -> None:
     typed = expression(
+        semantic_property="http://www.w3.org/2004/02/skos/core#notation",
+        source="/native/notation",
         language=None,
         datatype="http://www.w3.org/2001/XMLSchema#string",
     )
@@ -2503,11 +2606,14 @@ def test_vocabulary_freeze_pins_registry_mapping_and_output_profile() -> None:
 def runtime_records() -> dict[str, dict[str, Any]]:
     profile = output_profile()
     profile_payload = profile.sealed_payload()
-    coverage_payload = coverage_report().sealed_payload()
+    import_snapshot = registry_import_snapshot_record()
+    coverage_payload = deployment_coverage_record(import_snapshot)
     registry_deployment_payload = registry_deployment_decision(
+        import_snapshot=import_snapshot,
         coverage=coverage_payload,
         profile=profile_payload,
     ).sealed_payload(
+        import_snapshot_record=import_snapshot,
         coverage_report_record=coverage_payload,
         output_profile_record=profile_payload,
     )
