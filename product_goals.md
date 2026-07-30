@@ -294,7 +294,11 @@ Encodes statutes and regulations as executable, testable RuleSpec YAML:
 scrapers → corpus → AI-assisted encoding → Rust engine, across federal,
 state, and international jurisdictions. Young and fast-moving.
 
-Code-verified 2026-07-26 (org-wide review of `axiom-corpus`,
+**Current decision record:** [Axiom ecosystem assessment for Spicy
+Regs](docs/axiom-ecosystem-analysis-2026-07-28.md). It supersedes repository
+counts and live-service observations in the earlier summary below.
+
+Earlier code review, 2026-07-26 (org-wide review of `axiom-corpus`,
 `axiom-encode`, `axiom-scrapers`, `rulespec-us`, `axiom-bills`,
 `axiom-rules-engine`):
 
