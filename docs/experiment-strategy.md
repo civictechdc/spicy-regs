@@ -1,15 +1,18 @@
+<!-- markdownlint-disable MD013 -->
+
 # SpicyRegs Experiment Strategy
 
-- **Date:** 2026-07-27
+- **Date:** 2026-07-29
 - **Status:** Working decision guide
 - **Purpose:** Test whether SpicyRegs helps people find, filter, connect, and
   aggregate regulatory records. Choose tools only after identifying the user
   question and the failing stage.
-- **Authority:** subordinate to the MVP plan
-  ([`rulespec-testbed-path-forward.md`](rulespec-testbed-path-forward.md))
-  for near-term sequencing and to [`decisions.md`](decisions.md) for
-  decisions. The "Next sequence" below activates only after MVP-local
-  acceptance or a maintainer entry in `decisions.md`.
+- **Authority:** the
+  [RefSpec managed vocabulary roadmap](../RefSpec/plans/managed-vocabulary-experiment-roadmap.md)
+  controls vocabulary experiments; [`decisions.md`](decisions.md) records
+  project decisions. The earlier
+  [`rulespec-testbed-path-forward.md`](rulespec-testbed-path-forward.md) is a
+  historical record of the fused-registry MVP.
 
 ## Decision
 
@@ -28,6 +31,54 @@ The program will follow this order:
 
 BM25, dense retrieval, language models, rerankers, and graph engines are
 options. None is the program's goal or default center of attention.
+
+## Two lanes
+
+SpicyRegs uses two lanes so an ambitious experiment does not inherit
+production-release ceremony before it has taught us anything.
+
+### Experiment lane
+
+Use this lane for development-only comparisons of parsers, expressions,
+indexes, retrieval channels, fusion, reranking, prompts, models, and provider
+settings. The run may exercise the complete data model and real managed
+vocabulary release, but it cannot authorize accepted output or deployment.
+
+The runner creates the evidence that used to be assembled by hand:
+
+- `experiment.json` pins the managed release, expression corpus, lookup index,
+  code, managed target set, configuration, and evaluation boundary;
+- `candidates.parquet` preserves candidate and expression lineage;
+- `metrics.json` keeps availability, retrieval, assignment, and product
+  measures separate; and
+- `decision.md` records a development decision to continue, investigate, or
+  stop.
+
+Focused tests are the normal gate. A failed or incomplete experiment remains
+useful evidence and does not require a release record.
+
+The active lookup dataset reuses the 35 pinned source artifacts and evidence
+spans from the earlier experiment, but none of its fused-registry identifiers
+or verdicts. Each represented answer names an exact member of one pinned
+RefSpec release and carries a directional grade. `notRepresented` is an
+explicit outcome and stays outside reachable-candidate recall. These targets
+were prepared with candidate runs visible, so they support development
+comparisons only; independent review is deferred until promotion.
+
+### Promotion lane
+
+Enter this lane only when a result will change accepted output, an externally
+used interface, a published claim, or a stable deployed configuration.
+Promotion adds the applicable RefSpec and Rulespec schemas, permission rows,
+independent evaluation, reviewed deployment decision, cross-repository
+validation, and migration evidence. An automatically generated
+`developmentOnly` candidate selection used to open a local managed release
+does not by itself enter this lane.
+
+The promotion lane consumes an experiment directory; it does not ask the
+experimenter to reconstruct the run. The active division of responsibility is
+defined in the
+[managed vocabulary experiment roadmap](../RefSpec/plans/managed-vocabulary-experiment-roadmap.md).
 
 ## Product goal
 
@@ -206,26 +257,26 @@ Add a dedicated graph engine only after a real query exceeds DuckDB's measured
 capabilities. Engine comparisons without such a query do not answer a product
 question.
 
-## Required experiment charter
+## Minimum experiment start card
 
-Every material experiment must answer these questions before it runs:
+Before a material experiment runs, state five things:
 
-1. What user or engineering decision will the result change?
-2. What exactly goes in and comes out?
-3. Which processing step are we testing?
-4. What evidence identifies that step as a likely constraint?
-5. What is the simplest credible baseline?
-6. Which single variable will change?
-7. Which measure matches the failure we care about?
-8. What result would lead us to adopt, reject, or investigate the change?
-9. Can this dataset support that decision, or is it development-only?
-10. How will we confirm that a component gain improves the complete user
-    result? (For tagging components this is unmeasurable until MVP phase 4
-    publishes assignments — say so rather than substituting a proxy.)
-11. Which digests are pinned (registry, source, selection, configuration),
-    which metric version applies, and where is the ledger entry recorded?
+1. the user or engineering decision the result could change;
+2. the processing step that appears to limit that result, with the evidence
+   that points to it;
+3. the baseline and the one intended change;
+4. whether the data are development-only or eligible for an independent
+   decision; and
+5. the result that means continue, investigate, or stop.
 
-An experiment without clear answers should not run.
+The runner, not the author, records input and output shapes, exact release and
+artifact digests, metric versions, candidate lineage, timings, and the output
+directory. A run refuses an adoption or accepted-output claim when its
+evaluation boundary is development-only.
+
+For a component experiment, the start card must also name the later end-to-end
+check. If that check is not yet measurable, record the gap instead of treating
+a component proxy as product success.
 
 ## Evaluation data
 
@@ -334,7 +385,7 @@ filters, and decision before interpreting the score.
 
 ## Current status
 
-As of 2026-07-27:
+As of 2026-07-29:
 
 - The metadata and ontology design already defines the initial regulation,
   statute, and concept questions.
@@ -344,6 +395,11 @@ As of 2026-07-27:
   attestations) is not built. Retrieval serving remains outside that MVP.
 - The selector harness tests whether a usable registered concept reaches a
   fixed candidate list. It does not test the final tag or user query.
+- The active managed-release development set no longer uses fused-registry
+  identifiers or verdicts. Complete dense evidence windows remove hidden
+  512-token truncation and improve the dense-only arm, but the current
+  equal-weight fusion loses that gain. Query construction and fusion remain
+  separate component experiments.
 - Local changes now separate semantic facets from source vocabularies and
   enforce a frozen development boundary.
 - No untouched, independently adjudicated holdout exists. Accuracy and

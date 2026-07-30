@@ -1,5 +1,8 @@
 # Rulespec MVP path
 
+- **Status:** Historical fused-registry MVP record; superseded for vocabulary
+  experiments by the
+  [RefSpec managed vocabulary roadmap](../RefSpec/plans/managed-vocabulary-experiment-roadmap.md).
 - **Date:** 2026-07-28, revision 4 — adds the current execution order
   (three tracks) after the selector ablation, evaluation boundary, and
   experiment-strategy validation. Revision 3 (2026-07-27) incorporated
@@ -8,7 +11,7 @@
   [`decisions.md`](decisions.md); execution history in
   [`evidence/testbed-execution-2026-07-26.md`](evidence/testbed-execution-2026-07-26.md).
 
-## Current execution order (2026-07-28)
+## Historical execution order (2026-07-28)
 
 **Track A — the holdout (critical path; nothing accuracy-shaped moves
 without it).** In order: (1) draw candidate artifacts from several source
