@@ -1,0 +1,611 @@
+{
+  "schemaVersion": "spicy-managed-development-targets/1",
+  "id": "urn:spicy-regs:managed-vocabulary-development:fr-thesaurus-35:v1",
+  "evaluationScope": "developmentOnly",
+  "sourceEvidence": {
+    "datasetId": "managed-vocabulary-development-35-v1",
+    "gold": {
+      "path": "output/segmented-real-data-evaluation-v2/gold_spans.parquet",
+      "digest": "sha256:8989994441e94f987a3f079ab26a59da9795ff2caba4d50a34d7e12b625ff4ca",
+      "rowCount": 35
+    },
+    "selection": {
+      "path": "output/segmentation-tagging-document-openai-structure-overlap-1800-v4/tagging_segments.parquet",
+      "digest": "sha256:45258c081f5268b61712d0a271869b44411a494ce7938beb48e679650592ae93",
+      "rowCount": 109
+    }
+  },
+  "vocabularyUniverse": {
+    "managedReleaseManifestDigest": "sha256:c4b005040797e7cce1fd23e0682a43b17d65dd8e1b0ab3041c99042fb37c96b7",
+    "publicationReleaseId": "urn:ref:fr-thesaurus-1995:publication:development-v1",
+    "referenceResourceRelease": {
+      "id": "urn:ref:fr-thesaurus-1995:release:1995-11-16-preview",
+      "version": "1995-11-16-content-derived-preview",
+      "digest": "sha256:cd2625d687ec56a7026fdd71c172719943d4b026d3d1279b9adaa2bfa9c57e63"
+    },
+    "registryImportSnapshot": {
+      "id": "urn:ref:fr-thesaurus-1995:import-snapshot:lossless-v1",
+      "digest": "sha256:b6fcbfba3fbd9dfbde7ec127b4ac34587943a6414fc917f8e7ef4729c87e42b0"
+    },
+    "expressionCorpusSnapshot": {
+      "id": "urn:ref:fr-thesaurus-1995:expression-corpus:v1",
+      "digest": "sha256:b822850202b2f555791ff27721633cf59bbc76dc0507719ce71905f0ccc3c5e3"
+    }
+  },
+  "review": {
+    "status": "provisionalDevelopmentReview",
+    "independentlyReviewed": false,
+    "sealed": false,
+    "preparedAt": "2026-07-29",
+    "candidateRunsVisible": true
+  },
+  "expectations": [
+    {
+      "itemId": "gold-adjudication-gold_05485aadf13d9175a11ffec9",
+      "goldId": "gold_05485aadf13d9175a11ffec9",
+      "intendedMeaning": {"value": "trademark law", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0926",
+          "prefLabel": "Trademarks",
+          "grade": "close",
+          "adequateForDevelopment": true
+        }
+      ],
+      "rationale": "The managed concept covers the legal subject without preserving the word law."
+    },
+    {
+      "itemId": "gold-adjudication-gold_0b65e53875522836cc5abf83",
+      "goldId": "gold_0b65e53875522836cc5abf83",
+      "intendedMeaning": {"value": "clean fuel production credit", "language": "en"},
+      "outcome": "notRepresented",
+      "registeredTargets": [],
+      "openLabel": {"value": "clean fuel production credit", "language": "en"},
+      "rationale": "The release has fuel, tax, and pollution concepts but no defensible concept for this credit."
+    },
+    {
+      "itemId": "gold-adjudication-gold_0d2bd9fd692cc0e0444738e4",
+      "goldId": "gold_0d2bd9fd692cc0e0444738e4",
+      "intendedMeaning": {"value": "oranges and grapefruit", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0150",
+          "prefLabel": "Citrus fruits",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        }
+      ],
+      "rationale": "Citrus fruits contains both named commodities but is broader than the source phrase."
+    },
+    {
+      "itemId": "gold-adjudication-gold_0dafb4a87922aa267974a26c",
+      "goldId": "gold_0dafb4a87922aa267974a26c",
+      "intendedMeaning": {"value": "safety zones", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0578",
+          "prefLabel": "Marine safety",
+          "grade": "close",
+          "adequateForDevelopment": true
+        }
+      ],
+      "rationale": "The source concerns a Coast Guard marine safety zone."
+    },
+    {
+      "itemId": "gold-adjudication-gold_15089382a3c588e7e9ac9476",
+      "goldId": "gold_15089382a3c588e7e9ac9476",
+      "intendedMeaning": {"value": "religious accommodation", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0799",
+          "prefLabel": "Religious discrimination",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        },
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0310",
+          "prefLabel": "Equal employment opportunity",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        }
+      ],
+      "rationale": "The employment accommodation meaning spans two broader managed subjects."
+    },
+    {
+      "itemId": "gold-adjudication-gold_156f26dea7ec0dd9908020bb",
+      "goldId": "gold_156f26dea7ec0dd9908020bb",
+      "intendedMeaning": {"value": "aviation cybersecurity", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0086",
+          "prefLabel": "Aviation safety",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        },
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0188",
+          "prefLabel": "Computer technology",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        }
+      ],
+      "rationale": "The compound meaning requires broader aviation and computing subjects."
+    },
+    {
+      "itemId": "gold-adjudication-gold_196c4943e8d6f605578c5bbe",
+      "goldId": "gold_196c4943e8d6f605578c5bbe",
+      "intendedMeaning": {"value": "affirmative action", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0309",
+          "prefLabel": "Equal educational opportunity",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        }
+      ],
+      "rationale": "The source concerns college admissions, so the education concept is the relevant broader target."
+    },
+    {
+      "itemId": "gold-adjudication-gold_2211124f731f5f06456877eb",
+      "goldId": "gold_2211124f731f5f06456877eb",
+      "intendedMeaning": {"value": "immigration law", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0489",
+          "prefLabel": "Immigration",
+          "grade": "close",
+          "adequateForDevelopment": true
+        }
+      ],
+      "rationale": "Immigration preserves the subject while omitting the legal-form suffix."
+    },
+    {
+      "itemId": "gold-adjudication-gold_2cb09b5e636b53797247b356",
+      "goldId": "gold_2cb09b5e636b53797247b356",
+      "intendedMeaning": {"value": "title ix religious exemption", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0309",
+          "prefLabel": "Equal educational opportunity",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        },
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0799",
+          "prefLabel": "Religious discrimination",
+          "grade": "related",
+          "adequateForDevelopment": false
+        }
+      ],
+      "rationale": "The release represents the education and religion dimensions, not the exemption as one concept."
+    },
+    {
+      "itemId": "gold-adjudication-gold_2f46b09af5e1049c9ca0675b",
+      "goldId": "gold_2f46b09af5e1049c9ca0675b",
+      "intendedMeaning": {"value": "judicial power", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0213",
+          "prefLabel": "Courts",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        }
+      ],
+      "rationale": "Courts is broader than the constitutional doctrine in the source."
+    },
+    {
+      "itemId": "gold-adjudication-gold_3ce05d58feb8e6463dab726f",
+      "goldId": "gold_3ce05d58feb8e6463dab726f",
+      "intendedMeaning": {"value": "steep-slope mining", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0889",
+          "prefLabel": "Surface mining",
+          "grade": "close",
+          "adequateForDevelopment": true
+        }
+      ],
+      "rationale": "The source explicitly applies the steep-slope rule to surface coal mining."
+    },
+    {
+      "itemId": "gold-adjudication-gold_46af63a049ee1964b9ae13f4",
+      "goldId": "gold_46af63a049ee1964b9ae13f4",
+      "intendedMeaning": {"value": "poultry inspection", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0367",
+          "prefLabel": "Food grades and standards",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        },
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0742",
+          "prefLabel": "Poultry and poultry products",
+          "grade": "related",
+          "adequateForDevelopment": false
+        }
+      ],
+      "rationale": "The release splits inspection and poultry across two subjects."
+    },
+    {
+      "itemId": "gold-adjudication-gold_540c04525b1d09a5f11f02d7",
+      "goldId": "gold_540c04525b1d09a5f11f02d7",
+      "intendedMeaning": {"value": "human rights", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0153",
+          "prefLabel": "Civil rights",
+          "grade": "related",
+          "adequateForDevelopment": false
+        }
+      ],
+      "rationale": "Civil rights is related but does not preserve the international human-rights meaning."
+    },
+    {
+      "itemId": "gold-adjudication-gold_5701a4a8af60217ae1c86123",
+      "goldId": "gold_5701a4a8af60217ae1c86123",
+      "intendedMeaning": {"value": "elections clause", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0283",
+          "prefLabel": "Elections",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        }
+      ],
+      "rationale": "Elections is broader than the constitutional clause."
+    },
+    {
+      "itemId": "gold-adjudication-gold_6893b7d3b29ad03d749ce926",
+      "goldId": "gold_6893b7d3b29ad03d749ce926",
+      "intendedMeaning": {"value": "independent dispute resolution", "language": "en"},
+      "outcome": "notRepresented",
+      "registeredTargets": [],
+      "openLabel": {"value": "independent dispute resolution", "language": "en"},
+      "rationale": "The release has no defensible member for the No Surprises Act process."
+    },
+    {
+      "itemId": "gold-adjudication-gold_6dda7e7b3619b79e8902749f",
+      "goldId": "gold_6dda7e7b3619b79e8902749f",
+      "intendedMeaning": {"value": "hazard communication", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0677",
+          "prefLabel": "Occupational safety and health",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        },
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0444",
+          "prefLabel": "Hazardous substances",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        },
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0539",
+          "prefLabel": "Labeling",
+          "grade": "related",
+          "adequateForDevelopment": false
+        }
+      ],
+      "rationale": "The rule combines workplace safety, hazardous substances, and labeling."
+    },
+    {
+      "itemId": "gold-adjudication-gold_73e66810cc4e3d464d85ac1c",
+      "goldId": "gold_73e66810cc4e3d464d85ac1c",
+      "intendedMeaning": {"value": "health information privacy", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0756",
+          "prefLabel": "Privacy",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        },
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0454",
+          "prefLabel": "Health records",
+          "grade": "related",
+          "adequateForDevelopment": false
+        }
+      ],
+      "rationale": "The release splits privacy and health-record scope across two members."
+    },
+    {
+      "itemId": "gold-adjudication-gold_8a226f76fb07a004dd6f88de",
+      "goldId": "gold_8a226f76fb07a004dd6f88de",
+      "intendedMeaning": {"value": "science and technology policy", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0832",
+          "prefLabel": "Science and technology",
+          "grade": "close",
+          "adequateForDevelopment": true
+        }
+      ],
+      "rationale": "The managed subject preserves the policy domain while omitting the word policy."
+    },
+    {
+      "itemId": "gold-adjudication-gold_8b15306d5c256dd55b8b5a9e",
+      "goldId": "gold_8b15306d5c256dd55b8b5a9e",
+      "intendedMeaning": {"value": "safety zones", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0578",
+          "prefLabel": "Marine safety",
+          "grade": "close",
+          "adequateForDevelopment": true
+        }
+      ],
+      "rationale": "The source concerns a Coast Guard safety zone on navigable water."
+    },
+    {
+      "itemId": "gold-adjudication-gold_8c11eda68fb5ecd98629db3c",
+      "goldId": "gold_8c11eda68fb5ecd98629db3c",
+      "intendedMeaning": {"value": "free speech", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0153",
+          "prefLabel": "Civil rights",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        }
+      ],
+      "rationale": "Civil rights is broader than the speech right at issue."
+    },
+    {
+      "itemId": "gold-adjudication-gold_8d2e1db6a6a6016e3131fa8b",
+      "goldId": "gold_8d2e1db6a6a6016e3131fa8b",
+      "intendedMeaning": {"value": "fisheries management", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0353",
+          "prefLabel": "Fisheries",
+          "grade": "close",
+          "adequateForDevelopment": true
+        }
+      ],
+      "rationale": "Fisheries is the managed subject for fisheries-management policy."
+    },
+    {
+      "itemId": "gold-adjudication-gold_9699f26de500ef0bce70b53c",
+      "goldId": "gold_9699f26de500ef0bce70b53c",
+      "intendedMeaning": {"value": "tariff suspension", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0225",
+          "prefLabel": "Customs duties and inspection",
+          "grade": "close",
+          "adequateForDevelopment": true
+        }
+      ],
+      "rationale": "Tariffs is an alternate label on this member; suspension narrows the action."
+    },
+    {
+      "itemId": "gold-adjudication-gold_9bcfbe38aca881716c3cf1e8",
+      "goldId": "gold_9bcfbe38aca881716c3cf1e8",
+      "intendedMeaning": {"value": "true threats", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0153",
+          "prefLabel": "Civil rights",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        }
+      ],
+      "rationale": "Civil rights is broader than the First Amendment true-threat doctrine."
+    },
+    {
+      "itemId": "gold-adjudication-gold_a474a8d29ec59ec6ba159606",
+      "goldId": "gold_a474a8d29ec59ec6ba159606",
+      "intendedMeaning": {"value": "personal jurisdiction", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0213",
+          "prefLabel": "Courts",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        }
+      ],
+      "rationale": "Courts is broader than the jurisdiction doctrine."
+    },
+    {
+      "itemId": "gold-adjudication-gold_aa9146564ffb454114411888",
+      "goldId": "gold_aa9146564ffb454114411888",
+      "intendedMeaning": {"value": "student loan relief", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0881",
+          "prefLabel": "Student aid",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        },
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0560",
+          "prefLabel": "Loan programs",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        }
+      ],
+      "rationale": "The release splits the student and loan dimensions and has no relief member."
+    },
+    {
+      "itemId": "gold-adjudication-gold_bb672610d9e0f861a8d0d0cf",
+      "goldId": "gold_bb672610d9e0f861a8d0d0cf",
+      "intendedMeaning": {"value": "climate pollution", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0306",
+          "prefLabel": "Environmental protection",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        }
+      ],
+      "rationale": "Pollution is an alternate label, but the member is broader than climate pollution."
+    },
+    {
+      "itemId": "gold-adjudication-gold_bcd5ef6aa4616cead8192c66",
+      "goldId": "gold_bcd5ef6aa4616cead8192c66",
+      "intendedMeaning": {"value": "retirement plans", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0296",
+          "prefLabel": "Employee benefit plans",
+          "grade": "close",
+          "adequateForDevelopment": true
+        }
+      ],
+      "rationale": "The source concerns employer retirement arrangements within employee benefit plans."
+    },
+    {
+      "itemId": "gold-adjudication-gold_bedd662ed4eee85e2f379d07",
+      "goldId": "gold_bedd662ed4eee85e2f379d07",
+      "intendedMeaning": {"value": "administrative burden", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0804",
+          "prefLabel": "Reporting and recordkeeping requirements",
+          "grade": "related",
+          "adequateForDevelopment": false
+        }
+      ],
+      "rationale": "Paperwork is one source of burden, but this member does not cover the full meaning."
+    },
+    {
+      "itemId": "gold-adjudication-gold_ccc7eb2c1ef62fc9ddacf2c5",
+      "goldId": "gold_ccc7eb2c1ef62fc9ddacf2c5",
+      "intendedMeaning": {"value": "critical habitat", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0301",
+          "prefLabel": "Endangered and threatened species",
+          "grade": "exact",
+          "adequateForDevelopment": true
+        }
+      ],
+      "rationale": "Critical habitat is an exact registered alternate label."
+    },
+    {
+      "itemId": "gold-adjudication-gold_d43a5acdb46c9af6b37b76fc",
+      "goldId": "gold_d43a5acdb46c9af6b37b76fc",
+      "intendedMeaning": {"value": "army corps of engineers", "language": "en"},
+      "outcome": "notRepresented",
+      "registeredTargets": [],
+      "openLabel": {"value": "Army Corps of Engineers", "language": "en"},
+      "rationale": "This is a named organization, not a represented subject member."
+    },
+    {
+      "itemId": "gold-adjudication-gold_e7aa84bceab8eaa0ba85619b",
+      "goldId": "gold_e7aa84bceab8eaa0ba85619b",
+      "intendedMeaning": {"value": "student loan forgiveness", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0881",
+          "prefLabel": "Student aid",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        },
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0560",
+          "prefLabel": "Loan programs",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        }
+      ],
+      "rationale": "The release splits the student and loan dimensions and has no forgiveness member."
+    },
+    {
+      "itemId": "gold-adjudication-gold_f5d9863ba4507643eb91e184",
+      "goldId": "gold_f5d9863ba4507643eb91e184",
+      "intendedMeaning": {"value": "federal real property", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0426",
+          "prefLabel": "Government property management",
+          "grade": "close",
+          "adequateForDevelopment": true
+        }
+      ],
+      "rationale": "The report concerns management and consolidation of federal office space."
+    },
+    {
+      "itemId": "gold-adjudication-gold_f5de44fd6f2a2ef8ad88f302",
+      "goldId": "gold_f5de44fd6f2a2ef8ad88f302",
+      "intendedMeaning": {"value": "software asset management", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0188",
+          "prefLabel": "Computer technology",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        },
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0426",
+          "prefLabel": "Government property management",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        }
+      ],
+      "rationale": "The release represents the technology and asset-management dimensions separately."
+    },
+    {
+      "itemId": "gold-adjudication-gold_f6bda7557c925438539fafed",
+      "goldId": "gold_f6bda7557c925438539fafed",
+      "intendedMeaning": {"value": "PFAS", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0444",
+          "prefLabel": "Hazardous substances",
+          "grade": "targetBroaderThanGold",
+          "adequateForDevelopment": false
+        }
+      ],
+      "rationale": "Hazardous substances contains PFAS but is much broader."
+    },
+    {
+      "itemId": "gold-adjudication-gold_f9e29337911aa882dffe9870",
+      "goldId": "gold_f9e29337911aa882dffe9870",
+      "intendedMeaning": {"value": "medicaid", "language": "en"},
+      "outcome": "represented",
+      "registeredTargets": [
+        {
+          "conceptId": "urn:ref:fr-thesaurus-1995:concept:0589",
+          "prefLabel": "Medicaid",
+          "grade": "exact",
+          "adequateForDevelopment": true
+        }
+      ],
+      "rationale": "The intended meaning exactly matches the preferred label."
+    }
+  ]
+}

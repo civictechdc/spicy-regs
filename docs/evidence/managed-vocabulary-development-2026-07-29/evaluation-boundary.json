@@ -1,0 +1,59 @@
+{
+  "schema_version": "rulespec-evaluation-boundary-v1",
+  "adoption_policy": {
+    "minimum_holdout_artifacts": 1,
+    "minimum_independent_reviewer_families": 2
+  },
+  "datasets": [
+    {
+      "dataset_id": "managed-vocabulary-development-35-v1",
+      "role": "train",
+      "forced_split": "train",
+      "permanently_development": true,
+      "previously_inspected_and_tuned": true,
+      "frozen": true,
+      "gold_file": "output/segmented-real-data-evaluation-v2/gold_spans.parquet",
+      "gold_sha256": "8989994441e94f987a3f079ab26a59da9795ff2caba4d50a34d7e12b625ff4ca",
+      "gold_row_count": 35,
+      "gold_artifact_count": 35,
+      "selection_file": "output/segmentation-tagging-document-openai-structure-overlap-1800-v4/tagging_segments.parquet",
+      "selection_sha256": "45258c081f5268b61712d0a271869b44411a494ce7938beb48e679650592ae93",
+      "source_files": {
+        "cfr_sections.parquet": "afc350d91e9f3a22754a3f61b06b5f1d3c286d09c8c11416e656fab00527a0a6",
+        "congress_bills.parquet": "415e13431890519ae352a6bbcfed3d4a0e3f4545e62dab0ce558597f5e33bdee",
+        "court_opinions.parquet": "2c494a0a635c139a1f111e1b9e0a395e0b1e2ec8b28e44642b7ce80ccc063d6a",
+        "crs_reports.parquet": "c9ac2bdfe3422fec2d84692bc5de6b8e98ed32d17eeade1e7fff9a7160767578",
+        "documents.parquet": "5d483fd1cad6a49c235e0a29157f57e6c1cc992545b9f361b4607e11d4f3eb09",
+        "fcc_filings.parquet": "7b4053d336f8d464261dee9c0d028df4c20cb7cd3331d430eb29964792258a76",
+        "federal_register.parquet": "0e755e60d15c386fc29be1c2f338c7656a86c7c17d962782bcc72de709a51313",
+        "gao_reports.parquet": "0bb07e36ef357de3e1fe0e675164fecd669c5caf57e86cdc541517c6dc99119b",
+        "lobbying_filings.parquet": "5b072b923c3670afe5b1c1b323e27b8d24c0023f2bd5b0fa9127802eb287d81c",
+        "unified_agenda.parquet": "487654cfb789e9fec9957779621fc00af78da72d11d5ec8c835abea888935108"
+      },
+      "adjudication": {
+        "status": "provisional-development",
+        "scope": "train",
+        "blind_to_tagger_output": false,
+        "agreement_published": false,
+        "disagreement_resolution_status": "provisional",
+        "reviewers": []
+      },
+      "holdout_controls": {
+        "configuration_frozen_before_labels": false,
+        "tuning_access": true
+      },
+      "frozen_configuration": {
+        "candidate_selector": "lexical-overlap-v1",
+        "prompt_concept_limit": 12,
+        "registry_sha256": "7fd283c731c09e75da5db47b08b897ec8a58bd468f0012e9dd910a55fec8ad4b",
+        "tag_instructions_sha256": "6875ee647308ef9b1b0a5a32baf079a7d1a9633b4bb63af41b6ee778f2ee1205",
+        "tag_schema_sha256": "722da78535c87912632b71645dc939df555d85bea51b4f67ccff417535fbaedc",
+        "prompt_input_token_budget": 8192,
+        "prompt_safety_margin_tokens": 1024,
+        "managed_release_manifest_digest": "sha256:c4b005040797e7cce1fd23e0682a43b17d65dd8e1b0ab3041c99042fb37c96b7",
+        "target_dataset_id": "urn:spicy-regs:managed-vocabulary-development:fr-thesaurus-35:v1"
+      },
+      "accuracy_verdict_eligible": false
+    }
+  ]
+}
