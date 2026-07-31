@@ -16,6 +16,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+[![Slack](https://img.shields.io/badge/Slack-join%20us-4A154B?logo=slack&logoColor=white)](https://join.slack.com/t/civictechdc/shared_invite/zt-43eotbj04-QLQ_Ria296PtRYJU2EgwxQ)
 
 [Explore the data](https://app.spicy-regs.dev) ·
 [Data dictionary](https://docs.spicy-regs.dev/) ·
@@ -306,10 +307,13 @@ on R2 is openly readable.
 
 ## Contact
 
-Join the conversation in [#spicy-regs on the Civic Tech DC Slack](https://civictechdc.slack.com/archives/C09H576E6LU).
-No Slack access? Open a
-[GitHub issue](https://github.com/civictechdc/spicy-regs/issues/new/choose) and
-we'll get back to you.
+- **Slack** — [join the Civic Tech DC workspace](https://join.slack.com/t/civictechdc/shared_invite/zt-43eotbj04-QLQ_Ria296PtRYJU2EgwxQ)
+  (open invite, anyone welcome), then say hello in
+  [#spicy-regs](https://civictechdc.slack.com/archives/C09H576E6LU). This is the
+  fastest way to reach us.
+- **GitHub** — open an
+  [issue](https://github.com/civictechdc/spicy-regs/issues/new/choose) for a bug,
+  a feature idea, or a question about the data.
 
 ## Acknowledgments
 
@@ -330,6 +334,6 @@ we'll get back to you.
 Built and maintained by **[Civic Tech DC](https://www.civictechdc.org/)** — a
 volunteer community using technology to serve the DC region.
 
-**[Come build with us.](https://www.civictechdc.org/)**
+**[Come build with us.](https://join.slack.com/t/civictechdc/shared_invite/zt-43eotbj04-QLQ_Ria296PtRYJU2EgwxQ)**
 
 </div>
