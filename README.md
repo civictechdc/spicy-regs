@@ -314,6 +314,8 @@ on R2 is openly readable.
 - **GitHub** — open an
   [issue](https://github.com/civictechdc/spicy-regs/issues/new/choose) for a bug,
   a feature idea, or a question about the data.
+- **Email** — [eugene.kim@civictechdc.com](mailto:eugene.kim@civictechdc.com) for
+  sponsorships, partnerships, or enterprise use cases.
 
 ## Acknowledgments
 
