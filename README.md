@@ -55,8 +55,6 @@ welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 - [Running the pipeline yourself](#running-the-pipeline-yourself)
 - [Use it from an AI assistant](#use-it-from-an-ai-assistant)
 - [Project layout](#project-layout)
-- [Related repositories](#related-repositories)
-- [Contributing](#contributing)
 - [License](#license)
 - [Contact](#contact)
 - [Acknowledgments](#acknowledgments)
@@ -75,14 +73,14 @@ One line of SQL against the public bucket — no credentials, no download:
 ```sql
 -- DuckDB, anywhere: CLI, notebook, or the browser
 SELECT agency_code, comment_count
-FROM read_parquet('https://r2.spicy-regs.dev/agency_stats.parquet')
+FROM read_parquet('https://data.spicy-regs.dev/agency_stats.parquet')
 ORDER BY comment_count DESC
 LIMIT 10;
 ```
 
 ## What's in the corpus
 
-Everything is published under `https://r2.spicy-regs.dev` with public,
+Everything is published under `https://data.spicy-regs.dev` with public,
 anonymous read. Per-column reference and exact row counts live in the
 [data dictionary](https://docs.spicy-regs.dev/) — it's generated from the
 schemas in this repo and kept in sync by CI, so it never drifts from what's
@@ -268,34 +266,6 @@ Writer`, wired by a `Pipeline`. The
 [architecture section of CONTRIBUTING.md](CONTRIBUTING.md#architecture-the-etl-building-blocks)
 explains the contract, and `tests/test_example_pipeline.py` is a runnable
 reference for adding your own.
-
-## Related repositories
-
-| Repo | What it is |
-|---|---|
-| **spicy-regs** (this repo) | ETL, rollups, MCP server. Publishes the public corpus. |
-| [spicy-regs-ui](https://github.com/ekim1394/spicy-regs-ui) | The public explorer at [app.spicy-regs.dev](https://app.spicy-regs.dev) — Next.js + DuckDB-WASM, queries the corpus live in the browser with no backend. |
-
-## Contributing
-
-New contributors are welcome, technical or not. **[CONTRIBUTING.md](CONTRIBUTING.md)**
-covers getting set up, a glossary of regulatory terms, a map of where things
-live, and how to add your own reader / transform / writer / pipeline.
-
-Good places to start:
-
-- [Good first issues](https://github.com/civictechdc/spicy-regs/labels/good%20first%20issue)
-- [Help wanted](https://github.com/civictechdc/spicy-regs/labels/help%20wanted)
-- Open a [new issue](https://github.com/civictechdc/spicy-regs/issues/new/choose) — bug, feature, or a question
-
-Before opening a PR:
-
-```bash
-uv run ruff format . && uv run ruff check . && uv run ty check && uv run pytest
-```
-
-CI runs those same checks on every PR, plus a guard that the data dictionary
-still matches the schema. Live-data integration tests run weekly.
 
 ## License
 
