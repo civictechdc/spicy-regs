@@ -14,7 +14,7 @@ import json
 import sys
 from pathlib import Path
 
-R2_BASE_URL = "https://r2.spicy-regs.dev"
+R2_BASE_URL = "https://data.spicy-regs.dev"
 
 
 def _escape_sql_string(value: str) -> str:

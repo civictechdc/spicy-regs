@@ -34,7 +34,7 @@ from mcp.types import Icon
 
 from spicy_regs._icon import ICON_DATA_URI
 
-DEFAULT_R2_BASE_URL = "https://r2.spicy-regs.dev"
+DEFAULT_R2_BASE_URL = "https://data.spicy-regs.dev"
 # The full published R2 surface. Must match the data dictionary's table list
 # (src/spicy_regs/data_dictionary.py::TABLES) — a test enforces it so the two
 # can't drift. Keep in sync with the Vercel copy in mcp-server/api/index.py.

@@ -16,7 +16,7 @@ from urllib.request import urlretrieve
 from urllib.error import URLError
 
 # Public URL for the R2 bucket
-PUBLIC_URL = "https://r2.spicy-regs.dev"
+PUBLIC_URL = "https://data.spicy-regs.dev"
 DATA_TYPES = ["dockets", "documents", "comments", "manifest"]
 DEFAULT_OUTPUT_DIR = Path("./spicy-regs-data")
 

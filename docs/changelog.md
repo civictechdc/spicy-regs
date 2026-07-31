@@ -14,7 +14,7 @@ as their own tables, covering the rulemaking lifecycle, the organizations that
 engage in it, and its downstream context.
 
 !!! note "New tables"
-    Every table below is published as `https://r2.spicy-regs.dev/<name>.parquet`
+    Every table below is published as `https://data.spicy-regs.dev/<name>.parquet`
     and documented under **Tables** in the nav.
 
 ### New data sources

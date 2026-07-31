@@ -8,7 +8,7 @@ Use this reference when you need a quick map of the remote or local data files b
 
 ## Common locations
 
-- Default public R2 bucket: `https://r2.spicy-regs.dev`
+- Default public R2 bucket: `https://data.spicy-regs.dev`
 - Default local parquet directory: `./spicy-regs-data/`
 - Sample JSON for offline examples: `sample-data/mirrulations/`
 

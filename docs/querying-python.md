@@ -1,7 +1,7 @@
 # Querying with Python
 
 Every table is published as public Apache Parquet at
-`https://r2.spicy-regs.dev/<table>.parquet` — **no credentials, no download
+`https://data.spicy-regs.dev/<table>.parquet` — **no credentials, no download
 required**. The easiest way to query it from Python is [DuckDB](https://duckdb.org)
 with the `httpfs` extension, which reads the remote Parquet directly (and only
 fetches the byte ranges your query touches).
@@ -18,7 +18,7 @@ import duckdb
 con = duckdb.connect()
 con.execute("INSTALL httpfs; LOAD httpfs")
 
-BASE = "https://r2.spicy-regs.dev"
+BASE = "https://data.spicy-regs.dev"
 
 def table(name: str) -> str:
     """Return a read_parquet(...) expression for a published table."""
