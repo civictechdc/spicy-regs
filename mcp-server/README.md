@@ -6,7 +6,7 @@ MCP-compatible client — Claude.ai, Claude Code, Cursor, etc. — without
 requiring a local Python install.
 
 Under the hood it runs DuckDB queries against the public Cloudflare R2 parquet
-bucket (`r2.spicy-regs.dev`). Two transports are
+bucket (`data.spicy-regs.dev`). Two transports are
 shipped:
 
 - **Streamable HTTP** — this directory, deployed as a Vercel Python
@@ -89,7 +89,7 @@ npx vercel --prod
 
 | Variable | Default |
 | --- | --- |
-| `SPICY_REGS_R2_URL` | `https://r2.spicy-regs.dev` |
+| `SPICY_REGS_R2_URL` | `https://data.spicy-regs.dev` |
 
 Override `SPICY_REGS_R2_URL` if you fork the bucket.
 

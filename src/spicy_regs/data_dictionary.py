@@ -37,7 +37,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DESCRIPTIONS = REPO_ROOT / "data_dictionary" / "descriptions.yaml"
 DEFAULT_DOCS_TABLES_DIR = REPO_ROOT / "docs" / "tables"
 
-DEFAULT_R2_BASE_URL = "https://r2.spicy-regs.dev"
+DEFAULT_R2_BASE_URL = "https://data.spicy-regs.dev"
 
 # Display order for the dictionary. The first three are the core record types;
 # the rest are derived rollups. This is the full public R2 surface.

@@ -13,11 +13,11 @@ in step with what's actually published.
 
 ```
 regulations.gov  →  Mirrulations S3 mirror  →  Spicy Regs ETL  →  Parquet on R2
-                                                                   (r2.spicy-regs.dev)
+                                                                   (data.spicy-regs.dev)
 ```
 
 The ETL flattens the raw regulations.gov JSON into a handful of flat tables and
-publishes them, plus small pre-computed rollups, to `https://r2.spicy-regs.dev`.
+publishes them, plus small pre-computed rollups, to `https://data.spicy-regs.dev`.
 Alongside them it ingests a set of **complementary federal data sources** — the
 Federal Register, the Unified Agenda, Congress.gov, the CFR, SAM.gov, lobbying
 disclosures, the FEC, USASpending, federal-court litigation, and GAO/CRS reports
@@ -26,7 +26,7 @@ downstream context can all be queried from one place.
 
 ## The tables
 
-Every table below is published as `https://r2.spicy-regs.dev/<name>.parquet` and
+Every table below is published as `https://data.spicy-regs.dev/<name>.parquet` and
 is queryable through the MCP server (`list_sources` / `describe_table` /
 `query_sql`).
 
@@ -139,7 +139,7 @@ of `dockets`; they join to the corpus (and to each other) on a few shared keys:
     ```sql
     INSTALL httpfs; LOAD httpfs;
     SELECT agency_code, COUNT(*) AS dockets
-    FROM read_parquet('https://r2.spicy-regs.dev/dockets.parquet')
+    FROM read_parquet('https://data.spicy-regs.dev/dockets.parquet')
     GROUP BY agency_code
     ORDER BY dockets DESC
     LIMIT 20;
@@ -153,7 +153,7 @@ of `dockets`; they join to the corpus (and to each other) on a few shared keys:
     con.execute("INSTALL httpfs; LOAD httpfs")
     con.execute(
         "SELECT agency_code, docket_count "
-        "FROM read_parquet('https://r2.spicy-regs.dev/agency_stats.parquet') "
+        "FROM read_parquet('https://data.spicy-regs.dev/agency_stats.parquet') "
         "ORDER BY docket_count DESC LIMIT 20"
     ).df()   # -> pandas DataFrame
     ```

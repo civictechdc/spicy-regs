@@ -23,7 +23,7 @@ from itertools import combinations
 from pathlib import Path
 from typing import Any
 
-R2_BASE_URL = "https://r2.spicy-regs.dev"
+R2_BASE_URL = "https://data.spicy-regs.dev"
 
 STOPWORDS = {
     "a",
