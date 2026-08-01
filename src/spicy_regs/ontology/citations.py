@@ -217,9 +217,21 @@ def canonical_usc_iri(title: object, section: object) -> str:
     return f"urn:rkaf:us:usc:{title_number}:{section_number}"
 
 
+#: A Regulation Identifier Number: a four-digit agency code, then a two-letter
+#: sub-agency code and a two-digit sequence. The one definition of the shape —
+#: every reader of a RIN column goes through :func:`normalize_rin`.
+_RIN = re.compile(r"^\d{4}-[A-Z]{2}\d{2}$")
+
+
+def normalize_rin(value: object) -> str | None:
+    """Return the canonical RIN a value states, or ``None`` when it states none."""
+    text = str(value or "").strip().upper()
+    return text if _RIN.fullmatch(text) else None
+
+
 def canonical_rin_iri(rin: object) -> str:
-    value = str(rin).strip().upper()
-    if not re.fullmatch(r"\d{4}-[A-Z]{2}\d{2}", value):
+    value = normalize_rin(rin)
+    if value is None:
         raise ValueError(f"invalid RIN: {rin!r}")
     return f"urn:rkaf:us:rin:{value}"
 

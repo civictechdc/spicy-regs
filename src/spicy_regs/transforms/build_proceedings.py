@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -13,6 +12,7 @@ from loguru import logger
 from spicy_regs.ontology.citations import (
     canonical_cfr_iri,
     normalize_regsgov_identifier,
+    normalize_rin,
 )
 from spicy_regs.ontology.common import (
     ATTESTATION_COLUMNS,
@@ -48,7 +48,6 @@ COLUMNS = (
 STAGES = frozenset(
     {"prerule", "proposed", "supplemental", "final", "withdrawn", "longterm"}
 )
-_RIN = re.compile(r"^\d{4}-[A-Z]{2}\d{2}$")
 _STAGE_KIND = {
     "prerule": "proceedingPrerule",
     "proposed": "proceedingProposed",
@@ -57,11 +56,6 @@ _STAGE_KIND = {
     "withdrawn": "proceedingWithdrawn",
     "longterm": "proceedingLongterm",
 }
-
-
-def _rin(value: object) -> str | None:
-    normalized = str(value or "").strip().upper()
-    return normalized if _RIN.fullmatch(normalized) else None
 
 
 def _stage_from_document(document_type: object, title: object) -> str | None:
@@ -174,7 +168,7 @@ def build_proceedings(
             continue
         trusted_dockets.add(docket)
         docket_metadata[docket] = row
-        if _rin(row.get("rin")) or "rulemaking" in str(
+        if normalize_rin(row.get("rin")) or "rulemaking" in str(
             row.get("docket_type") or ""
         ).casefold():
             action_dockets.add(docket)
@@ -191,7 +185,7 @@ def build_proceedings(
             row_id=row.get("document_id"),
             column="additional_rins",
         )
-        has_rin = raw_rins is not None and any(_rin(value) for value in raw_rins)
+        has_rin = raw_rins is not None and any(normalize_rin(value) for value in raw_rins)
         if has_rin or _stage_from_document(
             row.get("document_type"),
             row.get("title"),
@@ -287,7 +281,7 @@ def build_proceedings(
         if key is None:
             continue
         group = groups[key]
-        if rin := _rin(row.get("rin")):
+        if rin := normalize_rin(row.get("rin")):
             group["rins"].add(rin)
         if row.get("title"):
             group["titles"].append(
@@ -311,7 +305,7 @@ def build_proceedings(
         )
         if raw_rins is not None:
             group["rins"].update(
-                rin for value in raw_rins if (rin := _rin(value)) is not None
+                rin for value in raw_rins if (rin := normalize_rin(value)) is not None
             )
         if row.get("title"):
             group["titles"].append(
@@ -344,7 +338,7 @@ def build_proceedings(
         rins = (
             set()
             if raw_rins is None
-            else {rin for value in raw_rins if (rin := _rin(value)) is not None}
+            else {rin for value in raw_rins if (rin := normalize_rin(value)) is not None}
         )
         stage = _stage_from_document(row.get("document_type"), row.get("title"))
         linked_keys = {
@@ -384,7 +378,7 @@ def build_proceedings(
         if key is None:
             continue
         group = groups[key]
-        if rin := _rin(row.get("rin")):
+        if rin := normalize_rin(row.get("rin")):
             group["rins"].add(rin)
         if row.get("cfr_ref"):
             group["cfr_refs"].add(str(row["cfr_ref"]))

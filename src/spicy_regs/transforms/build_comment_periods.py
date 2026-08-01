@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -12,7 +11,7 @@ from urllib.parse import quote
 import pyarrow.parquet as pq
 from loguru import logger
 
-from spicy_regs.ontology.citations import normalize_regsgov_identifier
+from spicy_regs.ontology.citations import normalize_regsgov_identifier, normalize_rin
 from spicy_regs.ontology.common import (
     ATTESTATION_COLUMNS,
     JsonReadStats,
@@ -26,7 +25,6 @@ from spicy_regs.ontology.common import (
 
 OUTPUT = "comment_periods.parquet"
 ACTOR_ID = "spicy-regs:comment-periods:v2"
-_RIN = re.compile(r"^\d{4}-[A-Z]{2}\d{2}$")
 
 COLUMNS = (
     "comment_period_id",
@@ -61,11 +59,6 @@ def _day(value: object) -> date | None:
         return date.fromisoformat(str(value)[:10])
     except ValueError:
         return None
-
-
-def _rin(value: object) -> str | None:
-    normalized = str(value or "").strip().upper()
-    return normalized if _RIN.fullmatch(normalized) else None
 
 
 def _artifact_url(source: str, identifier: object) -> str | None:
@@ -284,7 +277,7 @@ def build_comment_periods(
         resolved_rins.update(
             rin
             for proceeding_id in proceeding_ids
-            if (rin := _rin(proceeding_by_id[proceeding_id].get("rin"))) is not None
+            if (rin := normalize_rin(proceeding_by_id[proceeding_id].get("rin"))) is not None
         )
         intervals.append(
             _Interval(
@@ -316,7 +309,7 @@ def build_comment_periods(
         rins = (
             set()
             if raw_rins is None
-            else {rin for value in raw_rins if (rin := _rin(value)) is not None}
+            else {rin for value in raw_rins if (rin := normalize_rin(value)) is not None}
         )
         # The source-backed docket is action identity. A RIN is retained as
         # interval metadata but never filters or selects a Proceeding.
@@ -357,7 +350,7 @@ def build_comment_periods(
         rins = (
             set()
             if raw_rins is None
-            else {rin for value in raw_rins if (rin := _rin(value)) is not None}
+            else {rin for value in raw_rins if (rin := normalize_rin(value)) is not None}
         )
         dockets = set(linked_dockets_by_fr.get(document_number, ()))
         docket_targets: set[str] = set()

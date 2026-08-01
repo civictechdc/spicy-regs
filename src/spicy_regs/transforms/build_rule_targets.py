@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from collections import defaultdict
 from pathlib import Path
 
@@ -12,6 +11,7 @@ from loguru import logger
 from spicy_regs.ontology.citations import (
     CfrCitation,
     normalize_regsgov_identifier,
+    normalize_rin,
     parse_cfr_citation,
 )
 from spicy_regs.ontology.common import (
@@ -48,15 +48,6 @@ SOURCES = frozenset(
         "document_fr_doc",
     }
 )
-
-_RIN = re.compile(r"^\d{4}-[A-Z]{2}\d{2}$")
-
-
-def _rin(value: object) -> str | None:
-    if value is None:
-        return None
-    normalized = str(value).strip().upper()
-    return normalized if _RIN.fullmatch(normalized) else None
 
 
 def _date_bounds(*values: object) -> tuple[str | None, str | None]:
@@ -113,7 +104,7 @@ def build_rule_targets(
         docket = normalize_regsgov_identifier(docket_id)
         if docket is None or docket not in trusted_dockets or source not in SOURCES:
             return
-        normalized_rin = _rin(rin)
+        normalized_rin = normalize_rin(rin)
         cfr_ref = citation.cfr_ref if citation else None
         key = (docket, cfr_ref, normalized_rin, source)
         first, last = _date_bounds(first_seen, last_seen)
@@ -148,7 +139,7 @@ def build_rule_targets(
         if docket is None:
             continue
         trusted_dockets.add(docket)
-        rin = _rin(row.get("rin"))
+        rin = normalize_rin(row.get("rin"))
         if rin:
             add_edge(
                 docket_id=docket,
@@ -177,7 +168,7 @@ def build_rule_targets(
         )
         if raw_rins is not None:
             for raw_rin in raw_rins:
-                rin = _rin(raw_rin)
+                rin = normalize_rin(raw_rin)
                 if docket is None or not rin:
                     continue
                 add_edge(
@@ -221,7 +212,7 @@ def build_rule_targets(
             continue
         citations = [citation for raw in raw_cfr for citation in parse_cfr_citation(raw)]
         citations = list(dict.fromkeys(citations))
-        rins = list(dict.fromkeys(rin for value in raw_rins if (rin := _rin(value))))
+        rins = list(dict.fromkeys(rin for value in raw_rins if (rin := normalize_rin(value))))
         publication_date = row.get("publication_date")
 
         linked_dockets = linked_dockets_by_fr_doc.get(str(document_number), set())

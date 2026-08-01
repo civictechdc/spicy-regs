@@ -10,7 +10,7 @@ from urllib.parse import quote
 import pyarrow.parquet as pq
 from loguru import logger
 
-from spicy_regs.ontology.citations import normalize_regsgov_identifier
+from spicy_regs.ontology.citations import normalize_regsgov_identifier, normalize_rin
 from spicy_regs.ontology.common import (
     ATTESTATION_COLUMNS,
     JsonReadStats,
@@ -56,12 +56,6 @@ SOURCES = frozenset(
     {"docket_rin", "document_rin", "federal_register_rin"}
 )
 SCOPE_STATUSES = frozenset({"recurring", "single_observed", "unresolved"})
-_RIN = re.compile(r"^\d{4}-[A-Z]{2}\d{2}$")
-
-
-def _rin(value: object) -> str | None:
-    normalized = str(value or "").strip().upper()
-    return normalized if _RIN.fullmatch(normalized) else None
 
 
 def _agenda_date(edition: object) -> str | None:
@@ -215,7 +209,7 @@ def build_regulatory_agenda(
             seen_dates[rin].add(date)
 
     for row in iter_parquet_rows(paths["dockets"]):
-        rin = _rin(row.get("rin"))
+        rin = normalize_rin(row.get("rin"))
         docket = normalize_regsgov_identifier(row.get("docket_id"))
         if not rin:
             continue
@@ -244,7 +238,7 @@ def build_regulatory_agenda(
         if raw_rins is None:
             continue
         for value in raw_rins:
-            rin = _rin(value)
+            rin = normalize_rin(value)
             if not rin:
                 continue
             evidence_date = _source_date(
@@ -276,7 +270,7 @@ def build_regulatory_agenda(
         if raw_rins is None:
             continue
         for value in raw_rins:
-            rin = _rin(value)
+            rin = normalize_rin(value)
             if not rin:
                 continue
             observe(rin, row.get("publication_date"))
@@ -291,7 +285,7 @@ def build_regulatory_agenda(
                 )
 
     for row in iter_parquet_rows(paths["unified_agenda"]):
-        rin = _rin(row.get("rin"))
+        rin = normalize_rin(row.get("rin"))
         if not rin:
             continue
         edition = str(row.get("agenda_edition") or "").strip()

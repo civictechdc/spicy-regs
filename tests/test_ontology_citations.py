@@ -22,6 +22,7 @@ from spicy_regs.ontology.citations import (
     federal_register_identifier,
     normalize_docket_reference,
     normalize_regsgov_identifier,
+    normalize_rin,
     parse_authority_citation,
     parse_cfr_citation,
     usc_section_covers,
@@ -312,6 +313,41 @@ def test_regulations_gov_identifier_normalization_matches_repaired_grammar():
 )
 def test_the_docket_label_is_presentation_and_the_identifier_survives_it(stated, expected):
     assert normalize_docket_reference(stated) == expected
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("2060-AV16", "2060-AV16"),
+        ("2060-av16", "2060-AV16"),
+        ("  2060-av16  ", "2060-AV16"),
+        ("2060AV16", None),
+        ("2060-A16", None),
+        ("2060-AV1", None),
+        ("RIN 2060-AV16", None),
+        ("", None),
+        (None, None),
+    ],
+)
+def test_rin_normalization(value, expected):
+    assert normalize_rin(value) == expected
+
+
+def test_the_rin_grammar_has_one_definition():
+    """A grammar copied into five modules drifts; a grammar imported cannot.
+
+    The RIN shape was restated in four transforms and one discovery tool, each
+    beside its own private ``_rin`` wrapper, so a correction to any one of them
+    left the other four saying something different about the same identifier.
+    """
+    restating = sorted(
+        str(path.relative_to(REPO_ROOT))
+        for directory in ("src", "tools")
+        for path in (REPO_ROOT / directory).rglob("*.py")
+        if r"\d{4}-[A-Z]{2}\d{2}" in path.read_text()
+    )
+
+    assert restating == ["src/spicy_regs/ontology/citations.py"]
 
 
 def test_invalid_cfr_suffix_is_rejected():

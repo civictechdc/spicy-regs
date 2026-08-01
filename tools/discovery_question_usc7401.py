@@ -42,6 +42,8 @@ from typing import Any
 
 import duckdb
 
+from spicy_regs.ontology.citations import normalize_rin
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from discovery_scoring import (  # noqa: E402  (path insert must precede the import)
@@ -74,8 +76,6 @@ SOURCE_FILES = (
 )
 SYSTEM_FILES = ("authority_edges.parquet", "agenda_item_proceedings.parquet", "proceedings.parquet")
 
-_RIN = re.compile(r"^\d{4}-[A-Z]{2}\d{2}$")
-
 # A U.S.C. anchor: a title number immediately followed by the code's name in
 # any of the punctuation forms the agenda uses.
 _USC_ANCHOR = re.compile(r"\b(?P<title>\d{1,2})\s*U\.?\s*S\.?\s*C\.?", re.IGNORECASE)
@@ -86,12 +86,6 @@ _COMPETING_CITATION = re.compile(
 )
 # A section token, optionally a range: `7401`, `1831p-1`, `7401-7671q`.
 _SECTION_TOKEN = re.compile(r"\b(?P<start>\d+[A-Za-z]*)(?:\s*(?:-|–|—|to)\s*(?P<end>\d+[A-Za-z]*))?\b")
-
-
-def normalize_rin(value: object) -> str | None:
-    """Canonical RIN, or None when the syntax fails."""
-    text = str(value or "").strip().upper()
-    return text if _RIN.fullmatch(text) else None
 
 
 def load_json_array(value: object) -> list[Any]:
