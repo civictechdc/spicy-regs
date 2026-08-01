@@ -300,8 +300,14 @@ def test_cfr60_experiment_fails_when_the_table_admits_the_near_miss_part(tmp_pat
     assert link["precision"] == pytest.approx(2 / 3)
 
 
-def _usc_snapshot(tmp_path: Path) -> Path:
-    """Miniature of the real failure: a range citation the parser keeps opaque."""
+def _usc_snapshot(tmp_path: Path, *, ranges_as_endpoints: bool = False) -> Path:
+    """Miniature of the real failure: a range citation the parser keeps opaque.
+
+    ``ranges_as_endpoints`` switches `authority_edges` to the shape
+    `parse_authority_citation` publishes after `0378a9a` — a range becomes the
+    two sections its source text names, `usc_section` keeping the first — so
+    both readings of the same snapshot are scored by the same harness.
+    """
     snapshot = tmp_path / "snapshot"
     snapshot.mkdir()
     _write(
@@ -331,17 +337,23 @@ def _usc_snapshot(tmp_path: Path) -> Path:
         [],
         ("document_number", "cfr_references_json", "regulation_id_numbers_json"),
     )
-    # The parser reads the range as one opaque section, so 2222-BB22 never
-    # acquires a `7401` edge — exactly the defect the real snapshot shows.
+    # Before the fix the parser read the range as one opaque section, so
+    # 2222-BB22 never acquired a `7401` edge — the defect the real snapshot
+    # showed. After it, the same citation carries `7401` in `usc_section`.
+    ranged = (
+        {"rin": "2222-BB22", "usc_title": "42", "usc_section": "7401", "usc_section_end": "7671q"}
+        if ranges_as_endpoints
+        else {"rin": "2222-BB22", "usc_title": "42", "usc_section": "7401-7671q"}
+    )
     _write(
         snapshot,
         "authority_edges",
         [
             {"rin": "1111-AA11", "usc_title": "42", "usc_section": "7401"},
-            {"rin": "2222-BB22", "usc_title": "42", "usc_section": "7401-7671q"},
+            ranged,
             {"rin": "3333-CC33", "usc_title": "42", "usc_section": "7411"},
         ],
-        ("rin", "usc_title", "usc_section"),
+        ("rin", "usc_title", "usc_section", "usc_section_end"),
     )
     _write(
         snapshot,
@@ -387,6 +399,33 @@ def test_usc7401_experiment_reports_the_range_citation_as_missing_recall(tmp_pat
     assert record["scores"]["link"]["precision"] == 1.0
     assert "P-final" not in record["system"]["returned"]
     assert record["scores"]["filter"]["exactness"] == 1.0
+
+
+def test_usc7401_experiment_scores_endpoint_ranges_as_exact(tmp_path):
+    """The same snapshot, with ranges published as endpoints, scores 1.000.
+
+    This is the fixture-scale form of the 2026-08-01 re-score: nothing about
+    the question, the expectation, or the harness changed — only the encoding
+    of the range row — and the recall the 2026-07-28 record froze at 0.8125
+    becomes exact. It also pins the reason no query change was needed: the
+    exact filter on `usc_section = '7401'` finds a range by its first endpoint.
+    """
+    snapshot = _usc_snapshot(tmp_path, ranges_as_endpoints=True)
+    out = tmp_path / "record.json"
+    assert usc7401.main(["--snapshot", str(snapshot), "--out", str(out)]) == 0
+    record = json.loads(out.read_text())
+
+    assert record["scores"]["authority_link"]["missing"] == []
+    assert record["scores"]["authority_link"]["recall"] == 1.0
+    assert record["scores"]["link"]["missing"] == []
+    assert record["scores"]["link"]["recall"] == 1.0
+    assert record["scores"]["link"]["precision"] == 1.0
+    assert record["scores"]["aggregate"]["matches"] is True
+
+    # The near miss stays out and the completed proceeding stays out: the
+    # endpoint encoding widens recall without loosening either guard.
+    assert record["scores"]["link"]["forbidden_returned"] == []
+    assert "P-final" not in record["system"]["returned"]
 
 
 def test_usc7401_experiment_reports_fan_out_per_rin(tmp_path):
