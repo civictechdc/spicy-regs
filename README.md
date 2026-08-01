@@ -1,6 +1,36 @@
 # Spicy Regs
 
-Spicy Regs goal is to build an open, contributor-friendly platform for exploring and analyzing regulations.gov data, usable by both technical and non-technical users. The platform should enable rapid prototyping, reproducible analysis, and modular app extensions.
+SpicyRegs captures public regulatory sources and publishes immutable source
+records, exact document versions, Unicode text representations, structural
+passages, source observations, verified links, and acquisition coverage. It
+provides the source facts that downstream products can reproduce and audit.
+
+## Product boundary
+
+SpicyRegs owns source acquisition and source-addressable document structure.
+It does not own managed vocabulary policy, extracted semantic assertions, or
+search ranking and serving:
+
+- **RefSpec** owns vocabulary releases, concepts, labels, mappings, redirects,
+  and explicit resolution of source terms.
+- **Rulespec Core** owns portable evidence and semantic record shapes;
+  **Rulespec Extrapolator** owns candidate extraction and validation.
+- **SpicySearch** owns query planning, document retrieval, ranking,
+  explanations, search receipts, indexes, and query-time coverage.
+
+Build the sealed local M1 source release without another repository checkout:
+
+```bash
+uv run build-document-release --output ./output/document-release-m1.json
+```
+
+The builder reads repository-local, digest-pinned source and Rulespec Core
+fixtures. It writes canonical JSON and rejects any invalid digest, coordinate,
+classification, projection, or reference.
+
+The checked-in M1 release is
+`src/spicy_regs/fixtures/spicyregs-m1-document-release-v1.json`; consumers pin
+its `release_id` and `release_digest`, not a source-tree path.
 
 ## Quickstart
 
@@ -19,13 +49,12 @@ parquet files, or run the pipeline against the public Mirrulations mirror. A
 `.env` file (copy `.env.example` to `.env`) is only required if you want to
 upload your output to live Cloudflare R2 storage.
 
-## Managed vocabulary experiment
+## Historical managed-vocabulary incubation
 
-Spicy Regs is the lookup and product-learning playground for managed
-vocabularies defined by the RefSpec submodule. Development validation now
-covers complete ELSST Versions 5 and 6, reconciliation of current and
-historical Federal Register topic sources, source-grounded open labels, and
-the accepted-output authorization boundary. The
+This repository incubated managed-vocabulary and search experiments before the
+four-product boundary above. That evidence remains useful for migration, but
+it is not SpicyRegs runtime authority. RefSpec now owns the managed vocabulary
+capability and SpicySearch owns its search read models. The historical
 [active roadmap](RefSpec/plans/managed-vocabulary-experiment-roadmap.md)
 records the evidence and remaining decisions.
 
@@ -54,6 +83,10 @@ uv run spicy-regs sample comments -n 5 # 5 random rows from comments.parquet
 uv run spicy-regs search "climate"     # substring search across files
 uv run spicy-regs agencies             # list every agency code
 ```
+
+The current `spicy-regs search` command is a legacy exploratory surface. It
+still searches dockets and comments and remains available only while its
+consumers migrate; it is not the document-only SpicySearch API.
 
 > Don't have the repo cloned? You can also run it one-shot with
 > `uvx --from "spicy-regs @ git+https://github.com/civictechdc/spicy-regs" spicy-regs download --types comments`.

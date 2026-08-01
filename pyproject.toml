@@ -1,7 +1,7 @@
 [project]
 name = "spicy-regs"
 version = "0.1.0"
-description = "Regulations Data Analysis Tools"
+description = "Immutable regulatory source records, exact document versions, and structural passages"
 requires-python = ">=3.10"
 dependencies = [
     "refspec==0.1.0.dev0",
@@ -118,6 +118,7 @@ run-segmentation-tagging = "spicy_regs.corpora.segmentation_tagging:main"
 run-rulespec-testbed-tags = "spicy_regs.rulespec_testbed:main"
 run-artifact-retrieval-baseline = "spicy_regs.corpora.artifact_retrieval_baseline:main"
 build-document-acceptance-scope = "spicy_regs.corpora.document_acceptance_scope:main"
+build-document-release = "spicy_regs.document_release:main"
 run-relation-exclusion-evaluation = "spicy_regs.corpora.relation_exclusion_evaluation:main"
 validate-relation-exclusion-v2 = "spicy_regs.corpora.relation_exclusion_evaluation_v2:main"
 

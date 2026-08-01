@@ -843,3 +843,33 @@ repo. **Rule going forward: a cited external number does not enter this
 ledger without a URL and a verification note, and no decision may rest
 on a citation that has not been read first-hand.** Locally computed
 numbers remain the currency of this project.
+
+## 2026-07-31 — Four-product ownership boundary
+
+- **Decision:** SpicyRegs owns acquisition, source-native records, exact
+  document versions and renditions, immutable Unicode text representations,
+  structural passages, source observations, deterministic source-link
+  verification, and acquisition coverage. RefSpec owns vocabulary releases,
+  concepts, labels, mappings, redirects, and source-term resolution. Rulespec
+  Core owns portable evidence and semantic record shapes; Rulespec
+  Extrapolator owns derived assertions, candidate extraction, validation, and
+  selection. SpicySearch owns query planning, filters, ranking, results,
+  explanations, search receipts, indexes, and query-time coverage.
+- **Practical meaning:** products exchange immutable, digest-pinned releases.
+  They do not import another repository's source tree or read its mutable
+  database. Source-assigned API Topics and Lists of Subjects remain source
+  observations; they do not become concepts or assignments by label equality.
+- **Migration:** existing search, vocabulary, and extraction surfaces remain
+  available until their replacement consumers pass. This decision authorizes
+  inventory and replacement, not immediate deletion, release, or deployment.
+- **Historical clarification:** the 2026-07-25 combined Rulespec/SpicyRegs
+  vision remains useful design history but no longer defines product
+  ownership. The four-product boundary in
+  `docs/superpowers/specs/2026-07-31-spicysearch-product-boundary-and-extraction-plan.md`
+  supersedes it for ownership and migration decisions.
+- **Evidence:** the repository-local M1 `DocumentRelease` builder and sealed
+  fixture validate exact phrase coordinates, repeated captures, source facts,
+  successful and failed link receipts, document-only classification, and
+  reference closure without importing RefSpec or Rulespec source code.
+- **Revisit trigger:** an accepted cross-product release requires a source fact
+  that none of these owners can publish without creating a cyclic dependency.

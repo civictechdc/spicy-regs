@@ -1,0 +1,447 @@
+{
+  "baseline_commit": "be04ee5385d1dc813986a048f9dc7ebd75b800df",
+  "incubation_tip": "56e5ccf115726596667e9427b937381a5f8b37d1",
+  "items": [
+    {
+      "capability": "Local substring search over downloaded Parquet tables",
+      "command_line_entry_points": [
+        "spicy-regs search"
+      ],
+      "current_behavior": "Returns matching dockets, documents, and comments; lowercases the query and source text.",
+      "destination": "SpicySearch document-only search_documents operation",
+      "disposition": "retire",
+      "known_consumers": [
+        "CLI users; exact population not yet measured"
+      ],
+      "migration_status": "inventoried-retained-until-consumer-cutover",
+      "nested_or_uncommitted_state": null,
+      "notebooks": [],
+      "originating_commit": "2e7901e60e7aa19e2328fb9c0004f1eb9ac07016",
+      "owning_product": "SpicySearch",
+      "path": "src/spicy_regs/cli.py",
+      "pinned_fixture": "src/spicy_regs/fixtures/spicyregs-m1-document-release-v1.json",
+      "published_artifact_locations": [],
+      "replacement_interface": "search_documents over a published SearchSnapshot",
+      "scheduled_jobs": [],
+      "tests_or_evidence": [
+        "tests/test_document_release.py::test_document_only_classification_fails_closed_and_excludes_dockets_and_comments"
+      ]
+    },
+    {
+      "capability": "Client-side MiniSearch docket index",
+      "command_line_entry_points": [
+        "run-rollup-docket-search"
+      ],
+      "current_behavior": "Builds a compressed browser search blob from docket rows and publishes it daily.",
+      "destination": "SpicySearch snapshot builder or explicit retirement",
+      "disposition": "reimplement",
+      "known_consumers": [
+        "Public browser clients of docket_search.json.gz; exact population not yet measured"
+      ],
+      "migration_status": "inventoried-serving-surface-not-retired",
+      "nested_or_uncommitted_state": null,
+      "notebooks": [],
+      "originating_commit": "0c60dab266b021fdcc0aaaa786ff91977b7c0e47",
+      "owning_product": "SpicySearch",
+      "path": "src/spicy_regs/transforms/build_search_index.py",
+      "pinned_fixture": "src/spicy_regs/fixtures/spicyregs-m1-source-fixture-v1.json",
+      "published_artifact_locations": [
+        "https://r2.spicy-regs.dev/docket_search.json.gz"
+      ],
+      "replacement_interface": "Published SearchSnapshot with document-only eligibility and coverage",
+      "scheduled_jobs": [
+        ".github/workflows/rollup-docket-search.yml",
+        "src/spicy_regs/pipelines/rollups/docket_search.py"
+      ],
+      "tests_or_evidence": [
+        "docs/superpowers/specs/2026-07-31-spicysearch-product-boundary-and-extraction-plan.md"
+      ]
+    },
+    {
+      "capability": "Dense embeddings for dockets, documents, and comments",
+      "command_line_entry_points": [
+        "embed"
+      ],
+      "current_behavior": "Creates vector records for document and non-document tables, including public comments.",
+      "destination": "Optional SpicySearch M3 semantic index after a sealed holdout passes",
+      "disposition": "reimplement",
+      "known_consumers": [
+        "Vector-search notebook and local experiments"
+      ],
+      "migration_status": "inventoried-disabled-for-m1",
+      "nested_or_uncommitted_state": null,
+      "notebooks": [
+        "notebooks/vector_search.ipynb"
+      ],
+      "originating_commit": "2e7901e60e7aa19e2328fb9c0004f1eb9ac07016",
+      "owning_product": "SpicySearch",
+      "path": "src/spicy_regs/vectordb/embed.py",
+      "pinned_fixture": "none; semantic adoption requires a new sealed holdout",
+      "published_artifact_locations": [],
+      "replacement_interface": "Optional SearchSnapshot embedding manifest and evaluated ranking policy",
+      "scheduled_jobs": [],
+      "tests_or_evidence": [
+        "docs/superpowers/specs/2026-07-31-spicysearch-product-boundary-and-extraction-plan.md#semantic-search-adoption"
+      ]
+    },
+    {
+      "capability": "Exploratory full-text and vector search notebooks",
+      "command_line_entry_points": [],
+      "current_behavior": "Demonstrates docket and comment full-text search and local vector retrieval outside a release boundary.",
+      "destination": "SpicySearch historical research evidence",
+      "disposition": "historical evidence",
+      "known_consumers": [
+        "Repository contributors"
+      ],
+      "migration_status": "inventoried-preserved",
+      "nested_or_uncommitted_state": null,
+      "notebooks": [
+        "notebooks/search_capabilities.ipynb",
+        "notebooks/vector_search.ipynb"
+      ],
+      "originating_commit": "537ff2f8d36fffc79347fb85b50181b6e39caa96",
+      "owning_product": "SpicySearch",
+      "path": "notebooks/{search_capabilities,vector_search}.ipynb",
+      "pinned_fixture": "none; historical exploratory notebooks",
+      "published_artifact_locations": [
+        "https://r2.spicy-regs.dev/docket_search.json.gz"
+      ],
+      "replacement_interface": "Versioned SpicySearch research evidence and public API examples",
+      "scheduled_jobs": [],
+      "tests_or_evidence": [
+        "notebooks/search_capabilities.ipynb",
+        "notebooks/vector_search.ipynb"
+      ]
+    },
+    {
+      "capability": "MCP source listing, table description, and raw SQL",
+      "command_line_entry_points": [
+        "spicy-regs-mcp"
+      ],
+      "current_behavior": "Exposes current published tables and diagnostic SQL; it does not implement the product search API.",
+      "destination": "Retain SpicyRegs source diagnostics; add search operations only in SpicySearch",
+      "disposition": "retain",
+      "known_consumers": [
+        "MCP clients described in README.md"
+      ],
+      "migration_status": "inventoried-retained-diagnostic-only",
+      "nested_or_uncommitted_state": null,
+      "notebooks": [],
+      "originating_commit": "89ed7efead28b424a2e3fc1a7973e04404fab26e",
+      "owning_product": "SpicyRegs",
+      "path": "src/spicy_regs/mcp_server.py",
+      "pinned_fixture": "src/spicy_regs/fixtures/spicyregs-m1-source-fixture-v1.json",
+      "published_artifact_locations": [
+        "https://mcp.spicy-regs.dev/mcp"
+      ],
+      "replacement_interface": "SpicyRegs release inspection plus SpicySearch search_documents",
+      "scheduled_jobs": [],
+      "tests_or_evidence": [
+        "tests/test_mcp_server.py"
+      ]
+    },
+    {
+      "capability": "Exact source capture, regions, fragments, parser provenance, and source coverage",
+      "command_line_entry_points": [],
+      "current_behavior": "Builds source artifacts and source fragments with exact Unicode coordinates and fail-closed coverage.",
+      "destination": "SpicyRegs DocumentRelease producer",
+      "disposition": "retain",
+      "known_consumers": [
+        "docpipeline segments, retrieval, extraction, projection, and tests"
+      ],
+      "migration_status": "m1-release-records-implemented-adapter-integration-pending",
+      "nested_or_uncommitted_state": null,
+      "notebooks": [],
+      "originating_commit": "414964d7ab5a7475f27363b329dff3d9193ed93d",
+      "owning_product": "SpicyRegs",
+      "path": "src/spicy_regs/docpipeline/source.py",
+      "pinned_fixture": "src/spicy_regs/fixtures/spicyregs-m1-source-fixture-v1.json",
+      "published_artifact_locations": [],
+      "replacement_interface": "src/spicy_regs/document_release.py DocumentRelease JSON",
+      "scheduled_jobs": [],
+      "tests_or_evidence": [
+        "tests/test_docpipeline_source.py",
+        "tests/test_docpipeline_source_migration.py",
+        "tests/test_document_release.py"
+      ]
+    },
+    {
+      "capability": "Processing segments assembled from exact source slices",
+      "command_line_entry_points": [
+        "build-segmentation-evaluation",
+        "run-segmentation-experiment",
+        "run-segmentation-tagging"
+      ],
+      "current_behavior": "Combines source slices into bounded extraction inputs, including inserted newline delimiters.",
+      "destination": "Rulespec Extrapolator processing-segment records",
+      "disposition": "move",
+      "known_consumers": [
+        "tag_task, retrieval, extraction, evaluation corpora, RKAF projection"
+      ],
+      "migration_status": "inventoried-not-moved-m2-input-retained",
+      "nested_or_uncommitted_state": null,
+      "notebooks": [],
+      "originating_commit": "414964d7ab5a7475f27363b329dff3d9193ed93d",
+      "owning_product": "Rulespec Extrapolator",
+      "path": "src/spicy_regs/docpipeline/segments.py",
+      "pinned_fixture": "tests/fixtures/docpipeline_segments_migration_v1.json",
+      "published_artifact_locations": [],
+      "replacement_interface": "Pinned ExtrapolationRelease processing-segment receipt",
+      "scheduled_jobs": [],
+      "tests_or_evidence": [
+        "tests/test_docpipeline_segments.py",
+        "tests/test_docpipeline_segments_frozen_local.py"
+      ]
+    },
+    {
+      "capability": "Extraction task protocol, tag task, approval, and mixed pipeline runtime",
+      "command_line_entry_points": [
+        "run-segmentation-tagging",
+        "run-rulespec-testbed-tags"
+      ],
+      "current_behavior": "Runs source-to-segment-to-retrieval-to-extraction-to-approval in one repository process.",
+      "destination": "Rulespec Extrapolator",
+      "disposition": "move",
+      "known_consumers": [
+        "Local MVP and evaluation runners"
+      ],
+      "migration_status": "inventoried-not-moved-m2-input-retained",
+      "nested_or_uncommitted_state": null,
+      "notebooks": [],
+      "originating_commit": "56a203020ec5564018493790a8fd009bdd10fd3b",
+      "owning_product": "Rulespec Extrapolator",
+      "path": "src/spicy_regs/docpipeline/{extraction.py,tag_task.py,runtime.py}",
+      "pinned_fixture": "Rulespec repository local extrapolation fixture; migration pending",
+      "published_artifact_locations": [],
+      "replacement_interface": "ExtrapolationRelease plus validation and selection receipts",
+      "scheduled_jobs": [],
+      "tests_or_evidence": [
+        "tests/test_docpipeline_extraction.py",
+        "tests/test_docpipeline_runtime_validation.py",
+        "tests/test_docpipeline_runtime_runs.py"
+      ]
+    },
+    {
+      "capability": "Sparse, dense, and hybrid retrieval with replay receipts",
+      "command_line_entry_points": [
+        "run-artifact-retrieval-baseline",
+        "run-segmentation-rerank",
+        "run-segmentation-sparse-retrieval"
+      ],
+      "current_behavior": "Retrieves source artifacts or processing segments and lacks the release-scoped document result API.",
+      "destination": "SpicySearch query and ranking implementation",
+      "disposition": "reimplement",
+      "known_consumers": [
+        "Extraction runtime and evaluation corpora"
+      ],
+      "migration_status": "inventoried-not-moved-serving-disabled-for-m1",
+      "nested_or_uncommitted_state": null,
+      "notebooks": [],
+      "originating_commit": "9591c6ddc5ff294e0511eb7cc6fa365076ed51e1",
+      "owning_product": "SpicySearch",
+      "path": "src/spicy_regs/docpipeline/retrieval.py",
+      "pinned_fixture": "tests/fixtures/docpipeline_retrieval_migration_v1.json",
+      "published_artifact_locations": [],
+      "replacement_interface": "search_documents with immutable SearchRun and SearchResultSet records",
+      "scheduled_jobs": [],
+      "tests_or_evidence": [
+        "tests/test_docpipeline_retrieval.py",
+        "tests/test_docpipeline_retrieval_dense.py"
+      ]
+    },
+    {
+      "capability": "Rulespec Artifact, SourceFragment, evidence, and semantic JSON-LD projection",
+      "command_line_entry_points": [
+        "tools/project_document_to_rkaf.py"
+      ],
+      "current_behavior": "Projects source and extracted semantic state directly from mixed in-repository objects.",
+      "destination": "Split portable shapes to Rulespec Core, extraction projections to Rulespec Extrapolator, source projections to SpicyRegs",
+      "disposition": "reimplement",
+      "known_consumers": [
+        "Rulespec testbed and projection evidence"
+      ],
+      "migration_status": "source-artifact-and-fragment-projections-implemented-other-projections-pending",
+      "nested_or_uncommitted_state": null,
+      "notebooks": [],
+      "originating_commit": "e9d93792f2ce67c973f86148dc7f0e188485daa2",
+      "owning_product": "multiple-by-record-owner",
+      "path": "src/spicy_regs/docpipeline/rkaf_projection.py",
+      "pinned_fixture": "src/spicy_regs/fixtures/rulespec-core-release-v1.json",
+      "published_artifact_locations": [],
+      "replacement_interface": "DocumentRelease and ExtrapolationRelease projections against a pinned RulespecCoreRelease",
+      "scheduled_jobs": [],
+      "tests_or_evidence": [
+        "tests/test_docpipeline_rkaf_projection.py",
+        "tests/test_document_release.py::test_exact_phrase_passage_revalidates_without_assignment_data"
+      ]
+    },
+    {
+      "capability": "Concept registry, candidate channels, ontology materialization, receipts, and evaluations",
+      "command_line_entry_points": [
+        "materialize-ontology",
+        "spicy-regs-ontology-receipt",
+        "spicy-regs-evaluate-tags"
+      ],
+      "current_behavior": "Mixes vocabulary authority, extraction candidates, evaluation, and published ontology tables in SpicyRegs.",
+      "destination": "RefSpec vocabulary releases, Rulespec Extrapolator assertions, and SpicySearch read models",
+      "disposition": "reimplement",
+      "known_consumers": [
+        "Materialized ontology workflow, MCP SQL, enrichment, docpipeline, and tests"
+      ],
+      "migration_status": "inventoried-not-moved-serving-surfaces-retained",
+      "nested_or_uncommitted_state": null,
+      "notebooks": [],
+      "originating_commit": "b893e7cdaa6feebe5225174b4fe643c22cb04c77",
+      "owning_product": "multiple-by-record-owner",
+      "path": "src/spicy_regs/ontology/*.py and src/spicy_regs/pipelines/ontology_dataset.py",
+      "pinned_fixture": "release-specific fixtures required in each destination repository",
+      "published_artifact_locations": [
+        "https://r2.spicy-regs.dev/materialized/ontology/latest.json"
+      ],
+      "replacement_interface": "VocabularyRelease, ExtrapolationRelease, and SearchSnapshot",
+      "scheduled_jobs": [
+        ".github/workflows/materialize-ontology.yml"
+      ],
+      "tests_or_evidence": [
+        "tests/test_ontology_*.py",
+        "tests/test_materialized_ontology*.py"
+      ]
+    },
+    {
+      "capability": "Vocabulary atlas RDF projection, sealed corpus, source dimensions, queries, and lexical candidate tags",
+      "command_line_entry_points": [
+        "tools/build_vocabulary_atlas.py"
+      ],
+      "current_behavior": "Builds a disposable RDF read model from pinned source and managed-release inputs; uncommitted incubation work.",
+      "destination": "Source observations to SpicyRegs, vocabulary authority to RefSpec, candidate tags to Rulespec Extrapolator, queries to SpicySearch",
+      "disposition": "reimplement",
+      "known_consumers": [
+        "Vocabulary-atlas tests and graph experiment"
+      ],
+      "migration_status": "inventoried-uncommitted-preserved-not-moved",
+      "nested_or_uncommitted_state": "top-level untracked files preserved by the 2026-07-31 incubation snapshot",
+      "notebooks": [],
+      "originating_commit": "uncommitted at 56e5ccf115726596667e9427b937381a5f8b37d1",
+      "owning_product": "multiple-by-record-owner",
+      "path": "src/spicy_regs/ontology/vocabulary_atlas*.py, tests/test_vocabulary_atlas*.py, tools/build_vocabulary_atlas.py",
+      "pinned_fixture": "tests/test_vocabulary_atlas_corpus.py sealed real corpus",
+      "published_artifact_locations": [
+        "output/vocabulary-atlas/ (ignored local generated data)"
+      ],
+      "replacement_interface": "DocumentRelease, VocabularyRelease, ExtrapolationRelease, and SearchSnapshot",
+      "scheduled_jobs": [],
+      "tests_or_evidence": [
+        "tests/test_vocabulary_atlas.py",
+        "tests/test_vocabulary_atlas_corpus.py",
+        "tests/test_vocabulary_atlas_dimensions.py",
+        "tests/test_vocabulary_atlas_queries.py",
+        "tests/test_vocabulary_atlas_query_parity.py"
+      ]
+    },
+    {
+      "capability": "Managed-release lookup, open-label candidates, accepted output, and evidence assembly",
+      "command_line_entry_points": [],
+      "current_behavior": "Imports RefSpec directly and supplies candidate/extraction behavior inside SpicyRegs.",
+      "destination": "RefSpec release readers and Rulespec Extrapolator",
+      "disposition": "move",
+      "known_consumers": [
+        "Rulespec testbed, ontology pipeline, and enrichment tests"
+      ],
+      "migration_status": "inventoried-not-moved-m2-input-retained",
+      "nested_or_uncommitted_state": null,
+      "notebooks": [],
+      "originating_commit": "51898fa98f234391d1eb95fb7b3aa8723b909a3d",
+      "owning_product": "Rulespec Extrapolator",
+      "path": "src/spicy_regs/enrichment/*.py",
+      "pinned_fixture": "RefSpec and Rulespec repository-local release fixtures",
+      "published_artifact_locations": [],
+      "replacement_interface": "Pinned VocabularyRelease reader and ExtrapolationRelease writer",
+      "scheduled_jobs": [],
+      "tests_or_evidence": [
+        "tests/test_managed_release_consumer.py",
+        "tests/test_accepted_output*.py"
+      ]
+    },
+    {
+      "capability": "LadybugDB graph spike, graph repository configuration, and vocabulary-atlas experiment report",
+      "command_line_entry_points": [],
+      "current_behavior": "Measures an optional rebuildable graph read model against the DuckDB oracle.",
+      "destination": "SpicySearch research evidence",
+      "disposition": "historical evidence",
+      "known_consumers": [
+        "Repository contributors evaluating graph adoption"
+      ],
+      "migration_status": "inventoried-uncommitted-preserved-not-adopted",
+      "nested_or_uncommitted_state": "top-level untracked evidence and tools preserved by the 2026-07-31 incubation snapshot",
+      "notebooks": [],
+      "originating_commit": "uncommitted at 56e5ccf115726596667e9427b937381a5f8b37d1",
+      "owning_product": "SpicySearch",
+      "path": "docs/evidence/ladybug-vocabulary-atlas-spike-2026-07-31/, docs/evidence/vocabulary-atlas-graph-experiment-2026-07-31.md, tools/graphdb/",
+      "pinned_fixture": "Ladybug spike pinned input and DuckDB parity output",
+      "published_artifact_locations": [
+        "output/vocabulary-atlas/ (ignored local generated data)"
+      ],
+      "replacement_interface": "Optional SearchSnapshot graph-index manifest after an adoption decision",
+      "scheduled_jobs": [],
+      "tests_or_evidence": [
+        "docs/evidence/ladybug-vocabulary-atlas-spike-2026-07-31/README.md",
+        "docs/evidence/vocabulary-atlas-graph-experiment-2026-07-31.md"
+      ]
+    },
+    {
+      "capability": "Nested RefSpec managed releases and the Federal Register 1995 thesaurus/crosswalk",
+      "command_line_entry_points": [],
+      "current_behavior": "Provides vocabulary authority through an editable nested source checkout; 1995 data remains referenced by current code and tests.",
+      "destination": "RefSpec published VocabularyRelease",
+      "disposition": "reimplement",
+      "known_consumers": [
+        "SpicyRegs enrichment and vocabulary-atlas code; nested RefSpec tests"
+      ],
+      "migration_status": "inventoried-nested-work-preserved-1995-retirement-not-authorized",
+      "nested_or_uncommitted_state": "nested RefSpec was 23 commits ahead plus tracked and untracked local changes at preservation time",
+      "notebooks": [],
+      "originating_commit": "nested repository history; gitlink introduced by 8d36696",
+      "owning_product": "RefSpec",
+      "path": "RefSpec/ and output/refspec-vocabulary-portfolio/federal-register-thesaurus-1995/",
+      "pinned_fixture": "RefSpec repository-local managed-release fixtures",
+      "published_artifact_locations": [
+        "output/refspec-vocabulary-portfolio/federal-register-thesaurus-1995/ (ignored local generated data)"
+      ],
+      "replacement_interface": "Published VocabularyRelease with digest-pinned readers",
+      "scheduled_jobs": [],
+      "tests_or_evidence": [
+        "RefSpec/tests/",
+        "consumer proof required before 1995 retirement"
+      ]
+    },
+    {
+      "capability": "Repository-independent SpicyRegs M1 source release",
+      "command_line_entry_points": [
+        "build-document-release"
+      ],
+      "current_behavior": "Builds and validates canonical DocumentRelease records and the sealed 2026-03227 source fixture without cross-repository imports.",
+      "destination": "SpicyRegs",
+      "disposition": "retain",
+      "known_consumers": [
+        "SpicySearch M1 fixture builder and Rulespec Extrapolator release readers"
+      ],
+      "migration_status": "implemented-local-not-released",
+      "nested_or_uncommitted_state": "new local implementation; not committed, pushed, released, or deployed",
+      "notebooks": [],
+      "originating_commit": "local uncommitted implementation after 56e5ccf115726596667e9427b937381a5f8b37d1",
+      "owning_product": "SpicyRegs",
+      "path": "src/spicy_regs/document_release.py and src/spicy_regs/fixtures/*.json",
+      "pinned_fixture": "src/spicy_regs/fixtures/spicyregs-m1-document-release-v1.json",
+      "published_artifact_locations": [],
+      "replacement_interface": "DocumentRelease canonical JSON",
+      "scheduled_jobs": [],
+      "tests_or_evidence": [
+        "tests/test_document_release.py"
+      ]
+    }
+  ],
+  "manifest_version": "spicysearch-product-migration/v1",
+  "retirement_authorized": false,
+  "scope": "Pre-baseline and post-baseline SpicyRegs search, extraction, vocabulary, source-release, scheduled-job, command, notebook, evidence, and published-artifact surfaces.",
+  "status": "inventory-complete-serving-surfaces-retained"
+}

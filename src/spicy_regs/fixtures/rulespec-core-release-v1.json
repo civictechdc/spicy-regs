@@ -1,0 +1,93 @@
+{
+  "conformance_fixture_artifacts": [
+    {
+      "artifact_digest": "sha256:b84dccced45202fac167f0ad6a2ba80333fcb2e05faaf65a102c511482dbf97d",
+      "media_type": "application/ld+json",
+      "name": "fixtures/artifact-content-digest-positive.jsonld"
+    },
+    {
+      "artifact_digest": "sha256:5d622bd0a97fc71e9b2b5fa18567e7685d87746ffd3d80dd3ce35c838d26f5f1",
+      "media_type": "application/ld+json",
+      "name": "fixtures/sourcefragment-position-selector-positive.jsonld"
+    },
+    {
+      "artifact_digest": "sha256:c9000d59ebb581b27181bd454abb72610c75e33b0a0f2beb67a5844e6a959bd9",
+      "media_type": "application/ld+json",
+      "name": "fixtures/conceptassignment-document-derived-positive.jsonld"
+    },
+    {
+      "artifact_digest": "sha256:16c15c2381e065eb32acf084720135e27c0202b01dc5a11fa6a1b4d0ae3bc2b0",
+      "media_type": "application/ld+json",
+      "name": "fixtures/conceptassignment-fragment-direct-positive.jsonld"
+    },
+    {
+      "artifact_digest": "sha256:b114aaa2d4fcb6501b22aaca855a0e0420eb8a6f0780fdbaad7e52b7de7b9d77",
+      "media_type": "application/ld+json",
+      "name": "fixtures/evidencebinding-positive.jsonld"
+    },
+    {
+      "artifact_digest": "sha256:9f2718f7d6261bcd25d643a1a7a1c4cb905f73bf96b76ae76956f95b28721bc6",
+      "media_type": "application/ld+json",
+      "name": "fixtures/extractionactivity-model-positive.jsonld"
+    },
+    {
+      "artifact_digest": "sha256:83814a3b46e7041ef6c5b9ac34b9954b4f89262cc61475dd4a92aae3be86af99",
+      "media_type": "application/ld+json",
+      "name": "fixtures/ailineage-positive.jsonld"
+    },
+    {
+      "artifact_digest": "sha256:40ad919ba8b6a717b1395f37b5ca0ff569df723bc93070dc925e9b356e081213",
+      "media_type": "application/ld+json",
+      "name": "fixtures/reference-resource-release-digest-positive.jsonld"
+    }
+  ],
+  "record_type": "RulespecCoreRelease",
+  "release_digest": "sha256:5ac6ba59929eca874ec603cab0e90f7b15ab1a008b394cec5aefebdafe22564b",
+  "release_id": "urn:rulespec:core:5ac6ba59929eca874ec603cab0e90f7b15ab1a008b394cec5aefebdafe22564b",
+  "release_status": "fixture",
+  "schema_artifacts": [
+    {
+      "artifact_digest": "sha256:152e8d67a3ce99f236909f9612b8ad4b4e3819f08292dbd095d4c4f77777e09a",
+      "media_type": "application/schema+json",
+      "name": "compiled/json-schema/core/artifact.schema.json"
+    },
+    {
+      "artifact_digest": "sha256:6e23ade282f213e89cdca520dfb7ca4b0bd2e4ca03f6e2fd6c09c51dbf5b8699",
+      "media_type": "application/schema+json",
+      "name": "compiled/json-schema/core/source-fragment.schema.json"
+    },
+    {
+      "artifact_digest": "sha256:3a358e07edb863a06c91ce8d6c5d08b52001b7a5759765310fff74b7636940d0",
+      "media_type": "application/schema+json",
+      "name": "compiled/json-schema/core/concept-assignment.schema.json"
+    },
+    {
+      "artifact_digest": "sha256:e1fab6a7083ccf6df7d401db93720871b356da260c6a8b5b4436c10b6e35cb62",
+      "media_type": "application/schema+json",
+      "name": "compiled/json-schema/core/evidence-binding.schema.json"
+    },
+    {
+      "artifact_digest": "sha256:7e420b089ca809ae62247792bd4c72e87c49543c198cedf371358f0461fadeed",
+      "media_type": "application/schema+json",
+      "name": "compiled/json-schema/core/extraction-activity.schema.json"
+    },
+    {
+      "artifact_digest": "sha256:3946bbcde7028c7d913b9a5543ca60cef2b75985a772c5937a99b9c106926fbc",
+      "media_type": "application/schema+json",
+      "name": "compiled/json-schema/core/ai-lineage.schema.json"
+    },
+    {
+      "artifact_digest": "sha256:737d0a5577c1cd6d4d3fd3c78ef13e7c0d102ce8cfada7bc444a1a66b4e66d84",
+      "media_type": "application/schema+json",
+      "name": "compiled/json-schema/core/reference-resource-release.schema.json"
+    }
+  ],
+  "validator_artifacts": [
+    {
+      "artifact_digest": "sha256:82d55a497ee0225265ec1feb58e159815e15867645fd5f065ad692ad34e35eb6",
+      "media_type": "text/x-python",
+      "name": "tools/ci_validate.py"
+    }
+  ],
+  "version": "0.2.0-pre.9+m2-fixture"
+}

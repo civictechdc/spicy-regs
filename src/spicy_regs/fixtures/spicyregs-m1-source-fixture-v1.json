@@ -1,0 +1,296 @@
+{
+  "acquisition_release_ref": "urn:spicyregs:acquisition-release:m1-2026-07-31",
+  "coverage_gaps": [
+    {
+      "collection": "documents",
+      "reason": "fixture records an unavailable requested Federal Register document",
+      "record_ref": null,
+      "source": "federal-register",
+      "state": "unavailable"
+    },
+    {
+      "collection": "documents",
+      "reason": "fixture records a requested Regulations.gov document outside the sealed capture",
+      "record_ref": null,
+      "source": "regulations.gov",
+      "state": "unprocessed"
+    }
+  ],
+  "fixture_digest": "sha256:cdf76ffacd5552245d5fa191fd7d4b64e14dab6e249e89d47503d8171138b699",
+  "fixture_id": "spicyregs-m1-source-fixture-v1",
+  "format_version": "spicyregs-m1-source-fixture/v1",
+  "links": [
+    {
+      "expected_failure_reason": null,
+      "expected_outcome": "verified",
+      "source_field": "documents.fr_doc_num",
+      "source_record_key": "regulations-crosspost",
+      "target_record_key": "fr-2026-03227"
+    },
+    {
+      "expected_failure_reason": "document-number-mismatch",
+      "expected_outcome": "failed",
+      "source_field": "documents.fr_doc_num",
+      "source_record_key": "regulations-mismatch-control",
+      "target_record_key": "fr-2026-03227"
+    }
+  ],
+  "records": [
+    {
+      "captures": [
+        {
+          "observed_at": "2026-07-31T12:00:00Z",
+          "retrieval_receipt_ref": "urn:spicyregs:retrieval-receipt:fr-2026-03227:first"
+        },
+        {
+          "observed_at": "2026-07-31T12:05:00Z",
+          "retrieval_receipt_ref": "urn:spicyregs:retrieval-receipt:fr-2026-03227:repeat"
+        }
+      ],
+      "collection": "documents",
+      "content": {
+        "agency": "Food Safety and Inspection Service",
+        "body_html_layout": [
+          {
+            "count": 2282,
+            "repeat": " "
+          },
+          {
+            "text": "Poultry Inspection System"
+          },
+          {
+            "text": "\nWorker safety attestations document hazards.\nWorkers receive protections."
+          }
+        ],
+        "document_number": "2026-03227",
+        "document_type": "Proposed Rule",
+        "publication_date": "2026-02-19",
+        "title": "Maximum Line Speed Rates for Young Chicken and Turkey Establishments Operating Under the New Poultry Inspection System",
+        "topics": [
+          "Meat inspection"
+        ]
+      },
+      "document": {
+        "content_path": "body_html",
+        "document_type": "Proposed Rule",
+        "source_issued_version_id": "2026-03227"
+      },
+      "key": "fr-2026-03227",
+      "observations": [
+        {
+          "observation_kind": "federal-register-api-topic",
+          "source_native_key_or_ordinal": "0",
+          "source_native_path": "topics"
+        }
+      ],
+      "passages": [
+        {
+          "end": 2307,
+          "expected_text": "Poultry Inspection System",
+          "representation_path": "body_html",
+          "start": 2282
+        },
+        {
+          "end": 2352,
+          "expected_text": "Worker safety attestations document hazards.",
+          "representation_path": "body_html",
+          "start": 2308
+        },
+        {
+          "end": 2381,
+          "expected_text": "Workers receive protections.",
+          "representation_path": "body_html",
+          "start": 2353
+        }
+      ],
+      "publisher": "federal-register",
+      "representations": [
+        {
+          "evidence_grade": "source-exact",
+          "method": "json-field-decoding",
+          "method_config": {
+            "encoding": "utf-8",
+            "field": "body_html"
+          },
+          "method_version": "1",
+          "source_native_path": "body_html"
+        }
+      ],
+      "source_record_id": "2026-03227",
+      "source_url": "https://www.federalregister.gov/d/2026-03227"
+    },
+    {
+      "captures": [
+        {
+          "observed_at": "2026-07-31T12:01:00Z",
+          "retrieval_receipt_ref": "urn:spicyregs:retrieval-receipt:FSIS-2025-0012-0003"
+        }
+      ],
+      "collection": "documents",
+      "content": {
+        "docket_id": "FSIS-2025-0012",
+        "fr_doc_num": "2026-03227",
+        "title": "Maximum Line Speed Rates for Young Chicken and Turkey Establishments Operating Under the New Poultry Inspection System"
+      },
+      "document": {
+        "content_path": "title",
+        "document_type": "Proposed Rule Cross-post",
+        "source_issued_version_id": "FSIS-2025-0012-0003"
+      },
+      "key": "regulations-crosspost",
+      "observations": [],
+      "passages": [
+        {
+          "end": "full",
+          "expected_text": "Maximum Line Speed Rates for Young Chicken and Turkey Establishments Operating Under the New Poultry Inspection System",
+          "representation_path": "title",
+          "start": 0
+        }
+      ],
+      "publisher": "regulations.gov",
+      "representations": [
+        {
+          "evidence_grade": "source-exact",
+          "method": "json-field-decoding",
+          "method_config": {
+            "encoding": "utf-8",
+            "field": "title"
+          },
+          "method_version": "1",
+          "source_native_path": "title"
+        }
+      ],
+      "source_record_id": "FSIS-2025-0012-0003",
+      "source_url": "https://www.regulations.gov/document/FSIS-2025-0012-0003"
+    },
+    {
+      "captures": [
+        {
+          "observed_at": "2026-07-31T12:02:00Z",
+          "retrieval_receipt_ref": "urn:spicyregs:retrieval-receipt:fr-2026-03228"
+        }
+      ],
+      "collection": "documents",
+      "content": {
+        "document_number": "2026-03228",
+        "document_type": "Notice",
+        "publication_date": "2026-02-19",
+        "title": "Meat and Poultry Inspection Program Notice",
+        "topics": [
+          "Meat inspection"
+        ]
+      },
+      "document": {
+        "content_path": "title",
+        "document_type": "Notice",
+        "source_issued_version_id": "2026-03228"
+      },
+      "key": "fr-2026-03228",
+      "observations": [
+        {
+          "observation_kind": "federal-register-api-topic",
+          "source_native_key_or_ordinal": "0",
+          "source_native_path": "topics"
+        }
+      ],
+      "passages": [
+        {
+          "end": "full",
+          "expected_text": "Meat and Poultry Inspection Program Notice",
+          "representation_path": "title",
+          "start": 0
+        }
+      ],
+      "publisher": "federal-register",
+      "representations": [
+        {
+          "evidence_grade": "source-exact",
+          "method": "json-field-decoding",
+          "method_config": {
+            "encoding": "utf-8",
+            "field": "title"
+          },
+          "method_version": "1",
+          "source_native_path": "title"
+        }
+      ],
+      "source_record_id": "2026-03228",
+      "source_url": "https://www.federalregister.gov/d/2026-03228"
+    },
+    {
+      "captures": [
+        {
+          "observed_at": "2026-07-31T12:03:00Z",
+          "retrieval_receipt_ref": "urn:spicyregs:retrieval-receipt:mismatch-control"
+        }
+      ],
+      "collection": "documents",
+      "content": {
+        "docket_id": "FSIS-2025-0012",
+        "fr_doc_num": "2026-99999",
+        "title": "Mismatched Federal Register Number Control"
+      },
+      "document": {
+        "content_path": "title",
+        "document_type": "Supporting and Related Material",
+        "source_issued_version_id": "FSIS-2025-0012-9999"
+      },
+      "key": "regulations-mismatch-control",
+      "observations": [],
+      "passages": [
+        {
+          "end": "full",
+          "expected_text": "Mismatched Federal Register Number Control",
+          "representation_path": "title",
+          "start": 0
+        }
+      ],
+      "publisher": "regulations.gov",
+      "representations": [
+        {
+          "evidence_grade": "source-exact",
+          "method": "json-field-decoding",
+          "method_config": {
+            "encoding": "utf-8",
+            "field": "title"
+          },
+          "method_version": "1",
+          "source_native_path": "title"
+        }
+      ],
+      "source_record_id": "FSIS-2025-0012-9999",
+      "source_url": "https://www.regulations.gov/document/FSIS-2025-0012-9999"
+    },
+    {
+      "collection": "dockets",
+      "content": {
+        "docket_id": "FSIS-2025-0012",
+        "title": "Poultry line-speed rulemaking docket"
+      },
+      "document": null,
+      "key": "excluded-docket",
+      "publisher": "regulations.gov",
+      "source_record_id": "FSIS-2025-0012",
+      "source_url": "https://www.regulations.gov/docket/FSIS-2025-0012"
+    },
+    {
+      "collection": "comments",
+      "content": {
+        "comment": "Public comment text is not a document-search input.",
+        "document_id": "FSIS-2025-0012-0003"
+      },
+      "document": null,
+      "key": "excluded-comment",
+      "publisher": "regulations.gov",
+      "source_record_id": "FSIS-2025-0012-0042",
+      "source_url": "https://www.regulations.gov/comment/FSIS-2025-0012-0042"
+    }
+  ],
+  "released_at": "2026-07-31T12:10:00Z",
+  "requested_sources": [
+    "federal-register:documents",
+    "regulations.gov:comments",
+    "regulations.gov:dockets",
+    "regulations.gov:documents"
+  ]
+}
