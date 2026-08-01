@@ -308,34 +308,36 @@
       ]
     },
     {
-      "capability": "Vocabulary atlas RDF projection, sealed corpus, source dimensions, queries, and lexical candidate tags",
+      "capability": "Vocabulary-atlas crosswalk model and deterministic static RDF lookup projection",
       "command_line_entry_points": [
-        "tools/build_vocabulary_atlas.py"
+        "tools/build_vocabulary_atlas.py (preserved source)",
+        "RefSpec refspec-build-vocabulary-atlas (active replacement)"
       ],
-      "current_behavior": "Builds a disposable RDF read model from pinned source and managed-release inputs; uncommitted incubation work.",
-      "destination": "Source observations to SpicyRegs, vocabulary authority to RefSpec, candidate tags to Rulespec Extrapolator, queries to SpicySearch",
+      "current_behavior": "The preserved incubation code mixed crosswalk generation with document corpus, tagging, filtering, and related-document queries. RefSpec now implements the vocabulary-only crosswalk and static asset from pinned VocabularyRelease inputs.",
+      "destination": "RefSpec src/refspec/atlas and release-records; document filtering and related-document behavior remain SpicySearch responsibilities",
       "disposition": "reimplement",
       "known_consumers": [
-        "Vocabulary-atlas tests and graph experiment"
+        "RefSpec atlas builder and read-only lookup clients",
+        "SpicySearch when a snapshot policy enables cross-vocabulary expansion"
       ],
-      "migration_status": "inventoried-uncommitted-preserved-not-moved",
-      "nested_or_uncommitted_state": "top-level untracked files preserved by the 2026-07-31 incubation snapshot",
+      "migration_status": "crosswalk-and-static-asset-reimplemented-in-refspec",
+      "nested_or_uncommitted_state": "The original top-level untracked files are byte-preserved in the SpicySearch 2026-07-31 incubation archive and were removed from the SpicyRegs working tree after checksum and archive-content verification.",
       "notebooks": [],
       "originating_commit": "uncommitted at 56e5ccf115726596667e9427b937381a5f8b37d1",
-      "owning_product": "multiple-by-record-owner",
+      "owning_product": "RefSpec",
       "path": "src/spicy_regs/ontology/vocabulary_atlas*.py, tests/test_vocabulary_atlas*.py, tools/build_vocabulary_atlas.py",
-      "pinned_fixture": "tests/test_vocabulary_atlas_corpus.py sealed real corpus",
+      "pinned_fixture": "RefSpec package-local VocabularyRelease fixture and test-sealed mapping candidates, validation receipts, and optional feedback",
       "published_artifact_locations": [
-        "output/vocabulary-atlas/ (ignored local generated data)"
+        "output/vocabulary-atlas/ (ignored historical local generated data)",
+        "RefSpec release-records/fixtures/refspec-vocabulary-atlas-federal-register-2025-first-slice/atlas.nq",
+        "RefSpec release-records/fixtures/refspec-vocabulary-atlas-federal-register-2025-first-slice/atlas-manifest.json"
       ],
-      "replacement_interface": "DocumentRelease, VocabularyRelease, ExtrapolationRelease, and SearchSnapshot",
+      "replacement_interface": "RefSpec VocabularyAtlasAsset v1",
       "scheduled_jobs": [],
       "tests_or_evidence": [
-        "tests/test_vocabulary_atlas.py",
-        "tests/test_vocabulary_atlas_corpus.py",
-        "tests/test_vocabulary_atlas_dimensions.py",
-        "tests/test_vocabulary_atlas_queries.py",
-        "tests/test_vocabulary_atlas_query_parity.py"
+        "SpicySearch migration/preservation/spicyregs-untracked-56e5ccf1.tar",
+        "RefSpec atlas tests and byte-for-byte rebuild checks",
+        "RefSpec research/evidence/vocabulary-atlas-graph-experiment-2026-07-31.md"
       ]
     },
     {
@@ -366,38 +368,38 @@
       "capability": "LadybugDB graph spike, graph repository configuration, and vocabulary-atlas experiment report",
       "command_line_entry_points": [],
       "current_behavior": "Measures an optional rebuildable graph read model against the DuckDB oracle.",
-      "destination": "SpicySearch research evidence",
+      "destination": "RefSpec research/evidence",
       "disposition": "historical evidence",
       "known_consumers": [
         "Repository contributors evaluating graph adoption"
       ],
-      "migration_status": "inventoried-uncommitted-preserved-not-adopted",
-      "nested_or_uncommitted_state": "top-level untracked evidence and tools preserved by the 2026-07-31 incubation snapshot",
+      "migration_status": "moved-to-refspec-as-historical-v5-evidence",
+      "nested_or_uncommitted_state": "The original untracked evidence and tools remain byte-preserved in the SpicySearch incubation archive; historical copies now live in RefSpec research.",
       "notebooks": [],
       "originating_commit": "uncommitted at 56e5ccf115726596667e9427b937381a5f8b37d1",
-      "owning_product": "SpicySearch",
+      "owning_product": "RefSpec research",
       "path": "docs/evidence/ladybug-vocabulary-atlas-spike-2026-07-31/, docs/evidence/vocabulary-atlas-graph-experiment-2026-07-31.md, tools/graphdb/",
       "pinned_fixture": "Ladybug spike pinned input and DuckDB parity output",
       "published_artifact_locations": [
         "output/vocabulary-atlas/ (ignored local generated data)"
       ],
-      "replacement_interface": "Optional SearchSnapshot graph-index manifest after an adoption decision",
+      "replacement_interface": "Historical evidence for RefSpec VocabularyAtlasAsset and optional consumer-side SpicySearch read models",
       "scheduled_jobs": [],
       "tests_or_evidence": [
-        "docs/evidence/ladybug-vocabulary-atlas-spike-2026-07-31/README.md",
-        "docs/evidence/vocabulary-atlas-graph-experiment-2026-07-31.md"
+        "RefSpec research/evidence/ladybug-vocabulary-atlas-spike-2026-07-31/README.md",
+        "RefSpec research/evidence/vocabulary-atlas-graph-experiment-2026-07-31.md"
       ]
     },
     {
       "capability": "Nested RefSpec managed releases and the Federal Register 1995 thesaurus/crosswalk",
       "command_line_entry_points": [],
-      "current_behavior": "Provides vocabulary authority through an editable nested source checkout; 1995 data remains referenced by current code and tests.",
+      "current_behavior": "The preserved nested legacy checkout references the 1995 data in its historical code and tests. The active standalone RefSpec implementation excludes the 1995 source and crosswalk.",
       "destination": "RefSpec published VocabularyRelease",
       "disposition": "reimplement",
       "known_consumers": [
         "SpicyRegs enrichment and vocabulary-atlas code; nested RefSpec tests"
       ],
-      "migration_status": "inventoried-nested-work-preserved-1995-retirement-not-authorized",
+      "migration_status": "legacy-nested-state-preserved-active-1995-source-excluded",
       "nested_or_uncommitted_state": "nested RefSpec was 23 commits ahead plus tracked and untracked local changes at preservation time",
       "notebooks": [],
       "originating_commit": "nested repository history; gitlink introduced by 8d36696",

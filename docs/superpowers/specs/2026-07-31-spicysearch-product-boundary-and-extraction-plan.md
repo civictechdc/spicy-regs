@@ -104,10 +104,10 @@ owner, even when another product generates a conforming projection of it.
 | Product | Schema authority | Runtime and published data | Explicit exclusions |
 | --- | --- | --- | --- |
 | SpicyRegs | Source-native records, document identity and version records, passage coordinates, source observations, and acquisition coverage | Source connectors; immutable `DocumentRelease` records; exact text and passages; source history, failures, and exclusions | Vocabulary policy, derived semantic assertions, retrieval ranking, legal judgment |
-| RefSpec | Operational `VocabularyRelease`, capture, import, coverage, source-term resolution, mapping validation, optional review, and source-specific vocabulary profile schemas | Vocabulary capture and import; managed publication of conforming concept, hierarchy, and mapping instances; resolution, validation, and optional review records; vocabulary coverage | Redefining portable SKOS or Rulespec shapes, document acquisition, a general evidence framework, extrapolation execution, search ranking |
+| RefSpec | Operational `VocabularyRelease` and `VocabularyAtlasAsset`, capture, import, coverage, source-term resolution, crosswalk-candidate generation and validation, optional feedback, and source-specific vocabulary profile schemas | Vocabulary capture and import; managed publication of conforming concept, hierarchy, and mapping instances; resolution and validation records; vocabulary coverage; deterministic static crosswalk and lookup assets | Redefining portable SKOS or Rulespec shapes, document acquisition, a general evidence framework, extrapolation execution, live document queries, search ranking |
 | Rulespec Core | Generic artifact, fragment, assertion, evidence, provenance, confidence, attestation, assignment, authority, lifecycle, `ReferenceResourceRelease`, and portable SKOS-composition structures | Generated schemas, validators, conformance fixtures, and the core release | Source connectors, source-specific storage, managed vocabulary content or selection, search serving |
 | Rulespec Extrapolator | Extrapolation profiles, derived assertion types, and `ExtrapolationRelease` | The extraction and comparison runtime; evidence-bound assertions, assignments, relationships, and neutral findings | Canonical source text, vocabulary ownership, general document search, applicability decisions |
-| SpicySearch | Search requests, runs, snapshots, results, explanations, ranking policy, search feedback, and search coverage | Candidate generation, disposable indexes, ranking, query APIs, receipts, feedback events, and exports | Canonical documents, vocabulary mappings, extrapolation authority, legal or organizational judgments |
+| SpicySearch | Search requests, runs, snapshots, results, explanations, ranking policy, search feedback, and search coverage | Document candidate generation from pinned releases and atlas assets, disposable indexes, ranking, query APIs, receipts, feedback events, and exports | Canonical documents, vocabulary mappings or atlas generation, extrapolation authority, legal or organizational judgments |
 
 Every `DocumentRelease` includes a Rulespec Core `Artifact` projection for each
 published document version and each published text representation, plus a
@@ -123,10 +123,12 @@ MVP publication gate.
 
 An external vocabulary publisher remains authoritative for its distribution
 and native semantics. RefSpec owns the exact capture, import decision, managed
-release, local resolution policy, and evidence-backed cross-vocabulary
-mappings. It
+release, local resolution policy, evidence-backed cross-vocabulary mappings,
+and deterministic `VocabularyAtlasAsset` generated from pinned releases. It
 does not rewrite publisher history or present a local mapping as publisher
-fact.
+fact. Model- or agent-generated crosswalk candidates may receive `searchOnly`
+eligibility after usable pinned baseline validation; human review is optional
+later feedback, not a publication prerequisite.
 
 W3C SKOS remains authoritative for SKOS meaning. Rulespec Core defines the
 portable composition and validation shapes used across these products;
@@ -138,10 +140,10 @@ Every RefSpec `VocabularyRelease` exposes the exact complete Rulespec Core
 identifier, digest, and concept membership. RefSpec owns the operational
 managed-release manifest; Rulespec Core owns the portable release shape.
 
-RefSpec's current editor's draft assigns itself acquisition, processing,
-relationship publication, and query responsibilities. That scope must be
-narrowed to ontology and vocabulary before its first release under this plan.
-Do not preserve the broader draft as a second search or document framework.
+RefSpec may publish static, query-ready representations of its vocabulary and
+crosswalk content. It does not acquire documents, answer live document queries,
+rank search results, or become a second search framework. SpicySearch pins and
+verifies the asset, then owns document-query planning and serving.
 
 Rulespec currently describes itself mainly as a semantic substrate. Under this
 plan, the repository contains two release units: the independent Rulespec Core
@@ -526,6 +528,9 @@ SearchImportReceipt
   refspec_vocabulary_release_ref?
   refspec_resolution_policy_and_version?
   canonical_mapping_release_refs[]?
+  refspec_vocabulary_atlas_asset_ref?
+  refspec_vocabulary_atlas_manifest_digest?
+  refspec_vocabulary_atlas_distribution_digest?
   optional_review_refs[]
   checks_and_outcomes[]
   import_result
@@ -548,9 +553,12 @@ The evaluator fields are conditional on `semantic_record_kind`. A
 `SourceTermResolution` requires the pinned RefSpec `VocabularyRelease`,
 resolution policy, evidence, and baseline-validation receipt and forbids the
 Extrapolator receipt. A `ConceptMapping` requires its canonical endpoint
-releases, evidence, and baseline-validation receipt. Optional review records
-may be present, but none is required for search-only use. No import policy can
-substitute one product's evidence or validation mechanism for another's.
+releases, evidence, and baseline-validation receipt. When that mapping comes
+from a static atlas, the receipt also pins the RefSpec `VocabularyAtlasAsset`,
+its manifest digest, and the exact distribution digest SpicySearch read.
+Optional review records may be present, but none is required for search-only
+use. No import policy can substitute one product's evidence or validation
+mechanism for another's.
 
 The release manifest distinguishes its selected subset from the retained
 not-selected and deferred audit records, and extrapolation coverage counts all
@@ -579,6 +587,7 @@ source truth, an exact mapping, or a legal conclusion.
 | Search chunk | SpicySearch | Rebuildable lexical or semantic index unit | Candidate generation only |
 | `ConceptAssignment` | Rulespec Extrapolator | Immutable evidence-bound semantic proposition | A conforming, evidence-bound `searchOnly` candidate may support explained retrieval after baseline validation, release selection, and search import |
 | `BaselineValidationReceipt` | Profile or semantic-release owner | Reproducible deterministic and independent agent checks over a sealed sample | Qualifies a profile or release for candidate use; never proves semantic truth or applicability |
+| `VocabularyAtlasAsset` | RefSpec | Immutable crosswalk candidates, qualification proof, and deterministic static lookup distribution over pinned vocabulary releases | May support `searchOnly` query expansion; never becomes publisher truth or a mutable search index |
 | `ExtrapolationSelectionReceipt` | Rulespec Extrapolator | Immutable deterministic record of release assembly | Never substitutes for approval, verification, or lifecycle state |
 | `SearchImportReceipt` | SpicySearch | Immutable consumer-side index selection for one snapshot | May narrow but never broaden upstream eligibility |
 
@@ -595,8 +604,12 @@ source truth, an exact mapping, or a legal conclusion.
 - A metadata-only source change creates a new source-observation fact set and
   `DocumentRelease`. It does not create a new source-issued document version
   unless the publisher's versioned content changed.
-- Changed vocabulary capture, membership, mapping, or resolution creates a new
-  RefSpec `VocabularyRelease`.
+- Changed vocabulary capture, membership, publisher or managed-release mapping,
+  or resolution creates a new RefSpec `VocabularyRelease`.
+- Changed atlas-candidate input, model lineage, validation receipt, selection
+  policy, generator implementation, static distribution, or later human
+  feedback creates a new RefSpec `VocabularyAtlasAsset`. It never rewrites an
+  earlier asset or its `searchOnly` disposition.
 - Changed extraction configuration, model, or evidence selection creates a new
   `ExtrapolationRelease`; it does not rewrite a `DocumentRelease`.
 - Human or agent attestation, local adoption, and assignment lifecycle records
@@ -649,8 +662,10 @@ separate prevents a Rulespec-Core-to-RefSpec-to-Rulespec cycle.
 flowchart LR
     DR["SpicyRegs DocumentRelease"] --> ER["Rulespec ExtrapolationRelease"]
     VR["RefSpec VocabularyRelease"] --> ER
+    VR --> VA["RefSpec VocabularyAtlasAsset"]
     DR --> SS["SpicySearch SearchSnapshot"]
     VR --> SS
+    VA -. "when cross-vocabulary expansion is enabled" .-> SS
     ER -. "when indexed" .-> SS
     SS --> DP["Downstream products"]
 ```
@@ -670,7 +685,7 @@ database. A manifest or schema-digest mismatch fails closed.
 | --- | --- | --- | --- |
 | Rulespec Core | `RulespecCoreRelease`, schemas, generated types, validators, conformance fixtures | None | SpicyRegs, RefSpec, Rulespec Extrapolator, SpicySearch |
 | SpicyRegs | `DocumentRelease`, document versions, source renditions and text representations with Rulespec `Artifact` projections, passages with `SourceFragment` projections, source observations, rendition and observation capture events, source links, `LinkVerificationReceipt` records, acquisition coverage | Rulespec Core | Rulespec Extrapolator, SpicySearch |
-| RefSpec | `VocabularyRelease`, Rulespec `ReferenceResourceRelease` projection, concepts, labels, hierarchy, mappings, redirects, `SourceTermResolution` records and evidence, baseline-validation receipts, resolution policy, vocabulary coverage | Rulespec Core | Rulespec Extrapolator, SpicySearch |
+| RefSpec | `VocabularyRelease`, Rulespec `ReferenceResourceRelease` projection, concepts, labels, hierarchy, mappings, redirects, `SourceTermResolution` records and evidence, baseline-validation receipts, resolution policy, vocabulary coverage, and deterministic `VocabularyAtlasAsset` crosswalk and lookup files | Rulespec Core; each atlas asset also pins every input `VocabularyRelease`, candidate file, policy, implementation, and output digest | Rulespec Extrapolator, SpicySearch |
 | Rulespec Extrapolator | `ExtrapolationRelease`, evidence-bound assertions, assignments, agent- and baseline-validation receipts, `ExtrapolationSelectionReceipt` records, relationships, comparisons, extrapolation coverage | Rulespec Core, SpicyRegs releases, RefSpec releases | SpicySearch and downstream products |
 | SpicySearch | published `SearchSnapshot`, build receipt, index-coverage manifest, `SearchImportReceipt`, terminal `SearchRun` receipts, `SearchResultSet`, explanations, query coverage, feedback events, export manifest | Every indexed upstream release and policy version | Downstream products |
 
@@ -682,6 +697,8 @@ A `SearchSnapshot` pins:
 
 - one or more SpicyRegs document releases;
 - each RefSpec vocabulary release used for filtering or expansion;
+- each RefSpec vocabulary-atlas asset used for cross-vocabulary expansion,
+  including its manifest digest and selected static-distribution digest;
 - any Rulespec extrapolation release used for structured relationships;
 - each baseline-validation receipt used to qualify a candidate profile or
   semantic release;
@@ -1062,8 +1079,9 @@ SpicySearch executes four evidence channels in order:
 1. Official identifiers and direct links.
 2. Citations, backlinks, proceedings, authorities, agencies, programs,
    standards, dates, and source-assigned metadata.
-3. Baseline-qualified RefSpec term resolutions, machine-valid `searchOnly`
-   Rulespec assignment candidates, and named workflow candidates.
+3. Baseline-qualified RefSpec term resolutions, atlas-qualified `searchOnly`
+   crosswalk expansion, machine-valid `searchOnly` Rulespec assignment
+   candidates, and named workflow candidates.
 4. Lexical and semantic similarity.
 
 Federal Register API Topics belong to channel 2 as source-assigned metadata,
@@ -1212,10 +1230,13 @@ The first snapshot uses immutable Parquet files and DuckDB. It contains:
 The first snapshot does **not** require lexical, vector, semantic, or graph
 indexes. Add each only after the deterministic slice passes.
 
-LadybugDB remains behind a SpicySearch read-model adapter. Adopt it only if a
-real `get_document_connections` query materially improves over DuckDB in
-latency, clarity, or maintenance cost. Any graph is rebuildable from pinned
-releases and is not another source of truth.
+RefSpec generates the canonical static vocabulary-atlas asset and any
+query-ready vocabulary projection. SpicySearch may read a pinned distribution
+behind its own adapter; it does not generate or govern that crosswalk.
+LadybugDB remains an optional SpicySearch read-model runtime. Adopt it only if
+a real `get_document_connections` query materially improves over DuckDB in
+latency, clarity, or maintenance cost. Any document graph is rebuildable from
+pinned releases and is not another source of truth.
 
 ## First vertical slice
 
@@ -1313,10 +1334,10 @@ clean per-product Git history that the source commits do not contain.
 | Incubated capability | Final owner and disposition |
 | --- | --- |
 | Source connectors, immutable source records, exact versions and passages, source observations, acquisition coverage | Keep or reimplement in SpicyRegs. |
-| Vocabulary source capture, current managed releases, concepts, hierarchy, mappings, redirects, mapping validation, optional review, source-term resolution | Move or reimplement in RefSpec. |
+| Vocabulary source capture, current managed releases, concepts, hierarchy, mappings, redirects, mapping-candidate generation and validation, optional feedback, source-term resolution, and deterministic static atlas lookup assets | Move or reimplement in RefSpec. |
 | Generic semantic and evidence structures, validators, profiles, extrapolation runtime, candidate derived assertions and comparisons | Move or reimplement in the appropriate Rulespec release unit. |
 | Query planning, filters, ranking, results, explanations, search receipts, lexical/vector indexes, graph queries, query-time coverage | Move or reimplement in SpicySearch. |
-| Vocabulary-atlas graph and embedding experiments | Preserve in SpicySearch as research evidence; promote only the interfaces and behavior that pass product gates. |
+| Vocabulary-atlas crosswalk and static lookup projection | Reimplement as a RefSpec `VocabularyAtlasAsset`; preserve the mixed v5 graph and embedding experiment in RefSpec research. Document filtering, related-document queries, and ranking remain SpicySearch responsibilities. |
 | Mixed generated evidence | Preserve with the decision it supports; never treat it as runtime authority. |
 
 The current `docpipeline`, `ontology`, and `enrichment` packages import one
@@ -1416,8 +1437,9 @@ guide the move rather than describe it afterward.
 ### 3. Define and test release records
 
 - Release Rulespec Core schemas and fixtures without a RefSpec dependency.
-- Define `DocumentRelease`, `VocabularyRelease`, `ExtrapolationRelease`, and
-  `SearchSnapshot` manifests and stable identifiers.
+- Define `DocumentRelease`, `VocabularyRelease`, `VocabularyAtlasAsset`,
+  `ExtrapolationRelease`, and `SearchSnapshot` manifests and stable
+  identifiers.
 - Define `SourceRendition`, `SourceRenditionCapture`, `TextRepresentation`,
   structural-passage, `SourceObservation`, and `SourceObservationCapture`
   records plus the
@@ -1431,6 +1453,9 @@ guide the move rather than describe it afterward.
   `SearchSnapshotCoverage` and `SearchFeedbackEvent` with closed states and
   stable identifiers.
 - Add fail-closed schema and manifest compatibility checks.
+- Prove that a RefSpec atlas rebuild produces identical blank-node-free
+  N-Quads and manifest bytes, exactly two named graphs, valid mapping endpoints,
+  and closed input, implementation, and output digests.
 - Provide pinned fixtures so each repository can build and test without
   another repository's checkout or mutable database.
 
@@ -1489,6 +1514,8 @@ guide the move rather than describe it afterward.
 - Add baseline-qualified RefSpec resolved-term and Rulespec
   concept-assignment candidate channels.
 - Add lexical retrieval and pass the M3 lexical request.
+- When cross-vocabulary expansion is enabled, pin and verify a RefSpec
+  `VocabularyAtlasAsset`; do not regenerate its mappings in SpicySearch.
 - Before serving either chunk-backed channel, prove its derived-text
   projection closes character-for-character against the pinned
   representations and returns all mapped source spans.
@@ -1514,6 +1541,11 @@ The split passes only when:
 - every `ExtrapolationRelease` references only the Rulespec Core,
   `DocumentRelease`, and `VocabularyRelease` inputs it pins, and every
   `SearchSnapshot` verifies that reference closure;
+- every `VocabularyAtlasAsset` verifies its input releases, candidate file,
+  selection policy, generator implementation, static output digests, mapping
+  endpoints, graph counts, and declared counts;
+- identical RefSpec atlas inputs produce byte-identical manifest and N-Quads
+  output, and the read-only lookup result agrees with the canonical graph;
 - SpicySearch rebuilds its snapshot without reading an upstream mutable
   database;
 - the content-addressed top-level and nested RefSpec preservation artifacts
@@ -1844,24 +1876,22 @@ already implemented:
   `src/spicy_regs/transforms/build_search_index.py`, and
   `src/spicy_regs/vectordb/embed.py` show that search responsibility predates
   the migration baseline.
-- `tests/test_vocabulary_atlas_corpus.py` proves that `2026-03227` has a
-  Regulations.gov link classification and that `2026-03227` and `2026-03228`
-  share the source API Topic `Meat inspection`. It does not yet prove the
-  `LinkVerificationReceipt` required by this plan.
-- `tests/test_vocabulary_atlas_queries.py` enforces that API Topics cannot
-  become queryable concept assignments and that source-local or unresolved
-  Lists values cannot leak into concept-assignment candidates.
-- `tests/test_vocabulary_atlas.py` exercises all four Lists resolution shapes.
-  The current corpus contains no positive `recognizedVariant` or `unresolved`
-  examples, so those two positive fixtures remain required.
-- `RefSpec/spec/refspec.md` is an unreleased editor's draft with broader
-  acquisition and query scope than the ownership decision in this plan.
+- The historical vocabulary-atlas tests and source were preserved in the
+  SpicySearch migration archive before removal from the SpicyRegs working
+  tree. Their mixed document and crosswalk behavior is migration evidence, not
+  an active SpicyRegs interface.
+- RefSpec research preserves the historical graph and LadybugDB experiment.
+  The active RefSpec atlas tests cover only crosswalk generation, static asset
+  determinism, mapping qualification, and read-only vocabulary lookup.
+- `RefSpec/spec/refspec.md` defines the static `VocabularyAtlasAsset` while
+  excluding live document queries and search serving.
 - The Rulespec README describes Rulespec as a substrate and already contains a
   reference behavior runtime; it does not yet describe the Core/Extrapolator
   release split.
-- The targeted validation suite for document scope, concept search, vocabulary
-  atlas queries, and MCP behavior passed 115 tests with one deselection. This
-  is component evidence, not an end-to-end SpicySearch acceptance result.
+- The historical targeted validation suite for document scope, concept search,
+  vocabulary-atlas queries, and MCP behavior passed 115 tests with one
+  deselection before extraction. This is preserved component evidence, not an
+  end-to-end SpicySearch acceptance result or proof of the new RefSpec asset.
 - No SpicySearch repository existed at plan validation time.
 
 ## Deliberately open implementation choices

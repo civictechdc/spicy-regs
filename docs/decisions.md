@@ -850,15 +850,21 @@ numbers remain the currency of this project.
   document versions and renditions, immutable Unicode text representations,
   structural passages, source observations, deterministic source-link
   verification, and acquisition coverage. RefSpec owns vocabulary releases,
-  concepts, labels, mappings, redirects, and source-term resolution. Rulespec
-  Core owns portable evidence and semantic record shapes; Rulespec
-  Extrapolator owns derived assertions, candidate extraction, validation, and
-  selection. SpicySearch owns query planning, filters, ranking, results,
-  explanations, search receipts, indexes, and query-time coverage.
+  concepts, labels, mappings, redirects, source-term resolution, crosswalk
+  candidate generation and validation, and deterministic static
+  `VocabularyAtlasAsset` lookup representations. Rulespec Core owns portable
+  evidence and semantic record shapes; Rulespec Extrapolator owns derived
+  document assertions, candidate extraction, validation, and selection.
+  SpicySearch consumes pinned atlas assets and owns document query planning,
+  filters, ranking, results, explanations, search receipts, indexes, and
+  query-time coverage.
 - **Practical meaning:** products exchange immutable, digest-pinned releases.
   They do not import another repository's source tree or read its mutable
   database. Source-assigned API Topics and Lists of Subjects remain source
   observations; they do not become concepts or assignments by label equality.
+  Model- or agent-generated crosswalk candidates may qualify for `searchOnly`
+  use through pinned baseline validation without prior human approval. Human
+  feedback is optional input to a later immutable asset.
 - **Migration:** existing search, vocabulary, and extraction surfaces remain
   available until their replacement consumers pass. This decision authorizes
   inventory and replacement, not immediate deletion, release, or deployment.
