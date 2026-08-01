@@ -70,6 +70,7 @@ from spicy_regs.ontology.citations import (
     canonical_regsgov_iri,
     canonical_rin_iri,
     canonical_usc_iri,
+    docket_reference_as_stated,
     federal_register_identifier,
     normalize_docket_reference,
     parse_authority_citation,
@@ -554,7 +555,10 @@ def _document_docket_iris(
     notes: list[str] = []
     already = set(known_docket_iris)
     for raw in _json_list(row.get("docket_ids_json")):
-        stated = _clean(raw)
+        # The docket-aware cleaning, shared with the fr_docket_links transform
+        # so the two readers of this column agree byte for byte on what states
+        # nothing: it removes the same sentinels _clean does, plus a bare label.
+        stated = docket_reference_as_stated(raw)
         if not stated:
             continue
         identifier = normalize_docket_reference(stated)

@@ -123,12 +123,58 @@ def test_the_raw_docket_array_is_preserved_beside_the_normalized_key(tmp_path):
 
 
 def test_empty_and_label_only_references_are_dropped(tmp_path):
-    """A label with no identifier behind it names nothing, so it emits no row."""
+    """A label with no identifier behind it names nothing, so it emits no row.
+
+    "Docket No." is the only kind of unreadable reference that is dropped rather
+    than quarantined: a label with nothing behind it is presentation with
+    nothing to present, so keeping it would publish a docket key made entirely
+    of decoration.
+    """
     _write_federal_register(
         tmp_path,
-        {"2026-00001": ["", "   ", "FAA-2026-3485"]},
+        {"2026-00001": ["", "   ", "Docket No.", "Docket Number", "Doc. No. ", "FAA-2026-3485"]},
     )
 
     build_fr_docket_links(tmp_path)
 
     assert [docket_id for _, docket_id, _ in _links(tmp_path)] == ["FAA-2026-3485"]
+
+
+def test_a_stringified_null_states_no_docket_at_either_call_site(tmp_path):
+    """The link table and the RKAF projection clean the same sentinels.
+
+    ``rkaf_projection._clean`` turns "None"/"nan"/"null" into "" before the
+    docket grammar sees them. This transform did its own pre-cleaning in SQL
+    (``TRIM``), so a stringified null published a docket literally named "NAN".
+    One helper now does the cleaning for both readers.
+    """
+    from spicy_regs.docpipeline.rkaf_projection import _clean
+    from spicy_regs.ontology.citations import docket_reference_as_stated
+
+    for sentinel in ("", "   ", "None", "nan", "null"):
+        assert docket_reference_as_stated(sentinel) == _clean(sentinel) == ""
+    for stated in ("Docket No. FAA-2026-3485", "REG-103193-26"):
+        assert docket_reference_as_stated(stated) == _clean(stated) == stated
+
+    _write_federal_register(tmp_path, {"2026-00001": ["nan", "None", "null", "FAA-2026-3485"]})
+
+    build_fr_docket_links(tmp_path)
+
+    assert [docket_id for _, docket_id, _ in _links(tmp_path)] == ["FAA-2026-3485"]
+
+
+def test_the_decorated_and_bare_forms_of_one_docket_emit_one_row(tmp_path):
+    """Both forms name the same docket, so the exploded table links it once.
+
+    Without DISTINCT the docket page renders the same FR document twice for
+    every array that states its docket both ways.
+    """
+    stated = ["Docket No. FAA-2026-3485", "FAA-2026-3485"]
+    _write_federal_register(tmp_path, {"2026-00001": stated})
+
+    build_fr_docket_links(tmp_path)
+
+    (document_number, docket_id, raw), *rest = _links(tmp_path)
+    assert not rest
+    assert (document_number, docket_id) == ("2026-00001", "FAA-2026-3485")
+    assert json.loads(raw) == stated

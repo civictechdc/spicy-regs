@@ -20,6 +20,12 @@ snapshot (docs/corpus-edge-coverage-findings-2026-07-24.md §1). A reference the
 Regulations.gov scheme cannot express keeps its stated value — quarantined for
 inspection, never dropped and never forced onto a docket it does not name — and
 ``docket_ids_json`` still carries the raw array verbatim.
+
+Normalizing makes two references that state one docket identical, so the rows
+are distinct: one link per (docket, FR document), however many ways the array
+spelled it. A reference that states nothing at all is the one thing dropped
+rather than quarantined — 54 of the pinned corpus's 893,822 are bare labels
+("Docket No.", "MM Docket No.") whose stated value is decoration only.
 """
 
 from pathlib import Path
@@ -27,7 +33,7 @@ from pathlib import Path
 import pyarrow.parquet as pq
 from loguru import logger
 
-from spicy_regs.ontology.citations import normalize_docket_reference
+from spicy_regs.ontology.citations import docket_reference_as_stated, normalize_docket_reference
 
 
 def build_fr_docket_links(output_dir: Path) -> Path:
@@ -52,26 +58,29 @@ def build_fr_docket_links(output_dir: Path) -> Path:
     con.execute(f"SET temp_directory='{spill_dir}'")
 
     # One implementation of the docket grammar, shared with the RKAF projection
-    # (docpipeline/rkaf_projection.py) rather than restated in SQL. Refusal is
-    # the function's whole point, so it must be allowed to return NULL —
-    # ``null_handling="special"`` is what permits that.
-    con.create_function(
-        "normalize_docket_reference",
-        normalize_docket_reference,
-        ["VARCHAR"],
-        "VARCHAR",
-        null_handling="special",
-    )
+    # (docpipeline/rkaf_projection.py) rather than restated in SQL — including
+    # the pre-cleaning, so a stringified null ("nan") states no docket here
+    # either. ``null_handling="special"`` hands the function a SQL NULL instead
+    # of short-circuiting to NULL around it, which is what lets these two decide
+    # for themselves what states nothing; returning NULL needs no flag.
+    for name, function in (
+        ("normalize_docket_reference", normalize_docket_reference),
+        ("docket_reference_as_stated", docket_reference_as_stated),
+    ):
+        con.create_function(name, function, ["VARCHAR"], "VARCHAR", null_handling="special")
 
     # Carries the columns the docket page's FR section renders (normalizeFRRow
     # rebuilds `docket_ids` from docket_ids_json, so keep that column). Sorted by
     # docket_id with a small row-group size so per-docket lookups prune.
+    # DISTINCT because an array that states one docket both ways ("Docket No.
+    # FAA-2026-3485" and "FAA-2026-3485") normalizes to one link, and the docket
+    # page must not render that FR document twice.
     query = f"""
     COPY (
-        SELECT
+        SELECT DISTINCT
             COALESCE(
                 normalize_docket_reference(link.docket_id),
-                TRIM(link.docket_id)
+                docket_reference_as_stated(link.docket_id)
             ) AS docket_id,
             fr.document_number,
             fr.title,
@@ -91,8 +100,7 @@ def build_fr_docket_links(output_dir: Path) -> Path:
         FROM read_parquet('{fr_file}') fr,
              UNNEST(CAST(json_extract(fr.docket_ids_json, '$') AS VARCHAR[])) AS link(docket_id)
         WHERE fr.docket_ids_json IS NOT NULL
-          AND link.docket_id IS NOT NULL
-          AND TRIM(link.docket_id) <> ''
+          AND docket_reference_as_stated(link.docket_id) <> ''
         ORDER BY docket_id, fr.publication_date DESC
     ) TO '{out_file}' (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 50000);
     """

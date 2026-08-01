@@ -290,6 +290,31 @@ _DOCKET_LABEL_PREFIX = re.compile(
 #: refuses 5,214 of the 5,506 mutilated references and costs no real docket.
 _REGSGOV_DOCKET_SHAPE = re.compile(r"[A-Z][A-Z0-9]*(?:[-_][A-Z0-9]+)*[-_]\d{2}(?:\d{2})?(?:[-_][A-Z0-9]+)*[-_]\d+")
 
+#: The spellings a stringified null leaves behind. Matches the sentinel set
+#: ``spicy_regs.docpipeline.rkaf_projection._clean`` removes, so both readers of
+#: a docket column agree on what "no reference" looks like.
+_UNSTATED_SENTINELS = frozenset({"", "None", "nan", "null"})
+
+
+def docket_reference_as_stated(reference: object) -> str:
+    """Return the reference text a source states, or ``""`` when it states none.
+
+    One cleaning for every reader of a docket column, so the link table and the
+    RKAF projection quarantine and drop exactly the same strings. Three kinds of
+    value state nothing: an empty one, the sentinel a stringified null leaves
+    behind, and a bare label — "Docket No." with nothing behind it is
+    presentation with nothing to present, and publishing it would key a docket
+    on decoration. A value the scheme can already express is never read as a
+    label, for the same reason :func:`normalize_docket_reference` validates
+    before it strips.
+    """
+    text = "" if reference is None else str(reference).strip()
+    if text in _UNSTATED_SENTINELS:
+        return ""
+    if normalize_regsgov_identifier(text) is not None:
+        return text
+    return "" if not _DOCKET_LABEL_PREFIX.sub("", text, count=1).strip() else text
+
 
 def normalize_docket_reference(reference: object) -> str | None:
     """Return the Regulations.gov docket identifier a reference states, if any.
@@ -310,7 +335,7 @@ def normalize_docket_reference(reference: object) -> str | None:
     ``None`` means the reference names no Regulations.gov docket — a refusal,
     not a repair. Callers quarantine it; nothing here invents a match.
     """
-    stated = str(reference or "").strip()
+    stated = docket_reference_as_stated(reference)
     if not stated:
         return None
     direct = normalize_regsgov_identifier(stated)
