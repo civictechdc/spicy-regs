@@ -863,8 +863,11 @@ numbers remain the currency of this project.
   database. Source-assigned API Topics and Lists of Subjects remain source
   observations; they do not become concepts or assignments by label equality.
   Model- or agent-generated crosswalk candidates may qualify for `searchOnly`
-  use through pinned baseline validation without prior human approval. Human
-  feedback is optional input to a later immutable asset.
+  use without prior human approval when exactly two supporting machine
+  validations resolve the pinned evidence, pass deterministic checks, and use
+  distinct validator actors, independence groups, providers, provider model
+  IDs, and response artifacts. Human feedback is optional input to a later
+  immutable asset.
 - **Migration:** existing search, vocabulary, and extraction surfaces remain
   available until their replacement consumers pass. This decision authorizes
   inventory and replacement, not immediate deletion, release, or deployment.

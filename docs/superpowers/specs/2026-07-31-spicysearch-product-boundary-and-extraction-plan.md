@@ -1,8 +1,9 @@
 # SpicySearch Product Boundary and Extraction Plan
 
 - **Date:** 2026-07-31
-- **Status:** Working architecture decision for coordinated implementation;
-  unreleased and intentionally revisable
+- **Status:** Core product boundary and static release flow implemented and
+  verified locally; remaining compatibility cutovers and product milestones,
+  commit, release, and promotion are separate delivery decisions
 - **Scope:** SpicyRegs, RefSpec, Rulespec, and SpicySearch
 - **Repository authority:** We own all four repositories. No current release,
   specification, interface, or repository boundary is canonical, and no
@@ -17,6 +18,15 @@
   commits, releases, and promotion remain separate delivery decisions.
 - **Migration rule:** Archive, inventory, place, and verify the work before
   retiring it from SpicyRegs. Do not remove the post-baseline delta first.
+
+**RefSpec implementation clarification (31 July 2026):** Current sections use
+*managed release* for RefSpec's mature multi-file distribution and portable
+Rulespec projection. `VocabularyRelease` appears only where dated history or a
+superseded prototype requires its exact name. RefSpec generates
+`VocabularyAtlasAsset` from verified managed releases; the duplicate compact
+serializer, five-concept builder, and standalone validator are retired.
+The execution record and remaining compatibility cutovers are tracked in the
+[RefSpec reconciliation plan](../../../RefSpec/plans/2026-07-31-refspec-product-boundary-and-atlas-reconciliation-plan.md).
 
 ## Decision and supersession
 
@@ -104,7 +114,7 @@ owner, even when another product generates a conforming projection of it.
 | Product | Schema authority | Runtime and published data | Explicit exclusions |
 | --- | --- | --- | --- |
 | SpicyRegs | Source-native records, document identity and version records, passage coordinates, source observations, and acquisition coverage | Source connectors; immutable `DocumentRelease` records; exact text and passages; source history, failures, and exclusions | Vocabulary policy, derived semantic assertions, retrieval ranking, legal judgment |
-| RefSpec | Operational `VocabularyRelease` and `VocabularyAtlasAsset`, capture, import, coverage, source-term resolution, crosswalk-candidate generation and validation, optional feedback, and source-specific vocabulary profile schemas | Vocabulary capture and import; managed publication of conforming concept, hierarchy, and mapping instances; resolution and validation records; vocabulary coverage; deterministic static crosswalk and lookup assets | Redefining portable SKOS or Rulespec shapes, document acquisition, a general evidence framework, extrapolation execution, live document queries, search ranking |
+| RefSpec | Managed vocabulary distributions and `VocabularyAtlasAsset`, capture, import, coverage, source-term resolution, crosswalk-candidate generation and validation, optional feedback, and source-specific vocabulary profile schemas | Vocabulary capture and import; managed publication of conforming concept, hierarchy, and mapping instances; resolution and validation records; vocabulary coverage; deterministic static crosswalk and lookup assets | Redefining portable SKOS or Rulespec shapes, document acquisition, a general evidence framework, extrapolation execution, live document queries, search ranking |
 | Rulespec Core | Generic artifact, fragment, assertion, evidence, provenance, confidence, attestation, assignment, authority, lifecycle, `ReferenceResourceRelease`, and portable SKOS-composition structures | Generated schemas, validators, conformance fixtures, and the core release | Source connectors, source-specific storage, managed vocabulary content or selection, search serving |
 | Rulespec Extrapolator | Extrapolation profiles, derived assertion types, and `ExtrapolationRelease` | The extraction and comparison runtime; evidence-bound assertions, assignments, relationships, and neutral findings | Canonical source text, vocabulary ownership, general document search, applicability decisions |
 | SpicySearch | Search requests, runs, snapshots, results, explanations, ranking policy, search feedback, and search coverage | Document candidate generation from pinned releases and atlas assets, disposable indexes, ranking, query APIs, receipts, feedback events, and exports | Canonical documents, vocabulary mappings or atlas generation, extrapolation authority, legal or organizational judgments |
@@ -127,15 +137,17 @@ release, local resolution policy, evidence-backed cross-vocabulary mappings,
 and deterministic `VocabularyAtlasAsset` generated from pinned releases. It
 does not rewrite publisher history or present a local mapping as publisher
 fact. Model- or agent-generated crosswalk candidates may receive `searchOnly`
-eligibility after usable pinned baseline validation; human review is optional
-later feedback, not a publication prerequisite.
+eligibility when exactly two supporting machine validations resolve the pinned
+evidence, pass deterministic checks, and use distinct validator actors,
+independence groups, providers, provider model IDs, and response artifacts.
+Human review is optional later feedback, not a publication prerequisite.
 
 W3C SKOS remains authoritative for SKOS meaning. Rulespec Core defines the
 portable composition and validation shapes used across these products;
 RefSpec publishes the managed vocabulary instances and operational release
 selection without redefining either authority.
 
-Every RefSpec `VocabularyRelease` exposes the exact complete Rulespec Core
+Every RefSpec managed release exposes the exact complete Rulespec Core
 `ReferenceResourceRelease` used by portable concept assignments, including its
 identifier, digest, and concept membership. RefSpec owns the operational
 managed-release manifest; Rulespec Core owns the portable release shape.
@@ -160,7 +172,7 @@ search must work before tagging and must continue to work for untagged text.
 flowchart LR
     D["SpicyRegs exact document version"] --> P["SpicyRegs structural passages"]
     P --> E["Rulespec Extrapolator evidence selection"]
-    V["RefSpec VocabularyRelease"] --> E
+    V["RefSpec managed release and atlas"] --> E
     E --> A["Rulespec document or fragment assignments"]
     D --> S["SpicySearch indexes"]
     P --> S
@@ -290,8 +302,9 @@ the document bytes, source passage, and coordinate validation.
 
 ### 3. Extrapolate and tag documents or fragments
 
-The Rulespec Extrapolator consumes pinned `DocumentRelease` and
-`VocabularyRelease` inputs. A `ConceptAssignment` targets the Rulespec
+The Rulespec Extrapolator consumes a pinned `RulespecCoreRelease`,
+`DocumentRelease`, `VocabularyAtlasAsset` triple, and exact
+`ReferenceResourceRelease`. A `ConceptAssignment` targets the Rulespec
 `Artifact` projection of a whole document version or an exact
 `SourceFragment`. A fragment-level assignment does not imply the same
 document-level assignment, and a document-level assignment does not
@@ -310,8 +323,8 @@ The `ConceptAssignment` is an immutable Rulespec proposition. It uses
 the assignment role, `assertsObject` for the concept, `assertionPolarity` for
 the affirmed proposition, and `assignedConceptRelease` for the exact complete
 Rulespec `ReferenceResourceRelease`. The surrounding `ExtrapolationRelease`
-separately pins the RefSpec `VocabularyRelease` that published that portable
-release.
+separately pins the RefSpec atlas that proves the portable release's exact
+membership.
 
 Generation origin, evidence, confidence, optional attestation, consumer
 eligibility, and lifecycle remain separate Rulespec records. Human approval is
@@ -345,7 +358,7 @@ AgentValidationReceipt
   validator_actor_ref
   validator_kind: aiModel | aiAgent
   independence_group
-  provider_and_model_id
+  provider_model_id
   request_contract_ref_and_digest
   response_artifact_ref_and_digest?
   execution_status: completed | failed
@@ -388,6 +401,13 @@ means that another validator can inspect or rerun the same request; it does not
 promise byte-identical output from a stochastic model. An optional Rulespec
 `Attestation` is separate and advisory.
 
+A usable baseline requires exactly two completed machine receipts. Both must
+recommend `supports`; every check from both must pass; and their validator
+actors, independence groups, provider/model identities, and response artifacts
+must be distinct. A flag, failed check, abstention, failed execution, or extra
+attempt makes that baseline non-usable. A later retry or reevaluation creates a
+new sealed attempt set; it never restamps the original baseline.
+
 The baseline receipt qualifies only the named profile and release for a
 candidate-search deployment. It is not part of an assignment's evidence and
 does not validate every assignment in the release. Each assignment still
@@ -401,15 +421,15 @@ would otherwise inspect: whether the cited passage supports the proposed
 assignment, whether a term has the claimed meaning and scope, whether an
 ambiguity was ignored, and whether the output contains an obvious
 hallucination. Validators work independently. A second validator checks the
-same sealed sample without seeing the first response. A disagreement or
-abstention defers the affected item until a third validator reviews that exact
-check; unresolved items stay excluded and any unresolved blocking check makes
-the aggregate `deferred`. `usable_with_nonblocking_limits` may disclose only
-limitations that the rubric explicitly classifies as nonblocking. Separate
-contexts on the same foundation model are useful baseline critiques but count
-as one model family for a cross-family quality or adoption claim. The aggregate
-policy may keep flags, defer the profile, or fail it. It never emits approval
-or `verification=verified`.
+same sealed sample without seeing the first response. A disagreement,
+abstention, flag, or failed check defers the affected item or profile. A later
+evaluation uses a new sealed input and a new independent pair; it does not form
+a two-of-three vote or rewrite the original attempts. `usable_with_nonblocking_limits`
+may disclose known limitations, but both qualifying receipts still recommend
+`supports` and every one of their checks passes. Separate contexts on the same
+foundation model are useful baseline critiques but count as one provider/model
+identity for qualification. The aggregate policy may defer or fail the profile.
+It never emits approval or `verification=verified`.
 
 A notebook, short script, or agent swarm that writes these receipts is enough
 for baseline validation. Add a deterministic semantic rule only when the rule
@@ -550,7 +570,7 @@ The evaluator fields are conditional on `semantic_record_kind`. A
 `ExtrapolationSelectionReceipt`, and a usable baseline-validation receipt; an
 `aiSuggested` assignment also requires `AILineage` and
 `usageEligibility=searchOnly`. It forbids RefSpec source-resolution fields. A
-`SourceTermResolution` requires the pinned RefSpec `VocabularyRelease`,
+`SourceTermResolution` requires the pinned RefSpec managed release,
 resolution policy, evidence, and baseline-validation receipt and forbids the
 Extrapolator receipt. A `ConceptMapping` requires its canonical endpoint
 releases, evidence, and baseline-validation receipt. When that mapping comes
@@ -568,8 +588,8 @@ eligibility.
 An assignment enters the `concept_assignment_candidate` channel only when its
 Rulespec proposition conforms; its exact artifact or digest-valid fragment,
 evidence, `ExtractionActivity`, `AILineage` when applicable, complete
-`ReferenceResourceRelease`, and the RefSpec `VocabularyRelease` that exposes
-that release all resolve; its baseline result is `usable_for_search` or
+`ReferenceResourceRelease`, and the RefSpec atlas that proves that release all
+resolve; its baseline result is `usable_for_search` or
 `usable_with_nonblocking_limits`; its Extrapolator receipt is `selected`;
 upstream usage is capped at `searchOnly` and has no explicit blocking access or
 lifecycle state;
@@ -605,7 +625,7 @@ source truth, an exact mapping, or a legal conclusion.
   `DocumentRelease`. It does not create a new source-issued document version
   unless the publisher's versioned content changed.
 - Changed vocabulary capture, membership, publisher or managed-release mapping,
-  or resolution creates a new RefSpec `VocabularyRelease`.
+  or resolution creates a new RefSpec managed release.
 - Changed atlas-candidate input, model lineage, validation receipt, selection
   policy, generator implementation, static distribution, or later human
   feedback creates a new RefSpec `VocabularyAtlasAsset`. It never rewrites an
@@ -660,11 +680,14 @@ separate prevents a Rulespec-Core-to-RefSpec-to-Rulespec cycle.
 
 ```mermaid
 flowchart LR
-    DR["SpicyRegs DocumentRelease"] --> ER["Rulespec ExtrapolationRelease"]
-    VR["RefSpec VocabularyRelease"] --> ER
-    VR --> VA["RefSpec VocabularyAtlasAsset"]
-    DR --> SS["SpicySearch SearchSnapshot"]
-    VR --> SS
+    RC["Rulespec Core"] --> DR["SpicyRegs DocumentRelease"]
+    RC --> MR["RefSpec managed release"]
+    RC --> ER["Rulespec ExtrapolationRelease"]
+    RC --> SS["SpicySearch SearchSnapshot"]
+    MR --> VA["RefSpec VocabularyAtlasAsset"]
+    DR --> ER
+    VA --> ER
+    DR --> SS
     VA -. "when cross-vocabulary expansion is enabled" .-> SS
     ER -. "when indexed" .-> SS
     SS --> DP["Downstream products"]
@@ -685,8 +708,8 @@ database. A manifest or schema-digest mismatch fails closed.
 | --- | --- | --- | --- |
 | Rulespec Core | `RulespecCoreRelease`, schemas, generated types, validators, conformance fixtures | None | SpicyRegs, RefSpec, Rulespec Extrapolator, SpicySearch |
 | SpicyRegs | `DocumentRelease`, document versions, source renditions and text representations with Rulespec `Artifact` projections, passages with `SourceFragment` projections, source observations, rendition and observation capture events, source links, `LinkVerificationReceipt` records, acquisition coverage | Rulespec Core | Rulespec Extrapolator, SpicySearch |
-| RefSpec | `VocabularyRelease`, Rulespec `ReferenceResourceRelease` projection, concepts, labels, hierarchy, mappings, redirects, `SourceTermResolution` records and evidence, baseline-validation receipts, resolution policy, vocabulary coverage, and deterministic `VocabularyAtlasAsset` crosswalk and lookup files | Rulespec Core; each atlas asset also pins every input `VocabularyRelease`, candidate file, policy, implementation, and output digest | Rulespec Extrapolator, SpicySearch |
-| Rulespec Extrapolator | `ExtrapolationRelease`, evidence-bound assertions, assignments, agent- and baseline-validation receipts, `ExtrapolationSelectionReceipt` records, relationships, comparisons, extrapolation coverage | Rulespec Core, SpicyRegs releases, RefSpec releases | SpicySearch and downstream products |
+| RefSpec | Managed release distribution, Rulespec `ReferenceResourceRelease` projection, concepts, labels, hierarchy, mappings, redirects, `SourceTermResolution` records and evidence, baseline-validation receipts, resolution policy, vocabulary coverage, and deterministic `VocabularyAtlasAsset` crosswalk and lookup files | Rulespec Core; each atlas asset also pins every input managed release, closed crosswalk bundle, policy, implementation, runtime, and output digest | Rulespec Extrapolator, SpicySearch |
+| Rulespec Extrapolator | `ExtrapolationRelease`, evidence-bound assertions, assignments, agent- and baseline-validation receipts, `ExtrapolationSelectionReceipt` records, relationships, comparisons, extrapolation coverage | Rulespec Core, one SpicyRegs `DocumentRelease`, one RefSpec atlas triple, and one exact atlas-proven `ReferenceResourceRelease` | SpicySearch and downstream products |
 | SpicySearch | published `SearchSnapshot`, build receipt, index-coverage manifest, `SearchImportReceipt`, terminal `SearchRun` receipts, `SearchResultSet`, explanations, query coverage, feedback events, export manifest | Every indexed upstream release and policy version | Downstream products |
 
 Every published record carries a stable identifier and release identifier.
@@ -696,9 +719,9 @@ reference to content in a pinned release.
 A `SearchSnapshot` pins:
 
 - one or more SpicyRegs document releases;
-- each RefSpec vocabulary release used for filtering or expansion;
-- each RefSpec vocabulary-atlas asset used for cross-vocabulary expansion,
-  including its manifest digest and selected static-distribution digest;
+- each retained RefSpec vocabulary-atlas asset, including its asset ID,
+  manifest digest, and selected static-distribution digest; the atlas manifest
+  carries its exact managed-release inputs;
 - any Rulespec extrapolation release used for structured relationships;
 - each baseline-validation receipt used to qualify a candidate profile or
   semantic release;
@@ -1182,7 +1205,7 @@ SourceTermResolution
 
 Each SpicyRegs observation joins to exactly one resolution by the complete
 key. The same raw label in a different source field, profile, language, or
-declared context is a different key. This keeps `VocabularyRelease`
+declared context is a different key. This keeps the managed release
 independent of any one `DocumentRelease` while making every query-time
 resolution explicit and reproducible.
 
@@ -1437,9 +1460,9 @@ guide the move rather than describe it afterward.
 ### 3. Define and test release records
 
 - Release Rulespec Core schemas and fixtures without a RefSpec dependency.
-- Define `DocumentRelease`, `VocabularyRelease`, `VocabularyAtlasAsset`,
-  `ExtrapolationRelease`, and `SearchSnapshot` manifests and stable
-  identifiers.
+- Define `DocumentRelease`, the RefSpec managed-release and
+  `VocabularyAtlasAsset` file seams, `ExtrapolationRelease`, and
+  `SearchSnapshot` manifests and stable identifiers.
 - Define `SourceRendition`, `SourceRenditionCapture`, `TextRepresentation`,
   structural-passage, `SourceObservation`, and `SourceObservationCapture`
   records plus the
@@ -1538,9 +1561,9 @@ The split passes only when:
 - the release-artifact graph is acyclic;
 - Rulespec Core builds and releases with no RefSpec dependency;
 - a missing release, schema mismatch, or digest mismatch fails closed;
-- every `ExtrapolationRelease` references only the Rulespec Core,
-  `DocumentRelease`, and `VocabularyRelease` inputs it pins, and every
-  `SearchSnapshot` verifies that reference closure;
+- every `ExtrapolationRelease` pins exactly Rulespec Core, `DocumentRelease`,
+  the atlas triple, and the exact atlas-proven `ReferenceResourceRelease`, and
+  every `SearchSnapshot` verifies that reference closure;
 - every `VocabularyAtlasAsset` verifies its input releases, candidate file,
   selection policy, generator implementation, static output digests, mapping
   endpoints, graph counts, and declared counts;
@@ -1653,6 +1676,10 @@ The lightweight validation and feedback seam passes only when:
 - independent LLMs or subagents inspect only semantic support, ambiguity,
   overclaiming, user-facing limitations, and proposed edge cases, using the
   same sealed rubric and inputs without seeing another validator's response;
+- a usable baseline contains exactly two completed receipts that both
+  recommend `supports`, have only passing checks, and use distinct validator
+  actors, independence groups, provider/model identities, and response
+  artifacts;
 - every `AgentValidationReceipt.evidence_refs[]` resolves inside its sealed
   input manifest, and every required check has an explicit outcome;
 - a failed validator execution has no recommendation and is never treated as
@@ -1860,8 +1887,10 @@ already implemented:
 - The 2026-07-27 MVP decision already records the order `source -> segments ->
   concept assignments -> review -> publication`. This plan refines that
   unreleased sequence: search-only publication requires deterministic checks,
-  independent agent baseline validation, selection, and import, while human
-  review remains optional. It assigns the stages to separate products.
+  exactly two completed supporting machine receipts with passing checks and
+  distinct validator actors, independence groups, provider/model identities,
+  and response artifacts, followed by selection and import. Human review
+  remains optional. It assigns the stages to separate products.
 - `src/spicy_regs/corpora/document_acceptance_scope.py` defines a useful
   document-only classification, but production retrieval does not yet enforce
   it.
