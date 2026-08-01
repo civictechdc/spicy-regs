@@ -279,6 +279,17 @@ _DOCKET_LABEL_PREFIX = re.compile(
     re.IGNORECASE,
 )
 
+#: What a stripped label must have uncovered for the remainder to be identity:
+#: a Regulations.gov docket names its organization, then the year, then the
+#: sequence — "FAA-2026-3485", "AMS-SC-24-0046", "FDA-2011-N-0002",
+#: "OSHA-V05-2-2006-0785". The organization token opens on a letter, and that is
+#: the whole difference between reading "DHS Docket No. USCIS-2025-0004" and
+#: turning "MM Docket No. 98-213" into "98-213": a remainder that opens on a
+#: number is what the label was numbering, not an identifier hiding behind it.
+#: Measured on output/rin-ontology-revision-candidate, requiring the shape
+#: refuses 5,214 of the 5,506 mutilated references and costs no real docket.
+_REGSGOV_DOCKET_SHAPE = re.compile(r"[A-Z][A-Z0-9]*(?:[-_][A-Z0-9]+)*[-_]\d{2}(?:\d{2})?(?:[-_][A-Z0-9]+)*[-_]\d+")
+
 
 def normalize_docket_reference(reference: object) -> str | None:
     """Return the Regulations.gov docket identifier a reference states, if any.
@@ -290,15 +301,25 @@ def normalize_docket_reference(reference: object) -> str | None:
     identifier being read. Only a value the scheme cannot express is offered to
     the label rule, and only then is the remainder validated.
 
+    Validating the remainder is stricter than validating the stated value: a
+    label may only uncover a docket, never manufacture one, so the remainder has
+    to look like a docket id (:data:`_REGSGOV_DOCKET_SHAPE`) and not merely like
+    something the scheme could spell. Otherwise "MM Docket No. 98-213" publishes
+    the FCC proceeding number "98-213" as a Regulations.gov docket.
+
     ``None`` means the reference names no Regulations.gov docket — a refusal,
     not a repair. Callers quarantine it; nothing here invents a match.
     """
     stated = str(reference or "").strip()
     if not stated:
         return None
-    return normalize_regsgov_identifier(stated) or normalize_regsgov_identifier(
-        _DOCKET_LABEL_PREFIX.sub("", stated, count=1)
-    )
+    direct = normalize_regsgov_identifier(stated)
+    if direct is not None:
+        return direct
+    uncovered = normalize_regsgov_identifier(_DOCKET_LABEL_PREFIX.sub("", stated, count=1))
+    if uncovered is None or not _REGSGOV_DOCKET_SHAPE.fullmatch(uncovered):
+        return None
+    return uncovered
 
 
 def canonical_regsgov_iri(identifier: object) -> str:

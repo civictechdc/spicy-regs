@@ -318,10 +318,51 @@ def test_regulations_gov_identifier_normalization_matches_repaired_grammar():
         ("EPA HQ OAR 2021 0317", None),
         ("", None),
         (None, None),
+        # Measured on output/rin-ontology-revision-candidate: the label that
+        # names its department first still uncovers the docket dockets.parquet
+        # carries, and a docket-type letter between the year and the sequence
+        # (FDA's busiest docket, 144 references) is part of the identifier.
+        ("DOT Docket No. DOT-OST-2010-0074", "DOT-OST-2010-0074"),
+        ("FHWA Docket No. FHWA-2005-23112", "FHWA-2005-23112"),
+        ("CPSC Docket No. CPSC-2010-0075", "CPSC-2010-0075"),
+        ("Docket No. FDA-2011-N-0002", "FDA-2011-N-0002"),
+        ("Docket No. FSIS-2025-0012", "FSIS-2025-0012"),
+        ("Docket No. PHMSA-2025-0118", "PHMSA-2025-0118"),
+        ("Docket No. OSHA-V05-2-2006-0785", "OSHA-V05-2-2006-0785"),
     ],
 )
 def test_the_docket_label_is_presentation_and_the_identifier_survives_it(stated, expected):
     assert normalize_docket_reference(stated) == expected
+
+
+@pytest.mark.parametrize(
+    ("stated", "fragment"),
+    [
+        # Every string below is a reference measured on
+        # output/rin-ontology-revision-candidate, beside the docket-number
+        # fragment the label rule alone would have published for it. Stripping
+        # the label uncovered no identifier there — it exposed the number the
+        # label was numbering, and that number is not a Regulations.gov docket.
+        ("MM Docket No. 98-213", "98-213"),
+        ("WT Docket No. 17-17", "17-17"),
+        ("Docket No. 17-17", "17-17"),
+        ("EOIR Docket No. 176", "176"),
+        ("FE Docket No. 96-99-LNG", "96-99-LNG"),
+        ("CPSC Docket No. 08-C0004", "08-C0004"),
+    ],
+)
+def test_a_stripped_label_may_uncover_a_docket_but_never_manufacture_one(stated, fragment):
+    """Regression: 5,506 references were mutilated into docket-number fragments.
+
+    Measured on ``output/rin-ontology-revision-candidate``, the leading agency
+    token added by bfc9f8e turned 5,506 distinct non-regulations.gov references
+    into bare numbers against 1,011 real recoveries. What the fragments have in
+    common is that they do not name an organization: a Regulations.gov docket
+    id states organization, year, then sequence, so a remainder that opens on a
+    number is the label's subject matter, not an identifier hiding behind it.
+    """
+    assert normalize_regsgov_identifier(fragment) == fragment, "the fragment is what the scheme would have accepted"
+    assert normalize_docket_reference(stated) is None
 
 
 @pytest.mark.parametrize(
