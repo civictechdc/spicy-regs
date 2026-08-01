@@ -82,8 +82,14 @@ def text_digest(*parts: object) -> str:
 
 
 def canonical_json(value: object) -> str:
-    """Serialize JSON deterministically for stable ids, comparisons, and Parquet."""
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    """Serialize JSON deterministically for stable ids, comparisons, and Parquet.
+
+    ``allow_nan=False`` because the default spells NaN and the infinities as
+    ``NaN``/``Infinity``, which no JSON reader accepts: a digest taken over that
+    text is stable and the artifact it describes is unparseable. Raising says so
+    where the value enters, instead of in whatever reads the column back.
+    """
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
 
 @dataclass
