@@ -47,14 +47,12 @@ import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:
-    from refspec.registry import ConceptDomainBridge
-
-    from spicy_regs.enrichment.managed_release import (
-        ManagedReleaseCandidateSource,
-    )
+from spicy_regs.candidate_release import (
+    CandidateConceptBridge,
+    CandidateReleaseSource,
+)
 
 from spicy_regs.docpipeline.source import (
     SourceArtifact,
@@ -176,12 +174,12 @@ MODEL_USAGE_ELIGIBILITY = "rkaf:reviewQueueOnly"
 #: Records re-serialized from published spicy-regs tables.
 DETERMINISTIC_USAGE_ELIGIBILITY = "rkaf:localOperationalUse"
 
-PROJECTION_SCHEMA_VERSION = "rkaf-document-projection-v1"
+PROJECTION_SCHEMA_VERSION = "rkaf-document-projection-v2"
 
-#: This path emits diagnostic candidates for review. It does not accept the
-#: RefSpec authorization records needed to publish accepted enrichment output.
-REFSPEC_AUTHORIZATION_STATE = "notEvaluated"
-REFSPEC_OUTPUT_MODE = "diagnosticReviewQueue"
+#: This path emits diagnostic candidates for review. A selected atlas is an
+#: input, not an accepted-output or deployment decision.
+CANDIDATE_SELECTION_STATE = "notConfigured"
+CANDIDATE_OUTPUT_MODE = "diagnosticReviewQueue"
 
 _RULESPEC_VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$")
 _RULESPEC_REVISION_PATTERN = re.compile(r"^[0-9a-f]{40}$")
@@ -1034,7 +1032,7 @@ class ModelLayer:
     judgments: tuple[ConceptJudgment, ...]
     rejections: tuple[Mapping[str, Any], ...]
     call_count: int
-    candidate_permission: Mapping[str, Any] | None = None
+    candidate_selection_receipt: Mapping[str, Any] | None = None
     concept_domain_mapping_sha256: str | None = None
     candidate_selection_sha256: str = ""
     candidate_selection_ledger: tuple[Mapping[str, Any], ...] = ()
@@ -1147,7 +1145,7 @@ def verify_candidate_rows(
             rejections.append(
                 {
                     **base,
-                    "reason": "assignment_role_not_authorized",
+                    "reason": "assignment_role_not_selected",
                 }
             )
             continue
@@ -1802,7 +1800,11 @@ def assemble(
         )
 
     document = {"@context": settings.context_ref, "@graph": graph}
-    candidate_permission = model_layer.candidate_permission if model_layer is not None else None
+    candidate_selection = (
+        model_layer.candidate_selection_receipt
+        if model_layer is not None
+        else None
+    )
     run_record = {
         "schema_version": PROJECTION_SCHEMA_VERSION,
         "generated_at": context.asserted_at,
@@ -1835,19 +1837,20 @@ def assemble(
             "emit_profile_edge_projections": EMIT_PROFILE_EDGE_PROJECTIONS,
             "model_attestation_decision": MODEL_ATTESTATION_DECISION,
         },
-        "refspec_authorization": {
-            "state": ("candidateUseAuthorized" if candidate_permission is not None else REFSPEC_AUTHORIZATION_STATE),
-            "mode": REFSPEC_OUTPUT_MODE,
-            "output_profile": (candidate_permission["outputProfile"] if candidate_permission is not None else None),
-            "coverage_report": (candidate_permission["coverageReport"] if candidate_permission is not None else None),
-            "configuration": None,
-            "evaluation_result": None,
-            "deployment_decision": (
-                candidate_permission["registryDeployment"] if candidate_permission is not None else None
+        "candidate_selection": {
+            "state": (
+                "configured"
+                if candidate_selection is not None
+                else CANDIDATE_SELECTION_STATE
             ),
-            "candidate_use_authorized": (candidate_permission is not None),
+            "mode": CANDIDATE_OUTPUT_MODE,
+            "receipt": candidate_selection,
             "accepted_output_authorized": False,
-            "usage_ceiling": ("candidateUseOnly" if candidate_permission is not None else MODEL_USAGE_ELIGIBILITY),
+            "usage_ceiling": (
+                "diagnosticCandidateOnly"
+                if candidate_selection is not None
+                else MODEL_USAGE_ELIGIBILITY
+            ),
         },
         "deterministic": {
             "fragments": [
@@ -1880,25 +1883,22 @@ def assemble(
             )
             + (
                 [
-                    "The selected RefSpec OutputProfile, import coverage, and "
-                    "registry deployment authorize candidate use only. No "
-                    "evaluated configuration or enrichment deployment grants "
-                    "accepted-output use."
+                    "The selected vocabulary asset, exact reference release, "
+                    "facet, assignment role, route, and local lookup index are "
+                    "recorded as diagnostic candidate inputs. They grant no "
+                    "accepted-output or deployment authority."
                 ]
-                if candidate_permission is not None
+                if candidate_selection is not None
                 else [
-                    "No RefSpec OutputProfile, coverage report, evaluated "
-                    "configuration, or deployment decision was supplied. Model "
-                    "results are diagnostic review-queue candidates only and "
-                    "cannot enter accepted output."
+                    "No published candidate source was selected. Model results "
+                    "are diagnostic review-queue candidates only and cannot "
+                    "enter accepted output."
                 ]
             )
         ),
         "offset_verification": transcript,
         "node_count": len(graph),
     }
-    if candidate_permission is not None:
-        run_record["refspec_authorization"]["candidate_permission"] = candidate_permission
     if model_layer is not None:
         run_record["model"] = {
             "model_id": model_layer.model_id,
@@ -1962,15 +1962,12 @@ _RELATION_PROPERTY = {
 
 
 def _language_tag(value: object, *, label: str) -> str:
-    from refspec import (
-        ReferenceRuntimeError,
-        require_language_tag,
-    )
-
-    try:
-        return require_language_tag(value, label)
-    except ReferenceRuntimeError as error:
-        raise ProjectionError(str(error)) from error
+    if not isinstance(value, str) or not value.strip():
+        raise ProjectionError(f"{label} is required")
+    tag = value.strip()
+    if tag == "@none":
+        raise ProjectionError(f"{label} must name a language")
+    return tag
 
 
 def _language_map(
@@ -2049,36 +2046,39 @@ def _rows_digest(
     return hashlib.sha256(canonical_json(inventory).encode("utf-8")).hexdigest()
 
 
-def managed_release_candidate_vocabulary(
-    source: "ManagedReleaseCandidateSource",
+def candidate_release_vocabulary(
+    source: "CandidateReleaseSource",
     *,
     default_language: str,
-    concept_domain_bridges: Sequence["ConceptDomainBridge"] = (),
+    concept_domain_bridges: Sequence["CandidateConceptBridge"] = (),
 ) -> NormalizedVocabulary:
-    """Build an output view plus optional RefSpec-owned search anchors."""
+    """Build a diagnostic lookup view from a product-local release reader."""
 
-    from refspec.registry import ConceptDomainBridge
-    from spicy_regs.enrichment.managed_release import (
-        ManagedReleaseCandidateSource,
-    )
-
-    if not isinstance(source, ManagedReleaseCandidateSource):
-        raise ProjectionError("managed candidate lookup requires ManagedReleaseCandidateSource")
-    if source.usage_ceiling != "candidateUseOnly":
-        raise ProjectionError("managed release source must retain the candidateUseOnly ceiling")
+    if not isinstance(source, CandidateReleaseSource):
+        raise ProjectionError(
+            "candidate lookup requires a CandidateReleaseSource"
+        )
+    if source.usage_ceiling not in {
+        "diagnosticCandidateOnly",
+        "candidateUseOnly",  # Explicit managed-release compatibility path.
+    }:
+        raise ProjectionError(
+            "candidate source must retain a diagnostic-only usage ceiling"
+        )
     default_language = _language_tag(
         default_language,
         label="vocabulary_default_language",
     )
-    permission_facet = source.candidate_permission.facet_iri
+    selection = source.candidate_selection
+    configured_facet = selection.facet_iri
     selector_facets = {
         "urn:ref:facet:general-subject": "subject",
     }
     try:
-        selector_facet = selector_facets[permission_facet]
+        selector_facet = selector_facets[configured_facet]
     except KeyError as error:
         raise ProjectionError(
-            f"Spicy has no lookup adapter for authorized RefSpec facet {permission_facet!r}"
+            f"SpicyRegs has no lookup adapter for configured facet {configured_facet!r}"
         ) from error
 
     property_roles = {
@@ -2113,12 +2113,16 @@ def managed_release_candidate_vocabulary(
     for member_iri, roles in sorted(expressions_by_member.items()):
         member = source.lookup_member(member_iri)
         if member is None:
-            raise ProjectionError(f"managed expression member {member_iri!r} is not in the exact release")
+            raise ProjectionError(
+                f"candidate expression member {member_iri!r} is not in the exact release"
+            )
         preferred_values = roles.get("preferred", {})
         if not preferred_values:
             continue
         if any(len(values) != 1 for values in preferred_values.values()):
-            raise ProjectionError(f"{member_iri}: managed release must carry one preferred label per language")
+            raise ProjectionError(
+                f"{member_iri}: candidate source must carry one preferred label per language"
+            )
         preferred = {language: values[0] for language, values in sorted(preferred_values.items())}
         alternate = _one_or_many_map(roles.get("alternate", {}))
         hidden = _one_or_many_map(roles.get("hidden", {}))
@@ -2165,16 +2169,18 @@ def managed_release_candidate_vocabulary(
         concept_nodes.append(member.record)
 
     if not concepts:
-        raise ProjectionError("managed release has no language-tagged preferred-label candidates")
+        raise ProjectionError(
+            "candidate source has no language-tagged preferred-label candidates"
+        )
     lookup_rows = list(selector_rows)
     candidate_mappings: list[Any] = []
     mapping_artifact_sha256_by_id: dict[str, str] = {}
     bridge_pins: list[dict[str, Any]] = []
     lookup_ids = {str(row["concept_id"]) for row in lookup_rows}
     for bridge in concept_domain_bridges:
-        if not isinstance(bridge, ConceptDomainBridge):
+        if not isinstance(bridge, CandidateConceptBridge):
             raise ProjectionError(
-                "concept-domain lookup requires a RefSpec ConceptDomainBridge"
+                "concept-domain lookup requires a CandidateConceptBridge"
             )
         if not bridge.development_only:
             raise ProjectionError(
@@ -2188,7 +2194,7 @@ def managed_release_candidate_vocabulary(
             ):
                 raise ProjectionError(
                     f"mapping {mapping.mapping_iri!r} does not target the "
-                    "authorized managed release"
+                    "selected candidate release"
                 )
         for anchor in bridge.source_concepts:
             if anchor.concept_iri in lookup_ids:
@@ -2280,10 +2286,15 @@ def managed_release_candidate_vocabulary(
         else None
     )
     content_identity = {
-        "expressionCorpusSnapshot": dict(source.expression_corpus_snapshot),
+        "sourceAsset": dict(selection.source_asset),
+        "referenceResourceRelease": dict(
+            selection.reference_resource_release
+        ),
         "lookupIndexManifest": dict(source.lookup_index_manifest),
         "defaultLanguage": default_language,
-        "permissionFacet": permission_facet,
+        "facet": configured_facet,
+        "assignmentRole": selection.assignment_role_iri,
+        "resourceRoute": selection.resource_route,
         "selectorFacet": selector_facet,
         "conceptDomainBridges": bridge_pins,
         "mappingSha256": mapping_sha256,
@@ -2301,6 +2312,10 @@ def managed_release_candidate_vocabulary(
         mapping_sha256=mapping_sha256,
         default_language=default_language,
     )
+
+
+# Pre-atlas name retained for explicit compatibility callers.
+managed_release_candidate_vocabulary = candidate_release_vocabulary
 
 
 def load_migration_normalized_vocabulary_directory(
@@ -2625,29 +2640,40 @@ def run_migration_model_layer(
     )
 
 
-def run_managed_release_model_layer(
+def run_candidate_release_model_layer(
     artifact: SourceArtifact,
     *,
     model: Any,
-    candidate_source: "ManagedReleaseCandidateSource",
+    candidate_source: "CandidateReleaseSource",
     vocabulary_default_language: str,
     run_directory: Path,
     evidence_field: str,
     artifact_iri: str,
     prompt_concept_limit: int = 12,
     max_segments: int = 0,
-    concept_domain_bridges: Sequence["ConceptDomainBridge"] = (),
+    concept_domain_bridges: Sequence["CandidateConceptBridge"] = (),
 ) -> ModelLayer:
-    """Run candidate lookup only through a verified managed-release source."""
+    """Run lookup through an exact, diagnostic-only candidate source."""
 
-    vocabulary = managed_release_candidate_vocabulary(
+    if (
+        candidate_source.candidate_selection.source_asset.get("type")
+        == "VocabularyAtlasAsset"
+        and concept_domain_bridges
+    ):
+        raise ProjectionError(
+            "atlas candidate lookup does not consume legacy mapping bridges"
+        )
+
+    vocabulary = candidate_release_vocabulary(
         candidate_source,
         default_language=vocabulary_default_language,
         concept_domain_bridges=concept_domain_bridges,
     )
     selector_facets = {str(row["facet"]) for row in vocabulary.selector_rows}
     if len(selector_facets) != 1:
-        raise ProjectionError("managed release must resolve to one Spicy selector facet")
+        raise ProjectionError(
+            "candidate source must resolve to one Spicy selector facet"
+        )
     return _run_model_layer_with_vocabulary(
         artifact,
         model=model,
@@ -2658,26 +2684,14 @@ def run_managed_release_model_layer(
         prompt_concept_limit=prompt_concept_limit,
         max_segments=max_segments,
         allowed_facets=tuple(selector_facets),
-        allowed_assignment_role_iris=(candidate_source.candidate_permission.assignment_role_iri,),
-        candidate_permission={
-            "facet": candidate_source.candidate_permission.facet_iri,
-            "assignmentRole": candidate_source.candidate_permission.assignment_role_iri,
-            "resourceRoute": candidate_source.candidate_permission.resource_route,
-            "referenceResourceRelease": dict(candidate_source.candidate_permission.reference_resource_release),
-            "registryImportSnapshot": dict(candidate_source.candidate_permission.registry_import_snapshot),
-            "outputProfile": {
-                "id": candidate_source.candidate_permission.output_profile["id"],
-                "version": candidate_source.candidate_permission.output_profile["version"],
-                "digest": candidate_source.candidate_permission.output_profile["contentDigest"],
-            },
-            "coverageReport": {
-                "id": candidate_source.candidate_permission.coverage_report["id"],
-                "digest": candidate_source.candidate_permission.coverage_report["canonicalPayloadDigest"],
-            },
-            "registryDeployment": {
-                "id": candidate_source.candidate_permission.registry_deployment["id"],
-                "digest": candidate_source.candidate_permission.registry_deployment["canonicalPayloadDigest"],
-            },
+        allowed_assignment_role_iris=(
+            candidate_source.candidate_selection.assignment_role_iri,
+        ),
+        candidate_selection_receipt={
+            **candidate_source.candidate_selection.to_dict(),
+            "lookupIndexManifest": dict(
+                candidate_source.lookup_index_manifest
+            ),
         },
     )
 
@@ -2694,7 +2708,7 @@ def _run_model_layer_with_vocabulary(
     max_segments: int = 0,
     allowed_facets: Sequence[str] = ("subject",),
     allowed_assignment_role_iris: Sequence[str] | None = None,
-    candidate_permission: Mapping[str, Any] | None = None,
+    candidate_selection_receipt: Mapping[str, Any] | None = None,
 ) -> ModelLayer:
     """Ask the model for concept judgments and verify every one of them.
 
@@ -2705,10 +2719,9 @@ def _run_model_layer_with_vocabulary(
     prompt or the schema is redefined here.
 
     This function has no accepted-output mode. It produces Rulespec
-    ``reviewQueueOnly`` candidates for diagnostic review. A separate caller
-    must use the RefSpec reference runtime to validate an exact
-    ``OutputProfile``, coverage report, configuration, evaluation result, and
-    deployment decision before any later accepted output.
+    ``reviewQueueOnly`` candidates for diagnostic review. The selected
+    vocabulary files and local lookup settings are recorded as inputs; they do
+    not authorize accepted output or deployment.
     """
     from spicy_regs.docpipeline.extraction import (
         extraction_plan_facts,
@@ -2787,7 +2800,7 @@ def _run_model_layer_with_vocabulary(
             concept = vocabulary.concepts.get(concept_id)
             if concept is None:
                 raise ProjectionError(
-                    f"candidate selector returned unauthorized concept "
+                    f"candidate selector returned an unselected concept "
                     f"{concept_id!r}"
                 )
             raw_paths = candidate.get("mapping_paths")
@@ -3029,7 +3042,7 @@ def _run_model_layer_with_vocabulary(
         judgments=tuple(judgments),
         rejections=tuple(rejections),
         call_count=len(units),
-        candidate_permission=candidate_permission,
+        candidate_selection_receipt=candidate_selection_receipt,
         concept_domain_mapping_sha256=vocabulary.mapping_sha256,
         candidate_selection_sha256=candidate_selection_sha256,
         candidate_selection_ledger=tuple(
@@ -3047,42 +3060,58 @@ def project_document(
     settings: ProjectionSettings,
     model: Any = None,
     model_run_directory: Path | None = None,
-    managed_release_source: "ManagedReleaseCandidateSource | None" = None,
-    concept_domain_bridges: Sequence["ConceptDomainBridge"] = (),
+    candidate_release_source: CandidateReleaseSource | None = None,
+    # Pre-atlas keyword retained for explicit compatibility callers.
+    managed_release_source: CandidateReleaseSource | None = None,
+    concept_domain_bridges: Sequence[CandidateConceptBridge] = (),
 ) -> ProjectionResult:
     """Project one document into RKAF diagnostic output.
 
     Model judgments never leave ``reviewQueueOnly`` on this path. This
-    function deliberately has no accepted-output option; RefSpec authorization
-    belongs to the separate reference-runtime decision chain.
+    function deliberately has no accepted-output option.
     """
+    if (
+        candidate_release_source is not None
+        and managed_release_source is not None
+    ):
+        raise ProjectionError(
+            "choose either candidate_release_source or the legacy "
+            "managed_release_source keyword"
+        )
+    selected_candidate_source = (
+        candidate_release_source
+        if candidate_release_source is not None
+        else managed_release_source
+    )
+
     artifact, row = load_artifact(profile_id, subject_id, corpus_dir=settings.corpus_dir)
     tables = PublishedTables(settings.tables_dir)
     facts = build_profile_facts(artifact, row, tables=tables, partner=settings.partner)
     model_layer: ModelLayer | None = None
     if model is not None:
-        if concept_domain_bridges and managed_release_source is None:
+        if concept_domain_bridges and selected_candidate_source is None:
             raise ProjectionError(
-                "concept_domain_bridges require a managed-release "
+                "concept_domain_bridges require a legacy managed-release "
                 "candidate source"
             )
-        if managed_release_source is not None and settings.migration_vocabulary_directory is not None:
+        if selected_candidate_source is not None and settings.migration_vocabulary_directory is not None:
             raise ProjectionError(
-                "choose either the managed-release candidate source or the migration-only vocabulary directory"
+                "choose either a published candidate source or the "
+                "migration-only vocabulary directory"
             )
-        if managed_release_source is None and settings.migration_vocabulary_directory is None:
+        if selected_candidate_source is None and settings.migration_vocabulary_directory is None:
             raise ProjectionError(
-                "the model layer needs a managed-release candidate source or "
+                "the model layer needs a published candidate source or "
                 "an explicitly migration-only normalized candidate "
                 "vocabulary directory"
             )
         if model_run_directory is None:
             raise ProjectionError("the model layer needs a run directory for provider custody")
-        if managed_release_source is not None:
-            model_layer = run_managed_release_model_layer(
+        if selected_candidate_source is not None:
+            model_layer = run_candidate_release_model_layer(
                 artifact,
                 model=model,
-                candidate_source=managed_release_source,
+                candidate_source=selected_candidate_source,
                 vocabulary_default_language=(settings.vocabulary_default_language),
                 run_directory=model_run_directory,
                 evidence_field=facts.evidence_field,
@@ -3105,9 +3134,9 @@ def project_document(
                 prompt_concept_limit=settings.prompt_concept_limit,
                 max_segments=settings.max_segments,
             )
-    elif managed_release_source is not None or concept_domain_bridges:
+    elif selected_candidate_source is not None or concept_domain_bridges:
         raise ProjectionError(
-            "managed_release_source and concept_domain_bridges are only "
+            "candidate sources and concept_domain_bridges are only "
             "used by the diagnostic model layer"
         )
     return assemble(artifact, facts, settings=settings, model_layer=model_layer)

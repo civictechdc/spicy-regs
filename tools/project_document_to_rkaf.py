@@ -12,7 +12,12 @@ Deterministic layer only:
 With the model layer (concept assignments only; identity stays deterministic):
 
     python3 tools/project_document_to_rkaf.py ... \
-        --migration-vocabulary-dir output/normalized-vocabulary-v1 \
+        --vocabulary-atlas-manifest published/atlas-manifest.json \
+        --vocabulary-atlas-asset-id urn:ref:vocabulary-atlas:<generation> \
+        --vocabulary-atlas-manifest-digest sha256:<manifest> \
+        --vocabulary-atlas-output-digest sha256:<nquads> \
+        --vocabulary-reference-release-id <release-iri> \
+        --vocabulary-reference-release-digest sha256:<release> \
         --provider openai --model gpt-5.6-sol
 
 Writes ``<output-dir>/<slug>.rulespec.jsonld``, ``projection-run.json``,
@@ -42,29 +47,24 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from refspec import ManagedReleaseError  # noqa: E402
-from refspec.registry import (  # noqa: E402
-    ConceptDomainBridgeError,
-    load_concept_domain_bridge,
+from spicy_regs.candidate_release import (  # noqa: E402
+    CandidateReleaseError,
+    VocabularyAtlasCandidateSource,
 )
 from spicy_regs.docpipeline.rkaf_projection import (  # noqa: E402
     ProjectionError,
     ProjectionSettings,
     project_document,
 )
-from spicy_regs.enrichment import (  # noqa: E402
-    ManagedReleaseCandidateSource,
-    ManagedReleaseConsumerError,
-)
 
 DEFAULT_CORPUS_DIR = REPO_ROOT / "output" / "segmented-real-data-evaluation-v2"
 DEFAULT_TABLES_DIR = REPO_ROOT / "output" / "rulespec-stabilization-candidate-final"
 CONTEXT_NAME = "rkaf-context.jsonld"
-DEFAULT_MANAGED_RELEASE_FACET = "urn:ref:facet:general-subject"
-DEFAULT_MANAGED_RELEASE_ASSIGNMENT_ROLE = (
+DEFAULT_CANDIDATE_FACET = "urn:ref:facet:general-subject"
+DEFAULT_CANDIDATE_ASSIGNMENT_ROLE = (
     "https://rulespec.org/ns/v1#assignmentPrimary"
 )
-DEFAULT_MANAGED_RELEASE_RESOURCE_ROUTE = "document"
+DEFAULT_CANDIDATE_RESOURCE_ROUTE = "document"
 
 
 def _slug(value: str) -> str:
@@ -114,10 +114,138 @@ def _managed_lookup_index_manifest(
     }
 
 
+def _atlas_lookup_index_manifest(
+    *,
+    asset_id: str,
+    manifest_digest: str,
+    output_digest: str,
+    reference_release_id: str,
+    reference_release_digest: str,
+    facet_iri: str,
+    assignment_role_iri: str,
+    resource_route: str,
+    default_language: str,
+) -> dict[str, str]:
+    """Pin the local lookup view to every atlas selection input."""
+
+    identity = {
+        "schemaVersion": "spicy-regs-atlas-candidate-lookup-index/v1",
+        "sourceAsset": {
+            "type": "VocabularyAtlasAsset",
+            "assetId": asset_id,
+            "manifestDigest": manifest_digest,
+            "outputDigest": output_digest,
+        },
+        "referenceResourceRelease": {
+            "id": reference_release_id,
+            "digest": reference_release_digest,
+        },
+        "selection": {
+            "facet": facet_iri,
+            "assignmentRole": assignment_role_iri,
+            "resourceRoute": resource_route,
+        },
+        "defaultLanguage": default_language,
+    }
+    encoded = json.dumps(
+        identity,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    digest = "sha256:" + hashlib.sha256(encoded).hexdigest()
+    return {
+        "id": "urn:spicy-regs:lookup-index:" + digest.removeprefix("sha256:"),
+        "digest": digest,
+    }
+
+
+def _open_legacy_candidate_source(
+    args: argparse.Namespace,
+    *,
+    lookup_index_manifest: dict[str, str],
+) -> tuple[Any, tuple[Any, ...]]:
+    """Open the explicitly selected pre-atlas compatibility path lazily."""
+
+    from refspec import ManagedReleaseError
+    from refspec.registry import (
+        ConceptDomainBridgeError,
+        load_concept_domain_bridge,
+    )
+    from spicy_regs.enrichment.managed_release import (
+        ManagedReleaseCandidateSource,
+        ManagedReleaseConsumerError,
+    )
+
+    try:
+        source = ManagedReleaseCandidateSource.open(
+            args.managed_release_manifest,
+            expected_manifest_digest=(
+                args.managed_release_manifest_digest
+            ),
+            lookup_index_manifest=lookup_index_manifest,
+            permission_facet_iri=(
+                args.managed_release_permission_facet
+            ),
+            permission_assignment_role_iri=(
+                args.managed_release_permission_assignment_role
+            ),
+            permission_resource_route=(
+                args.managed_release_permission_resource_route
+            ),
+        )
+        bridges = ()
+        if args.concept_domain_bridge is not None:
+            bridges = (
+                load_concept_domain_bridge(
+                    args.concept_domain_bridge,
+                    expected_sha256=args.concept_domain_bridge_digest,
+                    target_view=source.view,
+                ),
+            )
+        return source, bridges
+    except (
+        ConceptDomainBridgeError,
+        ManagedReleaseConsumerError,
+        ManagedReleaseError,
+    ) as error:
+        raise CandidateReleaseError(str(error)) from error
+
+
 def _validate_vocabulary_arguments(
     args: argparse.Namespace,
     parser: argparse.ArgumentParser,
 ) -> None:
+    atlas_values = {
+        "--vocabulary-atlas-manifest": args.vocabulary_atlas_manifest,
+        "--vocabulary-atlas-asset-id": args.vocabulary_atlas_asset_id,
+        "--vocabulary-atlas-manifest-digest": (
+            args.vocabulary_atlas_manifest_digest
+        ),
+        "--vocabulary-atlas-output-digest": (
+            args.vocabulary_atlas_output_digest
+        ),
+        "--vocabulary-reference-release-id": (
+            args.vocabulary_reference_release_id
+        ),
+        "--vocabulary-reference-release-digest": (
+            args.vocabulary_reference_release_digest
+        ),
+    }
+    supplied_atlas_values = {
+        option for option, value in atlas_values.items() if value is not None
+    }
+    if supplied_atlas_values and len(supplied_atlas_values) != len(atlas_values):
+        missing = sorted(set(atlas_values) - supplied_atlas_values)
+        parser.error(
+            "atlas candidate lookup requires " + ", ".join(missing)
+        )
+    atlas_present = bool(supplied_atlas_values)
+    if args.vocabulary_atlas_nquads is not None and not atlas_present:
+        parser.error(
+            "--vocabulary-atlas-nquads requires --vocabulary-atlas-manifest"
+        )
+
     managed_manifest_present = (
         args.managed_release_manifest is not None
     )
@@ -148,16 +276,24 @@ def _validate_vocabulary_arguments(
         args.migration_vocabulary_dir is not None
         or args.migration_vocabulary_manifest is not None
     )
-    if managed_manifest_present and migration_present:
+    selected_modes = sum(
+        (atlas_present, managed_manifest_present, migration_present)
+    )
+    if selected_modes > 1:
         parser.error(
-            "choose either the managed release or the migration-only "
-            "vocabulary, not both"
+            "choose one candidate source: vocabulary atlas, legacy managed "
+            "release, or migration-only vocabulary"
+        )
+    if atlas_present and bridge_path_present:
+        parser.error(
+            "--concept-domain-bridge is available only with the legacy "
+            "managed-release compatibility path"
         )
     if args.no_model and (
-        managed_manifest_present or bridge_path_present
+        atlas_present or managed_manifest_present or bridge_path_present
     ):
         parser.error(
-            "managed releases and concept-domain bridges are used only by "
+            "candidate sources and concept-domain bridges are used only by "
             "the diagnostic model layer; remove --no-model"
         )
 
@@ -236,6 +372,71 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model", default=None, help="Provider model id; defaults to the arm's pinned model.")
     parser.add_argument("--compat-provider", default="", help="Named profile for --provider openai-compatible.")
     parser.add_argument(
+        "--vocabulary-atlas-manifest",
+        type=Path,
+        default=None,
+        help=(
+            "Published atlas-manifest.json for file-only diagnostic candidate "
+            "lookup. Requires the asset, manifest, output, and reference-release "
+            "pins below."
+        ),
+    )
+    parser.add_argument(
+        "--vocabulary-atlas-nquads",
+        type=Path,
+        default=None,
+        help="Published atlas.nq; defaults to the manifest's sibling atlas.nq.",
+    )
+    parser.add_argument(
+        "--vocabulary-atlas-asset-id",
+        default=None,
+        help="Exact urn:ref:vocabulary-atlas:<generation hex> asset id.",
+    )
+    parser.add_argument(
+        "--vocabulary-atlas-manifest-digest",
+        default=None,
+        help="Exact sha256:<64 lowercase hex> manifest file digest.",
+    )
+    parser.add_argument(
+        "--vocabulary-atlas-output-digest",
+        default=None,
+        help="Exact sha256:<64 lowercase hex> atlas.nq file digest.",
+    )
+    parser.add_argument(
+        "--vocabulary-reference-release-id",
+        default=None,
+        help="Exact ReferenceResourceRelease selected for candidates.",
+    )
+    parser.add_argument(
+        "--vocabulary-reference-release-digest",
+        default=None,
+        help="Exact sha256:<64 lowercase hex> digest of the selected release.",
+    )
+    parser.add_argument(
+        "--candidate-facet",
+        default=DEFAULT_CANDIDATE_FACET,
+        help=(
+            "SpicyRegs-local facet for candidate selection "
+            f"(default: {DEFAULT_CANDIDATE_FACET})."
+        ),
+    )
+    parser.add_argument(
+        "--candidate-assignment-role",
+        default=DEFAULT_CANDIDATE_ASSIGNMENT_ROLE,
+        help=(
+            "SpicyRegs-local Rulespec assignment role for candidates "
+            f"(default: {DEFAULT_CANDIDATE_ASSIGNMENT_ROLE})."
+        ),
+    )
+    parser.add_argument(
+        "--candidate-resource-route",
+        default=DEFAULT_CANDIDATE_RESOURCE_ROUTE,
+        help=(
+            "SpicyRegs-local resource route for candidates "
+            f"(default: {DEFAULT_CANDIDATE_RESOURCE_ROUTE})."
+        ),
+    )
+    parser.add_argument(
         "--migration-vocabulary-dir",
         type=Path,
         default=None,
@@ -259,9 +460,8 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         default=None,
         help=(
-            "Exact RefSpec managed-release bundle manifest for candidate "
-            "lookup. Requires its digest; permission selectors have "
-            "candidate-only defaults below."
+            "Legacy compatibility: exact RefSpec managed-release bundle "
+            "manifest for candidate lookup. Requires its digest."
         ),
     )
     parser.add_argument(
@@ -274,26 +474,26 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--managed-release-permission-facet",
-        default=DEFAULT_MANAGED_RELEASE_FACET,
+        default=DEFAULT_CANDIDATE_FACET,
         help=(
-            "Exact RefSpec facet IRI authorized for candidate use "
-            f"(default: {DEFAULT_MANAGED_RELEASE_FACET})."
+            "Legacy managed-release facet IRI "
+            f"(default: {DEFAULT_CANDIDATE_FACET})."
         ),
     )
     parser.add_argument(
         "--managed-release-permission-assignment-role",
-        default=DEFAULT_MANAGED_RELEASE_ASSIGNMENT_ROLE,
+        default=DEFAULT_CANDIDATE_ASSIGNMENT_ROLE,
         help=(
-            "Exact Rulespec assignment-role IRI authorized for candidate use "
-            f"(default: {DEFAULT_MANAGED_RELEASE_ASSIGNMENT_ROLE})."
+            "Legacy managed-release Rulespec assignment-role IRI "
+            f"(default: {DEFAULT_CANDIDATE_ASSIGNMENT_ROLE})."
         ),
     )
     parser.add_argument(
         "--managed-release-permission-resource-route",
-        default=DEFAULT_MANAGED_RELEASE_RESOURCE_ROUTE,
+        default=DEFAULT_CANDIDATE_RESOURCE_ROUTE,
         help=(
-            "Exact EnrichmentProfile resource route authorized for candidate "
-            f"use (default: {DEFAULT_MANAGED_RELEASE_RESOURCE_ROUTE})."
+            "Legacy managed-release resource route "
+            f"use (default: {DEFAULT_CANDIDATE_RESOURCE_ROUTE})."
         ),
     )
     parser.add_argument(
@@ -366,10 +566,60 @@ def main(argv: list[str] | None = None) -> int:
         )
         model = None
         model_run_directory = None
-        managed_release_source = None
+        candidate_source = None
         concept_domain_bridges = ()
         if not args.no_model:
-            if args.managed_release_manifest is not None:
+            if args.vocabulary_atlas_manifest is not None:
+                assert args.vocabulary_atlas_asset_id is not None
+                assert args.vocabulary_atlas_manifest_digest is not None
+                assert args.vocabulary_atlas_output_digest is not None
+                assert args.vocabulary_reference_release_id is not None
+                assert (
+                    args.vocabulary_reference_release_digest is not None
+                )
+                lookup_index_manifest = _atlas_lookup_index_manifest(
+                    asset_id=args.vocabulary_atlas_asset_id,
+                    manifest_digest=(
+                        args.vocabulary_atlas_manifest_digest
+                    ),
+                    output_digest=args.vocabulary_atlas_output_digest,
+                    reference_release_id=(
+                        args.vocabulary_reference_release_id
+                    ),
+                    reference_release_digest=(
+                        args.vocabulary_reference_release_digest
+                    ),
+                    facet_iri=args.candidate_facet,
+                    assignment_role_iri=(
+                        args.candidate_assignment_role
+                    ),
+                    resource_route=args.candidate_resource_route,
+                    default_language=args.vocabulary_default_language,
+                )
+                candidate_source = VocabularyAtlasCandidateSource.open(
+                    args.vocabulary_atlas_manifest,
+                    nquads_path=args.vocabulary_atlas_nquads,
+                    expected_asset_id=args.vocabulary_atlas_asset_id,
+                    expected_manifest_digest=(
+                        args.vocabulary_atlas_manifest_digest
+                    ),
+                    expected_output_digest=(
+                        args.vocabulary_atlas_output_digest
+                    ),
+                    reference_release_id=(
+                        args.vocabulary_reference_release_id
+                    ),
+                    reference_release_digest=(
+                        args.vocabulary_reference_release_digest
+                    ),
+                    facet_iri=args.candidate_facet,
+                    assignment_role_iri=(
+                        args.candidate_assignment_role
+                    ),
+                    resource_route=args.candidate_resource_route,
+                    lookup_index_manifest=lookup_index_manifest,
+                )
+            elif args.managed_release_manifest is not None:
                 assert (
                     args.managed_release_manifest_digest is not None
                 )
@@ -395,35 +645,13 @@ def main(argv: list[str] | None = None) -> int:
                         ),
                     )
                 )
-                managed_release_source = (
-                    ManagedReleaseCandidateSource.open(
-                        args.managed_release_manifest,
-                        expected_manifest_digest=(
-                            args.managed_release_manifest_digest
-                        ),
-                        lookup_index_manifest=lookup_index_manifest,
-                        permission_facet_iri=(
-                            args.managed_release_permission_facet
-                        ),
-                        permission_assignment_role_iri=(
-                            args.managed_release_permission_assignment_role
-                        ),
-                        permission_resource_route=(
-                            args.managed_release_permission_resource_route
-                        ),
-                    )
+                (
+                    candidate_source,
+                    concept_domain_bridges,
+                ) = _open_legacy_candidate_source(
+                    args,
+                    lookup_index_manifest=lookup_index_manifest,
                 )
-                if args.concept_domain_bridge is not None:
-                    assert args.concept_domain_bridge_digest is not None
-                    concept_domain_bridges = (
-                        load_concept_domain_bridge(
-                            args.concept_domain_bridge,
-                            expected_sha256=(
-                                args.concept_domain_bridge_digest
-                            ),
-                            target_view=managed_release_source.view,
-                        ),
-                    )
             model = build_model(
                 args.provider,
                 args.model,
@@ -436,15 +664,10 @@ def main(argv: list[str] | None = None) -> int:
             settings=settings,
             model=model,
             model_run_directory=model_run_directory,
-            managed_release_source=managed_release_source,
+            candidate_release_source=candidate_source,
             concept_domain_bridges=concept_domain_bridges,
         )
-    except (
-        ConceptDomainBridgeError,
-        ManagedReleaseConsumerError,
-        ManagedReleaseError,
-        ProjectionError,
-    ) as error:
+    except (CandidateReleaseError, ProjectionError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 1
 

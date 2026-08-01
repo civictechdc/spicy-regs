@@ -45,18 +45,11 @@ from spicy_regs.docpipeline.source import (
     build_source_artifact,
     profile_for_table,
 )
-from spicy_regs.enrichment import ManagedReleaseCandidateSource
-from tests.managed_release_support import build_selected_managed_bundle
+from spicy_regs.candidate_release import VocabularyAtlasCandidateSource
 from refspec import (
     ConceptLabel,
     ConceptRelation,
-    ManagedReleaseConceptMapping,
     ReferenceRuntimeStore,
-)
-from refspec.registry import (
-    ConceptDomainBridge,
-    ConceptDomainSourceConcept,
-    ConceptDomainSourceSnapshot,
 )
 from spicy_regs.ontology.attestations import DECISION_APPROVED, DECISIONS
 
@@ -73,6 +66,24 @@ FR_BODY = (
 )
 
 BILL_XML = "<bill><title>A bill concerning water quality permits.</title></bill>"
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+ATLAS_EXAMPLE = (
+    REPO_ROOT
+    / "RefSpec"
+    / "bindings"
+    / "atlas"
+    / "1.0"
+    / "examples"
+    / "federal-register-thesaurus-2025"
+)
+ATLAS_REFERENCE_RELEASE = (
+    "urn:ref:federal-register-thesaurus:2025-04-01:"
+    "reference-resource-release:v1"
+)
+ATLAS_REFERENCE_RELEASE_DIGEST = (
+    "sha256:30742a82b3e268942aec713a02c5ae4264eadea36aa61b564ffc93eeecfd5fe6"
+)
 
 
 def _write(path: Path, rows: list[dict[str, Any]]) -> None:
@@ -625,16 +636,11 @@ def test_the_landed_contract_findings_are_what_the_projection_emits(corpus: Path
     assert flags["emit_document_docket_edge"] is True
     assert flags["emit_profile_edge_projections"] is True
 
-    authorization = result.run_record["refspec_authorization"]
-    assert authorization == {
-        "state": "notEvaluated",
+    selection = result.run_record["candidate_selection"]
+    assert selection == {
+        "state": "notConfigured",
         "mode": "diagnosticReviewQueue",
-        "output_profile": None,
-        "coverage_report": None,
-        "configuration": None,
-        "evaluation_result": None,
-        "deployment_decision": None,
-        "candidate_use_authorized": False,
+        "receipt": None,
         "accepted_output_authorized": False,
         "usage_ceiling": "rkaf:reviewQueueOnly",
     }
@@ -850,34 +856,41 @@ def _project_with_model(
     )
 
 
-def _managed_release_candidate_source(
-    root: Path,
-) -> ManagedReleaseCandidateSource:
-    _, manifest_path = build_selected_managed_bundle(root)
-    manifest_digest = "sha256:" + hashlib.sha256(manifest_path.read_bytes()).hexdigest()
-    return ManagedReleaseCandidateSource.open(
+def _atlas_candidate_source() -> VocabularyAtlasCandidateSource:
+    manifest_path = ATLAS_EXAMPLE / "atlas-manifest.json"
+    manifest_raw = manifest_path.read_bytes()
+    manifest = json.loads(manifest_raw)
+    return VocabularyAtlasCandidateSource.open(
         manifest_path,
-        expected_manifest_digest=manifest_digest,
+        expected_asset_id=manifest["id"],
+        expected_manifest_digest=(
+            "sha256:" + hashlib.sha256(manifest_raw).hexdigest()
+        ),
+        expected_output_digest=manifest["output"]["digest"],
+        reference_release_id=ATLAS_REFERENCE_RELEASE,
+        reference_release_digest=ATLAS_REFERENCE_RELEASE_DIGEST,
+        facet_iri="urn:ref:facet:general-subject",
+        assignment_role_iri=(
+            "https://rulespec.org/ns/v1#assignmentPrimary"
+        ),
+        resource_route="document",
         lookup_index_manifest={
-            "id": "urn:test:lookup-index:managed-release:v1",
+            "id": "urn:test:lookup-index:vocabulary-atlas:v1",
             "digest": "sha256:" + "c" * 64,
         },
-        permission_facet_iri="urn:ref:facet:general-subject",
-        permission_assignment_role_iri=("https://rulespec.org/ns/v1#assignmentPrimary"),
-        permission_resource_route="document",
     )
 
 
-def test_managed_release_drives_the_real_model_path_without_output_authority(
+def test_atlas_release_drives_the_real_model_path_without_output_authority(
     corpus: Path,
     tables: Path,
     tmp_path: Path,
 ) -> None:
-    source = _managed_release_candidate_source(tmp_path / "managed-release")
+    source = _atlas_candidate_source()
     member_iri = next(
         expression.member_iri
         for expression in source.iter_expressions()
-        if expression.original_literal == "Poultry slaughter inspection"
+        if expression.original_literal == "Poultry and poultry products"
     )
     model = FakeModel(
         lambda payload: [
@@ -898,22 +911,25 @@ def test_managed_release_drives_the_real_model_path_without_output_authority(
         "2026-00001",
         settings=_settings(corpus, tables),
         model=model,
-        model_run_directory=tmp_path / "managed-model-run",
-        managed_release_source=source,
+        model_run_directory=tmp_path / "atlas-model-run",
+        candidate_release_source=source,
     )
 
     assignment = next(node for node in result.document["@graph"] if node.get("@type") == "rkaf:ConceptAssignment")
     assert assignment["rkaf:assertsObject"] == member_iri
     assert assignment["rkaf:assignedConceptRelease"] == (source.lookup_member(member_iri).release_iri)
     assert assignment["rkaf:usageEligibility"] == "rkaf:reviewQueueOnly"
-    assert source.usage_ceiling == "candidateUseOnly"
-    authorization = result.run_record["refspec_authorization"]
-    assert authorization["state"] == "candidateUseAuthorized"
-    assert authorization["candidate_use_authorized"] is True
-    assert authorization["accepted_output_authorized"] is False
-    assert authorization["candidate_permission"]["facet"] == ("urn:ref:facet:general-subject")
-    assert authorization["candidate_permission"]["assignmentRole"] == ("https://rulespec.org/ns/v1#assignmentPrimary")
-    assert authorization["candidate_permission"]["resourceRoute"] == "document"
+    assert source.usage_ceiling == "diagnosticCandidateOnly"
+    selection = result.run_record["candidate_selection"]
+    assert selection["state"] == "configured"
+    assert selection["accepted_output_authorized"] is False
+    receipt = selection["receipt"]
+    assert receipt["facet"] == "urn:ref:facet:general-subject"
+    assert receipt["assignmentRole"] == (
+        "https://rulespec.org/ns/v1#assignmentPrimary"
+    )
+    assert receipt["resourceRoute"] == "document"
+    assert receipt["sourceAsset"]["type"] == "VocabularyAtlasAsset"
     judgment = result.run_record["judgments"]["accepted"][0]
     assert judgment["candidate_channels"] == ["lexical"]
     assert judgment["candidate_rank"] == 1
@@ -927,134 +943,38 @@ def test_managed_release_drives_the_real_model_path_without_output_authority(
     assert len(model.calls) == 1
 
 
-def test_mapped_candidate_keeps_its_exact_selection_path(
+def test_atlas_candidate_source_rejects_legacy_mapping_bridges(
     corpus: Path,
     tables: Path,
     tmp_path: Path,
 ) -> None:
-    source = _managed_release_candidate_source(tmp_path / "managed-release")
-    member_iri = next(
-        expression.member_iri
-        for expression in source.iter_expressions()
-        if expression.original_literal == "Eligibility policy"
-    )
-    source_release = "urn:test:source-release:inspection"
-    source_concept = "urn:test:source-concept:inspection"
-    mapping = ManagedReleaseConceptMapping(
-        mapping_iri="urn:test:mapping:inspection",
-        source_member_iri=source_concept,
-        relation_iri="skos:closeMatch",
-        target_member_iri=member_iri,
-        source_release_iri=source_release,
-        target_release_iri=source.lookup_member(member_iri).release_iri,
-        record={},
-    )
-    bridge = ConceptDomainBridge(
-        development_only=True,
-        source_snapshot=ConceptDomainSourceSnapshot(
-            url="https://example.test/inspection-source.json",
-            revision="test",
-            sha256="sha256:" + "a" * 64,
-        ),
-        source_scheme_iri="urn:test:source-scheme:inspection",
-        source_release_iri=source_release,
-        target_release_iri=source.lookup_member(member_iri).release_iri,
-        source_concepts=(
-            ConceptDomainSourceConcept(
-                concept_iri=source_concept,
-                preferred_labels={"en": "Broiler plant oversight"},
-                alternate_labels={
-                    "en": ("poultry slaughter inspection",)
-                },
-                definitions={},
-                evidence_url=(
-                    "https://example.test/source-concept/inspection"
-                ),
-                record={},
-            ),
-        ),
-        mappings=(mapping,),
-        artifact_sha256="sha256:" + "b" * 64,
-        record={},
-    )
-    model = FakeModel(
-        lambda payload: [
-            tag
-            for tag in [
-                _tag(
-                    payload,
-                    quote="poultry slaughter inspection",
-                    concept_id=member_iri,
-                )
-            ]
-            if tag
-        ]
-    )
+    source = _atlas_candidate_source()
 
-    result = project_document(
-        "federal-register-document-v1",
-        "2026-00001",
-        settings=_settings(corpus, tables),
-        model=model,
-        model_run_directory=tmp_path / "mapped-model-run",
-        managed_release_source=source,
-        concept_domain_bridges=(bridge,),
-    )
-
-    judgment = result.run_record["judgments"]["accepted"][0]
-    assert judgment["concept_id"] == member_iri
-    assert judgment["candidate_rank"] == 2
-    assert judgment["candidate_score_state"] == "produced"
-    assert judgment["candidate_channels"] == [
-        "mappedNeighbor",
-        "lexical",
-    ]
-    assert judgment["mapping_paths"] == [
-        {
-            "mapping_iri": mapping.mapping_iri,
-            "relation_iri": mapping.relation_iri,
-            "source_member_iri": mapping.source_member_iri,
-            "target_member_iri": mapping.target_member_iri,
-            "source_release_iri": mapping.source_release_iri,
-            "target_release_iri": mapping.target_release_iri,
-            "direction": "sourceToTarget",
-            "bridge_artifact_sha256": bridge.artifact_sha256,
-            "mapping_set_sha256": (
-                "sha256:"
-                + result.run_record["model"][
-                    "concept_domain_mapping_sha256"
-                ]
-            ),
-        }
-    ]
-    assert judgment["selected_channel"] == "mappedNeighbor"
-    assert (
-        judgment["selected_mapping_path"]
-        == judgment["mapping_paths"][0]
-    )
-    ledger = result.run_record["model"][
-        "candidate_selection_ledger"
-    ]
-    selected = next(
-        row for row in ledger if row["concept_id"] == member_iri
-    )
-    assert selected["mapping_paths"] == judgment["mapping_paths"]
-    assert all(
-        node.get("@id") != source_concept
-        for node in result.document["@graph"]
-    )
+    with pytest.raises(
+        ProjectionError,
+        match="atlas candidate lookup does not consume legacy mapping bridges",
+    ):
+        project_document(
+            "federal-register-document-v1",
+            "2026-00001",
+            settings=_settings(corpus, tables),
+            model=FakeModel(lambda payload: []),
+            model_run_directory=tmp_path / "mapped-model-run",
+            candidate_release_source=source,
+            concept_domain_bridges=(object(),),
+        )
 
 
-def test_managed_release_rejects_model_role_outside_exact_permission(
+def test_atlas_release_rejects_model_role_outside_local_selection(
     corpus: Path,
     tables: Path,
     tmp_path: Path,
 ) -> None:
-    source = _managed_release_candidate_source(tmp_path / "managed-release")
+    source = _atlas_candidate_source()
     member_iri = next(
         expression.member_iri
         for expression in source.iter_expressions()
-        if expression.original_literal == "Poultry slaughter inspection"
+        if expression.original_literal == "Poultry and poultry products"
     )
     model = FakeModel(
         lambda payload: [
@@ -1076,13 +996,15 @@ def test_managed_release_rejects_model_role_outside_exact_permission(
         "2026-00001",
         settings=_settings(corpus, tables),
         model=model,
-        model_run_directory=tmp_path / "managed-model-run",
-        managed_release_source=source,
+        model_run_directory=tmp_path / "atlas-model-run",
+        candidate_release_source=source,
     )
 
     assert not [node for node in result.document["@graph"] if node.get("@type") == "rkaf:ConceptAssignment"]
-    assert [row["reason"] for row in result.run_record["judgments"]["rejected"]] == ["assignment_role_not_authorized"]
-    assert result.run_record["refspec_authorization"]["candidate_use_authorized"] is True
+    assert [row["reason"] for row in result.run_record["judgments"]["rejected"]] == [
+        "assignment_role_not_selected"
+    ]
+    assert result.run_record["candidate_selection"]["state"] == "configured"
 
 
 def test_a_verified_judgment_becomes_a_concept_assignment(
@@ -1109,7 +1031,7 @@ def test_a_verified_judgment_becomes_a_concept_assignment(
     assert assignment["rkaf:assignedConceptRelease"] == "urn:test:vocabulary:release:2026-07"
     assert assignment["rkaf:assertionOrigin"] == "rkaf:aiSuggested"
     assert assignment["rkaf:usageEligibility"] == "rkaf:reviewQueueOnly"
-    assert result.run_record["refspec_authorization"]["accepted_output_authorized"] is False
+    assert result.run_record["candidate_selection"]["accepted_output_authorized"] is False
     binding = next(
         node
         for node in result.document["@graph"]

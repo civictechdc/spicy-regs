@@ -15,6 +15,7 @@ from refspec import (
     ManagedReleaseMember,
     ManagedReleaseView,
 )
+from spicy_regs.candidate_release import CandidateSelectionReceipt
 
 _SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 
@@ -93,6 +94,31 @@ class ManagedReleaseCandidateSource:
     @property
     def expression_corpus_snapshot(self) -> Mapping[str, str]:
         return self.view.expression_corpus_snapshot
+
+    @property
+    def candidate_selection(self) -> CandidateSelectionReceipt:
+        """Describe this legacy source as local diagnostic selection input.
+
+        The managed-release authorization records remain available to legacy
+        callers through :attr:`candidate_permission`, but this adapter does not
+        present them as accepted-output or deployment authority to the model
+        projection.
+        """
+
+        return CandidateSelectionReceipt(
+            source_asset={
+                "type": "LegacyManagedReleaseView",
+                "publicationReleaseId": self.view.release_id,
+                "rulespecGraphId": self.view.rulespec_graph_id,
+            },
+            reference_resource_release={
+                "id": str(self.candidate_permission.reference_resource_release["id"]),
+                "digest": str(self.candidate_permission.reference_resource_release["digest"]),
+            },
+            facet_iri=self.candidate_permission.facet_iri,
+            assignment_role_iri=(self.candidate_permission.assignment_role_iri),
+            resource_route=self.candidate_permission.resource_route,
+        )
 
     def lookup_member(self, member_iri: str) -> ManagedReleaseMember | None:
         """Resolve only an exact release-member identifier."""
