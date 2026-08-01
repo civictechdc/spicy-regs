@@ -8,6 +8,45 @@
 - **Model dependency:** none. Every number here is deterministic and
   reproducible offline from the pinned snapshot.
 
+> **Addendum, 2026-08-01 — question 2 re-scored: end-to-end recall 0.8125 →
+> 1.000.** The range defect diagnosed below was fixed by `0378a9a`
+> ("publish U.S.C. section ranges as endpoints") three and a half hours after
+> this document was written, and the harness was never re-run. It has now been
+> re-run at HEAD against these same pinned snapshot bytes, with
+> `authority_edges` rebuilt from the same `unified_agenda.parquet`
+> (11,793 rows, SHA `f9bd79e0da25323c`). Authority-leg recall 0.923 → **1.000**
+> (65/65 RINs), end-to-end link recall 0.8125 → **1.000** (16/16 proceedings),
+> all three aggregate counts now match, and the harness exits 0. Precision was
+> and remains 1.000, no forbidden near-miss is admitted, and no stage-unknown
+> proceeding leaks in. The frozen expectation did not move at all — it is
+> derived from raw authority text, not from the parser — so only the system
+> side changed. The system query is unchanged too: a range now carries `7401`
+> in `usc_section`, so the existing exact filter finds it. New record:
+> [`question-2-usc-42-7401-rescore-2026-08-01.json`](discovery-slice-2026-07-28/question-2-usc-42-7401-rescore-2026-08-01.json).
+> Everything below is left exactly as it was written on 2026-07-28; the
+> question-2 scores, verdicts, and cleanup-track item in it are superseded by
+> that record.
+
+Reproduce the re-score:
+
+```bash
+mkdir -p output/discovery-slice-rescore-2026-08-01
+cp output/rin-ontology-revision-candidate/unified_agenda.parquet \
+   output/discovery-slice-rescore-2026-08-01/
+python -c "from pathlib import Path; \
+  from spicy_regs.transforms.build_authority_edges import build_authority_edges; \
+  build_authority_edges(Path('output/discovery-slice-rescore-2026-08-01'), \
+    run_id='authority-edges-rescore-2026-08-01', asserted_at='2026-08-01T00:00:00Z')"
+python tools/discovery_question_usc7401.py \
+  --snapshot output/rin-ontology-revision-candidate \
+  --authority-edges output/discovery-slice-rescore-2026-08-01/authority_edges.parquet \
+  --out docs/evidence/discovery-slice-2026-07-28/question-2-usc-42-7401-rescore-2026-08-01.json
+```
+
+The pinned `run_id` and `asserted_at` are what make the rebuilt table
+byte-reproducible; without them the provenance columns move and the digest
+changes while the scores do not.
+
 ## What was run
 
 Two product-level experiments, each with an expectation derived **independently
@@ -317,6 +356,9 @@ Missing proceedings: `proceeding_0d7373ebe1771d36bc5b61f7`,
 `proceeding_b5bdbd383f137cbc8458db45`, `proceeding_e4562534361c466f01dc0c27`
 — all at stage `proposed`, so all three are answers a user asked for and did
 not get.
+
+*Superseded 2026-08-01: all three are returned at HEAD, and every score in
+this table reaches 1.000. See the addendum at the top.*
 
 ## Diagnosis of the failure
 
