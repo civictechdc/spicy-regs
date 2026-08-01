@@ -13,8 +13,9 @@
 > ("publish U.S.C. section ranges as endpoints") three and a half hours after
 > this document was written, and the harness was never re-run. It has now been
 > re-run at HEAD against these same pinned snapshot bytes, with
-> `authority_edges` rebuilt from the same `unified_agenda.parquet`
-> (11,793 rows, SHA `f9bd79e0da25323c`). Authority-leg recall 0.923 → **1.000**
+> `authority_edges` (11,793 rows, SHA `f9bd79e0da25323c`) rebuilt from the same
+> `unified_agenda.parquet` (3,954 rows, SHA `e6862d5d6a5300f1`).
+> Authority-leg recall 0.923 → **1.000**
 > (65/65 RINs), end-to-end link recall 0.8125 → **1.000** (16/16 proceedings),
 > all three aggregate counts now match, and the harness exits 0. Precision was
 > and remains 1.000, no forbidden near-miss is admitted, and no stage-unknown
