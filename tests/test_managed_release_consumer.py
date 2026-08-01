@@ -8,13 +8,14 @@ from pathlib import Path
 from types import MappingProxyType
 
 import pytest
-
 from refspec import ManagedReleaseLifecycleParticipant, ManagedReleaseView
-from spicy_regs.enrichment import (
+from spicy_regs.enrichment.managed_release import (
     ManagedReleaseCandidateSource,
     ManagedReleaseConsumerError,
 )
 from tests.managed_release_support import build_selected_managed_bundle
+
+pytestmark = pytest.mark.legacy_rulespec_combined
 
 DIGEST = "sha256:" + "c" * 64
 

@@ -437,6 +437,7 @@ def test_not_represented_rows_are_absent_and_keep_safe_routes(
             ) in elsst_graph
 
 
+@pytest.mark.legacy_rulespec_combined
 def test_real_not_represented_rows_materialize_grounded_candidate_open_labels(
     pinned_assets: dict[str, Path],
     tmp_path: Path,

@@ -77,7 +77,7 @@ from spicy_regs.docpipeline.rkaf_projection import (
 )
 from spicy_regs.docpipeline.runtime import sha256_file
 from spicy_regs.docpipeline.tag_task import TagExtractionTask
-from spicy_regs.enrichment import ManagedReleaseCandidateSource
+from spicy_regs.enrichment.managed_release import ManagedReleaseCandidateSource
 from spicy_regs.enrichment.experiment_artifacts import (
     write_experiment_artifacts,
 )

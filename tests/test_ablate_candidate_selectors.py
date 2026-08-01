@@ -389,6 +389,7 @@ def _managed_target_document(
     }
 
 
+@pytest.mark.legacy_rulespec_combined
 def test_managed_targets_bind_exact_members_and_release_pins(
     harness,
     tmp_path,
@@ -489,6 +490,7 @@ def test_managed_targets_bind_exact_members_and_release_pins(
         ),
     ],
 )
+@pytest.mark.legacy_rulespec_combined
 def test_managed_targets_reject_stale_or_rebound_answers(
     harness,
     tmp_path,
@@ -1317,6 +1319,7 @@ def test_physical_dense_index_identity_excludes_query_and_requested_channel_fact
     assert first == second == physical
 
 
+@pytest.mark.legacy_rulespec_combined
 def test_managed_release_projection_and_derived_index_keep_exact_lineage(
     harness,
     tmp_path,

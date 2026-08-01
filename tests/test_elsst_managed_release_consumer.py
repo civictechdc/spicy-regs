@@ -5,10 +5,14 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from spicy_regs.enrichment import ManagedReleaseCandidateSource
+import pytest
+
+from spicy_regs.enrichment.managed_release import ManagedReleaseCandidateSource
 from tests.elsst_managed_release_support import (
     build_selected_elsst_managed_bundle,
 )
+
+pytestmark = pytest.mark.legacy_rulespec_combined
 
 LOOKUP_INDEX_DIGEST = "sha256:" + "e" * 64
 IS_VERSION_OF = "http://purl.org/dc/terms/isVersionOf"

@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from refspec import binding
 from refspec.accepted_output import AcceptedOutputAuthorizationError
 from refspec.release_graph import (
@@ -30,7 +29,7 @@ from refspec.release_graph import (
     rulespec_graph_digest,
 )
 from refspec.vocabulary import seal_payload
-from spicy_regs.enrichment import ManagedReleaseCandidateSource
+from spicy_regs.enrichment.managed_release import ManagedReleaseCandidateSource
 from spicy_regs.enrichment.accepted_output import (
     authorize_managed_accepted_assignment,
 )
@@ -38,6 +37,8 @@ from tests.elsst_managed_release_support import (
     build_selected_elsst_managed_bundle,
 )
 from tests.managed_release_support import build_selected_managed_bundle
+
+pytestmark = pytest.mark.legacy_rulespec_combined
 
 CLOSURE_FIXTURE = (
     Path(__file__).parents[1]

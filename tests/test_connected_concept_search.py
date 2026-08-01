@@ -284,6 +284,7 @@ def test_result_order_is_deterministic():
     ]
 
 
+@pytest.mark.legacy_rulespec_combined
 def test_managed_release_uses_bridge_concepts_only_as_search_anchors(
     tmp_path: Path,
 ):
