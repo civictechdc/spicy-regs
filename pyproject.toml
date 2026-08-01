@@ -21,6 +21,7 @@ dependencies = [
     "pypdf>=6.14,<7",
     "pyyaml", # data dictionary descriptions (src/spicy_regs/data_dictionary.py)
     "jsonschema>=4.23", # strict structured-output and locked-corpus validation
+    "rdflib>=7.1,<8", # file-only RefSpec vocabulary-atlas reader
     "bm25s==0.3.10", # sparse lexical concept retrieval; pinned for reproducible rankings
     "openai", # optional-at-runtime structured-output provider for ontology tagging
     "tiktoken>=0.9,<1", # pinned encoding implementation for ontology segment budgets
