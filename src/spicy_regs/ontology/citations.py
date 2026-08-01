@@ -271,9 +271,13 @@ def normalize_regsgov_identifier(identifier: object) -> str | None:
 
 
 #: Federal Register metadata writes a docket id behind a human label — "Docket
-#: No. FSIS-2025-0012", "Doc. No. AMS-SC-24-0046", "Docket Number X". The label
-#: is presentation, not identity.
-_DOCKET_LABEL_PREFIX = re.compile(r"^\s*(?:docket|doc\.?)\s*(?:no\.?|nos\.?|number|id)?\s*", re.IGNORECASE)
+#: No. FSIS-2025-0012", "Doc. No. AMS-SC-24-0046", "Docket Number X", and
+#: sometimes the department names itself first ("DHS Docket No. USCIS-2025-0004").
+#: The label is presentation, not identity.
+_DOCKET_LABEL_PREFIX = re.compile(
+    r"^\s*(?:[A-Za-z]{2,6}\s+)?(?:docket|doc\.?)\s*(?:no\.?|nos\.?|number|id)?\s*",
+    re.IGNORECASE,
+)
 
 
 def normalize_docket_reference(reference: object) -> str | None:

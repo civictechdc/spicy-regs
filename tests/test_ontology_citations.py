@@ -289,6 +289,9 @@ def test_regulations_gov_identifier_normalization_matches_repaired_grammar():
         ("Docket No. OSM-2025-0007", "OSM-2025-0007"),
         ("Docket No.CPSC-2010-0075", "CPSC-2010-0075"),
         ("  docket id phmsa-2025-0118  ", "PHMSA-2025-0118"),
+        # The label may name its own department first. "DHS Docket No." is still
+        # label: USCIS-2025-0004 is the docket dockets.parquet carries.
+        ("DHS Docket No. USCIS-2025-0004", "USCIS-2025-0004"),
         # An undecorated identifier is already identity.
         ("FSIS-2025-0012", "FSIS-2025-0012"),
         # An agency code the label grammar would otherwise eat. Commerce dockets
@@ -307,6 +310,12 @@ def test_regulations_gov_identifier_normalization_matches_repaired_grammar():
         ("FRL-12765-02-OCSPP", "FRL-12765-02-OCSPP"),
         ("not a docket id", None),
         ("Docket No.", None),
+        # A separator is source, not decoration. "FSIS 2025-0009" is one space
+        # away from a real docket and is still refused, because supplying the
+        # hyphen would be writing the identifier rather than reading it.
+        ("Docket No. FSIS 2025-0009", None),
+        # No label to strip, so nothing is stripped.
+        ("EPA HQ OAR 2021 0317", None),
         ("", None),
         (None, None),
     ],
