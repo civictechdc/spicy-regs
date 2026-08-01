@@ -11,12 +11,23 @@ ingestion path (not this repo's ETL); this rollup reads it from R2 as a base
 input. Exploding preserves the exact matching semantics of the old ``LIKE``
 (verified equal on 200 sampled dockets), including the pre-existing quirk where
 a few array elements join two IDs — no regression introduced here.
+
+The emitted ``docket_id`` is the identifier the reference states, not the
+string that states it: that upstream path supplies decorated values ("Docket
+No. FAA-2026-3485", "Doc. No. AMS-SC-24-0046") while the docket spine keys on
+the bare id, so raw matching recovered 1 of 14 real edges on the sampled
+snapshot (docs/corpus-edge-coverage-findings-2026-07-24.md §1). A reference the
+Regulations.gov scheme cannot express keeps its stated value — quarantined for
+inspection, never dropped and never forced onto a docket it does not name — and
+``docket_ids_json`` still carries the raw array verbatim.
 """
 
 from pathlib import Path
 
 import pyarrow.parquet as pq
 from loguru import logger
+
+from spicy_regs.ontology.citations import normalize_docket_reference
 
 
 def build_fr_docket_links(output_dir: Path) -> Path:
@@ -40,13 +51,28 @@ def build_fr_docket_links(output_dir: Path) -> Path:
     con.execute("SET threads=2")
     con.execute(f"SET temp_directory='{spill_dir}'")
 
+    # One implementation of the docket grammar, shared with the RKAF projection
+    # (docpipeline/rkaf_projection.py) rather than restated in SQL. Refusal is
+    # the function's whole point, so it must be allowed to return NULL —
+    # ``null_handling="special"`` is what permits that.
+    con.create_function(
+        "normalize_docket_reference",
+        normalize_docket_reference,
+        ["VARCHAR"],
+        "VARCHAR",
+        null_handling="special",
+    )
+
     # Carries the columns the docket page's FR section renders (normalizeFRRow
     # rebuilds `docket_ids` from docket_ids_json, so keep that column). Sorted by
     # docket_id with a small row-group size so per-docket lookups prune.
     query = f"""
     COPY (
         SELECT
-            link.docket_id AS docket_id,
+            COALESCE(
+                normalize_docket_reference(link.docket_id),
+                TRIM(link.docket_id)
+            ) AS docket_id,
             fr.document_number,
             fr.title,
             fr.abstract,

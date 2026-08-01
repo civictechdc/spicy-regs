@@ -20,6 +20,7 @@ from spicy_regs.ontology.citations import (
     canonical_rin_iri,
     canonical_usc_iri,
     federal_register_identifier,
+    normalize_docket_reference,
     normalize_regsgov_identifier,
     parse_authority_citation,
     parse_cfr_citation,
@@ -273,6 +274,44 @@ def test_regulations_gov_identifier_normalization_matches_repaired_grammar():
     assert normalize_regsgov_identifier("EPA") == "EPA"
     assert normalize_regsgov_identifier("Sequence No. 1") is None
     assert normalize_regsgov_identifier(None) is None
+
+
+@pytest.mark.parametrize(
+    ("stated", "expected"),
+    [
+        # The measured decorated forms from
+        # docs/corpus-edge-coverage-findings-2026-07-24.md §1: the label is
+        # presentation, the remainder is identity.
+        ("Doc. No. AMS-SC-24-0046", "AMS-SC-24-0046"),
+        ("Docket No. FAA-2026-3485", "FAA-2026-3485"),
+        ("Docket Number USCG-2026-0762", "USCG-2026-0762"),
+        ("Docket No. OSM-2025-0007", "OSM-2025-0007"),
+        ("Docket No.CPSC-2010-0075", "CPSC-2010-0075"),
+        ("  docket id phmsa-2025-0118  ", "PHMSA-2025-0118"),
+        # An undecorated identifier is already identity.
+        ("FSIS-2025-0012", "FSIS-2025-0012"),
+        # An agency code the label grammar would otherwise eat. Commerce dockets
+        # are DOC-YYYY-NNNN; stripping "DOC" would destroy a real identifier, so
+        # a value that already parses is never rewritten.
+        ("DOC-2010-0001", "DOC-2010-0001"),
+        ("DOCKET-2026-0001", "DOCKET-2026-0001"),
+        # Non-regulations.gov references. Those whose shape the scheme cannot
+        # express are refused here; the rest are syntactically expressible and
+        # are quarantined downstream by source-of-record evidence, never by
+        # force-matching them to a docket.
+        ("Special Conditions No. 25-893-SC", None),
+        ("Amendment 39-21234", None),
+        ("REG-103193-26", "REG-103193-26"),
+        ("CMS-9897-F", "CMS-9897-F"),
+        ("FRL-12765-02-OCSPP", "FRL-12765-02-OCSPP"),
+        ("not a docket id", None),
+        ("Docket No.", None),
+        ("", None),
+        (None, None),
+    ],
+)
+def test_the_docket_label_is_presentation_and_the_identifier_survives_it(stated, expected):
+    assert normalize_docket_reference(stated) == expected
 
 
 def test_invalid_cfr_suffix_is_rejected():

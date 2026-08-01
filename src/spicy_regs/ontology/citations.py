@@ -258,6 +258,33 @@ def normalize_regsgov_identifier(identifier: object) -> str | None:
     return value if re.fullmatch(r"[A-Z0-9]+(?:[-_][A-Z0-9]+)*", value) else None
 
 
+#: Federal Register metadata writes a docket id behind a human label — "Docket
+#: No. FSIS-2025-0012", "Doc. No. AMS-SC-24-0046", "Docket Number X". The label
+#: is presentation, not identity.
+_DOCKET_LABEL_PREFIX = re.compile(r"^\s*(?:docket|doc\.?)\s*(?:no\.?|nos\.?|number|id)?\s*", re.IGNORECASE)
+
+
+def normalize_docket_reference(reference: object) -> str | None:
+    """Return the Regulations.gov docket identifier a reference states, if any.
+
+    Strip-then-validate, in that order and only in that order. A value that is
+    already a well-formed identifier is returned untouched, because the label
+    grammar overlaps real agency codes: Commerce dockets are ``DOC-2010-0001``,
+    and stripping the ``DOC`` a label rule sees there would destroy the very
+    identifier being read. Only a value the scheme cannot express is offered to
+    the label rule, and only then is the remainder validated.
+
+    ``None`` means the reference names no Regulations.gov docket — a refusal,
+    not a repair. Callers quarantine it; nothing here invents a match.
+    """
+    stated = str(reference or "").strip()
+    if not stated:
+        return None
+    return normalize_regsgov_identifier(stated) or normalize_regsgov_identifier(
+        _DOCKET_LABEL_PREFIX.sub("", stated, count=1)
+    )
+
+
 def canonical_regsgov_iri(identifier: object) -> str:
     value = normalize_regsgov_identifier(identifier)
     if value is None:

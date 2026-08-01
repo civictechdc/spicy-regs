@@ -71,6 +71,7 @@ from spicy_regs.ontology.citations import (
     canonical_rin_iri,
     canonical_usc_iri,
     federal_register_identifier,
+    normalize_docket_reference,
     parse_authority_citation,
     parse_cfr_citation,
 )
@@ -530,13 +531,6 @@ def _authority_iri(row: Mapping[str, Any]) -> str | None:
     return None
 
 
-#: Federal Register metadata writes a docket id behind a human label — "Docket
-#: No. FSIS-2025-0012", "Doc. No. AMS-SC-24-0046", "Docket Number X". The label
-#: is presentation, not identity, so it is stripped before the remainder is
-#: offered to :func:`canonical_regsgov_iri`. Nothing else is rewritten.
-_DOCKET_LABEL_PREFIX = re.compile(r"^\s*(?:docket|doc\.?)\s*(?:no\.?|nos\.?|number|id)?\s*", re.IGNORECASE)
-
-
 def _document_docket_iris(
     row: Mapping[str, Any],
     *,
@@ -563,11 +557,11 @@ def _document_docket_iris(
         stated = _clean(raw)
         if not stated:
             continue
-        try:
-            docket_iri = canonical_regsgov_iri(_DOCKET_LABEL_PREFIX.sub("", stated, count=1))
-        except ValueError:
+        identifier = normalize_docket_reference(stated)
+        if identifier is None:
             notes.append(f"document docket identifier {stated!r} is not expressible in rkaf:us-regsgov")
             continue
+        docket_iri = canonical_regsgov_iri(identifier)
         if docket_iri in iris:
             continue
         if docket_iri in already:
