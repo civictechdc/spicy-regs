@@ -283,7 +283,7 @@
         "spicy-regs-evaluate-tags"
       ],
       "current_behavior": "Mixes vocabulary authority, extraction candidates, evaluation, and published ontology tables in SpicyRegs.",
-      "destination": "RefSpec vocabulary releases, Rulespec Extrapolator assertions, and SpicySearch read models",
+      "destination": "RefSpec managed releases and atlas assets, Rulespec Extrapolator assertions, and SpicySearch read models",
       "disposition": "reimplement",
       "known_consumers": [
         "Materialized ontology workflow, MCP SQL, enrichment, docpipeline, and tests"
@@ -298,7 +298,7 @@
       "published_artifact_locations": [
         "https://r2.spicy-regs.dev/materialized/ontology/latest.json"
       ],
-      "replacement_interface": "VocabularyRelease, ExtrapolationRelease, and SearchSnapshot",
+      "replacement_interface": "RefSpec managed-release distributions, VocabularyAtlasAsset, ExtrapolationRelease, and SearchSnapshot",
       "scheduled_jobs": [
         ".github/workflows/materialize-ontology.yml"
       ],
@@ -313,11 +313,12 @@
         "tools/build_vocabulary_atlas.py (preserved source)",
         "RefSpec refspec-build-vocabulary-atlas (active replacement)"
       ],
-      "current_behavior": "The preserved incubation code mixed crosswalk generation with document corpus, tagging, filtering, and related-document queries. RefSpec now implements the vocabulary-only crosswalk and static asset from pinned VocabularyRelease inputs.",
-      "destination": "RefSpec src/refspec/atlas and release-records; document filtering and related-document behavior remain SpicySearch responsibilities",
+      "current_behavior": "The preserved incubation code mixed crosswalk generation with document corpus, tagging, filtering, and related-document queries. The mature RefSpec implementation now builds the vocabulary-only crosswalk and static asset from verified managed-release distributions. Exactly two supporting machine validations can qualify a mapping for searchOnly use when they resolve the pinned evidence, pass deterministic checks, and use distinct validator actors, independence groups, providers, provider model IDs, and response artifacts. Optional human feedback can inform a later asset but cannot authorize or rewrite the current one.",
+      "destination": "RefSpec src/refspec/atlas and bindings/atlas/1.0; document filtering and related-document behavior remain SpicySearch responsibilities",
       "disposition": "reimplement",
       "known_consumers": [
-        "RefSpec atlas builder and read-only lookup clients",
+        "Rulespec Extrapolator membership reader",
+        "SpicyRegs candidate-release reader",
         "SpicySearch when a snapshot policy enables cross-vocabulary expansion"
       ],
       "migration_status": "crosswalk-and-static-asset-reimplemented-in-refspec",
@@ -326,30 +327,33 @@
       "originating_commit": "uncommitted at 56e5ccf115726596667e9427b937381a5f8b37d1",
       "owning_product": "RefSpec",
       "path": "src/spicy_regs/ontology/vocabulary_atlas*.py, tests/test_vocabulary_atlas*.py, tools/build_vocabulary_atlas.py",
-      "pinned_fixture": "RefSpec package-local VocabularyRelease fixture and test-sealed mapping candidates, validation receipts, and optional feedback",
+      "pinned_fixture": "RefSpec bindings/atlas/1.0 complete Federal Register example and conformance corpus, plus closed synthetic candidate and validation fixtures",
       "published_artifact_locations": [
         "output/vocabulary-atlas/ (ignored historical local generated data)",
-        "RefSpec release-records/fixtures/refspec-vocabulary-atlas-federal-register-2025-first-slice/atlas.nq",
-        "RefSpec release-records/fixtures/refspec-vocabulary-atlas-federal-register-2025-first-slice/atlas-manifest.json"
+        "RefSpec/bindings/atlas/1.0/examples/federal-register-thesaurus-2025/atlas.nq",
+        "RefSpec/bindings/atlas/1.0/examples/federal-register-thesaurus-2025/atlas-manifest.json"
       ],
       "replacement_interface": "RefSpec VocabularyAtlasAsset v1",
       "scheduled_jobs": [],
       "tests_or_evidence": [
         "SpicySearch migration/preservation/spicyregs-untracked-56e5ccf1.tar",
-        "RefSpec atlas tests and byte-for-byte rebuild checks",
-        "RefSpec research/evidence/vocabulary-atlas-graph-experiment-2026-07-31.md"
+        "RefSpec/tests/test_vocabulary_atlas.py",
+        "RefSpec/tests/test_vocabulary_atlas_conformance.py",
+        "RefSpec/tests/test_federal_register_vocabulary_atlas.py",
+        "tests/test_candidate_release_protocol.py",
+        "RefSpec/research/evidence/vocabulary-atlas-graph-experiment-2026-07-31.md"
       ]
     },
     {
       "capability": "Managed-release lookup, open-label candidates, accepted output, and evidence assembly",
       "command_line_entry_points": [],
-      "current_behavior": "Imports RefSpec directly and supplies candidate/extraction behavior inside SpicyRegs.",
-      "destination": "RefSpec release readers and Rulespec Extrapolator",
+      "current_behavior": "The atlas candidate path now reads pinned files through a SpicyRegs-owned adapter. Accepted-output and other compatibility paths still import RefSpec directly while their Rulespec Extrapolator cutover remains open.",
+      "destination": "Product-local atlas readers and Rulespec Extrapolator",
       "disposition": "move",
       "known_consumers": [
         "Rulespec testbed, ontology pipeline, and enrichment tests"
       ],
-      "migration_status": "inventoried-not-moved-m2-input-retained",
+      "migration_status": "atlas-reader-implemented-accepted-output-compatibility-retained",
       "nested_or_uncommitted_state": null,
       "notebooks": [],
       "originating_commit": "51898fa98f234391d1eb95fb7b3aa8723b909a3d",
@@ -357,9 +361,10 @@
       "path": "src/spicy_regs/enrichment/*.py",
       "pinned_fixture": "RefSpec and Rulespec repository-local release fixtures",
       "published_artifact_locations": [],
-      "replacement_interface": "Pinned VocabularyRelease reader and ExtrapolationRelease writer",
+      "replacement_interface": "VocabularyAtlasCandidateSource and ExtrapolationRelease",
       "scheduled_jobs": [],
       "tests_or_evidence": [
+        "tests/test_candidate_release_protocol.py",
         "tests/test_managed_release_consumer.py",
         "tests/test_accepted_output*.py"
       ]
@@ -386,21 +391,23 @@
       "replacement_interface": "Historical evidence for RefSpec VocabularyAtlasAsset and optional consumer-side SpicySearch read models",
       "scheduled_jobs": [],
       "tests_or_evidence": [
-        "RefSpec research/evidence/ladybug-vocabulary-atlas-spike-2026-07-31/README.md",
-        "RefSpec research/evidence/vocabulary-atlas-graph-experiment-2026-07-31.md"
+        "RefSpec/research/evidence/ladybug-vocabulary-atlas-spike-2026-07-31/README.md",
+        "RefSpec/research/evidence/vocabulary-atlas-graph-experiment-2026-07-31.md"
       ]
     },
     {
       "capability": "Nested RefSpec managed releases and the Federal Register 1995 thesaurus/crosswalk",
       "command_line_entry_points": [],
-      "current_behavior": "The preserved nested legacy checkout references the 1995 data in its historical code and tests. The active standalone RefSpec implementation excludes the 1995 source and crosswalk.",
-      "destination": "RefSpec published VocabularyRelease",
-      "disposition": "reimplement",
+      "current_behavior": "The mature nested RefSpec implementation is the active engineering base. It retains exact 1995 source handling, managed packages, and the analysis-only 1995-to-2025 crosswalk, and now publishes atlas assets from that managed-release foundation. The compact standalone implementation remains comparison and historical research, not a second release foundation.",
+      "destination": "RefSpec managed-release distributions and VocabularyAtlasAsset",
+      "disposition": "retain-and-narrow",
       "known_consumers": [
-        "SpicyRegs enrichment and vocabulary-atlas code; nested RefSpec tests"
+        "SpicyRegs compatibility enrichment and product-local atlas reader",
+        "Rulespec Extrapolator",
+        "SpicySearch atlas reader"
       ],
-      "migration_status": "legacy-nested-state-preserved-active-1995-source-excluded",
-      "nested_or_uncommitted_state": "nested RefSpec was 23 commits ahead plus tracked and untracked local changes at preservation time",
+      "migration_status": "mature-nested-foundation-active-compact-foundation-retired",
+      "nested_or_uncommitted_state": "The mature nested RefSpec was 23 commits ahead plus tracked and untracked local changes at preservation time and remains the local implementation base.",
       "notebooks": [],
       "originating_commit": "nested repository history; gitlink introduced by 8d36696",
       "owning_product": "RefSpec",
@@ -409,11 +416,13 @@
       "published_artifact_locations": [
         "output/refspec-vocabulary-portfolio/federal-register-thesaurus-1995/ (ignored local generated data)"
       ],
-      "replacement_interface": "Published VocabularyRelease with digest-pinned readers",
+      "replacement_interface": "Published managed-release distributions and digest-pinned VocabularyAtlasAsset readers",
       "scheduled_jobs": [],
       "tests_or_evidence": [
-        "RefSpec/tests/",
-        "consumer proof required before 1995 retirement"
+        "RefSpec/tests/test_federal_register_thesaurus.py",
+        "RefSpec/tests/test_federal_register_thesaurus_2025.py",
+        "RefSpec/tests/test_federal_register_vocabulary_atlas.py",
+        "tests/test_candidate_release_protocol.py"
       ]
     },
     {
