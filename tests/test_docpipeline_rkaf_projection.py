@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+import inspect
 import json
 import shutil
 import subprocess
@@ -941,6 +942,19 @@ def test_atlas_release_drives_the_real_model_path_without_output_authority(
     assert result.run_record["model"]["candidate_selection_sha256"]
     assert result.run_record["model"]["candidate_selection_ledger"]
     assert len(model.calls) == 1
+
+
+def test_project_document_carries_no_pre_atlas_compatibility_keyword() -> None:
+    """`managed_release_source=` outlived its last caller.
+
+    It was kept for "explicit compatibility callers"; a repo-wide grep finds
+    none, so the branch reconciling it against `candidate_release_source` was
+    dead weight that only widened the function's contract.
+    """
+    parameters = inspect.signature(project_document).parameters
+
+    assert "candidate_release_source" in parameters
+    assert "managed_release_source" not in parameters
 
 
 def test_atlas_candidate_source_rejects_legacy_mapping_bridges(

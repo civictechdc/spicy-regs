@@ -3055,8 +3055,6 @@ def project_document(
     model: Any = None,
     model_run_directory: Path | None = None,
     candidate_release_source: CandidateReleaseSource | None = None,
-    # Pre-atlas keyword retained for explicit compatibility callers.
-    managed_release_source: CandidateReleaseSource | None = None,
     concept_domain_bridges: Sequence[CandidateConceptBridge] = (),
 ) -> ProjectionResult:
     """Project one document into RKAF diagnostic output.
@@ -3064,36 +3062,22 @@ def project_document(
     Model judgments never leave ``reviewQueueOnly`` on this path. This
     function deliberately has no accepted-output option.
     """
-    if (
-        candidate_release_source is not None
-        and managed_release_source is not None
-    ):
-        raise ProjectionError(
-            "choose either candidate_release_source or the legacy "
-            "managed_release_source keyword"
-        )
-    selected_candidate_source = (
-        candidate_release_source
-        if candidate_release_source is not None
-        else managed_release_source
-    )
-
     artifact, row = load_artifact(profile_id, subject_id, corpus_dir=settings.corpus_dir)
     tables = PublishedTables(settings.tables_dir)
     facts = build_profile_facts(artifact, row, tables=tables, partner=settings.partner)
     model_layer: ModelLayer | None = None
     if model is not None:
-        if concept_domain_bridges and selected_candidate_source is None:
+        if concept_domain_bridges and candidate_release_source is None:
             raise ProjectionError(
                 "concept_domain_bridges require a legacy managed-release "
                 "candidate source"
             )
-        if selected_candidate_source is not None and settings.migration_vocabulary_directory is not None:
+        if candidate_release_source is not None and settings.migration_vocabulary_directory is not None:
             raise ProjectionError(
                 "choose either a published candidate source or the "
                 "migration-only vocabulary directory"
             )
-        if selected_candidate_source is None and settings.migration_vocabulary_directory is None:
+        if candidate_release_source is None and settings.migration_vocabulary_directory is None:
             raise ProjectionError(
                 "the model layer needs a published candidate source or "
                 "an explicitly migration-only normalized candidate "
@@ -3101,11 +3085,11 @@ def project_document(
             )
         if model_run_directory is None:
             raise ProjectionError("the model layer needs a run directory for provider custody")
-        if selected_candidate_source is not None:
+        if candidate_release_source is not None:
             model_layer = run_candidate_release_model_layer(
                 artifact,
                 model=model,
-                candidate_source=selected_candidate_source,
+                candidate_source=candidate_release_source,
                 vocabulary_default_language=(settings.vocabulary_default_language),
                 run_directory=model_run_directory,
                 evidence_field=facts.evidence_field,
@@ -3128,7 +3112,7 @@ def project_document(
                 prompt_concept_limit=settings.prompt_concept_limit,
                 max_segments=settings.max_segments,
             )
-    elif selected_candidate_source is not None or concept_domain_bridges:
+    elif candidate_release_source is not None or concept_domain_bridges:
         raise ProjectionError(
             "candidate sources and concept_domain_bridges are only "
             "used by the diagnostic model layer"
