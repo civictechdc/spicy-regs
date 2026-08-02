@@ -32,7 +32,7 @@ Beside the identifier the table publishes ``docket_key``, the comparison key
 separator rule, whitespace repaired, upper-cased. It is a **key, not a
 resolution**. Deriving it once here is what
 ``tools/build_agency_crosswalk_artifact.py`` was doing on every read to recover
-87,681 link rows the raw join dropped (finding #1, proven in 54f07a6); a joiner
+88,073 link rows the raw join dropped (finding #1, proven in 54f07a6); a joiner
 that keys on the column instead of re-deriving it cannot disagree with the
 table about what the key is.
 
@@ -138,7 +138,12 @@ def build_fr_docket_links(output_dir: Path) -> Path:
              UNNEST(CAST(json_extract(fr.docket_ids_json, '$') AS VARCHAR[])) AS link(docket_id)
         WHERE fr.docket_ids_json IS NOT NULL
           AND docket_reference_as_stated(link.docket_id) <> ''
-        ORDER BY docket_id, fr.publication_date DESC
+        -- document_number breaks every remaining tie, so the row order is a
+        -- function of the data rather than of DuckDB's scheduling. Without it
+        -- `preserve_insertion_order=false` made nine identical-input builds
+        -- produce nine distinct digests, which also defeated hardlink sharing
+        -- between generations (83 MB -> 982 MB on this checkout).
+        ORDER BY docket_id, fr.publication_date DESC, fr.document_number
     ) TO '{out_file}' (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 50000);
     """
     con.execute(query)

@@ -553,7 +553,7 @@ def normalize_docket_id(value: object) -> str:
     remove internal whitespace that split a real identifier, and upper-case.
     Returns ``""`` when nothing survives.
 
-    Proven in 54f07a6 across 276,326 dockets: 87,681 link rows recovered, zero
+    Proven in 54f07a6 across 276,326 dockets: 88,073 link rows recovered, zero
     normalized keys covering two dockets
     (docs/corpus-edge-coverage-findings-2026-07-24.md finding #1, RULE-010).
     """

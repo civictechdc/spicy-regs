@@ -107,6 +107,8 @@ def test_an_unreadable_page_is_a_named_hole_not_a_missing_row(tmp_path, stub_fet
     assert hole["url"].endswith("99_999.htm")
     assert hole["missing"] == "all classifications for this act"
     assert "peer closed connection" in hole["detail"]
+    # The receipt says what the SERVER did, not only that the client gave up.
+    assert "observed" in hole
     assert receipt["coverage"]["acts_incomplete"] == 1
     assert receipt["coverage"]["quarantine_reasons"] == {"source_incomplete": 1}
     quarantined = pq.read_table(tmp_path / "quarantine.parquet").to_pylist()

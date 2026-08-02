@@ -143,6 +143,39 @@ def acts_cited_by(detection_path: Path, names: frozenset[str]) -> list[str]:
     return sorted({c.act_key for text in texts for c in find_act_relative_citations(text, act_names=names)})
 
 
+def _characterize(url: str) -> str:
+    """One bounded probe describing what the server actually returns.
+
+    A receipt that records only "fetch failed after 4 attempts" tells a reader
+    the client gave up, not what the server did. For Pub. L. 119-21 the server
+    answers HTTP 200 with a truncated body and no classification rows, which is
+    a different fact from a timeout or a 404 and points at a different fix.
+    """
+    try:
+        import httpx
+
+        # Streamed and tolerant on purpose. The reading client raises on the
+        # truncated body, which is correct for a fetch and useless for a
+        # description: it reports that we gave up, not what arrived. Keeping the
+        # bytes received up to the break is what distinguishes "server rendered
+        # nothing" from "timeout" from "404".
+        status, chunks, broke = None, [], None
+        with httpx.stream("GET", url, timeout=httpx.Timeout(120.0), follow_redirects=True) as response:
+            status = response.status_code
+            try:
+                for chunk in response.iter_bytes():
+                    chunks.append(chunk)
+            except httpx.HTTPError as error:
+                broke = type(error).__name__
+        body = b"".join(chunks).decode("utf-8", errors="replace")
+        return (
+            f"HTTP {status}, {len(body.encode('utf-8'))} bytes received"
+            f"{f' before {broke}' if broke else ''}, {len(parse_table3(body))} classification rows"
+        )
+    except Exception as error:  # noqa: BLE001 - the probe must never fail a build
+        return f"probe failed: {type(error).__name__}"
+
+
 def build(output_dir: Path, *, cache_dir: Path | None, detection_path: Path | None, act_keys: list[str]) -> dict:
     output_dir.mkdir(parents=True, exist_ok=True)
     quarantine: list[dict[str, Any]] = []
@@ -207,6 +240,7 @@ def build(output_dir: Path, *, cache_dir: Path | None, detection_path: Path | No
                     "table3_key": table3_key,
                     "url": table3_url(table3_key),
                     "detail": detail or "unknown",
+                    "observed": _characterize(table3_url(table3_key)),
                     "missing": "all classifications for this act",
                 }
             )

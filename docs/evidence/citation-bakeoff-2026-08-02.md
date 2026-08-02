@@ -568,13 +568,30 @@ decision.
   On the pinned `rin-ontology-revision-candidate`: 893,766 rows, zero null keys,
   and the key joins 147,863 rows to the docket spine against 143,558 on the raw
   identifier. That gain is small precisely because the links build already
-  applied the *label* grammar; the 87,681 rows 54f07a6 recovered were measured
+  applied the *label* grammar; the 88,073 rows 54f07a6 recovered (the sealed crosswalk receipt's own figure; `87,681` appeared in four places in code and tests and was never artifact-backed) were measured
   against a links table with no normalization at all. **Zero normalized keys
   cover more than one docket**, across all 276,326 — so the ambiguity refusal is
   still exercised only by tests.
 * **`authority_edges` is value-stale by 9 rows**, all gains, from the spelling
   variants. The schema is unchanged, so nothing breaks; the rows are simply
   absent until a rebuild.
+* **The rebuild invalidated manifest source-hash bindings.** `fr_docket_links`
+  is a *source input* to downstream pipelines, not only a generation output, so
+  rewriting it broke the recorded digest in **25 manifests** in this checkout
+  (found by walking every `output/*/*manifest*.json`, not only `manifest.json`).
+  No receipt on disk attests the rebuilt state. Regenerating them spans several
+  unrelated evaluation pipelines with their own semantics and is not this
+  change; the invalidation is recorded so a reader does not mistake a stale
+  manifest for a corrupted one.
+* **The rebuild is now deterministic.** It was not: `preserve_insertion_order =
+  false` plus an `ORDER BY` with ties made nine identical-input generations
+  produce nine distinct digests, which also defeated hardlink sharing across
+  generations (83 MB → 982 MB on this checkout). Adding `document_number` as a
+  final tiebreaker makes row order a function of the data. Verified across all
+  24 rebuilt generations: every distinct row count now has exactly one digest.
+* **One generation was missed** on the first pass —
+  `output/mixed-real-data-corpus-v1/openai-eval/`, a nested directory the
+  `output/*/` glob did not reach. All 24 are rebuilt now, in 58 s.
 
 ### Act-relative citations: measured, 2026-08-02
 
@@ -589,8 +606,9 @@ matches `U.S.C.` 108 times. Against the index the same corpus yields **67
 act-relative citations across 67 strings**, naming 26 distinct acts, with no
 `U.S.C.` false positive at all.
 
-**47 of the 67 resolve to a U.S.C. identifier**, through
-popular name → Table III key → act section → title/section:
+**46 of the 67 resolve to a U.S.C. identifier**, through
+popular name → Table III key → act section → title/section (~~47~~ — three
+resolutions were withdrawn as ambiguous; see below):
 
 | Citation | Resolves to |
 |---|---|
@@ -604,14 +622,26 @@ popular name → Table III key → act section → title/section:
 `Clean Air Act sec. 111` → `42 U.S.C. 7411` is exactly what this document
 predicted before the data existed, and it is now derived rather than asserted.
 
-The 20 that do not resolve each say why, and none of them guesses:
+The 21 that do not resolve each say why, and none of them guesses:
 
 | n | Reason |
 |---:|---|
-| 8 | the act section is not in Table III (usually an amending section that classified nowhere) |
-| 7 | the U.S.C. target is not expressible in `rkaf:us-usc` (a note, a range, or an "et seq.") |
-| 4 | Table III fetch failed for one act (`119-21`, the One Big Beautiful Bill Act — the server truncates that page) |
-| 1 | classification status `Elim.` |
+| 8 | `act_section_not_classified` — no Table III row (usually an amending section that classified nowhere) |
+| 6 | `usc_section_not_expressible` — a note, a range, or an "et seq." |
+| 4 | `source_incomplete` — one act's Table III page is unreadable (`119-21`) |
+| 3 | `act_section_ambiguous` — several acts share the enacting Public Law |
+
+**Table III is keyed by the enacting Public Law, not by the act, and that
+matters.** Pub. L. 116-260 carries 94 popular names and 117-328 carries 70, so
+one `(table3_key, act_section)` may name classifications belonging to different
+acts with nothing in the citation to discriminate them — 471 of the 9,916 pairs
+in the artifact. The first implementation mapped that pair to a single row,
+discarding 1,060 of 10,976 rows and letting the artifact's row sort pick the
+survivor. It produced a wrong identity: `sec. 107 of the Taxpayer Certainty and
+Disaster Tax Relief Act of 2020` → `urn:rkaf:us:usc:49:60122`, pipeline-safety
+civil penalties, for a tax act. All 471 pairs now refuse. The discriminator is
+often in the source text ("Division EE") and the rows carry Statutes-at-Large
+ranges, so resolving is possible later — refusing comes first.
 
 **The acronym problem solved itself, and the alias rule came from the data.**
 "ERISA" is an entry in the tool in its own right — 17 citations, the largest
@@ -644,7 +674,11 @@ them, and the unresolved 20 carry declared codes rather than prose: 8
 `act_section_not_classified`, 6 `usc_section_not_expressible`, 4
 `source_incomplete`, 2 `classification_not_current`.
 
-`spicy_regs.ontology.act_index` is the driver. An `ActResolution` states an
+`spicy_regs.ontology.act_index` is the driver and `ActIndex.from_artifact` is
+the loader, so the measurement is re-derived from the pinned bytes rather than
+from a fixture. That mattered: before the loader existed the collapse policy
+lived in no committed code, and first-wins and last-wins gave different answers
+(67/48/19 and 67/47/20) from identical bytes. An `ActResolution` states an
 identifier **or** a reason, never both and never neither. `ALIAS_YEAR_RULE` —
 the rule that reaches ERISA — is pinned in the receipt with its derivation.
 
@@ -654,9 +688,12 @@ truncated 16 KB body carrying zero classification rows, after exactly 30 s,
 reproducibly across four httpx retries and three curl attempts with a session
 cookie in both compressed and identity encodings. (HEAD returns 404 while GET
 returns 200 — a JSF quirk, not the cause.) The receipt records it under
-`source_incomplete` with the key, URL, observed failure and what is missing, so
-the 4 citations into that act resolve to `source_incomplete` rather than the
-false `act_section_not_classified`. A hole in the evidence is not the same fact
+`source_incomplete` with the key, URL, what is missing, and an `observed` field
+carrying a tolerant re-probe — `HTTP 200, 16134 bytes received before
+RemoteProtocolError, 0 classification rows` — because "fetch failed after 4
+attempts" says the client gave up, not what the server did. The 4 citations into
+that act resolve to `source_incomplete` rather than the false
+`act_section_not_classified`. A hole in the evidence is not the same fact
 as a section going nowhere.
 
 ### Queued, not built
@@ -696,9 +733,10 @@ a non-identity recognition. Findings, each verified against fetched bytes:
   table is 0. Ruled out. The federalregister.gov API has no `3 CFR` field and
   starts 1994-01-03.
 * **Pre-1996 is resolvable only by inference**, by mining the FR corpus's own
-  republished CFR authority notes, which do carry the triple. That resolves all
-  the corpus citations but is co-occurrence inference rather than a published
-  crosswalk, it inherits agency citation errors (`20 CFR 402.75` cites
+  republished CFR authority notes, which do carry the triple. A hand-run demo
+  reached 7 of the 8 citations probed — **not a coverage measurement**, since
+  those citations were hand-picked and each was eyeballed across three
+  documents. It is co-occurrence inference rather than a published crosswalk, it inherits agency citation errors (`20 CFR 402.75` cites
   "Executive Order No. 12958 (1995) (3 CFR, 1987 Comp., p. 235)" where the true
   answer is 12600), and so it requires voting across ≥3 documents.
 

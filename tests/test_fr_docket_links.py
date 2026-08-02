@@ -169,7 +169,7 @@ def test_the_table_carries_the_join_key_beside_the_identifier_and_the_raw_array(
     """RULE-010: normalized key, preserved raw value, both published.
 
     ``tools/build_agency_crosswalk_artifact.py`` derived this key itself on every
-    read, recovering 87,681 link rows the raw join dropped
+    read, recovering 88,073 link rows the raw join dropped
     (docs/corpus-edge-coverage-findings-2026-07-24.md §1, proven in 54f07a6).
     Deriving it here means the table a joiner reads already carries it, and one
     implementation decides what it is.

@@ -858,7 +858,7 @@ def test_the_docket_decoration_grammar_has_one_definition():
 
     Same reasoning as the RIN grammar below. A pattern restated in a tool and a
     transform drifts the moment either is corrected, and this one decides
-    whether 87,681 link rows join.
+    whether 88,073 link rows join.
     """
     restating = sorted(
         str(path.relative_to(REPO_ROOT))
