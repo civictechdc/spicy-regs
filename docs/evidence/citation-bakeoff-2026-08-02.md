@@ -760,6 +760,66 @@ across 58 titles, of which **13,720 (26.6%)** name `Pub. L. N-M, div. X`,
 yielding **617** distinct (public law, division) pairs. That is the next
 increment. It was deliberately not half-built here.
 
+### USLM source credits: measured, parser proven, artifact NOT built
+
+Investigated to close the 826 combinations the page-range rule cannot soundly
+decide. The mechanism works and is measured; **the artifact was not built** —
+see the honest status at the end of this section.
+
+**The parse, and the mess.** 50,998 source credits across 58 titles. A loose
+expression that accepts any `Pub. L. N-M, div. X … §S … V Stat. P` inside a
+credit yields 13,641 credit hits and 13,153 distinct `(public law, division, act
+section)` triples — but **2,932 of those map to more than one U.S. Code
+section**, and spot-checking showed why: a credit lists the original enactment
+*and* every later amendment, so a loose match pairs a division with a section
+number belonging to a different citation in the same credit. Reading role by
+proximity to the word "amended" is not reliable — it credited `26 U.S.C. 7652`
+to (116-260, div. EE, §107), which is wrong.
+
+**Deciding conservatively rather than normalizing through it.** Requiring the
+citation to sit in an explicit enactment construction — `Added Pub. L. …` or
+`as added Pub. L. …` — collapses the population to something defensible:
+
+| | Count |
+|---|---:|
+| source credits scanned | 50,998 |
+| strict-enactment triples | 2,207 |
+| **unambiguous (exactly one U.S.C. target)** | **1,882** |
+| multi-target, refused | 325 |
+| quarantined (section identifier unparsable) | 26 |
+
+The strict rule removes the `7652` false positive, and it passes a
+self-consistency check the loose rule fails: every retained citation's Statutes
+at Large page falls inside its own division's range.
+
+**It answers the named cases, and the answers are verified from the credits:**
+
+    (116-260, div. EE, §107) -> 26 U.S.C. 6038E   at 134 Stat. 3048  (div. EE starts 3038)
+        "(Added Pub. L. 116–260, div. EE, title I, § 107(d)(1), Dec. 27, 2020, 134 Stat. 3048.)"
+    (117-328, div. T,  §120) -> nothing            -> correctly refuses
+    (117-328, div. T,  §303) -> 29 U.S.C. 1153    at 136 Stat. 5339  (div. T starts 5275)
+        "(Pub. L. 93–406, title I, § 523, as added Pub. L. 117–328, div. T, title III, § 303(a), …)"
+
+**Two findings worth more than the counts.**
+
+1. **Table III and the source credits are complementary, not redundant.**
+   `26 U.S.C. 6038E` is not among Table III's three rows for (116-260, §107) at
+   all. Table III simply lacks that classification, so no amount of
+   discriminating between its rows would ever have found it. A disagreement
+   between the two sources is a coverage fact about Table III, not noise.
+2. **The range rule produces false refusals as predicted.** (117-328, div. T,
+   §303) currently returns `act_section_outside_act`, but authority says
+   29 U.S.C. 1153. That is the range-start-too-high failure mode this document
+   already records, now observed rather than inferred — and it refuses rather
+   than misidentifies, which is the direction it was designed to fail in.
+
+**Status: not built.** The parse above is a measurement script, not committed
+code. The artifact, the loader wiring, the tests and the re-derivation are not
+done, and nothing in the shipped resolver consults source credits — the corpus
+counts remain 67/46/21 and the two named cases remain refusals. This section
+exists so the mechanism, the strict rule, the counts and the verified answers
+survive; building it is the next increment.
+
 ### Queued, not built
 
 Recorded so the next reader inherits the reasoning rather than rediscovering it.
