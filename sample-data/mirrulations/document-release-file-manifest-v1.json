@@ -1,0 +1,50 @@
+{
+  "coverage_gaps": [],
+  "documents": [
+    {
+      "adapter": "regulations-json-pdf/v1",
+      "captures": [
+        {
+          "observation_basis": "repository-import",
+          "observed_at": "2025-10-27T00:48:19-04:00"
+        }
+      ],
+      "collection": "documents",
+      "document": {
+        "document_type_path": "data.attributes.documentType",
+        "primary_rendition_key": "content-pdf",
+        "source_issued_version_id_path": "data.attributes.modifyDate"
+      },
+      "key": "ACF-2025-0038-0001",
+      "publisher": "regulations.gov",
+      "renditions": [
+        {
+          "bytes_digest": "sha256:ee9536faf7d743403a9b919c3416d576ea71bd8f4798dd97cb7b888c00637529",
+          "key": "source-record-json",
+          "media_type": "application/json",
+          "path": "document-ACF-2025-0038-0001.json",
+          "source_url_path": "data.links.self"
+        },
+        {
+          "bytes_digest": "sha256:b39cbad573a45baa638956cc8be0b6385a022cb2b19b7e228b3f91561d71351f",
+          "expected_bytes_path": "data.attributes.fileFormats.0.size",
+          "key": "content-pdf",
+          "media_type": "application/pdf",
+          "path": "document-ACF-2025-0038-0001_content.pdf",
+          "source_url_path": "data.attributes.fileFormats.0.fileUrl"
+        }
+      ],
+      "source_record": {
+        "id_path": "data.id",
+        "path": "document-ACF-2025-0038-0001.json",
+        "url_path": "data.links.self"
+      }
+    }
+  ],
+  "format_version": "spicyregs-document-files/v1",
+  "manifest_id": "mirrulations-acf-2025-0038-actual-files-v1",
+  "released_at": "2026-08-01T00:00:00Z",
+  "requested_sources": [
+    "regulations.gov:documents"
+  ]
+}

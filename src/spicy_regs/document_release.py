@@ -31,9 +31,13 @@ from typing import Any, Literal, cast
 
 
 FORMAT_VERSION = "spicyregs-document-release/v1"
+ACTUAL_FILE_FORMAT_VERSION = "spicyregs-document-release/v2"
 FIXTURE_FORMAT_VERSION = "spicyregs-m1-source-fixture/v1"
 DOCUMENT_ELIGIBILITY_POLICY_VERSION = "spicyregs-document-only/v1"
 PASSAGE_POLICY_VERSION = "spicyregs-structural-passages/v1"
+ACTUAL_DOCUMENT_ELIGIBILITY_POLICY_VERSION = "spicyregs-captured-documents/v2"
+PDF_PASSAGE_POLICY_VERSION = "spicyregs-pdf-page-text-passages/v1"
+MARKUP_PASSAGE_POLICY_VERSION = "spicyregs-visible-native-markup-passages/v1"
 LINK_VERIFICATION_METHOD = "federal-register-document-number-exact-match"
 LINK_VERIFICATION_METHOD_VERSION = "1"
 COORDINATE_SYSTEM = "unicode-codepoints-half-open"
@@ -41,6 +45,7 @@ EVIDENCE_GRADES = frozenset({"source-exact", "parser-derived", "ocr-derived"})
 SOURCE_EXACT_DECODING_METHODS = frozenset(
     {
         "json-field-decoding",
+        "raw-utf8",
         "source-native-unicode",
         "utf-8-decoding",
     }
@@ -111,6 +116,20 @@ def _require_string(value: object, label: str) -> str:
     return value
 
 
+def _requested_source_base(value: str, *, require_selection: bool) -> str:
+    base, separator, selection = value.partition("#selection=")
+    publisher, source_separator, collection = base.partition(":")
+    if not publisher or source_separator != ":" or not collection or ":" in collection:
+        raise DocumentReleaseError("requested source must be publisher:collection")
+    if require_selection:
+        if separator != "#selection=":
+            raise DocumentReleaseError("actual-file requested source must pin its selected input")
+        _require_digest(selection, "requested source selection digest")
+    elif separator:
+        raise DocumentReleaseError("legacy requested source cannot add a selection suffix")
+    return base
+
+
 def _require_exact_keys(value: Mapping[str, Any], expected: set[str], label: str) -> None:
     actual = set(value)
     if actual != expected:
@@ -141,19 +160,39 @@ def _resolve_path(value: object, path: str) -> object:
     return current
 
 
-_SOURCE_RECORD_ROLES: dict[tuple[str, str], RecordRole] = {
+_LEGACY_SOURCE_RECORD_ROLES: dict[tuple[str, str], RecordRole] = {
     ("federal-register", "documents"): "document",
     ("regulations.gov", "documents"): "document",
     ("regulations.gov", "dockets"): "relationship-context",
     ("regulations.gov", "comments"): "public-comment",
 }
 
+_ACTUAL_SOURCE_RECORD_ROLES: dict[tuple[str, str], RecordRole] = {
+    **_LEGACY_SOURCE_RECORD_ROLES,
+    ("cfr", "sections"): "document",
+    ("congress", "bills"): "document",
+    ("congressional-research-service", "reports"): "document",
+    ("gao", "reports"): "document",
+    ("supreme-court", "opinions"): "document",
+}
 
-def classify_source_record(publisher: str, collection: str) -> RecordRole:
+
+def classify_source_record(
+    publisher: str,
+    collection: str,
+    *,
+    policy_version: str = DOCUMENT_ELIGIBILITY_POLICY_VERSION,
+) -> RecordRole:
     """Classify a known source record; unknown kinds fail closed."""
 
+    if policy_version == DOCUMENT_ELIGIBILITY_POLICY_VERSION:
+        roles = _LEGACY_SOURCE_RECORD_ROLES
+    elif policy_version == ACTUAL_DOCUMENT_ELIGIBILITY_POLICY_VERSION:
+        roles = _ACTUAL_SOURCE_RECORD_ROLES
+    else:
+        raise DocumentReleaseError(f"unknown document eligibility policy: {policy_version!r}")
     try:
-        return _SOURCE_RECORD_ROLES[(publisher, collection)]
+        return roles[(publisher, collection)]
     except KeyError as error:
         raise DocumentReleaseError(
             f"unclassified source record kind: publisher={publisher!r}, collection={collection!r}"
@@ -179,8 +218,13 @@ class SourceRecordVersion:
         source_record_id: str,
         source_url: str,
         content: Mapping[str, Any],
+        eligibility_policy_version: str = DOCUMENT_ELIGIBILITY_POLICY_VERSION,
     ) -> "SourceRecordVersion":
-        classify_source_record(publisher, collection)
+        classify_source_record(
+            publisher,
+            collection,
+            policy_version=eligibility_policy_version,
+        )
         content_json = canonical_json(dict(content))
         digest = canonical_digest(dict(content))
         identity = {
@@ -227,6 +271,9 @@ class DocumentVersion:
     source_issued_version_id: str
     document_type: str
     content_digest: str
+    coordinate_system: str
+    evidence_grade: str
+    media_type: str
 
     @classmethod
     def create(
@@ -237,8 +284,15 @@ class DocumentVersion:
         source_issued_version_id: str,
         document_type: str,
         content_digest: str,
+        coordinate_system: str = "document-version",
+        evidence_grade: str = "source-exact",
+        media_type: str = "text/plain; charset=utf-8",
     ) -> "DocumentVersion":
         _require_digest(content_digest, "document content digest")
+        if evidence_grade != "source-exact":
+            raise DocumentReleaseError("a source document version must remain source-exact")
+        if not coordinate_system or not media_type:
+            raise DocumentReleaseError("document Artifact coordinates and media type must be named")
         identity = {
             "content_digest": content_digest,
             "document_type": document_type,
@@ -249,10 +303,10 @@ class DocumentVersion:
         document_version_id = stable_record_id("document-version", identity)
         artifact_identity = {
             "content_digest": content_digest,
-            "coordinate_system": "document-version",
+            "coordinate_system": coordinate_system,
             "document_version_id": document_version_id,
             "evidence_grade": "source-exact",
-            "media_type": "text/plain; charset=utf-8",
+            "media_type": media_type,
         }
         return cls(
             document_version_id=document_version_id,
@@ -262,6 +316,9 @@ class DocumentVersion:
             source_issued_version_id=source_issued_version_id,
             document_type=document_type,
             content_digest=content_digest,
+            coordinate_system=coordinate_system,
+            evidence_grade=evidence_grade,
+            media_type=media_type,
         )
 
     @property
@@ -270,9 +327,9 @@ class DocumentVersion:
             "artifact_id": self.artifact_id,
             "artifact_type": "Artifact",
             "content_digest": self.content_digest,
-            "coordinate_system": "document-version",
-            "evidence_grade": "source-exact",
-            "media_type": "text/plain; charset=utf-8",
+            "coordinate_system": self.coordinate_system,
+            "evidence_grade": self.evidence_grade,
+            "media_type": self.media_type,
         }
 
     def as_record(self) -> JsonObject:
@@ -851,11 +908,7 @@ def _expand_content(content: object) -> JsonObject:
     return expanded
 
 
-def _load_fixture(path: Path) -> JsonObject:
-    try:
-        fixture = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise DocumentReleaseError(f"cannot read source fixture {path}: {error}") from error
+def _validate_fixture(fixture: object) -> JsonObject:
     if not isinstance(fixture, dict):
         raise DocumentReleaseError("source fixture root must be an object")
     _require_exact_keys(
@@ -881,13 +934,53 @@ def _load_fixture(path: Path) -> JsonObject:
     return fixture
 
 
-def _load_rulespec_core_fixture(path: Path) -> JsonObject:
+def _load_fixture(path: Path) -> JsonObject:
     try:
         fixture = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        raise DocumentReleaseError(f"cannot read Rulespec Core fixture {path}: {error}") from error
+        raise DocumentReleaseError(f"cannot read source fixture {path}: {error}") from error
+    return _validate_fixture(fixture)
+
+
+def _fixture_representation_text(
+    content: Mapping[str, Any],
+    spec: Mapping[str, Any],
+    *,
+    label: str,
+) -> tuple[str, str, str]:
+    """Resolve one legacy source field or one prepared actual-file text value."""
+
+    inline_text = spec.get("unicode_text")
+    source_path = spec.get("source_native_path")
+    if inline_text is not None:
+        if not isinstance(inline_text, str):
+            raise DocumentReleaseError(f"{label} unicode_text must be a Unicode string")
+        if source_path is not None:
+            raise DocumentReleaseError(f"{label} cannot declare both unicode_text and source_native_path")
+        key = _require_string(spec.get("key"), f"{label} key")
+        kind_and_path = _require_string(
+            spec.get("representation_kind_and_path"),
+            f"{label} representation_kind_and_path",
+        )
+        return key, kind_and_path, inline_text
+    path = _require_string(source_path, f"{label} path")
+    text = _resolve_path(content, path)
+    if not isinstance(text, str):
+        raise DocumentReleaseError(f"{label} path must resolve to Unicode text")
+    return path, f"source-record-field:{path}", text
+
+
+def _load_rulespec_core_release(
+    path: Path,
+    *,
+    allowed_statuses: frozenset[str],
+) -> JsonObject:
+    try:
+        fixture = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise DocumentReleaseError(f"cannot read Rulespec Core release {path}: {error}") from error
     if not isinstance(fixture, dict):
-        raise DocumentReleaseError("Rulespec Core fixture root must be an object")
+        raise DocumentReleaseError("Rulespec Core release root must be an object")
     required_root = {
         "conformance_fixture_artifacts",
         "record_type",
@@ -898,16 +991,19 @@ def _load_rulespec_core_fixture(path: Path) -> JsonObject:
         "validator_artifacts",
         "version",
     }
-    _require_exact_keys(fixture, required_root, "Rulespec Core fixture")
+    _require_exact_keys(fixture, required_root, "Rulespec Core release")
     if fixture["record_type"] != "RulespecCoreRelease":
-        raise DocumentReleaseError("Rulespec Core fixture has the wrong record type")
-    if fixture["release_status"] != "fixture":
-        raise DocumentReleaseError("Rulespec Core fixture must identify itself as a fixture")
+        raise DocumentReleaseError("Rulespec Core release has the wrong record type")
+    if fixture["release_status"] not in allowed_statuses:
+        raise DocumentReleaseError(
+            "Rulespec Core release status is not allowed here: "
+            f"{fixture['release_status']!r}"
+        )
     body = {key: value for key, value in fixture.items() if key not in {"release_id", "release_digest"}}
     expected_digest = canonical_digest(body)
     expected_id = "urn:rulespec:core:" + expected_digest.removeprefix("sha256:")
     if fixture["release_digest"] != expected_digest or fixture["release_id"] != expected_id:
-        raise DocumentReleaseError("Rulespec Core fixture identity differs from its canonical bytes")
+        raise DocumentReleaseError("Rulespec Core release identity differs from its canonical bytes")
     for field in ("schema_artifacts", "validator_artifacts", "conformance_fixture_artifacts"):
         artifacts = fixture[field]
         if not isinstance(artifacts, list) or not artifacts:
@@ -927,15 +1023,22 @@ def _sorted_records(records: Sequence[JsonObject], id_field: str) -> list[JsonOb
 def _passage_coverage(
     representations: Sequence[TextRepresentation],
     passages: Sequence[StructuralPassage],
+    *,
+    default_policy_version: str,
 ) -> list[JsonObject]:
     by_representation: dict[str, list[StructuralPassage]] = {}
     for passage in passages:
         by_representation.setdefault(passage.text_representation_ref, []).append(passage)
     output: list[JsonObject] = []
     for representation in representations:
+        representation_passages = by_representation.get(representation.representation_id, [])
+        policy_versions = {passage.passage_policy_version for passage in representation_passages}
+        if len(policy_versions) > 1:
+            raise DocumentReleaseError("one text representation cannot mix passage policies")
+        passage_policy_version = next(iter(policy_versions), default_policy_version)
         cursor = 0
         regions: list[JsonObject] = []
-        for passage in sorted(by_representation.get(representation.representation_id, []), key=lambda item: item.start):
+        for passage in sorted(representation_passages, key=lambda item: item.start):
             if passage.start < cursor:
                 raise DocumentReleaseError("structural passages overlap in one text representation")
             if passage.start > cursor:
@@ -973,14 +1076,14 @@ def _passage_coverage(
                 {"end": 0, "passage_ref": None, "reason": "empty-representation", "start": 0, "state": "excluded"}
             )
         identity = {
-            "passage_policy_version": PASSAGE_POLICY_VERSION,
+            "passage_policy_version": passage_policy_version,
             "regions": regions,
             "text_representation_ref": representation.representation_id,
         }
         output.append(
             {
                 "coverage_id": stable_record_id("passage-coverage", identity),
-                "passage_policy_version": PASSAGE_POLICY_VERSION,
+                "passage_policy_version": passage_policy_version,
                 "regions": regions,
                 "text_representation_ref": representation.representation_id,
             }
@@ -1000,14 +1103,76 @@ def seal_document_release(body: Mapping[str, Any]) -> JsonObject:
     return _canonical_clone(sealed)
 
 
-def build_document_release(
-    fixture_path: Path = DEFAULT_FIXTURE_PATH,
-    rulespec_core_path: Path = DEFAULT_RULESPEC_CORE_PATH,
-) -> JsonObject:
-    """Build the sealed M1 ``DocumentRelease`` from repository-local fixtures."""
+def _actual_file_release_status(core_status: object, source_input_type: object) -> str:
+    """Keep evaluation locks non-promotable regardless of dependency status."""
 
-    fixture = _load_fixture(fixture_path)
-    rulespec_core = _load_rulespec_core_fixture(rulespec_core_path)
+    if source_input_type == "EvaluationSourceLock" or core_status == "fixture":
+        return "conformance"
+    if source_input_type == "CapturedFileManifest" and core_status in {
+        "candidate",
+        "published",
+    }:
+        return "candidate"
+    raise DocumentReleaseError("actual-file release status inputs are unsupported")
+
+
+def build_document_release(
+    fixture_path: Path | Mapping[str, Any] = DEFAULT_FIXTURE_PATH,
+    rulespec_core_path: Path = DEFAULT_RULESPEC_CORE_PATH,
+    *,
+    format_version: str = FORMAT_VERSION,
+    source_input_digest: str | None = None,
+    source_input_id: str | None = None,
+    source_input_path: str | None = None,
+    source_input_type: str | None = None,
+) -> JsonObject:
+    """Build a sealed ``DocumentRelease`` from a validated prepared source fixture."""
+
+    if format_version == FORMAT_VERSION:
+        document_policy_version = DOCUMENT_ELIGIBILITY_POLICY_VERSION
+        allowed_passage_policies = frozenset({PASSAGE_POLICY_VERSION})
+        default_passage_policy = PASSAGE_POLICY_VERSION
+        allowed_core_statuses = frozenset({"fixture"})
+        if any(
+            value is not None
+            for value in (source_input_digest, source_input_id, source_input_path, source_input_type)
+        ):
+            raise DocumentReleaseError("legacy DocumentRelease cannot declare a source input pin")
+    elif format_version == ACTUAL_FILE_FORMAT_VERSION:
+        document_policy_version = ACTUAL_DOCUMENT_ELIGIBILITY_POLICY_VERSION
+        allowed_passage_policies = frozenset(
+            {PDF_PASSAGE_POLICY_VERSION, MARKUP_PASSAGE_POLICY_VERSION}
+        )
+        default_passage_policy = MARKUP_PASSAGE_POLICY_VERSION
+        allowed_core_statuses = frozenset({"candidate", "fixture", "published"})
+        source_input_type = _require_string(
+            source_input_type,
+            "actual-file DocumentRelease source input type",
+        )
+        source_input_id = _require_string(
+            source_input_id,
+            "actual-file DocumentRelease source input ID",
+        )
+        source_input_digest = _require_digest(
+            source_input_digest,
+            "actual-file DocumentRelease source input digest",
+        )
+        source_input_path = _require_string(
+            source_input_path,
+            "actual-file DocumentRelease source input path",
+        )
+    else:
+        raise DocumentReleaseError(f"unknown DocumentRelease format version: {format_version!r}")
+
+    fixture = (
+        _validate_fixture(_canonical_clone(dict(fixture_path)))
+        if isinstance(fixture_path, Mapping)
+        else _load_fixture(fixture_path)
+    )
+    rulespec_core = _load_rulespec_core_release(
+        rulespec_core_path,
+        allowed_statuses=allowed_core_statuses,
+    )
     source_records: list[SourceRecordVersion] = []
     documents: list[DocumentVersion] = []
     renditions: list[SourceRendition] = []
@@ -1034,7 +1199,11 @@ def build_document_release(
             raise DocumentReleaseError(f"duplicate fixture record key: {key}")
         publisher = _require_string(spec.get("publisher"), f"fixture record {key}.publisher")
         collection = _require_string(spec.get("collection"), f"fixture record {key}.collection")
-        role = classify_source_record(publisher, collection)
+        role = classify_source_record(
+            publisher,
+            collection,
+            policy_version=document_policy_version,
+        )
         content = _expand_content(spec.get("content"))
         source_record = SourceRecordVersion.create(
             publisher=publisher,
@@ -1042,6 +1211,7 @@ def build_document_release(
             source_record_id=_require_string(spec.get("source_record_id"), f"fixture record {key}.source_record_id"),
             source_url=_require_string(spec.get("source_url"), f"fixture record {key}.source_url"),
             content=content,
+            eligibility_policy_version=document_policy_version,
         )
         records_by_key[key] = source_record
         source_records.append(source_record)
@@ -1062,10 +1232,65 @@ def build_document_release(
         document_spec = spec.get("document")
         if not isinstance(document_spec, Mapping):
             raise DocumentReleaseError(f"document record {key} must declare document metadata")
-        content_path = _require_string(document_spec.get("content_path"), f"fixture record {key}.content_path")
-        document_text = _resolve_path(content, content_path)
-        if not isinstance(document_text, str):
-            raise DocumentReleaseError(f"fixture record {key} document content must resolve to Unicode text")
+        representation_specs = spec.get("representations")
+        if not isinstance(representation_specs, list) or not representation_specs:
+            raise DocumentReleaseError(f"fixture document {key} must declare a text representation")
+        prepared_representations: list[tuple[str, str, str, Mapping[str, Any]]] = []
+        for representation_spec in representation_specs:
+            if not isinstance(representation_spec, Mapping):
+                raise DocumentReleaseError(f"fixture document {key} representation must be an object")
+            representation_key, kind_and_path, text = _fixture_representation_text(
+                content,
+                representation_spec,
+                label=f"fixture document {key} representation",
+            )
+            if any(existing[0] == representation_key for existing in prepared_representations):
+                raise DocumentReleaseError(f"fixture document {key} has duplicate representation key")
+            prepared_representations.append((representation_key, kind_and_path, text, representation_spec))
+        declared_content_digest = document_spec.get("content_digest")
+        content_representation_key = document_spec.get("content_representation_key")
+        if declared_content_digest is not None:
+            if content_representation_key is not None or document_spec.get("content_path") is not None:
+                raise DocumentReleaseError(
+                    f"fixture record {key} document content must choose bytes or a text representation"
+                )
+            document_content_digest = _require_digest(
+                declared_content_digest,
+                f"fixture record {key}.content_digest",
+            )
+            document_coordinate_system = _require_string(
+                document_spec.get("content_coordinate_system"),
+                f"fixture record {key}.content_coordinate_system",
+            )
+            document_media_type = _require_string(
+                document_spec.get("content_media_type"),
+                f"fixture record {key}.content_media_type",
+            )
+        elif content_representation_key is None:
+            content_path = _require_string(document_spec.get("content_path"), f"fixture record {key}.content_path")
+            document_text = _resolve_path(content, content_path)
+            if not isinstance(document_text, str):
+                raise DocumentReleaseError(f"fixture record {key} document content must resolve to Unicode text")
+            document_content_digest = text_digest(document_text)
+            document_coordinate_system = "document-version"
+            document_media_type = "text/plain; charset=utf-8"
+        else:
+            content_representation_key = _require_string(
+                content_representation_key,
+                f"fixture record {key}.content_representation_key",
+            )
+            matching_text = [
+                text for representation_key, _, text, _ in prepared_representations
+                if representation_key == content_representation_key
+            ]
+            if len(matching_text) != 1:
+                raise DocumentReleaseError(
+                    f"fixture record {key} document names an unknown content representation"
+                )
+            document_text = matching_text[0]
+            document_content_digest = text_digest(document_text)
+            document_coordinate_system = "document-version"
+            document_media_type = "text/plain; charset=utf-8"
         document = DocumentVersion.create(
             publisher=publisher,
             source_record_id=source_record.source_record_id,
@@ -1073,60 +1298,104 @@ def build_document_release(
                 document_spec.get("source_issued_version_id"), f"fixture record {key}.source_issued_version_id"
             ),
             document_type=_require_string(document_spec.get("document_type"), f"fixture record {key}.document_type"),
-            content_digest=text_digest(document_text),
+            content_digest=document_content_digest,
+            coordinate_system=document_coordinate_system,
+            media_type=document_media_type,
         )
         documents.append(document)
         documents_by_key[key] = document
-        rendition = SourceRendition.create(
-            document_version_ref=document.document_version_id,
-            source_native_path=f"{collection}:{source_record.source_record_id}",
-            source_url=source_record.source_url,
-            media_type="application/json",
-            bytes_digest=source_record.source_record_digest,
-        )
-        renditions.append(rendition)
         capture_specs = spec.get("captures")
         if not isinstance(capture_specs, list) or not capture_specs:
             raise DocumentReleaseError(f"fixture document {key} must declare at least one capture")
-        for capture_spec in capture_specs:
-            if not isinstance(capture_spec, Mapping):
-                raise DocumentReleaseError(f"fixture document {key} capture must be an object")
-            capture = SourceRenditionCapture.create(
-                source_rendition_ref=rendition.rendition_id,
-                observed_at=_require_string(capture_spec.get("observed_at"), f"fixture record {key} observed_at"),
-                retrieval_receipt_ref=_require_string(
-                    capture_spec.get("retrieval_receipt_ref"), f"fixture record {key} retrieval_receipt_ref"
+        rendition_specs = spec.get("renditions")
+        if rendition_specs is None:
+            rendition_specs = [
+                {
+                    "bytes_digest": source_record.source_record_digest,
+                    "key": "source-record",
+                    "media_type": "application/json",
+                    "source_native_path": f"{collection}:{source_record.source_record_id}",
+                    "source_url": source_record.source_url,
+                }
+            ]
+        if not isinstance(rendition_specs, list) or not rendition_specs:
+            raise DocumentReleaseError(f"fixture document {key} must declare at least one rendition")
+        renditions_by_key: dict[str, SourceRendition] = {}
+        for rendition_spec in rendition_specs:
+            if not isinstance(rendition_spec, Mapping):
+                raise DocumentReleaseError(f"fixture document {key} rendition must be an object")
+            rendition_key = _require_string(
+                rendition_spec.get("key"),
+                f"fixture document {key} rendition key",
+            )
+            if rendition_key in renditions_by_key:
+                raise DocumentReleaseError(f"fixture document {key} has duplicate rendition key")
+            source_native_path = rendition_spec.get("source_native_path")
+            source_url = rendition_spec.get("source_url")
+            if source_native_path is not None:
+                source_native_path = _require_string(
+                    source_native_path,
+                    f"fixture document {key} rendition source_native_path",
+                )
+            if source_url is not None:
+                source_url = _require_string(source_url, f"fixture document {key} rendition source_url")
+            rendition = SourceRendition.create(
+                document_version_ref=document.document_version_id,
+                source_native_path=source_native_path,
+                source_url=source_url,
+                media_type=_require_string(
+                    rendition_spec.get("media_type"),
+                    f"fixture document {key} rendition media_type",
                 ),
-                acquisition_release_ref=_require_string(
-                    fixture.get("acquisition_release_ref"), "fixture acquisition_release_ref"
+                bytes_digest=_require_digest(
+                    rendition_spec.get("bytes_digest"),
+                    f"fixture document {key} rendition bytes digest",
                 ),
             )
-            rendition_captures.append(capture)
-            record_capture_refs[key].append(capture.capture_id)
-        representation_specs = spec.get("representations")
-        if not isinstance(representation_specs, list) or not representation_specs:
-            raise DocumentReleaseError(f"fixture document {key} must declare a text representation")
-        record_representations: list[TextRepresentation] = []
-        for representation_spec in representation_specs:
-            if not isinstance(representation_spec, Mapping):
-                raise DocumentReleaseError(f"fixture document {key} representation must be an object")
-            path = _require_string(
-                representation_spec.get("source_native_path"), f"fixture document {key} representation path"
-            )
-            text = _resolve_path(content, path)
-            if not isinstance(text, str):
-                raise DocumentReleaseError(f"fixture document {key} representation path must resolve to Unicode text")
+            renditions_by_key[rendition_key] = rendition
+            renditions.append(rendition)
+            for capture_spec in capture_specs:
+                if not isinstance(capture_spec, Mapping):
+                    raise DocumentReleaseError(f"fixture document {key} capture must be an object")
+                capture = SourceRenditionCapture.create(
+                    source_rendition_ref=rendition.rendition_id,
+                    observed_at=_require_string(capture_spec.get("observed_at"), f"fixture record {key} observed_at"),
+                    retrieval_receipt_ref=_require_string(
+                        capture_spec.get("retrieval_receipt_ref"), f"fixture record {key} retrieval_receipt_ref"
+                    ),
+                    acquisition_release_ref=_require_string(
+                        fixture.get("acquisition_release_ref"), "fixture acquisition_release_ref"
+                    ),
+                )
+                rendition_captures.append(capture)
+                record_capture_refs[key].append(capture.capture_id)
+        for representation_key, kind_and_path, text, representation_spec in prepared_representations:
             method_config = representation_spec.get("method_config", {})
             if not isinstance(method_config, Mapping):
                 raise DocumentReleaseError(f"fixture document {key} method_config must be an object")
+            rendition_key = representation_spec.get("source_rendition_key")
+            if rendition_key is None:
+                if len(renditions_by_key) != 1:
+                    raise DocumentReleaseError(
+                        f"fixture document {key} representation must name its source rendition"
+                    )
+                source_rendition = next(iter(renditions_by_key.values()))
+            else:
+                source_rendition = renditions_by_key.get(
+                    _require_string(rendition_key, f"fixture document {key} source_rendition_key")
+                )
+                if source_rendition is None:
+                    raise DocumentReleaseError(
+                        f"fixture document {key} representation names an unknown source rendition"
+                    )
             representation = TextRepresentation.create(
                 document_version_ref=document.document_version_id,
-                representation_kind_and_path=f"source-record-field:{path}",
+                representation_kind_and_path=kind_and_path,
                 unicode_text=text,
                 evidence_grade=_require_string(
                     representation_spec.get("evidence_grade"), f"fixture document {key} evidence_grade"
                 ),
-                source_rendition_ref=rendition.rendition_id,
+                source_rendition_ref=source_rendition.rendition_id,
                 method=(str(representation_spec["method"]) if representation_spec.get("method") is not None else None),
                 method_version=(
                     str(representation_spec["method_version"])
@@ -1135,27 +1404,43 @@ def build_document_release(
                 ),
                 method_config_digest=canonical_digest(dict(method_config)),
             )
-            record_representations.append(representation)
             representations.append(representation)
-            representations_by_key[(key, path)] = representation
+            representations_by_key[(key, representation_key)] = representation
         passage_specs = spec.get("passages")
         if not isinstance(passage_specs, list) or not passage_specs:
             raise DocumentReleaseError(f"fixture document {key} must declare structural passages")
         for passage_spec in passage_specs:
             if not isinstance(passage_spec, Mapping):
                 raise DocumentReleaseError(f"fixture document {key} passage must be an object")
-            path = _require_string(passage_spec.get("representation_path"), f"fixture document {key} passage path")
-            representation = representations_by_key.get((key, path))
+            representation_key = passage_spec.get("representation_key", passage_spec.get("representation_path"))
+            representation_key = _require_string(
+                representation_key,
+                f"fixture document {key} passage representation",
+            )
+            representation = representations_by_key.get((key, representation_key))
             if representation is None:
                 raise DocumentReleaseError(f"fixture document {key} passage references an unknown representation")
             end = passage_spec.get("end")
             if end == "full":
                 end = len(representation.unicode_text)
+            start = passage_spec.get("start")
+            if isinstance(start, bool) or not isinstance(start, int):
+                raise DocumentReleaseError(f"fixture document {key} passage start must be an integer")
+            if isinstance(end, bool) or not isinstance(end, int):
+                raise DocumentReleaseError(f"fixture document {key} passage end must be an integer or full")
             passage = StructuralPassage.create(
                 representation=representation,
-                start=passage_spec.get("start"),
+                start=start,
                 end=end,
+                passage_policy_version=_require_string(
+                    passage_spec.get("passage_policy_version", default_passage_policy),
+                    f"fixture document {key} passage policy version",
+                ),
             )
+            if passage.passage_policy_version not in allowed_passage_policies:
+                raise DocumentReleaseError(
+                    f"fixture document {key} uses a passage policy outside the release profile"
+                )
             expected_text = passage_spec.get("expected_text")
             if expected_text is not None and representation.unicode_text[passage.start : passage.end] != expected_text:
                 raise DocumentReleaseError(f"fixture document {key} passage text differs from its sealed expectation")
@@ -1258,36 +1543,43 @@ def build_document_release(
     acquisition_identity = {
         "capture_refs": capture_refs,
         "entries": coverage_entries,
-        "policy_version": DOCUMENT_ELIGIBILITY_POLICY_VERSION,
+        "policy_version": document_policy_version,
         "requested_sources": fixture["requested_sources"],
     }
     acquisition_coverage = {
         "capture_refs": capture_refs,
         "coverage_id": stable_record_id("acquisition-coverage", acquisition_identity),
         "entries": coverage_entries,
-        "policy_version": DOCUMENT_ELIGIBILITY_POLICY_VERSION,
+        "policy_version": document_policy_version,
         "requested_sources": fixture["requested_sources"],
     }
     representation_by_id = {item.representation_id: item for item in representations}
+    used_passage_policies = sorted(
+        {passage.passage_policy_version for passage in passages}
+    )
     body: JsonObject = {
         "acquisition_coverage": acquisition_coverage,
         "document_versions": _sorted_records([item.as_record() for item in documents], "document_version_id"),
-        "format_version": FORMAT_VERSION,
+        "format_version": format_version,
         "link_verification_receipts": _sorted_records(verification_receipts, "verification_id"),
-        "passage_coverage": _passage_coverage(representations, passages),
+        "passage_coverage": _passage_coverage(
+            representations,
+            passages,
+            default_policy_version=default_passage_policy,
+        ),
         "policies": {
-            "document_eligibility": DOCUMENT_ELIGIBILITY_POLICY_VERSION,
-            "passage_generation": PASSAGE_POLICY_VERSION,
+            "document_eligibility": document_policy_version,
+            "passage_generation": (
+                PASSAGE_POLICY_VERSION
+                if format_version == FORMAT_VERSION
+                else used_passage_policies
+            ),
         },
         "record_type": "DocumentRelease",
         "released_at": fixture["released_at"],
         "rulespec_core_release": {
             "release_digest": rulespec_core["release_digest"],
             "release_id": rulespec_core["release_id"],
-        },
-        "source_fixture": {
-            "fixture_digest": fixture["fixture_digest"],
-            "fixture_id": fixture["fixture_id"],
         },
         "source_links": _sorted_records(source_links, "source_link_id"),
         "source_observation_captures": _sorted_records(
@@ -1305,6 +1597,22 @@ def build_document_release(
         ),
         "text_representations": _sorted_records([item.as_record() for item in representations], "representation_id"),
     }
+    if format_version == FORMAT_VERSION:
+        body["source_fixture"] = {
+            "fixture_digest": fixture["fixture_digest"],
+            "fixture_id": fixture["fixture_id"],
+        }
+    else:
+        body["release_status"] = _actual_file_release_status(
+            rulespec_core["release_status"],
+            source_input_type,
+        )
+        body["source_input"] = {
+            "input_digest": source_input_digest,
+            "input_id": source_input_id,
+            "input_path": source_input_path,
+            "input_type": _require_string(source_input_type, "source input type"),
+        }
     release = seal_document_release(body)
     validate_document_release(release, rulespec_core_path=rulespec_core_path)
     return release
@@ -1334,6 +1642,40 @@ def validate_document_release(
 ) -> None:
     """Validate canonical identity, record facts, coordinates, and closure."""
 
+    format_version = release.get("format_version")
+    expected_acquisition_release_ref: str | None = None
+    source_input_digest: str | None = None
+    if format_version == FORMAT_VERSION:
+        document_policy_version = DOCUMENT_ELIGIBILITY_POLICY_VERSION
+        allowed_passage_policies = frozenset({PASSAGE_POLICY_VERSION})
+        allowed_core_statuses = frozenset({"fixture"})
+        source_pin_field = "source_fixture"
+        declared_passage_policies = frozenset({PASSAGE_POLICY_VERSION})
+    elif format_version == ACTUAL_FILE_FORMAT_VERSION:
+        document_policy_version = ACTUAL_DOCUMENT_ELIGIBILITY_POLICY_VERSION
+        allowed_passage_policies = frozenset(
+            {PDF_PASSAGE_POLICY_VERSION, MARKUP_PASSAGE_POLICY_VERSION}
+        )
+        allowed_core_statuses = frozenset({"candidate", "fixture", "published"})
+        source_pin_field = "source_input"
+        passage_policy_value = (
+            release.get("policies", {}).get("passage_generation")
+            if isinstance(release.get("policies"), Mapping)
+            else None
+        )
+        if (
+            not isinstance(passage_policy_value, list)
+            or not passage_policy_value
+            or passage_policy_value != sorted(set(passage_policy_value))
+            or not all(isinstance(value, str) for value in passage_policy_value)
+        ):
+            raise DocumentReleaseError("actual-file passage policies must be sorted unique strings")
+        declared_passage_policies = frozenset(passage_policy_value)
+        if not declared_passage_policies.issubset(allowed_passage_policies):
+            raise DocumentReleaseError("actual-file release names an unknown passage policy")
+    else:
+        raise DocumentReleaseError("DocumentRelease type or format version differs")
+
     expected_root = {
         "acquisition_coverage",
         "document_versions",
@@ -1346,7 +1688,7 @@ def validate_document_release(
         "release_id",
         "released_at",
         "rulespec_core_release",
-        "source_fixture",
+        source_pin_field,
         "source_links",
         "source_observation_captures",
         "source_observations",
@@ -1356,27 +1698,66 @@ def validate_document_release(
         "structural_passages",
         "text_representations",
     }
+    if format_version == ACTUAL_FILE_FORMAT_VERSION:
+        expected_root.add("release_status")
     _require_exact_keys(release, expected_root, "DocumentRelease")
-    if release["record_type"] != "DocumentRelease" or release["format_version"] != FORMAT_VERSION:
+    if release["record_type"] != "DocumentRelease":
         raise DocumentReleaseError("DocumentRelease type or format version differs")
+    expected_policy_value: str | list[str] = (
+        PASSAGE_POLICY_VERSION
+        if format_version == FORMAT_VERSION
+        else sorted(declared_passage_policies)
+    )
     if release["policies"] != {
-        "document_eligibility": DOCUMENT_ELIGIBILITY_POLICY_VERSION,
-        "passage_generation": PASSAGE_POLICY_VERSION,
+        "document_eligibility": document_policy_version,
+        "passage_generation": expected_policy_value,
     }:
         raise DocumentReleaseError("DocumentRelease policy pins differ")
-    core = _load_rulespec_core_fixture(rulespec_core_path)
+    core = _load_rulespec_core_release(
+        rulespec_core_path,
+        allowed_statuses=allowed_core_statuses,
+    )
     if release["rulespec_core_release"] != {
         "release_digest": core["release_digest"],
         "release_id": core["release_id"],
     }:
         raise DocumentReleaseError("DocumentRelease Rulespec Core pin differs")
     _require_string(release["released_at"], "DocumentRelease released_at")
-    source_fixture = release["source_fixture"]
-    if not isinstance(source_fixture, Mapping):
-        raise DocumentReleaseError("DocumentRelease source_fixture must be an object")
-    _require_exact_keys(source_fixture, {"fixture_digest", "fixture_id"}, "DocumentRelease source fixture pin")
-    _require_string(source_fixture["fixture_id"], "DocumentRelease source fixture ID")
-    _require_digest(source_fixture["fixture_digest"], "DocumentRelease source fixture digest")
+    source_pin = release[source_pin_field]
+    if not isinstance(source_pin, Mapping):
+        raise DocumentReleaseError(f"DocumentRelease {source_pin_field} must be an object")
+    if format_version == FORMAT_VERSION:
+        _require_exact_keys(source_pin, {"fixture_digest", "fixture_id"}, "DocumentRelease source fixture pin")
+        _require_string(source_pin["fixture_id"], "DocumentRelease source fixture ID")
+        _require_digest(source_pin["fixture_digest"], "DocumentRelease source fixture digest")
+    else:
+        _require_exact_keys(
+            source_pin,
+            {"input_digest", "input_id", "input_path", "input_type"},
+            "DocumentRelease source input pin",
+        )
+        _require_digest(source_pin["input_digest"], "DocumentRelease source input digest")
+        _require_string(source_pin["input_id"], "DocumentRelease source input ID")
+        _require_string(source_pin["input_path"], "DocumentRelease source input path")
+        _require_string(source_pin["input_type"], "DocumentRelease source input type")
+        source_input_digest = str(source_pin["input_digest"])
+        input_kind = str(source_pin["input_type"])
+        acquisition_kind = {
+            "CapturedFileManifest": "file-manifest",
+            "EvaluationSourceLock": "source-lock",
+        }.get(input_kind)
+        if acquisition_kind is None:
+            raise DocumentReleaseError("DocumentRelease source input type has no acquisition binding")
+        expected_acquisition_release_ref = (
+            f"urn:spicyregs:acquisition-release:{acquisition_kind}:"
+            + source_input_digest.removeprefix("sha256:")
+        )
+        expected_status = _actual_file_release_status(
+            core["release_status"],
+            input_kind,
+        )
+        if release["release_status"] != expected_status:
+            raise DocumentReleaseError("DocumentRelease status contradicts its Rulespec Core input")
 
     source_records = _record_index(release, "source_record_versions", "source_record_version_id")
     source_objects: dict[str, SourceRecordVersion] = {}
@@ -1403,6 +1784,7 @@ def validate_document_release(
             source_record_id=str(record["source_record_id"]),
             source_url=str(record["source_url"]),
             content=record["content"],
+            eligibility_policy_version=document_policy_version,
         )
         if rebuilt.as_record() != record or rebuilt.source_record_version_id != identifier:
             raise DocumentReleaseError(f"SourceRecordVersion {identifier} identity or digest differs")
@@ -1432,15 +1814,39 @@ def validate_document_release(
             if source.publisher == record["publisher"] and source.source_record_id == record["source_record_id"]
         ]
         if not matching or any(
-            classify_source_record(source.publisher, source.collection) != "document" for source in matching
+            classify_source_record(
+                source.publisher,
+                source.collection,
+                policy_version=document_policy_version,
+            )
+            != "document"
+            for source in matching
         ):
             raise DocumentReleaseError(f"DocumentVersion {identifier} is not document-only eligible")
+        projection = record["artifact_projection"]
+        if not isinstance(projection, Mapping):
+            raise DocumentReleaseError(f"DocumentVersion {identifier} Artifact projection must be an object")
+        _require_exact_keys(
+            projection,
+            {
+                "artifact_id",
+                "artifact_type",
+                "content_digest",
+                "coordinate_system",
+                "evidence_grade",
+                "media_type",
+            },
+            "DocumentVersion Artifact projection",
+        )
         rebuilt = DocumentVersion.create(
             publisher=str(record["publisher"]),
             source_record_id=str(record["source_record_id"]),
             source_issued_version_id=str(record["source_issued_version_id"]),
             document_type=str(record["document_type"]),
             content_digest=str(record["content_digest"]),
+            coordinate_system=str(projection["coordinate_system"]),
+            evidence_grade=str(projection["evidence_grade"]),
+            media_type=str(projection["media_type"]),
         )
         if rebuilt.as_record() != record or rebuilt.document_version_id != identifier:
             raise DocumentReleaseError(f"DocumentVersion {identifier} identity differs")
@@ -1481,6 +1887,13 @@ def validate_document_release(
         )
         if rebuilt.as_record() != record:
             raise DocumentReleaseError(f"SourceRenditionCapture {identifier} identity differs")
+        if (
+            expected_acquisition_release_ref is not None
+            and rebuilt.acquisition_release_ref != expected_acquisition_release_ref
+        ):
+            raise DocumentReleaseError(
+                f"SourceRenditionCapture {identifier} is not bound to the source input"
+            )
     if {str(record["source_rendition_ref"]) for record in rendition_captures.values()} != set(renditions):
         raise DocumentReleaseError("every SourceRendition must have at least one immutable capture event")
 
@@ -1532,12 +1945,27 @@ def validate_document_release(
         representation_objects[identifier] = rebuilt
         artifact_ids.add(rebuilt.artifact_id)
     for document_id, document in documents.items():
-        if not any(
-            representation.document_version_ref == document_id
-            and representation.text_digest == document["content_digest"]
+        document_representations = [
+            representation
             for representation in representation_objects.values()
+            if representation.document_version_ref == document_id
+        ]
+        if not document_representations:
+            raise DocumentReleaseError(f"DocumentVersion {document_id} has no text representation")
+        projection = cast(Mapping[str, Any], document["artifact_projection"])
+        if projection["media_type"] == "text/plain; charset=utf-8":
+            if not any(
+                representation.text_digest == document["content_digest"]
+                for representation in document_representations
+            ):
+                raise DocumentReleaseError(f"DocumentVersion {document_id} has no exact content representation")
+        elif not any(
+            rendition["document_version_ref"] == document_id
+            and rendition["bytes_digest"] == document["content_digest"]
+            and rendition["media_type"] == projection["media_type"]
+            for rendition in renditions.values()
         ):
-            raise DocumentReleaseError(f"DocumentVersion {document_id} has no exact content representation")
+            raise DocumentReleaseError(f"DocumentVersion {document_id} has no exact source-byte rendition")
 
     passages = _record_index(release, "structural_passages", "passage_id")
     passage_objects: dict[str, StructuralPassage] = {}
@@ -1570,6 +1998,10 @@ def validate_document_release(
             passage_policy_version=str(record["passage_policy_version"]),
             selector_kind=str(record["selector_kind"]),
         )
+        if rebuilt.passage_policy_version not in allowed_passage_policies:
+            raise DocumentReleaseError(
+                f"StructuralPassage {identifier} names a policy outside the release profile"
+            )
         if rebuilt.as_record(representation.artifact_id) != record:
             raise DocumentReleaseError(f"StructuralPassage {identifier} coordinate, digest, or projection differs")
         passage_objects[identifier] = rebuilt
@@ -1634,6 +2066,11 @@ def validate_document_release(
         raise DocumentReleaseError("passage coverage does not account for every text representation")
     if covered_passages != set(passage_objects):
         raise DocumentReleaseError("passage coverage does not account for every structural passage exactly once")
+    actual_passage_policies = frozenset(
+        passage.passage_policy_version for passage in passage_objects.values()
+    )
+    if actual_passage_policies != declared_passage_policies:
+        raise DocumentReleaseError("DocumentRelease passage policy pins do not match its passages")
 
     observations = _record_index(release, "source_observations", "observation_id")
     observation_objects: dict[str, SourceObservation] = {}
@@ -1698,6 +2135,13 @@ def validate_document_release(
         )
         if rebuilt.as_record() != record:
             raise DocumentReleaseError(f"SourceObservationCapture {identifier} identity differs")
+        if (
+            expected_acquisition_release_ref is not None
+            and rebuilt.acquisition_release_ref != expected_acquisition_release_ref
+        ):
+            raise DocumentReleaseError(
+                f"SourceObservationCapture {identifier} is not bound to the source input"
+            )
     if {str(record["source_observation_ref"]) for record in observation_captures.values()} != set(observations):
         raise DocumentReleaseError("every SourceObservation must have at least one immutable capture event")
 
@@ -1759,7 +2203,7 @@ def validate_document_release(
         {"capture_refs", "coverage_id", "entries", "policy_version", "requested_sources"},
         "AcquisitionCoverage",
     )
-    if acquisition["policy_version"] != DOCUMENT_ELIGIBILITY_POLICY_VERSION:
+    if acquisition["policy_version"] != document_policy_version:
         raise DocumentReleaseError("acquisition coverage policy differs")
     requested_sources = acquisition["requested_sources"]
     if (
@@ -1769,6 +2213,20 @@ def validate_document_release(
         or not all(isinstance(source, str) and source for source in requested_sources)
     ):
         raise DocumentReleaseError("acquisition coverage requested sources must be sorted unique strings")
+    requested_source_bases = {
+        _requested_source_base(
+            source,
+            require_selection=format_version == ACTUAL_FILE_FORMAT_VERSION,
+        )
+        for source in requested_sources
+    }
+    if source_input_digest is not None and any(
+        source.partition("#selection=")[2] != source_input_digest
+        for source in requested_sources
+    ):
+        raise DocumentReleaseError("requested source selection differs from the source input")
+    if len(requested_source_bases) != len(requested_sources):
+        raise DocumentReleaseError("requested source selections must have unique source bases")
     all_capture_ids = set(rendition_captures) | set(observation_captures)
     if acquisition["capture_refs"] != sorted(all_capture_ids):
         raise DocumentReleaseError("acquisition coverage capture references are incomplete")
@@ -1776,6 +2234,7 @@ def validate_document_release(
     if not isinstance(entries, list) or entries != sorted(entries, key=canonical_json):
         raise DocumentReleaseError("acquisition coverage entries must be a sorted array")
     covered_record_refs: set[str] = set()
+    covered_source_bases: set[str] = set()
     for entry in entries:
         if not isinstance(entry, Mapping):
             raise DocumentReleaseError("acquisition coverage entries must be objects")
@@ -1784,7 +2243,8 @@ def validate_document_release(
         record_ref = entry["record_ref"]
         reason = entry["reason"]
         source_key = f"{entry['source']}:{entry['collection']}"
-        if source_key not in requested_sources:
+        covered_source_bases.add(source_key)
+        if source_key not in requested_source_bases:
             raise DocumentReleaseError("acquisition coverage entry names an unrequested source")
         if state in {"captured", "excluded"}:
             if record_ref not in source_records:
@@ -1798,7 +2258,11 @@ def validate_document_release(
                 source_record["collection"],
             ):
                 raise DocumentReleaseError("acquisition coverage entry names the wrong source record tuple")
-            role = classify_source_record(str(entry["source"]), str(entry["collection"]))
+            role = classify_source_record(
+                str(entry["source"]),
+                str(entry["collection"]),
+                policy_version=document_policy_version,
+            )
             if state == "captured" and role != "document":
                 raise DocumentReleaseError("non-document source record cannot be captured into document scope")
             if state == "excluded" and role == "document":
@@ -1813,6 +2277,8 @@ def validate_document_release(
             raise DocumentReleaseError(f"{state} acquisition entry requires no record and a typed reason")
     if covered_record_refs != set(source_records):
         raise DocumentReleaseError("acquisition coverage does not account for every source record")
+    if covered_source_bases != requested_source_bases:
+        raise DocumentReleaseError("acquisition coverage does not account for every requested source")
     acquisition_identity = {
         "capture_refs": acquisition["capture_refs"],
         "entries": entries,
@@ -1829,10 +2295,15 @@ def validate_document_release(
         raise DocumentReleaseError("DocumentRelease canonical identity differs")
 
 
-def write_document_release(path: Path, release: Mapping[str, Any]) -> None:
+def write_document_release(
+    path: Path,
+    release: Mapping[str, Any],
+    *,
+    rulespec_core_path: Path = DEFAULT_RULESPEC_CORE_PATH,
+) -> None:
     """Write one canonical UTF-8 release with a trailing newline."""
 
-    validate_document_release(release)
+    validate_document_release(release, rulespec_core_path=rulespec_core_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(canonical_json(dict(release)) + "\n", encoding="utf-8")
 

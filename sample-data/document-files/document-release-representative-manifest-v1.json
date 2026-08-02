@@ -1,0 +1,89 @@
+{
+  "coverage_gaps": [],
+  "documents": [
+    {
+      "adapter": "captured-rendition/v1",
+      "captures": [
+        {
+          "observation_basis": "sealed-source-lock",
+          "observed_at": "2026-07-24"
+        }
+      ],
+      "collection": "bills",
+      "document": {
+        "document_type": "Congressional bill",
+        "primary_rendition_key": "source-file",
+        "source_issued_version_id": "BILLS-109s2977is"
+      },
+      "key": "bill-html-short",
+      "publisher": "congress",
+      "renditions": [
+        {
+          "bytes_digest": "sha256:fcd3675460e10150f0f150dccf1d08470ada847b7fa4edb8aaafe420bfe432ff",
+          "key": "source-file",
+          "media_type": "text/html",
+          "path": "bill-html-short.html",
+          "source_url": "https://www.govinfo.gov/content/pkg/BILLS-109s2977is/html/BILLS-109s2977is.htm"
+        }
+      ],
+      "source_record": {
+        "content": {
+          "bill_number": "2977",
+          "bill_type": "s",
+          "congress": "109",
+          "edition": "is",
+          "rendition_bytes_digest": "sha256:fcd3675460e10150f0f150dccf1d08470ada847b7fa4edb8aaafe420bfe432ff",
+          "source_record_id": "109-s-2977",
+          "source_url": "https://www.govinfo.gov/content/pkg/BILLS-109s2977is/html/BILLS-109s2977is.htm"
+        },
+        "source_record_id": "109-s-2977",
+        "source_url": "https://www.govinfo.gov/content/pkg/BILLS-109s2977is/html/BILLS-109s2977is.htm"
+      }
+    },
+    {
+      "adapter": "captured-rendition/v1",
+      "captures": [
+        {
+          "observation_basis": "sealed-source-lock",
+          "observed_at": "2026-07-24"
+        }
+      ],
+      "collection": "sections",
+      "document": {
+        "document_type": "CFR section",
+        "primary_rendition_key": "source-file",
+        "source_issued_version_id": "CFR-2025-title30-vol3-sec716-2"
+      },
+      "key": "cfr-xml-short",
+      "publisher": "cfr",
+      "renditions": [
+        {
+          "bytes_digest": "sha256:4a6471fa7548dbd4402ae386c8c6f709907fe5be3afff90313d0802284b2cb98",
+          "key": "source-file",
+          "media_type": "application/xml",
+          "path": "cfr-xml-short.xml",
+          "source_url": "https://www.govinfo.gov/content/pkg/CFR-2025-title30-vol3/xml/CFR-2025-title30-vol3-sec716-2.xml"
+        }
+      ],
+      "source_record": {
+        "content": {
+          "citation": "30 CFR 716.2",
+          "edition": "2025-07-01",
+          "rendition_bytes_digest": "sha256:4a6471fa7548dbd4402ae386c8c6f709907fe5be3afff90313d0802284b2cb98",
+          "section": "716.2",
+          "source_record_id": "CFR-2025-title30-vol3-sec716-2",
+          "source_url": "https://www.govinfo.gov/content/pkg/CFR-2025-title30-vol3/xml/CFR-2025-title30-vol3-sec716-2.xml"
+        },
+        "source_record_id": "CFR-2025-title30-vol3-sec716-2",
+        "source_url": "https://www.govinfo.gov/content/pkg/CFR-2025-title30-vol3/xml/CFR-2025-title30-vol3-sec716-2.xml"
+      }
+    }
+  ],
+  "format_version": "spicyregs-document-files/v1",
+  "manifest_id": "spicyregs-real-html-xml-representative-v1",
+  "released_at": "2026-08-01T00:00:00Z",
+  "requested_sources": [
+    "cfr:sections",
+    "congress:bills"
+  ]
+}

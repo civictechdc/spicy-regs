@@ -1,0 +1,3 @@
+# Captured source fixtures are byte-pinned; do not rewrite publisher whitespace.
+sample-data/document-files/*.html -whitespace
+sample-data/document-files/*.xml -whitespace
