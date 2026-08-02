@@ -471,6 +471,8 @@ above was recomputed; the artifact is still the one this document pins.
 | `8e680d9` | `3 CFR … Comp.` recognized, never identified | 2 |
 | `ef6c2d5` | U.S.C. chapter grammar + chapter URN | 4 |
 | `a31605b` | Docket join key published on `fr_docket_links` | — |
+| `52754a8` | USLM source-credit reader + sealed index (3,721 rows) | 4/6 |
+| `d60dd6b` | Two-source resolution, disagreement refusal, re-derivation driver | 4/6 |
 
 **12 of the 14 in-scope strings now parse.** The 7 regex ones reach the
 identity their standard spelling already minted; the 5 compilation strings are
@@ -697,6 +699,14 @@ as a section going nowhere.
 
 ### The division discriminator, and the half of it that shipped
 
+> **Superseded in part, 2026-08-02.** The closing paragraph's "next increment"
+> is built — see **"USLM source credits: built, and what the build contradicts"**
+> below. The measured cost figures it quotes are corrected there. Everything
+> above that paragraph stands: the range rule, its asymmetry, and the 826
+> withdrawn resolutions are unchanged, and the source credits now corroborate the
+> asymmetry directly. The corpus counts in this section are superseded by
+> **67 / 48 / 19**.
+
 Table III cannot tell two acts apart because it is keyed by the enacting public
 law. Both halves of a discriminator turned out to be **already in the pages the
 build fetches, and both were being discarded**:
@@ -762,6 +772,16 @@ increment. It was deliberately not half-built here.
 
 ### USLM source credits: measured, parser proven, artifact NOT built
 
+> **Superseded 2026-08-02 by "USLM source credits: built, and what the build
+> contradicts" below.** It is built. Every count in this section was re-derived
+> from the archive through committed code and **five of them are wrong** — the
+> credit total, the loose and strict triple counts, the quarantine count, and the
+> self-consistency claim. The corrected figures, and why each moved, are in the
+> superseding section. The three verified cases, the strict rule, the `7652`
+> false positive and both findings reproduce exactly and are unchanged. This
+> section is kept because the reasoning that produced the rule is the durable
+> part; its arithmetic is not.
+
 Investigated to close the 826 combinations the page-range rule cannot soundly
 decide. The mechanism works and is measured; **the artifact was not built** —
 see the honest status at the end of this section.
@@ -813,12 +833,222 @@ at Large page falls inside its own division's range.
    already records, now observed rather than inferred — and it refuses rather
    than misidentifies, which is the direction it was designed to fail in.
 
-**Status: not built.** The parse above is a measurement script, not committed
+**Status: not built.** ~~The parse above is a measurement script, not committed
 code. The artifact, the loader wiring, the tests and the re-derivation are not
 done, and nothing in the shipped resolver consults source credits — the corpus
-counts remain 67/46/21 and the two named cases remain refusals. This section
-exists so the mechanism, the strict rule, the counts and the verified answers
-survive; building it is the next increment.
+counts remain 67/46/21 and the two named cases remain refusals.~~ **Built
+2026-08-02** — `52754a8` (source + artifact) and `d60dd6b` (loader, resolver,
+driver). See below. This section exists so the mechanism, the strict rule, the
+counts and the verified answers survive; building it is the next increment.
+
+### USLM source credits: built, and what the build contradicts
+
+Supersedes the two sections above. Everything here is re-derived from the
+archive through committed code — `spicy_regs.sources.uscode_uslm`,
+`tools/build_usc_source_credit_artifact.py`,
+`spicy_regs.ontology.act_index.SourceCreditIndex`, and
+`tools/measure_act_relative_resolution.py` — rather than from the measurement
+script that discovered it. That distinction already cost this project once: the
+first act-index numbers depended on a collapse policy living in no committed
+code, and first-wins and last-wins gave different answers from identical bytes.
+
+**The design decision that shaped the build: two sources, not a tiebreaker.**
+`26 U.S.C. 6038E` is not among Table III's three rows for (116-260, §107) at
+all, so no rule that picks among Table III's rows could ever have found it. The
+credit index is therefore a **second source with its own coverage**, and the
+resolver consults both and states which one answered. Measured over the 222
+unambiguous credit triples whose public law Table III was actually fetched for:
+
+| | n |
+|---|---:|
+| Table III has **no** in-division row — the credits are the only source | **172** |
+| the two agree | 30 |
+| **the two disagree** | **5** |
+| credit target `rkaf:us-usc` cannot spell, so not comparable | 15 |
+
+**A disagreement is a coverage fact, not noise, and its cause is now known.** It
+means the act section classified to more than one place and each source retained
+a different one. All five:
+
+| key | Table III | source credits |
+|---|---|---|
+| 114-94, div. C, §32101 | `22:2714a` | `26:7345` |
+| 116-260, div. CC, §407 | `15:9097` | `42:1395i-6` |
+| 116-260, div. S, §102 | `20:80t` | `42:16298` |
+| 116-260, div. Z, §1007 | `42:17064` | `42:17086` |
+| 117-328, div. FF, §3401 | `21:350a-1` | `21:350m` |
+
+The first is checked to the bytes: FAST Act §32101 enacted both, and
+`22 U.S.C. 2714a`'s credit reads `(Pub. L. 114–94, div. C, title XXXII, § 32101,
+…)` with **no enactment construction**, so the strict rule does not retain it.
+Both sources are right and neither is complete. The resolver publishes
+`sources_disagree` and no identifier — never a third answer.
+
+#### What the build contradicts in the section above
+
+Re-measured from the same 109 MB archive
+(`sha256:55c8d19543c4a972a33e33532b592ac3984c83fdcb04de9f5a64ef1f8483d300`,
+release point 119-102).
+
+| | recorded above | re-derived | why |
+|---|---:|---:|---|
+| source credits scanned | ~~50,998~~ | **51,548** | the same document already said 51,548 two sections earlier; 50,998 was the outlier |
+| loose triples | ~~13,153~~ | **13,122** | a different expression over the same bytes; conclusion unchanged |
+| loose multi-target | ~~2,932~~ | **2,916** | as above |
+| strict triples | ~~2,207~~ | **2,202** | as above |
+| unambiguous | ~~1,882~~ | **1,877** | as above |
+| multi-target | 325 | **325** | reproduces exactly |
+| quarantined | ~~26~~ | **0** | see below |
+| (public law, division) pairs | ~~617~~ | **292** strict / 615 loose | 617 was the *loose* figure and is not the index's key space |
+
+**Quarantine is zero, and that is a claim about attribution rather than about
+tolerance.** A credit is attributed to the section that *contains* it, read from
+the XML tree; on this release point every strict-rule credit lands in a
+`/us/usc/tN/sX` section. 549 of the 51,548 credits sit under no section at all
+(chapter-level and appendix credits) and none of them carries an enactment
+construction. The quarantine machinery exists, has two declared reasons, and is
+tested against synthetic unattributable credits — a zero here is a measurement,
+not an absence of the check.
+
+**The self-consistency claim was too strong, and it fails in the safe
+direction.** The section above says "every retained citation's Statutes at Large
+page falls inside its own division's range". Checked directly — 2,590
+(triple, page) pairs whose division the act index bounds:
+
+| | n |
+|---|---:|
+| inside the range | 1,950 |
+| **below the range start** | **640** |
+| above the range end | **0** |
+
+Every failure is range-**start**-too-high, which is exactly the false-refusal
+mode already recorded, and **not one is range-end-too-low**. The popular-name
+tool states where an *act* begins, and an act may begin well inside its
+division. So the asymmetry the range rule rests on — everything-outside refuses
+soundly, a surviving tie still refuses — survives intact and is now corroborated
+from the authoritative source rather than argued. The sentence that claimed a
+clean pass does not.
+
+#### Two findings the build produced that the measurement did not
+
+1. **USLM and Table III spell a section suffix with different dashes.** USLM
+   writes `/us/usc/t16/s824s–1` with an EN DASH (U+2013); Table III, the citation
+   grammar and `rkaf:us-usc` all write a hyphen. Title 16 alone carries **1,487
+   en-dash section identifiers and zero hyphen ones**, so it is a spelling
+   convention of the source, not a distinction it draws. **278 of the artifact's
+   3,721 rows carry it, and with the dash left in, zero of them are expressible
+   as a `rkaf:us-usc` identifier at all** — 188 become expressible once it is
+   straightened. In the source comparison the effect is 18 of the 222 comparable
+   triples discarded as unspellable rather than joined, **10 of them agreements
+   with Table III**. Straightened under a pinned rule, with the verbatim
+   identifier carried alongside so nothing is lost.
+2. **124 of the artifact's 3,721 rows name a section `rkaf:us-usc` cannot
+   spell.** The space admits one letter of suffix (`\d+[a-z]?(-\d+[a-z]?)?`) and
+   the Code writes three: `12 U.S.C. 1831cc`, `21 U.S.C. 360bbb-3`. They refuse
+   with `usc_section_not_expressible` rather than being mangled into an
+   identifier. Widening the lexical space is an identity decision and this does
+   not make it.
+
+#### The artifact
+
+`output/usc-source-credit-index-2026-08-02`, schema
+`usc-source-credit-artifact-v1`, parser `uscode-uslm-parser-v1`. Three real
+builds byte-identical:
+
+| Output | sha256 | Rows |
+|---|---|---:|
+| `usc-source-credits.parquet` | `d377545fe60d592a…` | 3,721 |
+| `quarantine.parquet` | `69072c28c0a8c299…` | 0 |
+| `receipt.json` | `98d39f27da5391a1…` | — |
+
+```sh
+uv run python tools/build_usc_source_credit_artifact.py \
+    --output output/usc-source-credit-index-2026-08-02 \
+    --archive /tmp/uscall.zip --release-point 119-102
+```
+
+3,721 rows over 2,202 triples: 1,877 unambiguous and 325 multi-target, whose
+**1,844 rows are kept and marked** `refusal='multi_target'` rather than dropped.
+"The source said two things" is a different fact from "the source said nothing"
+and they call for different fixes. Every row carries its Statutes at Large page
+(zero rows without one) and the verbatim USLM identifier. The receipt pins the
+archive digest **and all 58 member digests**, so a count is attributable to the
+bytes it was read from rather than only to the bundle they arrived in.
+
+#### Re-derived through the committed loaders
+
+```sh
+uv run python tools/measure_act_relative_resolution.py \
+    --act-index output/usc-act-index-2026-08-02 \
+    --source-credits output/usc-source-credit-index-2026-08-02 \
+    --detection output/citation-bakeoff-2026-08-02/detection.json
+```
+
+| | Table III alone | both sources |
+|---|---:|---:|
+| corpus citations found | 67 | 67 |
+| **resolved** | 46 | **48** |
+| **unresolved** | 21 | **19** |
+| `act_section_not_classified` | 8 | 8 |
+| `usc_section_not_expressible` | 6 | 6 |
+| `source_incomplete` | 4 | 4 |
+| **`act_section_outside_act`** | **3** | **1** |
+
+Both gains are `answered_by: source_credits`, and they are the two named cases:
+
+    sec. 107 of the Taxpayer Certainty and Disaster Tax Relief Act of 2020
+      (Pub. L. 116-260, Division EE)   -> urn:rkaf:us:usc:26:6038e @ 134 Stat. 3048
+    SECURE 2.0 Act of 2022, sec. 303   -> urn:rkaf:us:usc:29:1153  @ 136 Stat. 5339
+    SECURE 2.0 Act of 2022, sec. 120   -> nothing from either source -> still refuses
+
+**No existing resolution changed and none was lost.** All 46 Table III answers
+survive as `answered_by: table3`, and the corpus produces zero
+`sources_disagree`.
+
+**The ambiguous combinations.** 471 `(table3_key, act_section)` pairs carry more
+than one classification row, spanning **29,284 (act, act section)
+combinations** — the ones the page-range rule narrows but deliberately does not
+decide.
+
+| | Table III alone | both sources |
+|---|---:|---:|
+| resolved | 0 | **71**, all `source_credits` |
+| `act_section_outside_act` | 25,329 | 25,270 |
+| `act_section_ambiguous` | 3,955 | 3,943 |
+
+~~27,536 of 29,284 now carry a specific reason~~ — re-derived, the specific
+reason `act_section_outside_act` covers **25,329**, and the other 3,955 are the
+surviving ties. The earlier figure is not reproducible from the committed loader
+and the sealed artifact.
+
+**Why only 71.** The credit index is keyed by (public law, division, act
+section), and only **292** (law, division) pairs carry an enactment construction
+anywhere in the Code — 1,877 unambiguous triples against 29,284 combinations to
+decide. This closes the cases the authority happens to state and no others,
+which is the whole of what a second source can honestly do. The remaining 29,213
+refuse.
+
+**One named hole is not closed.** Pub. L. 119-21, whose Table III page
+`uscode.house.gov` cannot render, has **zero rows** in the credit index. The 4
+corpus citations into it still answer `source_incomplete`, which remains the true
+statement.
+
+#### What this does NOT settle
+
+- **The comparison's denominator is Table III's coverage, not the Code's.** Only
+  24 public laws have a Table III page in the act index, so 222 of the 1,877
+  unambiguous triples are comparable at all. The 172/30/5 split is a fact about
+  those 24 acts. A wider act index would move it and the direction is unknown.
+- **The 5 disagreements are unadjudicated beyond the first.** (114-94, §32101)
+  was checked to the credit bytes; the other four are consistent with the same
+  mechanism and were not individually verified against the Statutes at Large.
+- **The strict rule's recall is not measured.** It is known to exclude real
+  classifications by construction (`22 U.S.C. 2714a`, `21 U.S.C. 350a-1` are two
+  named examples). How many classifications the Code states without an
+  enactment construction is not counted here, and a loose-rule recall figure
+  would be meaningless while the loose rule is unsafe.
+- **Nothing consumes the resolver in production.** As before, this is a driver
+  and a measurement. No pipeline calls `resolve_act_relative_citation`.
 
 ### Queued, not built
 
@@ -830,8 +1060,10 @@ Recorded so the next reader inherits the reasoning rather than rediscovering it.
   atlas generation path. That is RefSpec's decision, made in RefSpec — the atlas
   asset id is its own sha256, so a merge would re-mint it and invalidate the
   pins in two repos.
-* **The three artifact tools now restate `canonical_json`, `file_sha256` and
-  `_pin_path`.** Extracting them means touching two digest-sealed tools and
+* **The ~~three~~ four artifact tools now restate `canonical_json`,
+  `file_sha256`, `_pin_path`, `_write_parquet` and the secret-scan expression.**
+  `build_usc_source_credit_artifact.py` is the fourth and copies all five.
+  Extracting them means touching ~~two~~ three digest-sealed tools and
   re-verifying their byte-identical rebuilds.
 * **EO compilation, if it is ever built.** The investigation below argues the
   demand should be measured first, and that the two tiers must stay separate
