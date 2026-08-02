@@ -1,6 +1,7 @@
 # Citation-parsing bakeoff — current parser vs current + CiteURL, 2026-08-02
 
-**Verdict: do not wire CiteURL. Extend four owned grammars instead.**
+**Verdict: do not wire CiteURL. Extend two owned grammars, and take two
+identity questions to review separately.**
 
 The 2026-07-27 decision ("Citation parsing: supplement-first") recorded an
 exploratory probe and said of it: *"no committed command yet makes it
@@ -12,6 +13,29 @@ Tool: `tools/run_citation_bakeoff.py` with
 `tools/citation_bakeoff_citeurl_worker.py`, tested by
 `tests/test_run_citation_bakeoff.py` (46 tests, run targeted). Artifacts live
 in `output/citation-bakeoff-2026-08-02/` — gitignored, pinned here by digest.
+
+> **Corrections, 2026-08-02 (adversarial review).** Applied in place; struck
+> text is the original claim, kept so the error is auditable. **No artifact
+> byte changed** — every correction is a description of the same sealed data,
+> and each is re-derivable from `adjudication.jsonl` and `detection.json`.
+>
+> 1. The single false positive was described as `54 CFR 05`. It is not: the
+>    compact branch matches greedily and yields **title 5401, part 5405**
+>    (`urn:rkaf:us:cfr:5401:5405`). Corrected below.
+> 2. Two of the 14 in-scope wins are **not** regex-recoverable; they are a
+>    normalization-policy question on the fenced identity surface. Corrected
+>    below.
+> 3. `_PUBLIC_LAW` already accepts an en-dash. The sole gap is the literal
+>    spelling `Pub. Law`. Corrected below.
+> 4. Three of the examples given for the 127-string shared-miss cell were not
+>    in that cell. Replaced, and the cell is restated as a **floor**.
+> 5. The headline gain is **33** clear wins plus 1 partial, not a flat 34.
+> 6. The pilot calls are unreceipted and excluded from the reported spend.
+>
+> One review claim was **not** adopted, because the data contradicts it: the
+> `3 CFR … Comp.` forms are not "detection-true/identity-false today." The
+> project detects them not at all — which is *why* they are CiteURL-only. The
+> wrong reading is CiteURL's, and it is a new finding recorded below.
 
 ## The probe reproduces exactly
 
@@ -124,6 +148,16 @@ relevance grading.
 - **Total spend: $0.245** against a $5.00 cap. Even at ten times the pinned
   price the run stays under the cap.
 
+**Two pilot runs preceded this and are not receipted.** A 6-call pilot
+(~$0.0017) and a 12-call pilot (~$0.0046) ran to scratch directories under
+`/tmp` to size the prompt and catch a budget defect — Gemini 3.6 Flash spends
+output budget on thinking tokens, and the first pilot returned
+`finish_reason="length"` with 13 answer tokens. Their receipts were not kept
+and **their ~$0.006 is excluded from the $0.245 above**. Total actual spend
+across all three runs is approximately **$0.251**; the cap was never at risk.
+Recorded because a spend figure that quietly omits the runs that shaped the
+prompt is not a spend figure.
+
 Prices are pinned estimates ($0.30/$2.50 per Mtok in and out); the token
 counts the provider reported are the durable fact and are recorded next to
 them, so the spend can be recomputed if published pricing differs.
@@ -146,6 +180,16 @@ at 100%. A further 70 agreement-cell strings were adjudicated as a byproduct.
 "garbage" means the string contains no legal citation at all, so detecting
 nothing is the correct answer.
 
+**One judge error is known and located.** `auth-01871`, the string `'3102'`,
+is the lone `citeurl_correct` in the `neither` row. CiteURL fired **zero**
+templates on it, the judge itself answered `contains_citations: false` with an
+empty citation list, and then returned `citeurl_correct` — internally
+inconsistent, and impossible on the face of it, since an arm that detected
+nothing cannot be the one that got it right. It does not touch the 33/1 gain
+figures (those are drawn from the CiteURL-only cell, and `'3102'` is not in
+it), but it is one measured defect in 620 k=1 judgments and it is the kind the
+absent human-correction pass exists to catch.
+
 ### False positives — the safety half
 
 | Arm | Claimed a citation in a string that has none |
@@ -154,13 +198,28 @@ nothing is the correct answer.
 | CiteURL | **0** of 620 |
 
 CiteURL never manufactured a citation on this corpus. The single project false
-positive is `'5401-5405'`, read as 54 CFR 05 by `parse_cfr_citation`'s
-compact-key branch, which matches any bare `N-M` string.
+positive is `'5401-5405'`: `parse_cfr_citation`'s compact-key branch matches
+any bare `N-M` string, ~~reading it as 54 CFR 05~~ and here matching **greedily**
+to yield `CfrCitation(title='5401', part='5405')` →
+`urn:rkaf:us:cfr:5401:5405`. There is no title 5401. (The original text said
+"54 CFR 05"; a fixer sent after that would hunt a misparse that does not
+exist.)
+
+**It is latent, not live.** The compact branch is only reachable from a bare
+string, and the column that feeds CFR parsing in production —
+`federal_register.cfr_references_json` — carries structured objects
+(`{"title": 10, "part": null, …}`), never bare `N-M` text. Zero of its 14,524
+distinct values reach the compact branch. The defect is real and worth
+closing, but nothing in the current pipeline triggers it.
 
 ## Verdict per citation family
 
-Counts are citation instances from adjudicated ground truth; one string may
-carry several, so columns do not sum to string counts.
+Counts are citation instances from adjudicated ground truth, counting
+`citeurl_correct` verdicts only; one string may carry several, so columns do
+not sum to string counts. (~~The FR volume/page row previously read 14~~, which
+silently mixed in a `both_partial` record while every other row counted clear
+wins alone. Counted the same way as its neighbours it is **12 instances across
+10 strings**.)
 
 | Family | CiteURL adds (project cannot see) | Project detects, CiteURL misses | Both miss |
 |---|---:|---:|---:|
@@ -169,7 +228,7 @@ carry several, so columns do not sum to string counts.
 | PL | 2 | 21 | 9 |
 | EO | **0** | **95** | 7 |
 | Stat | 0 | 0 | 2 |
-| FR volume/page | **14** | n/a — no project grammar | — |
+| FR volume/page | **12** | n/a — no project grammar | — |
 | FR document number | 0 | 0 | 0 |
 | docket | 0 | 0 | 0 |
 | RIN | 0 | 0 | 0 |
@@ -180,49 +239,115 @@ Family notes:
 - **EO — CiteURL has no Executive Order template at all.** 95 EO citations,
   every one detected by the project and missed by CiteURL. This is the single
   largest block in the disagreement population and it runs against CiteURL.
-- **FR volume/page is CiteURL's largest genuine win (14).** The two "FR"
-  families are different things: CiteURL reads `89 FR 1234` (volume/page); the
-  project reads a document number (`2026-13078`). Neither reads the other's.
-  Scoring them as one family would have credited each arm with the other's
-  capability.
+- **FR volume/page is CiteURL's largest genuine win (12 instances, 10
+  strings).** The two "FR" families are different things: CiteURL reads
+  `89 FR 1234` (volume/page); the project reads a document number
+  (`2026-13078`). Neither reads the other's. Scoring them as one family would
+  have credited each arm with the other's capability.
 - **USC (5), CFR (7), PL (2) — all spelling variants**, not missing
   capability. These are the complete list of 14 in-scope wins:
 
-  | Form | Strings |
-  |---|---|
-  | `3 CFR, YYYY Comp., p. N` — the EO compilation form | 5 |
-  | `48 CFR 1.301-1.304`, `and 49 CFR 1.89.` — range and leading conjunction | 2 |
-  | `49 U.S. Code 106`, `49 U.S. Code 44715` — "U.S. Code" spelled out | 2 |
-  | `50 U.S.C.A. 4701(a)` — U.S.C. **Annotated** | 1 |
-  | `I.R.C. 337(d)`, `IRC 382(m)` — Internal Revenue Code | 2 |
-  | `Pub. Law 111–296`, `Pub. Law 119-21, …` — "Pub. Law" + en-dash | 2 |
+  | Form | Strings | Recoverable by |
+  |---|---|---|
+  | `49 U.S. Code 106`, `49 U.S. Code 44715` — "U.S. Code" spelled out | 2 | regex |
+  | `50 U.S.C.A. 4701(a)` — U.S.C. **Annotated** | 1 | regex |
+  | `I.R.C. 337(d)`, `IRC 382(m)` — Internal Revenue Code | 2 | regex |
+  | `Pub. Law 111–296`, `Pub. Law 119-21, …` — the spelling `Pub. Law` | 2 | regex |
+  | | **7** | **pure regex** |
+  | `3 CFR, YYYY Comp., p. N` — the EO compilation form | 5 | regex **+ identity rule** |
+  | `48 CFR 1.301-1.304`, `and 49 CFR 1.89.` | 2 | **normalization policy — see below** |
 
-- **"other" (10)** is DC Official Code (6) and U.S. caselaw (3) — outside the
-  federal regulatory scope this parser serves, and the decision record already
-  routes judicial citation to eyecite rather than CiteURL.
+  The last two are **already detected** by `_CFR_STANDARD` (title 48/part 1
+  and title 49/part 1, with sections `301-1.304` and `89.`). They are then
+  dropped by `_cfr_section`'s fail-closed normalization, which refuses a
+  section token it cannot express, and `_cfr_from_match` correctly returns
+  `None` rather than publish a citation with a section it had to discard.
+  Recovering them means deciding what a sub-section range and a trailing-dot
+  section normalize *to* — a change on the fenced identity surface the
+  decision record protects ("project-owned `canonical_*` functions assign
+  identity; block unreviewed identity changes"). That is a policy decision,
+  not a regex, and this bakeoff does not make it.
+
+- **"other" (10)** is DC Official Code (5), U.S. caselaw (3), one INA
+  act-relative section, and one Secretary's Order matched through the Federal
+  Register template — outside the federal regulatory scope this parser serves,
+  and the decision record already routes judicial citation to eyecite rather
+  than CiteURL. (~~Previously given as "DC Official Code (6) and U.S. caselaw
+  (3)"~~.)
 - **Act-relative sections are not a CiteURL win.** CiteURL fires its INA
   template on `INA sec. 103(a)(1)`, but the judge classified all four such
   strings as act-relative "other" and credited CiteURL on only one — the other
   three are the `neither` verdicts in the CiteURL-only cell. Act-relative
   references belong to the shared-miss problem below, not to the gain column.
 
+- **CiteURL's largest in-scope "win" is a wrong parse** (found while checking
+  a review claim). On the five `3 CFR … Comp.` strings CiteURL reads the
+  **year as the section**:
+
+  | String | CiteURL tokens | Matched text |
+  |---|---|---|
+  | `3 CFR, 1977 Comp., p. 123` | `title=3, section=1977` | `3 CFR, 1977` |
+  | `3 CFR, 1980 Comp., p. 298` | `title=3, section=1980` | `3 CFR, 1980` |
+  | `3 CFR, 1959-1963 Comp.` | `title=3, section=1959-1963` | `3 CFR, 1959-1963` |
+
+  There is no 3 CFR § 1977. The string cites the Title 3 *annual compilation*
+  for 1977 at page 123, which is how an Executive Order's compilation location
+  is written. The judge scored these `citeurl_correct` on the question it was
+  asked — *is there a citation here?* — and there is. But the parse behind the
+  detection is wrong, and the page number, which is the part that identifies
+  the order, is discarded.
+
+  This sharpens the recommendation rather than changing it: whatever grammar
+  covers this form must resolve to the **Executive Order** the compilation
+  cites, not to a phantom CFR section. It also removes any remaining appeal in
+  wiring CiteURL here — adopting it for this form would import the wrong
+  reading along with the detection.
+
 ## The measured gain
 
-CiteURL correctly detects **34 strings of 4,777 (0.71%)** that the project's
-free-text grammars cannot.
+CiteURL detects **33 strings of 4,777 (0.69%)** that the project's free-text
+grammars cannot, plus 1 more scored `both_partial`. ~~34 strings (0.71%)~~ —
+the original figure summed clear wins and the partial together.
 
 Strip what the decision record already routes elsewhere — FR volume/page and
 caselaw are the eyecite trigger, DC Code is out of scope — and the **in-scope
-federal gain is 14 strings, 0.29%**. Every one of those 14 is a spelling
-variant of a form the project already parses.
+federal gain is 14 strings, 0.29%**: 12 spelling variants of forms the project
+already parses, and 2 that it already detects and deliberately declines to
+normalize.
 
-Against that: the **shared-miss cell is 127 strings (2.7% of the population)**
-— real citations neither arm detects, 3.7x CiteURL's total gain and 9x its
-in-scope gain. CiteURL closes none of it. Its largest components are USC
-chapter citations (`49 U.S.C. ch. 311`, `5 U.S.C. Ch. 63`) and act-relative
-sections (`PHS Act secs. 2791(b)(5) and 2792`, `ERISA sec. 803`,
-`Exchange Act 15(c)`, `sec. 3505 of the Modernization of Cosmetics Regulation
-Act of 2022`), plus presidential proclamations and treaty citations.
+Against that: the **shared-miss cell is at least 127 strings (2.7% of the
+population)** — real citations neither arm detects, 3.8x CiteURL's clear gain
+and 9x its in-scope gain. CiteURL closes none of it. Its largest measured
+components are **USC chapter citations (31 strings** — `49 U.S.C. ch. 311`,
+`5 U.S.C. Ch. 63`, `22 USC Ch. 34- The Peace Corps Act`) and act-relative
+sections (`Clean Air Act sec. 112`, `Clean Air Act sec. 111(b)(1)(B)`,
+`Exchange Act 15(c)`, `FAST Act sec. 3022`), plus presidential proclamations
+and treaty citations.
+
+**127 is a floor, not a point estimate**, because the judge's
+`garbage`/`neither` boundary is unstable on exactly these act-relative forms.
+The clearest evidence is a minimal pair — the same citation, two spellings,
+opposite verdicts:
+
+| String | Verdict |
+|---|---|
+| `Clean Air Act sec. 112` | `neither` (counted in the 127) |
+| `Clean Air Act Section 112` | `garbage` (excluded from the 127) |
+| `Clean Air Act sec. 111(b)(1)(B)` | `neither` |
+| `Clean Air Act section 111` | `garbage` |
+
+Whether an act-relative section reference "is a citation" is a real judgment
+call, and the judge did not make it consistently. **The error direction
+strengthens the conclusion**: every act-relative string wrongly sorted into
+`garbage` belongs in the shared-miss cell, so the true gap is larger than 127
+and the case for spending effort there rather than on a package is stronger,
+not weaker.
+
+~~Three strings were previously offered as examples of this cell —
+`PHS Act secs. 2791(b)(5) and 2792`, `ERISA sec. 803`, and `sec. 3505 of the
+Modernization of Cosmetics Regulation Act of 2022`. All three were adjudicated
+`garbage` and are not in the 127.~~ They are, however, precisely the forms the
+boundary instability affects, which is why they were miscited here.
 
 ## Recommendation
 
@@ -238,24 +363,40 @@ dependency does not close.
 
 Do this instead, in order of measured value:
 
-1. **Extend four owned grammars** to cover the spellings tabulated above,
-   which is a few characters of regex each and keeps identity project-owned:
-   `U.S. Code` spelled out, `U.S.C.A.` and `I.R.C.`/`IRC` in `_USC_STANDARD`;
-   `Pub. Law` and the en-dash in `_PUBLIC_LAW`; the `3 CFR, YYYY Comp., p. N`
-   compilation form in the CFR grammar. That recovers all 14 in-scope wins
-   without adding a package — and each one is a case the bakeoff has already
-   written down, so the change is testable against this artifact.
-2. **Fix the one false positive.** Guard `parse_cfr_citation`'s compact-key
-   branch so it does not fire on free authority text; `'5401-5405'` is not
-   54 CFR 05.
-3. **Aim at the 127-string shared miss**, which is the largest real gap and
-   which no evaluated package addresses: USC chapter citations and
-   act-relative section references.
-4. **Leave the eyecite trigger exactly as the decision record writes it.** FR
-   volume/page (14) plus caselaw (3) is the largest single CiteURL-only
-   bucket, and the decision already routes it to a separate eyecite evaluation
-   when FR volume-page extraction becomes active. This bakeoff supplies the
-   number that trigger will need; it does not fire it.
+1. **Extend two owned grammars** — **7** of the 14 in-scope wins, pure regex,
+   no identity change: `U.S. Code` spelled out, `U.S.C.A.`, and `I.R.C.`/`IRC`
+   in `_USC_STANDARD` (5 strings); the literal spelling `Pub. Law` in
+   `_PUBLIC_LAW` (2 strings). ~~and the en-dash~~ — `_PUBLIC_LAW` already
+   accepts `[-–—]`, and one of the two strings uses a plain hyphen, so the dash
+   was never the gap.
+2. **Decide two identity questions** covering the remaining **7**. These are
+   policy, not pattern-matching, and the decision record fences them off from
+   unreviewed change:
+   - **The `3 CFR, YYYY Comp., p. N` compilation form (5 strings).** Needs both
+     a new pattern *and* a rule for what it resolves to. It should yield the
+     **Executive Order** identity, not a CFR section — CiteURL's reading
+     (`title=3, section=1977`) is wrong, and copying it would be worse than
+     detecting nothing.
+   - **Sub-section ranges and trailing-dot sections (2 strings)** —
+     `1.301-1.304`, `89.`. Both are already detected by `_CFR_STANDARD` and
+     deliberately dropped by `_cfr_section`'s fail-closed rule. Changing that
+     rule is an identity change and needs review, not a bakeoff verdict.
+
+   7 + 7 = the 14 in-scope wins; half are regex, half are policy.
+3. **Fix the one false positive.** Guard `parse_cfr_citation`'s compact-key
+   branch so it does not fire on free text: `'5401-5405'` currently yields
+   `urn:rkaf:us:cfr:5401:5405`. Latent rather than live today (nothing in the
+   pipeline feeds it bare strings), so this is hygiene, not an incident.
+4. **Aim at the shared miss (≥127 strings)**, the largest real gap and one no
+   evaluated package addresses: USC chapter citations (31 measured) and
+   act-relative section references. Settling the `garbage`/`neither` boundary
+   for act-relative forms is a prerequisite — it is currently inconsistent,
+   and the true cell is larger than 127.
+5. **Leave the eyecite trigger exactly as the decision record writes it.** FR
+   volume/page (12 instances over 10 strings) plus caselaw (3) is the largest
+   single CiteURL-only bucket, and the decision already routes it to a separate
+   eyecite evaluation when FR volume-page extraction becomes active. This
+   bakeoff supplies the number that trigger will need; it does not fire it.
 
 Detection is complementary rather than substitutable, which is the honest
 summary: inside the agreement cell there are 32 strings where both arms fire
@@ -294,7 +435,16 @@ document number as a CFR citation. Both are recorded in
 - **The human correction has not happened.** The protocol specifies "frontier
   model first pass, async human correction." This is the first pass only:
   k=1, one model, no second opinion, no human review. The verdicts are
-  evidence, not an oracle.
+  evidence, not an oracle — and two measured defects show why: one internally
+  inconsistent judgment (`auth-01871`), and an unstable `garbage`/`neither`
+  boundary on act-relative section references, where the same citation in two
+  spellings drew opposite verdicts.
+- **Whether an act-relative reference is a citation was never settled.**
+  `Clean Air Act sec. 112` is a real reference to a real provision, but it
+  names no code, title, or section number that resolves without knowing which
+  act. The rubric left this to the judge and the judge was inconsistent. Any
+  future measurement of the shared-miss cell has to decide this first, because
+  it moves the cell size materially.
 - **There is no held-out split.** The full population was adjudicated, so
   under the 2026-07-27 gold and held-out protocol these 620 items are now
   permanently development data. A future "material held-out gain" claim needs
