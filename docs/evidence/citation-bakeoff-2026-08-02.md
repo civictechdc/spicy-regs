@@ -629,7 +629,7 @@ The 21 that do not resolve each say why, and none of them guesses:
 | 8 | `act_section_not_classified` — no Table III row (usually an amending section that classified nowhere) |
 | 6 | `usc_section_not_expressible` — a note, a range, or an "et seq." |
 | 4 | `source_incomplete` — one act's Table III page is unreadable (`119-21`) |
-| 3 | `act_section_ambiguous` — several acts share the enacting Public Law |
+| 3 | `act_section_outside_act` — every candidate row lies outside the citing act's division |
 
 **Table III is keyed by the enacting Public Law, not by the act, and that
 matters.** Pub. L. 116-260 carries 94 popular names and 117-328 carries 70, so
@@ -639,9 +639,8 @@ in the artifact. The first implementation mapped that pair to a single row,
 discarding 1,060 of 10,976 rows and letting the artifact's row sort pick the
 survivor. It produced a wrong identity: `sec. 107 of the Taxpayer Certainty and
 Disaster Tax Relief Act of 2020` → `urn:rkaf:us:usc:49:60122`, pipeline-safety
-civil penalties, for a tax act. All 471 pairs now refuse. The discriminator is
-often in the source text ("Division EE") and the rows carry Statutes-at-Large
-ranges, so resolving is possible later — refusing comes first.
+civil penalties, for a tax act. All 471 pairs refuse; the discriminator added
+below narrows them and, deliberately, still does not decide them.
 
 **The acronym problem solved itself, and the alias rule came from the data.**
 "ERISA" is an entry in the tool in its own right — 17 citations, the largest
@@ -657,22 +656,22 @@ Still refused, correctly: `INA sec. 103(a)(1)`, `PHS Act secs. 2791(b)(5)`,
 they stand for is the guess the identity fence exists to stop.
 
 **Both tables are now a digest-pinned artifact**, `output/usc-act-index-2026-08-02`
-(`tools/build_usc_act_index_artifact.py`, schema `usc-act-index-artifact-v1`,
-parser `uscode-olrc-parser-v1`). Two real builds byte-identical across all four
+(`tools/build_usc_act_index_artifact.py`, schema `usc-act-index-artifact-v2`,
+parser `uscode-olrc-parser-v2`). Two real builds byte-identical across all four
 files:
 
 | Output | sha256 | Rows |
 |---|---|---:|
-| `usc-popular-names.parquet` | `389fa8fc1e438334…` | 20,865 |
-| `usc-act-sections.parquet` | `31c4f15cd61d52f3…` | 10,976 |
+| `usc-popular-names.parquet` | `603d5b072133d8fe…` | 20,865 |
+| `usc-act-sections.parquet` | `93c4981ec437f08c…` | 10,976 |
 | `quarantine.parquet` | `c2d956c67dd05203…` | 1 |
-| `receipt.json` | `4cfb04c6d62a4fac…` | — |
+| `receipt.json` | `8f117a54c6e027e1…` | — |
 
-13,626 distinct names; 24 acts reached, 1 incomplete. The 67/47/20 above are
+13,626 distinct names; 24 acts reached, 1 incomplete. 8,451 of the 10,976 rows
+carry a Statutes at Large page and 1,549 popular names carry a division — the
+two halves of the discriminator, added in v2. The 67/46/21 above are
 **re-derived through the sealed parquet**, not from the script that discovered
-them, and the unresolved 20 carry declared codes rather than prose: 8
-`act_section_not_classified`, 6 `usc_section_not_expressible`, 4
-`source_incomplete`, 2 `classification_not_current`.
+them, and the unresolved 21 carry declared codes rather than prose.
 
 `spicy_regs.ontology.act_index` is the driver and `ActIndex.from_artifact` is
 the loader, so the measurement is re-derived from the pinned bytes rather than
@@ -695,6 +694,71 @@ attempts" says the client gave up, not what the server did. The 4 citations into
 that act resolve to `source_incomplete` rather than the false
 `act_section_not_classified`. A hole in the evidence is not the same fact
 as a section going nowhere.
+
+### The division discriminator, and the half of it that shipped
+
+Table III cannot tell two acts apart because it is keyed by the enacting public
+law. Both halves of a discriminator turned out to be **already in the pages the
+build fetches, and both were being discarded**:
+
+* The Popular Name Tool states each act's division and where it begins —
+  `Pub. L. 116-260, div. EE, Dec. 27, 2020, 134 Stat. 3038`. The parser read the
+  name and dropped the rest.
+* Every Table III row states the page its classification sits on, in the
+  statviewer link whose query string carries the volume the link text omits.
+
+Artifact **v2** keeps both. The U.S. Code's own source credits confirm the join
+from a second, independent OLRC surface — they state the division per section,
+and their pages are exactly the three Table III gives for (116-260, §107):
+
+    20 U.S.C. 80t-5  ← Pub. L. 116-260, div. T,  title I, §107, 134 Stat. 2276
+    33 U.S.C. 701h-3 ← Pub. L. 116-260, div. AA, title I, §107, 134 Stat. 2623
+    49 U.S.C. 60122  ← Pub. L. 116-260, div. R,  title I, §107, 134 Stat. 2221
+
+**Validation against those credits found two defects, and only one was fixable.**
+
+1. The range end was taken from the next *act's* start rather than the next
+   *division's*. Many popular names are a title inside a division, not the whole
+   of one — the AI in Government Act of 2020 begins at 134 Stat. 2286 inside
+   div. U — so the range truncated the division. Fixed by keying the boundaries
+   on the division at its earliest page. Agreement rose from 414 of 1,350 acts
+   to **1,067 of 1,349 (79.1%)**.
+2. The residual is structural and points the dangerous way. Popular names do not
+   mark division boundaries at all, so a division whose acts the tool never
+   names leaves the previous range overrunning into it. Measured against the
+   credits, **2,240 of the 34,113 pages such a range accepts — 6.6% — belong to
+   a different division.**
+
+So the rule decides in one direction only, and the asymmetry is the point:
+
+* **Every row outside the range → `act_section_outside_act`.** Sound despite the
+  range being only an upper bound, because a page outside a range that is too
+  *wide* is outside the true one.
+* **A tie surviving the range → still refuses.** Narrowing on a rule measured
+  wrong 6.6% of the time would mint exactly the identifier this work exists to
+  prevent.
+
+826 combinations would have resolved under the unsound half. They refuse. That
+is the honest number, and it is the guardrail working rather than a shortfall.
+
+Both named cases now carry the specific reason rather than a vague one. The
+Taxpayer Certainty and Disaster Tax Relief Act of 2020 is div. EE from 134 Stat.
+3038 and its three candidates sit at 2221/2276/2623; SECURE 2.0 is div. T from
+136 Stat. 5275 and its two sit at 4926/5114. Every candidate is outside, so the
+section belongs to a sibling act — which is the true answer, not a hedge.
+
+The citation grammar also reads a stated division (`div. L`, `Division EE`) and
+refuses with `act_division_conflict` when the citation's division contradicts
+the act it names. Two corpus strings state a division; the
+`(Pub. L. 116-260, Division EE)` spelling used to illustrate the problem is not
+among them, which is recorded rather than assumed.
+
+**What would resolve the remaining ties, and what it costs.** USLM's per-section
+division, which needs no range at all. Measured rather than estimated: the whole
+Code is one **109 MB** zip fetched in **49 s**, giving **51,548** source credits
+across 58 titles, of which **13,720 (26.6%)** name `Pub. L. N-M, div. X`,
+yielding **617** distinct (public law, division) pairs. That is the next
+increment. It was deliberately not half-built here.
 
 ### Queued, not built
 
