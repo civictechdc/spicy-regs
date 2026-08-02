@@ -11,7 +11,6 @@ import pytest
 from spicy_regs.ontology.citations import normalize_popular_name
 from spicy_regs.sources.uscode_olrc import (
     PopularNameIndex,
-    PopularNameRecord,
     Table3Record,
     parse_popular_names,
     parse_table3,
@@ -72,6 +71,94 @@ TABLE3 = """
 """
 
 
+# uscode.house.gov/table3/116_260.htm — the three rows that share act section
+# 107 under one public law. The Statutes at Large page is what tells them apart.
+TABLE3_SHARED_PUBLIC_LAW = """
+  <tr class="table3row_even"> <td class="actsection">107</td>
+   <td class="statutesatlargepage"><a href="/statviewer.htm?volume=134&page=2221" target="_blank">2221</a></td>
+   <td class="unitedstatescodetitle">49</td>
+   <td class="unitedstatescodesection"><a href="/view.xhtml?req=granuleid:USC-prelim-title49-section60122">60122</a></td>
+   <td class="unitedstatescodestatus"></td></tr>
+  <tr class="table3row_odd"> <td class="actsection">107</td>
+   <td class="statutesatlargepage"><a href="/statviewer.htm?volume=134&page=2276" target="_blank">2276</a></td>
+   <td class="unitedstatescodetitle">20</td>
+   <td class="unitedstatescodesection"><a href="/view.xhtml?req=granuleid:USC-prelim-title20-section80t-5">80t-5</a></td>
+   <td class="unitedstatescodestatus"></td></tr>
+"""
+
+# uscode.house.gov/popularnames — the act side of the same discriminator.
+POPULAR_NAMES_DIVISIONS = """
+<div id='TCDTRA' class='popular-name-table-entry' release-point='119-102'>
+    <p class='popular-name'>Taxpayer Certainty and Disaster Tax Relief Act of 2020</p>
+    <p class='popular-name-information' content-type='cite' t3searchkey='116-260' datekey='2020-12-27'>Pub. L. <a href="/table3/116_260.htm">116-260, div. EE</a>, Dec. 27, 2020,<a href="/statviewer.htm?volume=134&amp;page=3038">134 Stat. 3038</a></p>
+  </div>
+<div id='WRDA' class='popular-name-table-entry' release-point='119-102'>
+    <p class='popular-name'>Water Resources Development Act of 2020</p>
+    <p class='popular-name-information' content-type='cite' t3searchkey='116-260' datekey='2020-12-27'>Pub. L. 116-260, div. AA, Dec. 27, 2020,<a href="/statviewer.htm?volume=134&amp;page=2615">134 Stat. 2615</a></p>
+  </div>
+<div id='CAA2021' class='popular-name-table-entry' release-point='119-102'>
+    <p class='popular-name'>Consolidated Appropriations Act, 2021</p>
+    <p class='popular-name-information' content-type='cite' t3searchkey='116-260' datekey='2020-12-27'>Pub. L. 116-260, Dec. 27, 2020,<a href="/statviewer.htm?volume=134&amp;page=1182">134 Stat. 1182</a></p>
+  </div>
+"""
+
+
+def test_a_table_three_row_carries_the_statutes_at_large_citation():
+    """The volume lives only in the link's query string; the page is in both.
+
+    Discarding this was what left 471 (public law, act section) pairs with no
+    way to tell one act from another.
+    """
+    rows = parse_table3(TABLE3_SHARED_PUBLIC_LAW)
+
+    assert [(r.statutes_at_large_volume, r.statutes_at_large_page) for r in rows] == [
+        ("134", "2221"),
+        ("134", "2276"),
+    ]
+
+
+def test_a_row_whose_link_states_no_page_reports_none():
+    """Some Table III links carry a volume and an empty page."""
+    (row,) = parse_table3(
+        '<tr class="table3row_odd"><td class="actsection">111</td>'
+        '<td class="statutesatlargepage"><a href="/statviewer.htm?volume=69&page="></a></td>'
+        '<td class="unitedstatescodetitle">42</td>'
+        '<td class="unitedstatescodesection">7411</td>'
+        '<td class="unitedstatescodestatus"></td></tr>'
+    )
+    assert (row.statutes_at_large_volume, row.statutes_at_large_page) == ("69", None)
+
+
+def test_an_act_states_the_division_and_page_where_it_begins():
+    """ "Pub. L. 116-260, div. EE, ... 134 Stat. 3038" — both halves, from the tool."""
+    records = {r.name: r for r in parse_popular_names(POPULAR_NAMES_DIVISIONS) if r.content_type == "cite"}
+
+    tcdtra = records["Taxpayer Certainty and Disaster Tax Relief Act of 2020"]
+    assert (tcdtra.division, tcdtra.statutes_at_large_volume, tcdtra.statutes_at_large_page) == (
+        "EE",
+        "134",
+        "3038",
+    )
+    wrda = records["Water Resources Development Act of 2020"]
+    assert (wrda.division, wrda.statutes_at_large_page) == ("AA", "2615")
+
+
+def test_an_act_that_is_the_whole_public_law_states_no_division():
+    """ "Consolidated Appropriations Act, 2021" is all of 116-260, not a division.
+
+    It must not be given a division it does not have: an act with no division
+    spans the whole law, and treating its start page as a division boundary
+    would carve the law at the wrong place.
+    """
+    (record,) = [
+        r
+        for r in parse_popular_names(POPULAR_NAMES_DIVISIONS)
+        if r.name == "Consolidated Appropriations Act, 2021" and r.content_type == "cite"
+    ]
+    assert record.division is None
+    assert record.statutes_at_large_page == "1182"
+
+
 def _by_name(records, name, content_type):
     return next(r for r in records if r.name == name and r.content_type == content_type)
 
@@ -96,16 +183,12 @@ def test_the_enacting_citation_carries_the_table_three_key_and_the_code_anchor()
     """ "Clean Air Act" -> Table III 1955:360, and 42 U.S.C. 7401 et seq."""
     record = _by_name(parse_popular_names(POPULAR_NAMES), "Clean Air Act", "cite")
 
-    assert record == PopularNameRecord(
-        name="Clean Air Act",
-        content_type="cite",
-        table3_key="1955:360",
-        usc_title="42",
-        usc_section="7401",
-        see_also=None,
-        release_point="119-102",
-        stated=record.stated,
-    )
+    assert (record.name, record.content_type, record.table3_key) == ("Clean Air Act", "cite", "1955:360")
+    assert (record.usc_title, record.usc_section) == ("42", "7401")
+    assert (record.see_also, record.release_point) == (None, "119-102")
+    # An act that is its own public law states no division.
+    assert record.division is None
+    assert (record.statutes_at_large_volume, record.statutes_at_large_page) == ("69", "322")
     assert "69 Stat. 322" in record.stated
 
 
@@ -143,6 +226,8 @@ def test_table_three_maps_an_act_section_to_the_code_section_it_became():
         usc_title="42",
         usc_section="7411",
         status=None,
+        # The Clean Air Act's rows link a volume with no page.
+        statutes_at_large_volume="69",
         statutes_at_large_page=None,
     )
     assert records[1].usc_section == "7412"

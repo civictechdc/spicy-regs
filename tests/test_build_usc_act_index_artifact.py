@@ -62,8 +62,8 @@ def _build(tmp_path, acts):
 def test_the_artifact_seals_both_tables_and_a_receipt(tmp_path, stub_fetch):
     receipt = _build(tmp_path, ["clean air act"])
 
-    assert receipt["schema_version"] == "usc-act-index-artifact-v1"
-    assert receipt["parser_version"] == "uscode-olrc-parser-v1"
+    assert receipt["schema_version"] == "usc-act-index-artifact-v2"
+    assert receipt["parser_version"] == "uscode-olrc-parser-v2"
     assert receipt["coverage"]["distinct_names"] == 3
     assert receipt["coverage"]["act_section_rows"] == 1
     names = pq.read_table(tmp_path / "usc-popular-names.parquet").to_pylist()
@@ -115,6 +115,18 @@ def test_an_unreadable_page_is_a_named_hole_not_a_missing_row(tmp_path, stub_fet
     assert [(r["source"], r["reason"], r["table3_key"]) for r in quarantined] == [
         ("table3", "source_incomplete", "99-999")
     ]
+
+
+def test_the_division_discriminator_is_pinned_with_its_derivation(tmp_path, stub_fetch):
+    """v2 exists for this: the discriminator, and where each half comes from."""
+    rules = _build(tmp_path, ["clean air act"])["rules"]
+
+    assert rules["division_discriminator"] == "act-division-statutes-at-large-range-v1"
+    derivation = rules["division_discriminator_derivation"]
+    assert "neither is inferred" in derivation
+    assert "div. EE" in derivation and "134 Stat. 3038" in derivation
+    # The one derived step is named as derived.
+    assert "division END is derived" in derivation
 
 
 def test_the_alias_year_rule_is_pinned_with_its_derivation(tmp_path, stub_fetch):

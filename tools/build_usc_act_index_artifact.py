@@ -51,6 +51,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 from spicy_regs.ontology.act_index import (  # noqa: E402
     ALIAS_MAX_DEPTH,
     ALIAS_YEAR_RULE,
+    DIVISION_RULE,
     UNRESOLVED_REASONS,
 )
 from spicy_regs.ontology.citations import (  # noqa: E402
@@ -66,11 +67,11 @@ from spicy_regs.sources.uscode_olrc import (  # noqa: E402
     table3_url,
 )
 
-ARTIFACT_SCHEMA_VERSION = "usc-act-index-artifact-v1"
+ARTIFACT_SCHEMA_VERSION = "usc-act-index-artifact-v2"
 
 #: The parser this artifact was produced by. Bump when a parse changes shape,
 #: so a receipt cannot silently describe bytes a different parser would read.
-PARSER_VERSION = "uscode-olrc-parser-v1"
+PARSER_VERSION = "uscode-olrc-parser-v2"
 
 POPULAR_NAME_COLUMNS = (
     "name",
@@ -82,8 +83,19 @@ POPULAR_NAME_COLUMNS = (
     "see_also",
     "see_also_key",
     "release_point",
+    "division",
+    "statutes_at_large_volume",
+    "statutes_at_large_page",
 )
-ACT_SECTION_COLUMNS = ("table3_key", "act_section", "usc_title", "usc_section", "status")
+ACT_SECTION_COLUMNS = (
+    "table3_key",
+    "act_section",
+    "usc_title",
+    "usc_section",
+    "status",
+    "statutes_at_large_volume",
+    "statutes_at_large_page",
+)
 QUARANTINE_COLUMNS = ("source", "reason", "table3_key", "raw_value")
 
 #: A build must not seal a secret. The scan is over what is written, not what
@@ -202,6 +214,9 @@ def build(output_dir: Path, *, cache_dir: Path | None, detection_path: Path | No
                 "see_also": record.see_also,
                 "see_also_key": normalize_popular_name(record.see_also) if record.see_also else None,
                 "release_point": record.release_point,
+                "division": record.division,
+                "statutes_at_large_volume": record.statutes_at_large_volume,
+                "statutes_at_large_page": record.statutes_at_large_page,
             }
         )
 
@@ -261,6 +276,8 @@ def build(output_dir: Path, *, cache_dir: Path | None, detection_path: Path | No
                     "usc_title": row.usc_title,
                     "usc_section": row.usc_section,
                     "status": row.status,
+                    "statutes_at_large_volume": row.statutes_at_large_volume,
+                    "statutes_at_large_page": row.statutes_at_large_page,
                 }
             )
 
@@ -284,6 +301,8 @@ def build(output_dir: Path, *, cache_dir: Path | None, detection_path: Path | No
             "popular_name_rows": len(name_rows),
             "distinct_names": len({r["name_key"] for r in name_rows}),
             "act_section_rows": len(section_rows),
+            "act_section_rows_with_stat_page": sum(1 for r in section_rows if r["statutes_at_large_page"]),
+            "acts_with_division": sum(1 for r in name_rows if r["division"]),
             "quarantine_rows": len(quarantine),
             "quarantine_reasons": dict(sorted(Counter(r["reason"] for r in quarantine).items())),
         },
@@ -308,6 +327,18 @@ def build(output_dir: Path, *, cache_dir: Path | None, detection_path: Path | No
             "alias_max_depth": ALIAS_MAX_DEPTH,
             "unresolved_reasons": list(UNRESOLVED_REASONS),
             "name_normalization": "casefold, collapse whitespace, strip edge punctuation, straighten apostrophes and dashes",
+            "division_discriminator": DIVISION_RULE,
+            "division_discriminator_derivation": (
+                "Table III is keyed by the enacting public law, and one public law may enact "
+                "dozens of acts (116-260 enacts 94). Both halves of the discriminator are stated "
+                "by OLRC and neither is inferred: the Popular Name Tool states each act's division "
+                "and the Statutes at Large page where it begins ('Pub. L. 116-260, div. EE, ... 134 "
+                "Stat. 3038'), and every Table III row states the page its classification sits on. "
+                "A row belongs to the act whose division contains its page. Only the division END "
+                "is derived -- from the next division's start, which is exact because divisions "
+                "partition the volume -- and an act stating no division spans its whole public law "
+                "and bounds nothing."
+            ),
         },
         "outputs": {
             _pin_path(path): {"digest": file_sha256(path), "rows": pq.ParquetFile(path).metadata.num_rows}

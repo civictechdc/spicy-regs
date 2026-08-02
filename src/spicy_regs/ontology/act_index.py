@@ -47,6 +47,25 @@ ALIAS_YEAR_RULE = "supply-trailing-year-when-exactly-one-act-supplies-it"
 #: chains are one or two hops; this bounds a cycle without licensing one.
 ALIAS_MAX_DEPTH = 8
 
+#: How an act is told apart from the others its public law enacted.
+#:
+#: Both halves are stated by OLRC; neither is inferred. The Popular Name Tool
+#: states each act's division and the Statutes at Large page where it begins
+#: ("Pub. L. 116-260, div. EE, Dec. 27, 2020, 134 Stat. 3038"), and every
+#: Table III row states the page its classification sits on. A row belongs to
+#: the act whose division contains its page.
+#:
+#: Only the division *end* is derived, from the next division's start, and that
+#: is exact rather than estimated: divisions partition the volume. An act that
+#: states no division is the whole public law -- "Consolidated Appropriations
+#: Act, 2021" is all of 116-260 -- so it bounds nothing and cannot narrow
+#: anything.
+#:
+#: Independently corroborated against the U.S. Code's own source credits, which
+#: state the division per section: 20 U.S.C. 80t-5 reads "Pub. L. 116-260, div.
+#: T, title I, sec. 107, ... 134 Stat. 2276", and 2276 falls in div. T's range.
+DIVISION_RULE = "act-division-statutes-at-large-range-v1"
+
 _YEAR_SUFFIX = re.compile(r"\s+of\s+(?:1[789]|20)\d{2}$")
 
 #: Every way this module declines to publish an identifier. Codes are data, not
@@ -75,6 +94,16 @@ UNRESOLVED_REASONS = (
     #: Disaster Tax Relief Act of 2020`` became ``urn:rkaf:us:usc:49:60122`` --
     #: pipeline-safety civil penalties, for a tax act.
     "act_section_ambiguous",
+    #: The public law classifies this act section, but every row for it sits
+    #: outside the citing act's own division. The section belongs to a sibling
+    #: act, not this one. Both named wrong identities land here: Table III's
+    #: three rows for (116-260, 107) sit at 134 Stat. 2221/2276/2623 and the
+    #: Taxpayer Certainty and Disaster Tax Relief Act of 2020 is div. EE,
+    #: beginning at 3038.
+    "act_section_outside_act",
+    #: The citation names a division and the act it names sits in a different
+    #: one. The source disagrees with itself about which act is meant.
+    "act_division_conflict",
 )
 
 
@@ -111,12 +140,33 @@ class ActIndex:
     #: Public Law rather than by the act. A single-valued mapping here silently
     #: discarded 1,060 of the sealed artifact's 10,976 rows and let the survivor
     #: be chosen by the row sort -- which is not a citation rule.
-    classifications: Mapping[str, Mapping[str, tuple[tuple[str | None, str | None, str | None], ...]]] = field(
-        default_factory=dict
-    )
+    classifications: Mapping[
+        str, Mapping[str, tuple[tuple[str | None, str | None, str | None, int | None], ...]]
+    ] = field(default_factory=dict)
     #: Table III keys whose page could not be read. Distinguishes "this act
     #: classifies nothing here" from "we could not look".
     incomplete_sources: frozenset[str] = frozenset()
+    #: normalized popular name -> (division, first Statutes at Large page).
+    #: Absent for an act that states no division, which is how "spans the whole
+    #: public law" is represented rather than asserted.
+    division_by_name: Mapping[str, tuple[str, int]] = field(default_factory=dict)
+    #: Table III key -> ordered division start pages, for bounding each range.
+    division_starts: Mapping[str, tuple[int, ...]] = field(default_factory=dict)
+
+    def act_page_range(self, act_key: str) -> tuple[int, int] | None:
+        """The Statutes at Large pages an act occupies, or ``None`` if unbounded.
+
+        ``None`` means the act states no division and therefore spans its whole
+        public law -- it narrows nothing, and a caller must not read that as an
+        empty range.
+        """
+        stated = self.division_by_name.get(act_key)
+        if stated is None:
+            return None
+        _, start = stated
+        table3_key = self.table3_key_by_name.get(act_key)
+        later = [p for p in self.division_starts.get(table3_key, ()) if p > start]
+        return (start, min(later) if later else 1 << 30)
 
     @classmethod
     def from_artifact(cls, artifact_dir: Path) -> ActIndex:
@@ -134,22 +184,33 @@ class ActIndex:
         receipt = json.loads((directory / "receipt.json").read_text(encoding="utf-8"))
         table3_key_by_name: dict[str, str] = {}
         alias_by_name: dict[str, str] = {}
+        division_by_name: dict[str, tuple[str, int]] = {}
+        starts: dict[str, set[int]] = {}
         for row in pq.read_table(directory / "usc-popular-names.parquet").to_pylist():
             if row["content_type"] == "cite" and row["table3_key"]:
                 table3_key_by_name.setdefault(row["name_key"], row["table3_key"])
             if row["see_also_key"]:
                 alias_by_name.setdefault(row["name_key"], row["see_also_key"])
+            if row["content_type"] == "cite" and row["division"] and row["statutes_at_large_page"]:
+                division_by_name.setdefault(
+                    row["name_key"], (row["division"], int(row["statutes_at_large_page"]))
+                )
+                if row["table3_key"]:
+                    starts.setdefault(row["table3_key"], set()).add(int(row["statutes_at_large_page"]))
         classifications: dict[str, dict[str, tuple]] = {}
         for row in pq.read_table(directory / "usc-act-sections.parquet").to_pylist():
             by_section = classifications.setdefault(row["table3_key"], {})
+            page = row["statutes_at_large_page"]
             by_section[row["act_section"]] = by_section.get(row["act_section"], ()) + (
-                (row["usc_title"], row["usc_section"], row["status"]),
+                (row["usc_title"], row["usc_section"], row["status"], int(page) if page else None),
             )
         return cls(
             table3_key_by_name=table3_key_by_name,
             alias_by_name=alias_by_name,
             classifications=classifications,
             incomplete_sources=frozenset(hole["table3_key"] for hole in receipt.get("source_incomplete", ())),
+            division_by_name=division_by_name,
+            division_starts={k: tuple(sorted(v)) for k, v in starts.items()},
         )
 
 
@@ -193,12 +254,32 @@ def resolve_act_relative_citation(citation: ActRelativeCitation, *, index: ActIn
     common = {"act_key": act_key, "table3_key": table3_key}
     if not rows:
         return ActResolution(citation, **common, unresolved_reason="act_section_not_classified")
+    # Several acts may share this public law. The citing act's division bounds a
+    # page range in the Statutes at Large, and a row belongs to the act whose
+    # range contains it. An act stating no division spans the whole law and
+    # narrows nothing, so its rows are left as they are.
+    # A division the citation itself names is the strongest discriminator there
+    # is, because it comes from the source rather than from a range. If it
+    # contradicts the division of the act the name resolved to, the two halves
+    # disagree about which act is meant and nothing here picks a winner.
+    stated = index.division_by_name.get(act_key)
+    if citation.division and stated and citation.division != stated[0]:
+        return ActResolution(citation, **common, unresolved_reason="act_division_conflict")
+
+    page_range = index.act_page_range(act_key)
+    if page_range is not None and len(rows) > 1:
+        low, high = page_range
+        inside = tuple(row for row in rows if row[3] is not None and low <= row[3] < high)
+        if not inside:
+            # Every classification of this act section belongs to a sibling act
+            # in another division. The section is not this act's.
+            return ActResolution(citation, **common, unresolved_reason="act_section_outside_act")
+        rows = inside
     if len(rows) > 1:
-        # Several acts share this Public Law and nothing in the citation says
-        # which one. Refuse: the source text often carries the discriminator
-        # ("Division EE"), but reading it is a separate, reviewable change.
+        # Nothing available discriminates them: either the act states no
+        # division, or several rows sit inside the one it states.
         return ActResolution(citation, **common, unresolved_reason="act_section_ambiguous")
-    usc_title, usc_section, status = rows[0]
+    usc_title, usc_section, status, _page = rows[0]
     if status:
         return ActResolution(citation, **common, unresolved_reason="classification_not_current")
     if not (usc_title and usc_section):

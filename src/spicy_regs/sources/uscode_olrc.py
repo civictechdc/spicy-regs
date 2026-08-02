@@ -93,6 +93,18 @@ _SEE_TARGET = re.compile(r"^\s*(?:see|renamed(?:\s+as)?)\s+(?P<target>.+?)\s*$",
 #: U.S.C. identifier grammar excludes ("15:12(b)").
 _USC_KEY = re.compile(r"^(?P<title>[1-9]\d*):(?P<section>[^\s:]+)$")
 
+#: The Statutes at Large citation is the discriminator that tells apart two
+#: acts sharing one enacting public law. Table III states it as link text ("2221")
+#: and, more reliably, in the statviewer query string, which carries the volume
+#: the text omits. Reading the query string is how the volume survives.
+_STATVIEWER = re.compile(r"statviewer\.htm\?volume=(?P<volume>\d+)&(?:amp;)?page=(?P<page>\d*)")
+
+#: "Pub. L. 116-260, div. EE, Dec. 27, 2020, 134 Stat. 3038" -- the enacting
+#: citation the Popular Name Tool states for each act. The division is the other
+#: half of the discriminator, and the page is where the division begins.
+_CITE_DIVISION = re.compile(r"\bdiv\.\s*(?P<division>[A-Z]{1,3})\b")
+_CITE_STAT = re.compile(r"\b(?P<volume>\d+)\s+Stat\.\s+(?P<page>\d+)")
+
 _TABLE3_ROW = re.compile(r'<tr class="table3row_(?:odd|even)">(?P<body>.*?)</tr>', re.DOTALL)
 _TABLE3_CELL = re.compile(r'<td class="(?P<column>[a-z]+)"[^>]*>(?P<value>.*?)</td>', re.DOTALL)
 _TAG = re.compile(r"<[^>]*>")
@@ -136,6 +148,14 @@ class PopularNameRecord:
     see_also: str | None = None
     release_point: str | None = None
     stated: str | None = None
+    #: The division of the enacting public law this act occupies, when the tool
+    #: states one ("div. EE"). One public law may enact dozens of acts, each in
+    #: its own division, and this is the only thing that tells them apart.
+    division: str | None = None
+    #: Where the act begins in the Statutes at Large. With the division above it
+    #: bounds the act inside its public law.
+    statutes_at_large_volume: str | None = None
+    statutes_at_large_page: str | None = None
 
 
 @dataclass(frozen=True)
@@ -151,6 +171,9 @@ class Table3Record:
     usc_title: str | None = None
     usc_section: str | None = None
     status: str | None = None
+    #: Where this classification sits in the Statutes at Large. The row's place
+    #: in the volume is what says which act inside the public law it belongs to.
+    statutes_at_large_volume: str | None = None
     statutes_at_large_page: str | None = None
 
 
@@ -173,6 +196,8 @@ def parse_popular_names(document: str) -> list[PopularNameRecord]:
                 continue
             stated = _text(information.group("text"))
             usc_title, usc_section = _split_usc_key(attributes.get("usckey"))
+            division = _CITE_DIVISION.search(stated) if content_type == "cite" else None
+            stat = _CITE_STAT.search(stated) if content_type == "cite" else None
             alias = _SEE_TARGET.match(stated) if content_type in {"see", "renamed"} else None
             records.append(
                 PopularNameRecord(
@@ -184,6 +209,9 @@ def parse_popular_names(document: str) -> list[PopularNameRecord]:
                     see_also=alias.group("target") if alias else None,
                     release_point=release_point,
                     stated=stated or None,
+                    division=division.group("division") if division else None,
+                    statutes_at_large_volume=stat.group("volume") if stat else None,
+                    statutes_at_large_page=stat.group("page") if stat else None,
                 )
             )
     return records
@@ -198,17 +226,24 @@ def parse_table3(document: str) -> list[Table3Record]:
     """Parse one Table III page into one record per act section."""
     records: list[Table3Record] = []
     for row in _TABLE3_ROW.finditer(document):
-        cells = {column: _text(value) for column, value in _TABLE3_CELL.findall(row.group("body"))}
+        raw = dict(_TABLE3_CELL.findall(row.group("body")))
+        cells = {column: _text(value) for column, value in raw.items()}
         act_section = cells.get("actsection", "")
         if not act_section:
             continue
+        # The link text carries the page; only the query string carries the
+        # volume, and some rows link a volume with no page at all.
+        stat = _STATVIEWER.search(raw.get("statutesatlargepage", ""))
         records.append(
             Table3Record(
                 act_section=act_section,
                 usc_title=cells.get("unitedstatescodetitle") or None,
                 usc_section=cells.get("unitedstatescodesection") or None,
                 status=cells.get("unitedstatescodestatus") or None,
-                statutes_at_large_page=cells.get("statutesatlargepage") or None,
+                statutes_at_large_volume=(stat.group("volume") if stat else None) or None,
+                statutes_at_large_page=(stat.group("page") if stat else None)
+                or cells.get("statutesatlargepage")
+                or None,
             )
         )
     return records

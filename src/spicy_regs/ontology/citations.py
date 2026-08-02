@@ -670,6 +670,11 @@ _ACT_SECTION = re.compile(
     re.IGNORECASE,
 )
 
+#: "div. L", "division J", "Division EE" — the division of the enacting public
+#: law a citation names, when it names one. A public law may enact dozens of
+#: acts, one per division, so this is the discriminator the source text carries.
+_CITED_DIVISION = re.compile(r"\bdiv(?:ision)?\.?\s+(?P<division>[A-Z]{1,3})\b")
+
 #: The inverted spelling: "sec. 3505 of the Modernization of Cosmetics ... Act".
 _ACT_SECTION_OF_THE = re.compile(r"\A\s*of\s+(?:the\s+)?", re.IGNORECASE)
 
@@ -711,6 +716,9 @@ class ActRelativeCitation:
     act_name: str
     act_key: str
     section: str
+    #: The division the citation itself names, when it names one. ``None`` means
+    #: the text stated none — never that it stated the whole law.
+    division: str | None = None
 
 
 def find_act_relative_citations(text: object, *, act_names: Container[str]) -> list[ActRelativeCitation]:
@@ -739,7 +747,19 @@ def find_act_relative_citations(text: object, *, act_names: Container[str]) -> l
         )
         if section is None or named is None:
             continue
-        citation = ActRelativeCitation(act_name=named, act_key=normalize_popular_name(named), section=section)
+        # A division stated anywhere across the citation's own span belongs to
+        # it: "Consolidated Appropriations Act of 2018, div. L, title IV, sec.
+        # 410" puts it between the name and the section, and the inverted
+        # spelling puts it after. The window is the span, not the string, so a
+        # second citation's division is never borrowed.
+        window = document[max(0, marker.start() - len(named) - 40) : marker.end() + 40]
+        stated_division = _CITED_DIVISION.search(window)
+        citation = ActRelativeCitation(
+            act_name=named,
+            act_key=normalize_popular_name(named),
+            section=section,
+            division=stated_division.group("division") if stated_division else None,
+        )
         if citation not in found:
             found.append(citation)
     return found

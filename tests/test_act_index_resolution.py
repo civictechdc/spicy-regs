@@ -42,26 +42,35 @@ INDEX = _Index(
     },
     classifications={
         "1955:360": {
-            "111": (("42", "7411", None),),
-            "112": (("42", "7412", None),),
-            "150-159": (("42", "7450-7459", "Rep."),),
-            "301": (("42", "7601 et seq.", None),),
+            "111": (("42", "7411", None, 322),),
+            "112": (("42", "7412", None, 323),),
+            "150-159": (("42", "7450-7459", "Rep.", 400),),
+            "301": (("42", "7601 et seq.", None, 401),),
         },
-        "93-406": {"803": (("29", "1193b", None),)},
-        "94-469": {"5": (("15", "2604", None),)},
+        "93-406": {"803": (("29", "1193b", None, 940),)},
+        "94-469": {"5": (("15", "2604", None, 2020),)},
         # The real rows for the two ambiguous pairs, from the sealed artifact.
         # Table III is keyed by the enacting Public Law, and 116-260 carries 94
         # popular names; nothing in the citation says which act is meant.
+        # The real rows and their real Statutes at Large pages.
         "116-260": {
             "107": (
-                ("20", "80t-5", None),
-                ("33", "701h-3", None),
-                ("49", "60122", None),
-            )
+                ("20", "80t-5", None, 2276),
+                ("33", "701h-3", None, 2623),
+                ("49", "60122", None, 2221),
+            ),
+            # A section that DOES fall inside div. EE, so the range picks it.
+            "301": (("26", "6001", None, 2221), ("26", "9801", None, 3100)),
         },
-        "117-328": {"120": (("2", "1912", None), ("23", "104 nt", "Elim."))},
+        "117-328": {"120": (("2", "1912", None, 4926), ("23", "104 nt", "Elim.", 5114))},
     },
     incomplete_sources=frozenset({"119-21"}),
+    # Divisions and their first pages, exactly as the Popular Name Tool states.
+    division_by_name={
+        "taxpayer certainty and disaster tax relief act of 2020": ("EE", 3038),
+        "secure 2.0 act of 2022": ("T", 5275),
+    },
+    division_starts={"116-260": (1182, 2221, 2615, 3038), "117-328": (4462, 4926, 5275)},
 )
 
 
@@ -188,34 +197,88 @@ def test_a_resolution_always_states_exactly_one_of_an_identifier_or_a_reason():
 
 
 @pytest.mark.parametrize(
-    ("act", "section", "would_have_been"),
+    ("act", "section", "would_have_been", "pages", "division_start"),
     [
-        # The wrong identity this refusal replaces. `sec. 107 of the Taxpayer
-        # Certainty and Disaster Tax Relief Act of 2020` resolved to
+        # The wrong identity this replaces. `sec. 107 of the Taxpayer Certainty
+        # and Disaster Tax Relief Act of 2020` resolved to
         # urn:rkaf:us:usc:49:60122 -- pipeline-safety civil penalties, for a tax
-        # act -- because the single-valued map kept whichever of three rows the
-        # artifact's row sort happened to leave last.
-        ("Taxpayer Certainty and Disaster Tax Relief Act of 2020", "107", "urn:rkaf:us:usc:49:60122"),
+        # act. The act is div. EE of Pub. L. 116-260, beginning at 134 Stat.
+        # 3038; all three rows for act section 107 sit at 2221, 2276 and 2623,
+        # so every one of them belongs to a sibling act in another division.
+        # Corroborated by the Code's own source credits: 49 U.S.C. 60122 reads
+        # "Pub. L. 116-260, div. R, ... 134 Stat. 2221".
+        (
+            "Taxpayer Certainty and Disaster Tax Relief Act of 2020",
+            "107",
+            "urn:rkaf:us:usc:49:60122",
+            (2221, 2276, 2623),
+            3038,
+        ),
         # And the one whose refusal only *looked* principled: under first-wins
         # this minted urn:rkaf:us:usc:2:1912 (Legislative Branch approps); under
         # last-wins it answered `classification_not_current`, a refusal for the
-        # wrong reason.
-        ("SECURE 2.0 Act of 2022", "120", "urn:rkaf:us:usc:2:1912"),
+        # wrong reason. SECURE 2.0 is div. T of 117-328 beginning at 136 Stat.
+        # 5275; its two candidate rows sit at 4926 and 5114.
+        ("SECURE 2.0 Act of 2022", "120", "urn:rkaf:us:usc:2:1912", (4926, 5114), 5275),
     ],
 )
-def test_a_public_law_carrying_several_acts_refuses_rather_than_picks(act, section, would_have_been):
-    """Table III is keyed by the enacting Public Law, not by the act.
+def test_a_section_outside_the_citing_acts_division_is_not_its_section(
+    act, section, would_have_been, pages, division_start
+):
+    """Table III is keyed by the enacting public law, not by the act.
 
-    116-260 carries 94 popular names and 117-328 carries 70, so one
-    (table3_key, act_section) can name classifications belonging to different
-    acts. Nothing in the citation discriminates them, so nothing here chooses.
+    116-260 enacts 94 popular names and 117-328 enacts 70, so one
+    (table3_key, act_section) names classifications belonging to different acts.
+    The citing act's division bounds a page range, and every candidate row here
+    falls outside it -- so the section is a sibling act's, and the honest answer
+    is that this act does not have one.
     """
     from spicy_regs.ontology.citations import ActRelativeCitation
 
     resolution = resolve_act_relative_citation(
         ActRelativeCitation(act, normalize_popular_name(act), section), index=INDEX
     )
-    assert resolution.iri is None
+    assert resolution.iri is None, "a wrong identifier is worse than no identifier"
+    assert resolution.unresolved_reason == "act_section_outside_act"
+    assert all(page < division_start for page in pages), "the fixture must encode the real pages"
+
+
+def test_the_division_range_picks_the_row_that_is_inside_it():
+    """When one candidate falls in the act's division, that one is the answer.
+
+    This is the resolving half: refusing everything would be safe and useless.
+    """
+    from spicy_regs.ontology.citations import ActRelativeCitation
+
+    resolution = resolve_act_relative_citation(
+        ActRelativeCitation(
+            "Taxpayer Certainty and Disaster Tax Relief Act of 2020",
+            "taxpayer certainty and disaster tax relief act of 2020",
+            "301",
+        ),
+        index=INDEX,
+    )
+    assert resolution.iri == "urn:rkaf:us:usc:26:9801", "the row at 3100 is inside div. EE"
+
+
+def test_an_act_that_states_no_division_narrows_nothing():
+    """ "Consolidated Appropriations Act, 2021" is all of 116-260, not a division.
+
+    It bounds no range, so an ambiguous section under it stays ambiguous rather
+    than being silently narrowed by a range it never stated.
+    """
+    from spicy_regs.ontology.citations import ActRelativeCitation
+
+    index = _Index(
+        table3_key_by_name={"consolidated appropriations act, 2021": "116-260"},
+        classifications=INDEX.classifications,
+        division_starts=INDEX.division_starts,
+    )
+    assert index.act_page_range("consolidated appropriations act, 2021") is None
+    resolution = resolve_act_relative_citation(
+        ActRelativeCitation("Consolidated Appropriations Act, 2021", "consolidated appropriations act, 2021", "107"),
+        index=index,
+    )
     assert resolution.unresolved_reason == "act_section_ambiguous"
 
 
@@ -236,5 +299,30 @@ def test_the_index_loads_from_the_sealed_artifact():
     assert index.incomplete_sources == frozenset({"119-21"})
     # Every row survives the load: a single-valued map lost 1,060 of 10,976.
     assert sum(len(v) for s in index.classifications.values() for v in s.values()) == 10976
-    assert index.classifications["1955:360"]["111"] == (("42", "7411", None),)
+    assert index.classifications["1955:360"]["111"] == (("42", "7411", None, None),)
     assert len(index.classifications["116-260"]["107"]) == 3
+    # Both halves of the discriminator survive the round trip through parquet.
+    assert index.division_by_name["taxpayer certainty and disaster tax relief act of 2020"] == ("EE", 3038)
+    assert index.division_by_name["secure 2.0 act of 2022"] == ("T", 5275)
+    assert index.act_page_range("taxpayer certainty and disaster tax relief act of 2020")[0] == 3038
+    assert {row[3] for row in index.classifications["116-260"]["107"]} == {2221, 2276, 2623}
+
+
+def test_the_sealed_artifact_still_refuses_both_named_wrong_identities():
+    """End to end, through the pinned bytes rather than a fixture."""
+    from spicy_regs.ontology.citations import ActRelativeCitation
+
+    artifact = Path(__file__).resolve().parents[1] / "output" / "usc-act-index-2026-08-02"
+    if not (artifact / "receipt.json").exists():
+        pytest.skip("artifact not built in this checkout (output/ is gitignored)")
+    index = ActIndex.from_artifact(artifact)
+
+    for act, section in (
+        ("Taxpayer Certainty and Disaster Tax Relief Act of 2020", "107"),
+        ("SECURE 2.0 Act of 2022", "120"),
+    ):
+        resolution = resolve_act_relative_citation(
+            ActRelativeCitation(act, normalize_popular_name(act), section), index=index
+        )
+        assert resolution.iri is None, f"{act} sec. {section} must not mint an identifier"
+        assert resolution.unresolved_reason == "act_section_outside_act"
