@@ -230,11 +230,17 @@ def _exam_record(number: str, row: Mapping[str, Any]) -> dict[str, Any]:
     }
     if abstract is not None:
         content["abstract"] = abstract
-    agencies = _agency_names(row.get("agencies_json"), label=f"document {number} agencies_json")
-    if agencies:
-        content["agencies"] = agencies
+    # Field names align with the spicysearch engine's supported filter keys
+    # (records.py _KNOWN_FILTERS): "agency" and "proceeding" are filterable
+    # request dimensions, so the sealed metadata must carry those exact keys.
+    # Both are sealed on every document — an empty list is the source's own
+    # "states none" fact — because the engine treats a metadata filter key as
+    # supported only when every eligible document carries it.
+    content["agency"] = _agency_names(row.get("agencies_json"), label=f"document {number} agencies_json")
+    content["proceeding"] = _json_string_list(
+        row.get("docket_ids_json"), label=f"document {number} docket_ids_json"
+    )
     for column, field in (
-        ("docket_ids_json", "docket_ids"),
         ("regulation_id_numbers_json", "regulation_id_numbers"),
         ("topics_json", "topics"),
     ):

@@ -41,6 +41,12 @@ spicysearch carries the same count.
   document number, type, publication/effective/comments-close dates, agency
   names, docket ids, RINs, topics, html_url. Malformed source facts fail the
   build closed — nothing is repaired or dropped silently.
+- Sealed metadata keys align with the spicysearch engine's supported request
+  filter dimensions: docket ids land as `proceeding`, agency names as
+  `agency`, sealed on **every** document (an empty list is the source's own
+  "states none" fact) because the engine treats a metadata filter key as
+  supported only when every eligible document carries it. Match semantics
+  stay fail-closed: an empty list can never satisfy a filter.
 - Declared constants: `observed_at` / `released_at` `2026-08-01T22:00:00Z`,
   fixture id `urn:spicyregs:source-fixture:search-holdout-exam-2026-08-01`.
 - `links` is empty by design: the exam jobs (known-item / subject-ranked /
@@ -51,11 +57,11 @@ spicysearch carries the same count.
 
 | digest | value |
 |---|---|
-| source fixture (`fixture_digest`) | `sha256:cb487442edd1a7855bca124d47d4591f97df32818c9f9d4f741b2f21faace28b` |
-| release (`release_digest`) | `sha256:4c789818302c8116f1f39f3dc98b19de11949fc5e52a8bc2f2acc1f975137bb5` |
-| release id | `urn:spicyregs:document-release:4c789818302c8116f1f39f3dc98b19de11949fc5e52a8bc2f2acc1f975137bb5` |
-| `source-fixture.json` file bytes | `sha256:d8ed4f5aef21657cb3dddf9488b598b01d4981754ad8293de870bc50398e1866` |
-| `document-release.json` file bytes | `sha256:d66a33a053761fa8af0a4ad75e1d8ac5cea0e4f2b8da9b3a2078d3b6735c862a` |
+| source fixture (`fixture_digest`) | `sha256:fa7518f58d0858e35e1d026ece1c1c142c35a10686e12ad536acfce43f01f100` |
+| release (`release_digest`) | `sha256:236034f4e40dc2f5bb0ed74b676cf8b7bfb767a14692562a8622bcd02c236f93` |
+| release id | `urn:spicyregs:document-release:236034f4e40dc2f5bb0ed74b676cf8b7bfb767a14692562a8622bcd02c236f93` |
+| `source-fixture.json` file bytes | `sha256:75d266f793d1a552a4f6c1159f38671b847633c703ad1f4a9449b9c7ea620a69` |
+| `document-release.json` file bytes | `sha256:91ad2c6a2105abd91556045962e371dad35bbc430712c526f3812a557b8e8af8` |
 
 Inputs consumed:
 

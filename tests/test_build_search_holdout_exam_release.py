@@ -145,9 +145,20 @@ def test_optional_metadata_is_parsed_and_empty_collections_are_omitted():
     fixture = mod.build_exam_source_fixture(manifest, rows)
     content = fixture["records"][0]["content"]
     assert "topics" not in content
-    assert content["docket_ids"] == ["EPA-HQ-1"]
-    assert content["agencies"] == ["Test Agency"]
+    # Engine-filterable keys: "proceeding" and "agency" match spicysearch's
+    # supported request filter dimensions exactly.
+    assert content["proceeding"] == ["EPA-HQ-1"]
+    assert content["agency"] == ["Test Agency"]
     assert content["effective_on"] == "2020-07-01"
+
+
+def test_filterable_keys_are_sealed_on_every_document_even_when_empty():
+    manifest = _manifest([_matter("m1", ["2020-11111"])])
+    rows = {"2020-11111": _row("2020-11111", docket_ids_json=json.dumps([]), agencies_json=json.dumps([]))}
+    fixture = mod.build_exam_source_fixture(manifest, rows)
+    content = fixture["records"][0]["content"]
+    assert content["proceeding"] == []
+    assert content["agency"] == []
 
 
 def test_missing_row_for_a_drawn_document_fails_closed():
