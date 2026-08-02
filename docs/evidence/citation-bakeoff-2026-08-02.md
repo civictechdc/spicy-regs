@@ -626,10 +626,55 @@ Still refused, correctly: `INA sec. 103(a)(1)`, `PHS Act secs. 2791(b)(5)`,
 `ACA sec. 1557`. The tool lists none of those abbreviations, and inferring what
 they stand for is the guess the identity fence exists to stop.
 
-**Not yet landed:** the resolution driver is a script, not a committed tool, and
-neither table is published as parquet. The readers, the index, the grammar and
-the refusals are committed and tested; turning 47 resolutions into a published
-table is the next step.
+**Both tables are now a digest-pinned artifact**, `output/usc-act-index-2026-08-02`
+(`tools/build_usc_act_index_artifact.py`, schema `usc-act-index-artifact-v1`,
+parser `uscode-olrc-parser-v1`). Two real builds byte-identical across all four
+files:
+
+| Output | sha256 | Rows |
+|---|---|---:|
+| `usc-popular-names.parquet` | `389fa8fc1e438334…` | 20,865 |
+| `usc-act-sections.parquet` | `31c4f15cd61d52f3…` | 10,976 |
+| `quarantine.parquet` | `c2d956c67dd05203…` | 1 |
+| `receipt.json` | `4cfb04c6d62a4fac…` | — |
+
+13,626 distinct names; 24 acts reached, 1 incomplete. The 67/47/20 above are
+**re-derived through the sealed parquet**, not from the script that discovered
+them, and the unresolved 20 carry declared codes rather than prose: 8
+`act_section_not_classified`, 6 `usc_section_not_expressible`, 4
+`source_incomplete`, 2 `classification_not_current`.
+
+`spicy_regs.ontology.act_index` is the driver. An `ActResolution` states an
+identifier **or** a reason, never both and never neither. `ALIAS_YEAR_RULE` —
+the rule that reaches ERISA — is pinned in the receipt with its derivation.
+
+**One named coverage gap.** `uscode.house.gov` cannot render Table III for
+Pub. L. 119-21 (the One Big Beautiful Bill Act). It returns HTTP 200 with a
+truncated 16 KB body carrying zero classification rows, after exactly 30 s,
+reproducibly across four httpx retries and three curl attempts with a session
+cookie in both compressed and identity encodings. (HEAD returns 404 while GET
+returns 200 — a JSF quirk, not the cause.) The receipt records it under
+`source_incomplete` with the key, URL, observed failure and what is missing, so
+the 4 citations into that act resolve to `source_incomplete` rather than the
+false `act_section_not_classified`. A hole in the evidence is not the same fact
+as a section going nowhere.
+
+### Queued, not built
+
+Recorded so the next reader inherits the reasoning rather than rediscovering it.
+
+* **Popular names are vocabulary-shaped.** The alias graph is prefLabel /
+  altLabel structure. If act names should be searchable as concepts, the path is
+  spicy-regs publishes the crosswalk and RefSpec ingests it through the normal
+  atlas generation path. That is RefSpec's decision, made in RefSpec — the atlas
+  asset id is its own sha256, so a merge would re-mint it and invalidate the
+  pins in two repos.
+* **The three artifact tools now restate `canonical_json`, `file_sha256` and
+  `_pin_path`.** Extracting them means touching two digest-sealed tools and
+  re-verifying their byte-identical rebuilds.
+* **EO compilation, if it is ever built.** The investigation below argues the
+  demand should be measured first, and that the two tiers must stay separate
+  artifacts.
 
 ### The EO compilation page: sources evaluated, 2026-08-02
 
@@ -674,6 +719,31 @@ a non-identity recognition. Findings, each verified against fetched bytes:
 Consequence: the non-identity recognition already committed is the right
 resting place, and the *next* step is a typed presidential-document resolver,
 not an EO-number lookup.
+
+**Three further findings, recorded and not acted on:**
+
+1. **The compilation cite is the tail of a triple whose head is the answer.**
+   `E.O. 11991, 42 FR 26967, 3 CFR, 1977 Comp., p. 123` is the Office of the
+   Federal Register's house form. A citation parser that splits that triple
+   manufactures the orphan it then needs a resolver for. **Measure the genuine
+   residual before building anything** — distinct `(compilation, page)` pairs
+   with no document identity within ~150 characters to the left. That number
+   decides whether there is a project here at all.
+2. **Page iv of any GovInfo Title 3 volume carries a compilation → EO-number
+   range table covering 1936 to present** — roughly 40 rows, one keyless fetch,
+   including every year GovInfo holds no volume for. It is a cheap deterministic
+   *validator* over any inferential resolution, and it independently catches the
+   known bad datum: `20 CFR 402.75` cites "Executive Order No. 12958 (1995)
+   (3 CFR, 1987 Comp., p. 235)" where the true answer is 12600, and 12958 falls
+   outside the 1987 range 12580–12622. Highest value per byte in the whole
+   investigation.
+3. **If built, two artifacts, never one.** GovInfo `[[Page N]]` transcription is
+   a *fact* — deterministic, reproducible, digest-pinnable, and it starts at the
+   1996 Comp. Pre-1996 resolution by Federal Register co-occurrence is
+   *inference*, and it demonstrably inherits agency citation errors. Merging
+   them would launder inference as fact, which is the failure the platform's
+   `twoIndependentMachinesSearchOnly` posture exists to prevent. And no live API
+   call at query time: build, digest, pin, ship.
 
 ### Act-relative citations: what would unlock them (superseded — see above)
 
