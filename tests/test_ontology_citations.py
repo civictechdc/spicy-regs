@@ -52,6 +52,40 @@ def test_parse_cfr_fixture_forms(raw, expected):
 
 
 @pytest.mark.parametrize(
+    "raw",
+    [
+        # The measured false positive. docs/evidence/citation-bakeoff-2026-08-02.md,
+        # "False positives — the safety half": one string in 620 drew a citation
+        # from a project grammar that has none, and this is it. The compact
+        # branch matched greedily and published title 5401, part 5405.
+        "5401-5405",
+        # The same branch on a Federal Register document number, recorded as a
+        # known overlap in tests/test_run_citation_bakeoff.py.
+        "2026-13078",
+        # One past the last title the CFR has.
+        "51-1",
+    ],
+)
+def test_the_compact_key_refuses_a_title_the_cfr_does_not_have(raw):
+    """Regression: ``'5401-5405'`` published ``urn:rkaf:us:cfr:5401:5405``.
+
+    Every other CFR branch is anchored by the literal "CFR" (``_CFR_STANDARD``)
+    or by the word "part" (``_CFR_TITLE_PART``), so an implausible title there
+    is still a title the source text called one. The compact branch has no
+    anchor at all — it reads a bare ``N-M`` as title-part — so the only thing
+    left to hold it closed is the range the CFR actually has.
+    """
+    assert parse_cfr_citation(raw) == []
+
+
+def test_the_compact_key_still_reads_every_title_the_cfr_has():
+    """The bound is the CFR's own, so no real compact key is refused by it."""
+    assert parse_cfr_citation("1-1") == [CfrCitation("1", "1")]
+    assert parse_cfr_citation("50-17") == [CfrCitation("50", "17")]
+    assert parse_cfr_citation("50-17.11") == [CfrCitation("50", "17", "11")]
+
+
+@pytest.mark.parametrize(
     ("raw", "expected"),
     [
         (

@@ -11,6 +11,20 @@ _CFR_COMPACT = re.compile(
     r"^\s*(?P<title>[1-9]\d*)-(?P<part>\d+)(?:\.(?P<section>[A-Za-z0-9][A-Za-z0-9.-]*))?\s*$",
     re.IGNORECASE,
 )
+
+#: The Code of Federal Regulations has 50 titles.
+#:
+#: Every other CFR branch is held in place by something the source text says:
+#: :data:`_CFR_STANDARD` requires the literal "CFR", :data:`_CFR_TITLE_PART`
+#: requires the word "part". The compact key is the internal ``title-part``
+#: spelling of :attr:`CfrCitation.cfr_ref` and has no anchor at all, so pointed
+#: at free text it reads any bare ``N-M`` as a citation — greedily, which is how
+#: ``'5401-5405'`` published ``urn:rkaf:us:cfr:5401:5405``
+#: (docs/evidence/citation-bakeoff-2026-08-02.md, "False positives"). With no
+#: anchor to require, the shape has to carry the refusal, and the only fact
+#: available in the shape is whether the title is one the CFR has.
+_CFR_TITLE_COUNT = 50
+
 _CFR_STANDARD = re.compile(
     r"(?P<title>[1-9]\d*)\s*C\.?\s*F\.?\s*R\.?"
     r"\s*(?:parts?|pt\.?|§{1,2}|sections?|secs?\.?)?\s*"
@@ -87,6 +101,11 @@ def _cfr_section(value: object) -> str | None:
     if text is None:
         return None
     return text if re.fullmatch(r"\d+[a-z]{0,3}(?:-[0-9a-z]+)*", text) else None
+
+
+def _cfr_title_exists(title: str | None) -> bool:
+    """Whether a normalized title number names a title of the CFR."""
+    return title is not None and 1 <= int(title) <= _CFR_TITLE_COUNT
 
 
 _USC_SECTION_ATOM = re.compile(r"(?P<number>\d+)(?P<suffix>[a-z]*)")
@@ -394,7 +413,9 @@ def parse_cfr_citation(value: object) -> list[CfrCitation]:
     compact = _CFR_COMPACT.fullmatch(text)
     if compact:
         citation = _cfr_from_match(compact)
-        return [citation] if citation else []
+        if citation is None or not _cfr_title_exists(citation.title):
+            return []
+        return [citation]
 
     found: list[CfrCitation] = []
     for pattern in (_CFR_STANDARD, _CFR_TITLE_PART):

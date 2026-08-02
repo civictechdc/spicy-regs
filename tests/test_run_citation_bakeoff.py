@@ -127,22 +127,35 @@ def test_current_families_reads_every_project_owned_grammar():
     assert mod.current_families("Departmental policy statement") == []
 
 
-def test_current_families_records_the_grammars_that_overlap_each_other():
-    """Two project-owned grammars claim strings the other also claims.
+def test_current_families_records_the_grammar_overlap_that_remains():
+    """One project-owned grammar still claims a string another one owns.
 
-    Neither is a bug in this harness and neither is fixed here — the bakeoff
-    changes no identity. They are recorded because they inflate the extended
-    arm's per-family counts, and a reader of those counts has to know.
-
-    * ``normalize_docket_reference`` returns early for any value the
-      Regulations.gov *syntax* can express, before the stricter docket-shape
-      check, so every RIN also reads as a docket.
-    * ``parse_cfr_citation``'s compact-key branch reads a bare ``N-M`` as
-      title-part, so a Federal Register document number also reads as CFR.
+    ``normalize_docket_reference`` returns early for any value the
+    Regulations.gov *syntax* can express, before the stricter docket-shape
+    check, so every RIN also reads as a docket. Not a bug in this harness and
+    not fixed here; recorded because it inflates the extended arm's per-family
+    counts, and a reader of those counts has to know.
     """
     assert mod.current_families("0648-AB12") == ["docket", "rin"]
-    assert mod.current_families("2026-13078") == ["cfr", "docket", "fr_doc"]
-    assert mod.cfr_compact_key_only("2026-13078") is True
+
+
+def test_the_compact_key_no_longer_claims_a_federal_register_document_number():
+    """The second recorded overlap is closed, and the sealed artifact predates it.
+
+    ``parse_cfr_citation``'s compact-key branch read any bare ``N-M`` as
+    title-part, so ``2026-13078`` also read as CFR. Bounding the unanchored
+    branch to the 50 titles the CFR has closes it — the same guard that stops
+    ``'5401-5405'``, the one measured false positive
+    (docs/evidence/citation-bakeoff-2026-08-02.md, "False positives").
+
+    ``output/citation-bakeoff-2026-08-02`` was measured against the parser at
+    ``b7a5632``, which the evidence doc pins, so re-running ``detect`` after
+    this fix is expected to produce a different artifact. The recorded
+    four-cell table is a fact about that pin, not a claim about HEAD.
+    """
+    assert mod.current_families("2026-13078") == ["docket", "fr_doc"]
+    assert mod.cfr_compact_key_only("2026-13078") is False
+    assert mod.cfr_compact_key_only("40-60") is True
     assert mod.cfr_compact_key_only("40 CFR Part 60") is False
 
 
