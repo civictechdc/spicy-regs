@@ -456,3 +456,70 @@ document number as a CFR citation. Both are recorded in
 - **One corpus, one source.** Unified Agenda authority strings only. Nothing
   here generalizes to Federal Register preamble prose or CFR body text, where
   the citation distribution is different.
+
+## What was built from this, 2026-08-02
+
+Recommendations 1–4 landed as five commits on `main`. Nothing in the sections
+above was recomputed; the artifact is still the one this document pins.
+
+| # | Landed | Recommendation |
+|---|---|---|
+| `1400140` | Compact-key title bound (1–50) | 3 |
+| `5d8dffd` | `U.S. Code` / `U.S.C.A.` / `I.R.C.` / `Pub. Law` spellings | 1 |
+| `8e680d9` | `3 CFR … Comp.` recognized, never identified | 2 |
+| `ef6c2d5` | U.S.C. chapter grammar + chapter URN | 4 |
+| `a31605b` | Docket join key published on `fr_docket_links` | — |
+
+**12 of the 14 in-scope strings now parse.** The 7 regex ones reach the
+identity their standard spelling already minted; the 5 compilation strings are
+recognized as compilation locators. The remaining 2 — `48 CFR 1.301-1.304` and
+`and 49 CFR 1.89.` — are the sub-section-range and trailing-dot normalization
+question, which is still the unmade policy decision this bakeoff declined to
+make.
+
+**The measurement no longer describes HEAD.** The four-cell table is a fact
+about the parser at `b7a5632`. Re-running `detect` after these commits produces
+a different `detection.json`, and that is expected, not drift.
+
+Two things the fixers found that this document did not:
+
+- **The compilation form was already being misread, in a spelling not in the
+  citeurl-only cell.** The five strings above all write `3 CFR,` with a comma,
+  which `_CFR_STANDARD` could not cross — so they were undetected, exactly as
+  recorded. The same corpus writes the form *without* the comma eight more
+  times, and every one of those was read as a CFR part: `3 CFR 1978 Comp. p.
+  142` → `urn:rkaf:us:cfr:3:1978`. So the project did make CiteURL's mistake;
+  it just made it on strings that landed in the agreement cell, where nothing
+  was adjudicated. Nine phantom CFR citations were withdrawn in total (the
+  eight above plus `'5401-5405'`), and none of them was ever live —
+  `parse_cfr_citation`'s two production callers read `cfr_references_json`,
+  which carries structured objects.
+- **The chapter slice is 35 strings, not 31.** Four more carry a chapter
+  citation inside a string another grammar also fired on, so they were never in
+  the `neither` cell. 38 chapter citations across 35 strings; 33 of the strings
+  are in the shared-miss cell.
+
+### Act-relative citations: what would unlock them
+
+Not built, on purpose. `Clean Air Act section 111` is the remaining bulk of the
+≥127 shared miss, and it is a data problem rather than a grammar problem — the
+string names no code, title or section number, so no expression can resolve it.
+Two joins are missing, and they are separate:
+
+1. **Popular name → code location.** "Clean Air Act" → 42 U.S.C. ch. 85. The
+   Office of the Law Revision Counsel publishes this as the U.S. Code *Popular
+   Name Tool* (`uscode.house.gov`). Not ingested. This half now has a landing
+   surface: `urn:spicy-regs:usc-chapter:42:85` is exactly the identity a
+   popular-name index would map to.
+2. **Act section → U.S.C. section.** "Clean Air Act sec. 111" → 42 U.S.C.
+   § 7411. This is *not* arithmetic and cannot be derived from the chapter — it
+   is the OLRC classification tables (Table III, Statutes at Large → U.S. Code),
+   keyed by Public Law and Statutes-at-Large section. Also not ingested, and
+   this is the harder of the two.
+
+A prerequisite stands ahead of both, and it is the one recorded above under
+"What this does NOT settle": whether an act-relative reference *is* a citation
+was never decided, and the judge answered inconsistently on minimal pairs
+(`Clean Air Act sec. 112` → `neither`, `Clean Air Act Section 112` →
+`garbage`). Ingesting either table before settling that would produce a
+recall number no one can interpret.
