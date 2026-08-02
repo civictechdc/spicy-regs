@@ -1,0 +1,244 @@
+{
+  "code": {
+    "branch": "main",
+    "head_commit": "3a472f0dfa2f96a13df1c6ded86ab2e6c9402c70",
+    "state": "committed",
+    "note": "Unlike the 2026-07-26 Step 4 receipt, which ran against local-uncommitted code, every result here was produced by committed code. The frozen-gate failure below is the direct consequence of that difference."
+  },
+  "execution": {
+    "provider_calls": 32,
+    "provider_call_counts": {
+      "boundary-selection": 31,
+      "embedding": 1
+    },
+    "paid_provider_calls": 0,
+    "provider_models_loaded": [
+      "sentence-transformers:BAAI/bge-base-en-v1.5@a5beb1e3e68b9ab74eb54cfd186867f64f240e1a"
+    ],
+    "note": "Zero paid API calls. Boundary-selection calls are the local HeuristicBoundarySelector; the single embedding call is the pinned local BGE provider. The OpenAI arms of the July comparison were deliberately not re-run."
+  },
+  "format_version": 2,
+  "generated_at": "2026-08-02T00:00:00Z",
+  "work_items": {
+    "1_frozen_local_gate": {
+      "status": "fail",
+      "command": "SPICY_REGS_FROZEN_SEGMENTATION_ROOT=\"$PWD/output\" R2_PUBLIC_URL='' uv run --frozen pytest tests/test_docpipeline_segments_frozen_local.py -q -rs",
+      "result": "6 passed, 6 errors in 30.40s",
+      "failure": "AssertionError: assert 1296 == 1302",
+      "finding": "The committed segmenter produces 1,296 selected structure-overlap-1800 segments where the frozen baseline recorded 1,302.",
+      "blocked_first_by": {
+        "symptom": "frozen dataset member drifted: fr_docket_links.parquet",
+        "sealed_sha256": "fa8ad683f90cc8974e98e00c26950cc2f0afc0fd3492df0c75774e5b6c434e74",
+        "rebuilt_sha256": "a11ddb6a677dafe28c5fcade28d08df9cafef528385fa4320218be37de7fa394",
+        "rebuilt_by": "3a472f0",
+        "recoverable": false,
+        "recovery_note": "No copy of the sealed bytes survives on disk (all 24 generations were rebuilt) and the previous writer was byte-non-deterministic, so re-running it cannot reproduce the row order. The sealed identity segmentation_eval_627ba96e04872d870a2ccd6e can never be reproduced on this machine again.",
+        "segmentation_relevance": "none; fr_docket_links is an EXCLUDED_SOURCE_TABLES relationship carrier and never becomes a SourceArtifact"
+      },
+      "resolution": "The corpus was re-sealed byte for byte (tools/reseal_segmentation_dataset.py) so the gate could run at all. The gate then failed on segmentation parity, which is a real and previously unattested divergence."
+    },
+    "2_fair_comparison_rerun": {
+      "status": "pass",
+      "experiment_id": "segmentation_experiment_15331a57b818675faa1de316",
+      "build_command": "R2_PUBLIC_URL='' TOKENIZERS_PARALLELISM=false uv run --frozen python -m spicy_regs.corpora.segmentation_experiment build output/segmented-real-data-evaluation-v2-resealed-2026-08-02 output/segmentation-experiment-document-bge-2026-08-02 --provider incumbent-bge --budgets 1800 --scope-dir output/document-acceptance-scope-resealed-2026-08-02",
+      "validate_command": "R2_PUBLIC_URL='' uv run --frozen python -m spicy_regs.corpora.segmentation_experiment validate output/segmented-real-data-evaluation-v2-resealed-2026-08-02 output/segmentation-experiment-document-bge-2026-08-02 --scope-dir output/document-acceptance-scope-resealed-2026-08-02",
+      "validate_result": "status pass, failures []"
+    },
+    "3_adapter_path": {
+      "status": "not-run",
+      "reason": "Structurally impossible over this gold set; see limitations. Not attempted rather than approximated."
+    }
+  },
+  "inputs": {
+    "dataset": {
+      "directory": "output/segmented-real-data-evaluation-v2-resealed-2026-08-02",
+      "evaluation_id": "segmentation_eval_21d9a09f13ad3b9bf5ea212b",
+      "descends_from_evaluation_id": "segmentation_eval_627ba96e04872d870a2ccd6e",
+      "manifest_sha256": "2c54cf3ae893d52b50a4ca13e715aa883cf4a34bf020af14e50b177b41705812",
+      "receipt_sha256": "b81e14d6a6dbf71d25248b999556ea97f5f30459c7fc0725d755ef9bebac9980",
+      "members_carried_byte_for_byte": 26,
+      "members_changed": 1
+    },
+    "scope": {
+      "directory": "output/document-acceptance-scope-resealed-2026-08-02",
+      "scope_id": "document_scope_cd30315482563696a07e4103",
+      "manifest_sha256": "41a87b5ba2eff70a6f691f6c9fe4e1ae78232db8cc49f5c685b47ed2a1d3300e",
+      "receipt_sha256": "ead7274476e314fbf88a5a182389edcef81c99ff53e2f97784157413b7f909dd",
+      "membership_identical_to_july_scope": {
+        "artifact_digests": "153/153 identical",
+        "gold_ids": "35/35 identical",
+        "adversarial_case_ids": "7/7 identical"
+      }
+    },
+    "july_baseline": {
+      "directory": "output/segmentation-experiment-document-bge-v3",
+      "experiment_id": "segmentation_experiment_de7d119e838ac153a0980337",
+      "experiment_segments_sha256": "0874cfae61b741b7d946bc47be62d583879b43f76269557262598c1e8e11dc78",
+      "written_at": "2026-07-24 18:11:58",
+      "produced_by_committed_code": false
+    }
+  },
+  "outputs": {
+    "directory": "output/segmentation-experiment-document-bge-2026-08-02",
+    "artifacts": {
+      "embedding_cache.parquet": "be44b0951f100a28ddafe5752aa65da3cf6d0409cdca193429dd9e907799feca",
+      "experiment_config_metrics.parquet": "4db16107ee550be5c073fc2fcee82bd2667453e25fc6daafa4b30d6a742c2b75",
+      "experiment_segments.parquet": "470a597b713703a99cdfdd79ca19d856c5175b94e43d3660a3408dadfb48f9f3",
+      "provider_calls.parquet": "3d948cd166db2eca0ff23ea307050581698a1b29308e1bc7a0d4863c0b36d3c2",
+      "retrieval_candidates.parquet": "29931bc67ea44a4e621d24f18f455e2c77799c54ba3ad2cbbeb7c7db19fcd8d3",
+      "segmentation-experiment-manifest.json": "6c78f37ec98ea992df08703189a7cd84e5510d770d6bcc9bad3195d40572a2e4",
+      "segmentation-experiment-receipt.json": "db6ad37ef5dab22c6a65f7035ab11af99efd201e326c0b004a494777a40906bf"
+    }
+  },
+  "results": {
+    "artifact_count": 153,
+    "gold_span_count": 35,
+    "config_count": 5,
+    "segment_count": 7190,
+    "metric_provider": "ir-measures:0.4.3",
+    "corpus_metrics_1800_incumbent_bge": {
+      "structure-overlap-1800": {
+        "segments": 1296,
+        "gold_contained": 35,
+        "recall_at_10": 0.5714285714285714,
+        "recall_at_50": 0.8,
+        "recall_at_200": 0.8285714285714286,
+        "mrr": 0.28958241485247777,
+        "ndcg_at_10": 0.34397678337386234,
+        "duplicated_characters": 142632
+      },
+      "structure-first-1800": {
+        "segments": 1260,
+        "gold_contained": 35,
+        "recall_at_10": 0.5142857142857142,
+        "recall_at_50": 0.8,
+        "recall_at_200": 0.8285714285714286,
+        "mrr": 0.2957745099119919,
+        "ndcg_at_10": 0.3332149692089632,
+        "duplicated_characters": 0
+      },
+      "paragraph-sentence-1800": {
+        "segments": 1276,
+        "gold_contained": 35,
+        "recall_at_10": 0.4857142857142857,
+        "recall_at_50": 0.8,
+        "recall_at_200": 0.8285714285714286,
+        "mrr": 0.26262430646421664,
+        "ndcg_at_10": 0.2981813885372206
+      },
+      "semantic-embedding-1800": {
+        "segments": 1594,
+        "gold_contained": 34,
+        "recall_at_10": 0.5714285714285714,
+        "recall_at_50": 0.8857142857142857,
+        "recall_at_200": 0.9428571428571428,
+        "mrr": 0.2882698358934027,
+        "ndcg_at_10": 0.3385010562280828
+      },
+      "llm-guided-1800": {
+        "segments": 1764,
+        "gold_contained": 34,
+        "recall_at_10": 0.6571428571428571,
+        "recall_at_50": 0.9142857142857143,
+        "recall_at_200": 0.9428571428571428,
+        "mrr": 0.3509638853091112,
+        "ndcg_at_10": 0.40985597260612044,
+        "boundary_selector": "HeuristicBoundarySelector (local, not the OpenAI selector)"
+      }
+    },
+    "paired_significance_recall_at_10": {
+      "test": "exact two-sided McNemar over 35 paired queries",
+      "structure-overlap_vs_structure-first": {
+        "hits": "20/35 vs 18/35",
+        "discordant_favoring_overlap": 2,
+        "discordant_favoring_first": 0,
+        "p_value": 0.5
+      },
+      "structure-overlap_vs_paragraph-sentence": {
+        "hits": "20/35 vs 17/35",
+        "discordant_favoring_overlap": 3,
+        "discordant_favoring_paragraph": 0,
+        "p_value": 0.25
+      },
+      "structure-first_vs_paragraph-sentence": {
+        "hits": "18/35 vs 17/35",
+        "discordant_favoring_first": 1,
+        "discordant_favoring_paragraph": 0,
+        "p_value": 1.0
+      },
+      "power_note": "With an exact two-sided sign test, p < 0.05 requires at least 6 discordant queries all in one direction. The largest observed discordance is 3. No direct-arm Recall@10 comparison on this 35-query corpus can reach conventional significance."
+    },
+    "segment_count_drift_from_july": {
+      "structure-overlap-1800": {
+        "july": 1302,
+        "now": 1296
+      },
+      "structure-first-1800": {
+        "july": 1263,
+        "now": 1260
+      },
+      "paragraph-sentence-1800": {
+        "july": 1276,
+        "now": 1276
+      },
+      "semantic-embedding-1800": {
+        "july": 1597,
+        "now": 1594
+      },
+      "localisation": "The entire structure-overlap delta is one artifact: congress-bill-v1 / 118-hr-8862, 64 segments then, 58 now. Its congress_bills.xml_text element stream went from 174 slices to 3,428.",
+      "attribution": "e0af2b9 (2026-07-24 20:37) last changed src/spicy_regs/ontology/adapters.py; the baseline parquet was written 2026-07-24 18:11, 2.5 hours earlier. paragraph-sentence, which ignores the element stream, is unchanged at 1,276 — confirming the corpus is identical and the change is in element extraction."
+    }
+  },
+  "decision": {
+    "incumbent_retained": true,
+    "selected_policy_unchanged": "structure-overlap-1800",
+    "pinned_constants_touched": false,
+    "basis": "Among the three lossless arms (35/35 gold contained) all tie at Recall@50 = 0.8000; the declared tiebreak is Recall@10, where structure-overlap leads 20/35 to 18/35 and never loses a query to structure-first. The lead is not statistically significant and cannot be made so on this corpus."
+  },
+  "limitations": [
+    "The sealed evaluation identity segmentation_eval_627ba96e04872d870a2ccd6e is permanently unreproducible on this machine. Every result here runs against a re-seal proven set-identical on artifacts, gold, and adversarial cases, but a reader who demands the original digest cannot get it.",
+    "The frozen parity gate fails and is left failing on purpose. Nothing in this receipt asserts that the committed segmenter reproduces the July baseline; it demonstrably does not.",
+    "The July fair comparison could not be re-run through the DocumentRelease adapter. The adapter mints a different artifact_digest space (sha256 of one representation's text) and a different source_field namespace, so no gold row's key survives the crossing; 152 of the 1,302 baseline segments span 2-6 source fields that a one-representation-per-artifact adapter cannot produce; no DocumentRelease exists over the 153 artifacts and no code builds one; and only structure-overlap is expressible through the production segmenter at all. Measuring the adapter's effect on this comparison was therefore not attempted rather than approximated.",
+    "OpenAI arms were not re-run: no paid provider calls were made. The July OpenAI-side result, including its structure-first advantage, is not re-verified here and this run says nothing about it.",
+    "The llm-guided arm uses the local heuristic boundary selector, matching the July BGE system-level row, not the OpenAI selector.",
+    "35 gold queries. Every metric difference reported is exact on this corpus and carries no confidence interval.",
+    "Reranking, sparse, hybrid, and whole-artifact stages of the July comparison were out of scope for this run."
+  ],
+  "publication": {
+    "attempted": false,
+    "authorized": false,
+    "published": false,
+    "pushed": false
+  },
+  "red_before_green": {
+    "reseal_tool": {
+      "command": "R2_PUBLIC_URL='' uv run --frozen pytest tests/test_reseal_segmentation_dataset.py -q",
+      "initial_result": "collection error: FileNotFoundError tools/reseal_segmentation_dataset.py",
+      "final_result": "11 passed in 0.81s"
+    },
+    "frozen_gate_provenance_check": {
+      "command": "env -u SPICY_REGS_FROZEN_SEGMENTATION_ROOT R2_PUBLIC_URL='' uv run --frozen pytest tests/test_docpipeline_segments_frozen_local.py -q",
+      "initial_result": "3 failed (NameError: EXTERNALLY_REBUILT_DATASET_MEMBERS / _check_reseal_provenance not defined)",
+      "final_result": "6 passed, 6 skipped in 0.62s"
+    }
+  },
+  "status": "fail-with-findings",
+  "verification": [
+    {
+      "command": "R2_PUBLIC_URL='' uv run --frozen pytest tests/test_reseal_segmentation_dataset.py -q",
+      "result": "11 passed"
+    },
+    {
+      "command": "env -u SPICY_REGS_FROZEN_SEGMENTATION_ROOT R2_PUBLIC_URL='' uv run --frozen pytest tests/test_docpipeline_segments_frozen_local.py -q",
+      "result": "6 passed, 6 skipped"
+    },
+    {
+      "command": "SPICY_REGS_FROZEN_SEGMENTATION_ROOT=\"$PWD/output\" R2_PUBLIC_URL='' uv run --frozen pytest tests/test_docpipeline_segments_frozen_local.py -q -rs",
+      "result": "6 passed, 6 errors - assert 1296 == 1302 (the finding)"
+    },
+    {
+      "command": "R2_PUBLIC_URL='' uv run --frozen ruff check + ruff format --check over the three changed files",
+      "result": "pass"
+    }
+  ]
+}

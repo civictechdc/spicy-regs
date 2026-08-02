@@ -3,6 +3,26 @@
 Set ``SPICY_REGS_FROZEN_SEGMENTATION_ROOT`` to the directory that contains the
 three frozen output directories.  Normal CI skips with a precise message; the
 dated Step 4 evidence record names the command that ran this gate locally.
+
+**This gate currently FAILS, and the failure is the finding — not a defect in
+the gate.** As of 2026-08-02 the committed segmenter produces 1,296 selected
+segments where the frozen baseline recorded 1,302. The entire delta is one
+artifact (``congress-bill-v1`` / ``118-hr-8862``), whose ``xml_text`` element
+stream went from 174 slices to 3,428. The baseline parquet was written
+2026-07-24 18:11; ``e0af2b9``, the commit that last changed the element
+adapters, landed 20:37 the same day — so the frozen baseline was produced by
+code that was never committed in that form, and nothing has attested
+corpus-scale parity against committed code since.
+
+Do not "repair" this by moving 1302 to 1296. Whether the new element
+granularity is an improvement to accept or a regression to revert is a
+decision for a human; the gate's job is to keep the divergence visible until
+that decision is made. See
+``docs/evidence/document-segmentation-remeasurement-2026-08-02.md``.
+
+The dataset and scope directories this gate names were re-sealed on 2026-08-02
+(``tools/reseal_segmentation_dataset.py``); ``_check_reseal_provenance`` below
+proves the re-sealed corpus is the corpus the baseline measured.
 """
 
 from __future__ import annotations
@@ -10,6 +30,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -27,6 +48,7 @@ from spicy_regs.docpipeline.segments import (
 )
 from spicy_regs.docpipeline.source import (
     COVERAGE_RECORD_SOURCE_TABLE_EXCLUSION,
+    EXCLUDED_SOURCE_TABLES,
     EXCLUSION_INACTIVE_SOURCE_TABLE,
     STEP4_ACTIVE_SOURCE_TABLES,
     build_source_artifacts,
@@ -35,12 +57,20 @@ from spicy_regs.docpipeline.source import (
 from spicy_regs.ontology.common import canonical_json, read_parquet_rows
 
 ROOT_ENV = "SPICY_REGS_FROZEN_SEGMENTATION_ROOT"
-DATASET_DIR = "segmented-real-data-evaluation-v2"
-SCOPE_DIR = "document-acceptance-scope-v2"
+DATASET_DIR = "segmented-real-data-evaluation-v2-resealed-2026-08-02"
+SCOPE_DIR = "document-acceptance-scope-resealed-2026-08-02"
 BASELINE_DIR = "segmentation-experiment-document-bge-v3"
 
-DATASET_ID = "segmentation_eval_627ba96e04872d870a2ccd6e"
-SCOPE_ID = "document_scope_6b4f8a64ba43fc1b8e0a7e05"
+# The corpus this gate measures is the one the July baseline measured. Its *seal*
+# had to be recomputed on 2026-08-02 because an unrelated commit rewrote one
+# non-segmentation member in place and the sealed bytes are unrecoverable — see
+# EXTERNALLY_REBUILT_DATASET_MEMBERS below and tools/reseal_segmentation_dataset.py.
+# The chain the gate proves: the baseline names SEALED_DATASET_ID; the re-sealed
+# manifest declares it descends from SEALED_DATASET_ID changing only members the
+# segmenter cannot read; therefore the baseline's corpus is this corpus.
+SEALED_DATASET_ID = "segmentation_eval_627ba96e04872d870a2ccd6e"
+DATASET_ID = "segmentation_eval_21d9a09f13ad3b9bf5ea212b"
+SCOPE_ID = "document_scope_cd30315482563696a07e4103"
 BASELINE_ID = "segmentation_experiment_de7d119e838ac153a0980337"
 SELECTED_CONFIG = "structure-overlap-1800"
 DIFFERENCES_FIXTURE = Path(__file__).parent / "fixtures" / "docpipeline_step4_expected_differences_v1.json"
@@ -52,16 +82,16 @@ EXPECTED_AGGREGATE_ROW_SHA256 = "34f757e1fa12a431c720da46e68c78e9c58ca25a78ad51c
 
 EXPECTED_FILE_SHA256 = {
     f"{DATASET_DIR}/segmentation-evaluation-manifest.json": (
-        "b1827a5bef8fef5d2a3e10d76e22429537be73b8b768cda726fbac6cd421039e"
+        "2c54cf3ae893d52b50a4ca13e715aa883cf4a34bf020af14e50b177b41705812"
     ),
     f"{DATASET_DIR}/segmentation-evaluation-receipt.json": (
-        "19aae874169280746f0b8b2ff6c4a4ba3b6be83926302c68a374ff381cdc82c1"
+        "b81e14d6a6dbf71d25248b999556ea97f5f30459c7fc0725d755ef9bebac9980"
     ),
     f"{SCOPE_DIR}/document-acceptance-manifest.json": (
-        "653c9c66101ee9ee7fbd79fa0805e3ad5e11d8d55d1d7d279174aa03500e92a6"
+        "41a87b5ba2eff70a6f691f6c9fe4e1ae78232db8cc49f5c685b47ed2a1d3300e"
     ),
     f"{SCOPE_DIR}/document-acceptance-receipt.json": (
-        "ffaa89ca5aa3ce5c171ec7fe391a39f1ac88240db14103844fbf99f4ae0c0dcc"
+        "ead7274476e314fbf88a5a182389edcef81c99ff53e2f97784157413b7f909dd"
     ),
     f"{BASELINE_DIR}/segmentation-experiment-manifest.json": (
         "1c9764b0df7985b60666ef1bc69f1ed7bfee4cbdcf1fa0036457118729f80a10"
@@ -71,6 +101,56 @@ EXPECTED_FILE_SHA256 = {
     ),
     f"{BASELINE_DIR}/experiment_segments.parquet": ("0874cfae61b741b7d946bc47be62d583879b43f76269557262598c1e8e11dc78"),
 }
+
+
+EXTERNALLY_REBUILT_DATASET_MEMBERS: dict[str, dict[str, str]] = {
+    "fr_docket_links.parquet": {
+        "source_table": "fr_docket_links",
+        "sealed_sha256": "fa8ad683f90cc8974e98e00c26950cc2f0afc0fd3492df0c75774e5b6c434e74",
+        "rebuilt_sha256": "a11ddb6a677dafe28c5fcade28d08df9cafef528385fa4320218be37de7fa394",
+        "rebuilt_by": "3a472f0",
+        "reason": (
+            "The docket_key rebuild rewrote this carrier in place across every generation. "
+            "Its previous writer was byte-non-deterministic, so the sealed bytes are "
+            "unrecoverable: no copy survives on disk and re-running the old writer cannot "
+            "reproduce the row order. fr_docket_links is an EXCLUDED_SOURCE_TABLES "
+            "relationship carrier and never becomes a SourceArtifact, so no segment "
+            "boundary depends on it."
+        ),
+    }
+}
+"""Members rewritten outside this dataset's own build, with both digests pinned.
+
+This is a quarantine, not an amnesty. Each entry names one file, the digest the
+dataset sealed, the digest that replaced it, and the commit that did it — and the
+test above refuses any entry the segmenter could actually read. Any *other*
+drift, or a third digest for a listed member, still fails the gate.
+"""
+
+
+def _check_reseal_provenance(dataset_manifest: Mapping[str, Any]) -> None:
+    """Prove the re-sealed corpus is the sealed one, minus nothing that matters.
+
+    The re-seal is only admissible if it descends from the exact identity the
+    frozen baseline names and every member it changed is one this ledger already
+    licenses. An unlisted change, or a descent from some other dataset, means the
+    corpus under test is not the corpus the baseline measured.
+    """
+    provenance = dataset_manifest.get("resealed_from")
+    assert isinstance(provenance, Mapping), "the re-sealed dataset must record what it descends from"
+    assert provenance["evaluation_id"] == SEALED_DATASET_ID, (
+        "the re-sealed dataset does not descend from the identity the frozen baseline names"
+    )
+    changed = {str(one["name"]): one for one in provenance["changed_members"]}
+    assert set(changed) == set(EXTERNALLY_REBUILT_DATASET_MEMBERS), (
+        f"the re-seal changed {sorted(changed)}, but the ledger licenses {sorted(EXTERNALLY_REBUILT_DATASET_MEMBERS)}"
+    )
+    for name, record in EXTERNALLY_REBUILT_DATASET_MEMBERS.items():
+        assert changed[name]["sealed_sha256"] == record["sealed_sha256"]
+        assert changed[name]["current_sha256"] == record["rebuilt_sha256"]
+    assert int(provenance["unchanged_member_count"]) == 26, (
+        "every other member of the sealed corpus must have been carried byte for byte"
+    )
 
 
 @dataclass(frozen=True)
@@ -118,6 +198,63 @@ def _frozen_root() -> Path:
     return root
 
 
+def test_every_externally_rebuilt_member_is_provably_not_a_segmentation_input() -> None:
+    """A quarantined member must be one the segmenter can never read.
+
+    This is the whole licence for the ledger below. ``fr_docket_links`` is a
+    relationship carrier in ``EXCLUDED_SOURCE_TABLES``: it never becomes a
+    ``SourceArtifact``, so its bytes cannot move a segment boundary. If a future
+    entry named a table the segmenter *does* read, this fails and the ledger
+    stops being a legitimate quarantine.
+    """
+    assert EXTERNALLY_REBUILT_DATASET_MEMBERS, "the ledger states which members moved outside this dataset's build"
+    for name, record in EXTERNALLY_REBUILT_DATASET_MEMBERS.items():
+        table = record["source_table"]
+        assert table in EXCLUDED_SOURCE_TABLES, f"{name} is a segmentation input and cannot be quarantined"
+        assert table not in STEP4_ACTIVE_SOURCE_TABLES
+        assert record["sealed_sha256"] != record["rebuilt_sha256"]
+        assert record["rebuilt_by"] and record["reason"]
+
+
+def _provenance(**overrides: Any) -> dict[str, Any]:
+    record = EXTERNALLY_REBUILT_DATASET_MEMBERS["fr_docket_links.parquet"]
+    base = {
+        "evaluation_id": SEALED_DATASET_ID,
+        "changed_members": [
+            {
+                "name": "fr_docket_links.parquet",
+                "sealed_sha256": record["sealed_sha256"],
+                "current_sha256": record["rebuilt_sha256"],
+            }
+        ],
+        "unchanged_member_count": 26,
+    }
+    base.update(overrides)
+    return {"resealed_from": base}
+
+
+def test_reseal_provenance_accepts_exactly_the_licensed_descent() -> None:
+    _check_reseal_provenance(_provenance())
+
+
+def test_reseal_provenance_refuses_descent_from_another_dataset() -> None:
+    with pytest.raises(AssertionError, match="does not descend from"):
+        _check_reseal_provenance(_provenance(evaluation_id="segmentation_eval_000000000000000000000000"))
+
+
+def test_reseal_provenance_refuses_an_unlicensed_changed_member() -> None:
+    changed = _provenance()["resealed_from"]["changed_members"] + [
+        {"name": "gold_spans.parquet", "sealed_sha256": "a", "current_sha256": "b"}
+    ]
+    with pytest.raises(AssertionError, match="the ledger licenses"):
+        _check_reseal_provenance(_provenance(changed_members=changed))
+
+
+def test_reseal_provenance_refuses_a_silently_dropped_member() -> None:
+    with pytest.raises(AssertionError, match="carried byte for byte"):
+        _check_reseal_provenance(_provenance(unchanged_member_count=25))
+
+
 def test_frozen_root_unset_skips_but_explicit_invalid_root_fails(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -154,7 +291,10 @@ def _verify_frozen_files(root: Path) -> tuple[Path, Path, Path]:
     assert scope_manifest["scope_id"] == scope_receipt["scope_id"] == SCOPE_ID
     assert scope_manifest["dataset_evaluation_id"] == DATASET_ID
     assert baseline_manifest["experiment_id"] == baseline_receipt["experiment_id"] == BASELINE_ID
-    assert baseline_manifest["dataset_evaluation_id"] == DATASET_ID
+    # The baseline names the pre-reseal identity; the provenance check below is
+    # what licenses measuring it against the re-sealed corpus.
+    assert baseline_manifest["dataset_evaluation_id"] == SEALED_DATASET_ID
+    _check_reseal_provenance(dataset_manifest)
     assert dataset_receipt["status"] == scope_receipt["status"] == baseline_receipt["status"] == "pass"
     assert (
         baseline_manifest["artifacts"]["experiment_segments.parquet"]["sha256"]
