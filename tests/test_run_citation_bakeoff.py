@@ -457,3 +457,76 @@ def test_verdict_counts_families_from_adjudicated_ground_truth_only():
     assert verdict["cfr"]["citeurl_correct"] == 1
     assert verdict["eo"]["current_parser_correct"] == 1
     assert verdict["_unadjudicated"] == 1
+
+
+# --------------------------------------------------------------------------
+# the text-grammar cut: the comparison a recommendation can rest on
+# --------------------------------------------------------------------------
+
+
+def test_text_grammar_families_exclude_the_column_scoped_readers():
+    """Only grammars meant for free text belong in a free-text comparison.
+
+    ``normalize_rin``, ``canonical_frdoc_iri`` and ``normalize_docket_reference``
+    read a *column* whose every value is meant to be one identifier. Pointed at
+    authority prose they over-fire — ``normalize_docket_reference`` returns
+    early for anything the Regulations.gov syntax can spell, so a bare section
+    number like ``"1255"`` comes back as a docket. Scoring them against CiteURL
+    would charge the project for false positives it never makes in production.
+    """
+    assert mod.TEXT_GRAMMAR_FAMILIES == frozenset({"usc", "cfr", "pl", "eo", "stat"})
+    assert mod.current_text_grammar_recognized("42 U.S.C. 7401") is True
+    assert mod.current_text_grammar_recognized("40 CFR Part 60") is True
+    assert mod.current_text_grammar_recognized("1255") is False
+    assert "docket" in mod.current_families("1255")
+
+
+def test_text_grammar_cut_reclassifies_records_without_re_running_detection():
+    records = [
+        {"string_id": "a", "current_families": ["cfr"], "citeurl_recognized": True},
+        {"string_id": "b", "current_families": ["eo"], "citeurl_recognized": False},
+        {"string_id": "c", "current_families": [], "citeurl_recognized": True},
+        {"string_id": "d", "current_families": ["docket"], "citeurl_recognized": False},
+    ]
+    cells = mod.text_grammar_cells(records)
+    assert cells == {"a": "both", "b": "current_only", "c": "citeurl_only", "d": "neither"}
+    assert mod.four_cell_table([{"cell": cell} for cell in cells.values()]) == {
+        "both": 1,
+        "current_only": 1,
+        "citeurl_only": 1,
+        "neither": 1,
+    }
+
+
+def test_false_positive_counts_are_reported_for_both_arms():
+    """A system that claims a citation the string does not contain is wrong.
+
+    This is the safety half of the comparison. Detection coverage alone would
+    reward an arm for firing on everything.
+    """
+    records = [
+        {
+            "status": "adjudicated",
+            "verdict": "garbage",
+            "response": {"contains_citations": False, "citations": []},
+            "current_text_recognized": True,
+            "citeurl_recognized": False,
+        },
+        {
+            "status": "adjudicated",
+            "verdict": "garbage",
+            "response": {"contains_citations": False, "citations": []},
+            "current_text_recognized": False,
+            "citeurl_recognized": True,
+        },
+        {
+            "status": "adjudicated",
+            "verdict": "citeurl_correct",
+            "response": {"contains_citations": True, "citations": [{"family": "cfr", "text": "40 CFR 60"}]},
+            "current_text_recognized": False,
+            "citeurl_recognized": True,
+        },
+        {"status": "failed", "verdict": None, "response": None},
+    ]
+    counts = mod.false_positive_counts(records)
+    assert counts == {"current_text_grammars": 1, "citeurl": 1, "adjudicated": 3}

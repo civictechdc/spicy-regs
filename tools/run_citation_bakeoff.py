@@ -161,6 +161,18 @@ CITEURL_TEMPLATE_FAMILIES: dict[str, str] = {
 #: The families the evidence document reports on.
 FAMILIES = ("usc", "cfr", "pl", "eo", "stat", "fr_doc", "fr_vol_page", "docket", "rin")
 
+#: The families whose project-owned grammars are meant to read **free text**.
+#:
+#: The comparison a recommendation can rest on uses these and only these.
+#: ``normalize_rin``, ``canonical_frdoc_iri`` and ``normalize_docket_reference``
+#: read a *column* whose every value is supposed to be one identifier; pointed
+#: at authority prose they over-fire (``normalize_docket_reference`` returns
+#: early for anything the Regulations.gov syntax can spell, so a bare section
+#: number such as "1255" comes back as a docket). Scoring them against CiteURL
+#: would charge the project for false positives it does not make in
+#: production, where those functions are never handed authority text.
+TEXT_GRAMMAR_FAMILIES = frozenset({"usc", "cfr", "pl", "eo", "stat"})
+
 CELLS = ("both", "current_only", "citeurl_only", "neither")
 DISAGREEMENT_CELLS = ("current_only", "citeurl_only", "neither")
 
@@ -503,6 +515,52 @@ def cfr_compact_key_only(text: str) -> bool:
     from spicy_regs.ontology.citations import _CFR_STANDARD, _CFR_TITLE_PART  # noqa: PLC0415
 
     return not (_CFR_STANDARD.search(text) or _CFR_TITLE_PART.search(text))
+
+
+def current_text_grammar_recognized(text: str) -> bool:
+    """Whether a project-owned **free-text** grammar reads anything here."""
+    return bool(TEXT_GRAMMAR_FAMILIES & set(current_families(text)))
+
+
+def text_grammar_cells(records: list[dict[str, Any]]) -> dict[str, str]:
+    """Re-cut published detection records against the text-grammar arm.
+
+    Derived from ``current_families``, which the detection artifact already
+    publishes per string, so this reclassification needs no rebuild and cannot
+    disagree with the sealed artifact it reads.
+    """
+    cells: dict[str, str] = {}
+    for record in records:
+        current = bool(TEXT_GRAMMAR_FAMILIES & set(record.get("current_families", [])))
+        cells[str(record["string_id"])] = classify_cell(
+            current=current,
+            citeurl=bool(record.get("citeurl_recognized", False)),
+        )
+    return cells
+
+
+def false_positive_counts(records: list[dict[str, Any]]) -> dict[str, int]:
+    """How often each arm claimed a citation the string does not contain.
+
+    The safety half of the comparison. Detection coverage on its own rewards an
+    arm for firing on everything; this is the column that charges it for doing
+    so. Ground truth is the judge's ``contains_citations``.
+    """
+    current = 0
+    citeurl = 0
+    adjudicated = 0
+    for record in records:
+        if record.get("status") != "adjudicated":
+            continue
+        adjudicated += 1
+        response = record.get("response") or {}
+        if response.get("contains_citations"):
+            continue
+        if record.get("current_text_recognized"):
+            current += 1
+        if record.get("citeurl_recognized"):
+            citeurl += 1
+    return {"current_text_grammars": current, "citeurl": citeurl, "adjudicated": adjudicated}
 
 
 def citeurl_families(template_names: list[str]) -> tuple[list[str], list[str]]:
@@ -1064,6 +1122,19 @@ def command_verdict(args: argparse.Namespace) -> int:
     output = Path(args.output)
     records = [json.loads(line) for line in (output / "adjudication.jsonl").read_text().splitlines() if line.strip()]
     detection = json.loads((output / "detection.json").read_text())
+
+    # The comparison a recommendation rests on: project-owned *free-text*
+    # grammars against CiteURL. Re-cut from what detection already published,
+    # so it cannot disagree with the sealed artifact.
+    cells = text_grammar_cells(detection["records"])
+    text_table = four_cell_table([{"cell": cell} for cell in cells.values()])
+    citeurl_by_id = {str(item["string_id"]): bool(item["citeurl_recognized"]) for item in detection["records"]}
+    for record in records:
+        string_id = str(record["string_id"])
+        record["cell_text_grammars"] = cells.get(string_id)
+        record["current_text_recognized"] = cells.get(string_id) in {"both", "current_only"}
+        record["citeurl_recognized"] = citeurl_by_id.get(string_id, False)
+
     verdict = {
         "schema_version": VERDICT_SCHEMA_VERSION,
         "scope": "detection evaluation only; nothing here retires a regex or changes identity",
@@ -1071,14 +1142,21 @@ def command_verdict(args: argparse.Namespace) -> int:
             "population": detection["population"],
             "four_cell": detection["four_cell"],
             "four_cell_extended": detection["four_cell_extended"],
+            "four_cell_text_grammars": text_table,
+            "text_grammar_families": sorted(TEXT_GRAMMAR_FAMILIES),
         },
         "adjudicated": sum(1 for record in records if record.get("status") == "adjudicated"),
         "by_family": verdict_by_family(records),
         "by_cell": verdict_by_cell(records),
+        "by_cell_text_grammars": verdict_by_cell(
+            [{**record, "cell": record.get("cell_text_grammars")} for record in records]
+        ),
+        "false_positives": false_positive_counts(records),
         "spend": realized_cost(records, prices=PRICES_USD_PER_MTOK),
     }
     _write(output / "verdict.json", verdict)
-    print(canonical_json(verdict["by_cell"]))
+    print(canonical_json(verdict["by_cell_text_grammars"]))
+    print(canonical_json(verdict["false_positives"]))
     return 0
 
 
