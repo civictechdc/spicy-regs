@@ -576,7 +576,106 @@ decision.
   variants. The schema is unchanged, so nothing breaks; the rows are simply
   absent until a rebuild.
 
-### Act-relative citations: what would unlock them
+### Act-relative citations: measured, 2026-08-02
+
+Superseded by measurement. The two joins named below were ingested; what
+follows is what they actually resolve. Readers:
+`spicy_regs.sources.uscode_olrc`. Grammar: `find_act_relative_citations`.
+
+**The index is the grammar.** Recognition matches against the Popular Name
+Tool's 13,626 names, not against a shape. The shape does not work: a generic
+"capitalised words ending in Act" expression over the 4,777 sealed strings
+matches `U.S.C.` 108 times. Against the index the same corpus yields **67
+act-relative citations across 67 strings**, naming 26 distinct acts, with no
+`U.S.C.` false positive at all.
+
+**47 of the 67 resolve to a U.S.C. identifier**, through
+popular name → Table III key → act section → title/section:
+
+| Citation | Resolves to |
+|---|---|
+| `Clean Air Act sec. 111` | `urn:rkaf:us:usc:42:7411` |
+| `Clean Air Act sec. 112` | `urn:rkaf:us:usc:42:7412` |
+| `ERISA sec. 803` | `urn:rkaf:us:usc:29:1193b` |
+| `Social Security Act sec. 1173` | `urn:rkaf:us:usc:42:1320d-2` |
+| `Federal Food, Drug, and Cosmetic Act sec. 505` | `urn:rkaf:us:usc:21:355` |
+| `Wagner-Peyser Act sec. 12` | `urn:rkaf:us:usc:29:49k` |
+
+`Clean Air Act sec. 111` → `42 U.S.C. 7411` is exactly what this document
+predicted before the data existed, and it is now derived rather than asserted.
+
+The 20 that do not resolve each say why, and none of them guesses:
+
+| n | Reason |
+|---:|---|
+| 8 | the act section is not in Table III (usually an amending section that classified nowhere) |
+| 7 | the U.S.C. target is not expressible in `rkaf:us-usc` (a note, a range, or an "et seq.") |
+| 4 | Table III fetch failed for one act (`119-21`, the One Big Beautiful Bill Act — the server truncates that page) |
+| 1 | classification status `Elim.` |
+
+**The acronym problem solved itself, and the alias rule came from the data.**
+"ERISA" is an entry in the tool in its own right — 17 citations, the largest
+act-relative token in the corpus — pointing at "Employee Retirement Income
+Security Act". The tool lists no entry by that name: only "… Act **of 1974**".
+The year is how the tool distinguishes acts, so it cannot be dropped from an
+alias target; it can only be supplied, and only when exactly one act supplies
+it. "Clean Air Act Amendments" would be 1966, 1970 and 1977, and picking one
+would invent a citation. That refusal is a named test.
+
+Still refused, correctly: `INA sec. 103(a)(1)`, `PHS Act secs. 2791(b)(5)`,
+`ACA sec. 1557`. The tool lists none of those abbreviations, and inferring what
+they stand for is the guess the identity fence exists to stop.
+
+**Not yet landed:** the resolution driver is a script, not a committed tool, and
+neither table is published as parquet. The readers, the index, the grammar and
+the refusals are committed and tested; turning 47 resolutions into a published
+table is the next step.
+
+### The EO compilation page: sources evaluated, 2026-08-02
+
+Investigated to close the gap flagged when `ExecutiveOrderCompilation` landed as
+a non-identity recognition. Findings, each verified against fetched bytes:
+
+* **GovInfo Title 3 works, but only from the 1996 Comp. onward.** Package
+  `CFR-{Y+1}-title3-vol1` is the `Y` compilation. Title 3 starts at 1997
+  (`CFR-1996-title3-vol1` 302s; 1997 is 200). MODS metadata carries the EO
+  number but **no page**; the page lives only as `[[Page N]]` markers in the
+  whole-volume HTML, which is keyless and parseable. Verified:
+  `3 CFR, 1996 Comp., p. 157` → E.O. 12988, matching the FR text exactly.
+* **The U.S. Code USLM XML does NOT carry the compilation citation.** This was
+  the leading hypothesis and it is false. Across titles 3, 5, 10, 20, 42 and 50
+  — ~4,561 `Ex. Ord. No.` references — there are **zero** `Comp., p.`
+  citations; the notes are FR-only (`Ex. Ord. No. 11340, Mar. 30, 1967, 32 F.R.
+  5453`). Ruled out.
+* **NARA disposition tables do not carry it either.** `grep -c CFR` on the 1977
+  table is 0. Ruled out. The federalregister.gov API has no `3 CFR` field and
+  starts 1994-01-03.
+* **Pre-1996 is resolvable only by inference**, by mining the FR corpus's own
+  republished CFR authority notes, which do carry the triple. That resolves all
+  the corpus citations but is co-occurrence inference rather than a published
+  crosswalk, it inherits agency citation errors (`20 CFR 402.75` cites
+  "Executive Order No. 12958 (1995) (3 CFR, 1987 Comp., p. 235)" where the true
+  answer is 12600), and so it requires voting across ≥3 documents.
+
+**Two findings change the shape of the problem:**
+
+1. **The premise "compilation page → Executive Order" is unsound.**
+   `3 CFR, 1949-1953 Comp., p. 1002` is **Reorganization Plan No. 2 of 1950**,
+   not an EO. Title 3 compilations also carry proclamations, reorganization
+   plans, memoranda and determinations. A resolver must return a *presidential
+   document with a type*, not an EO number — which means
+   `ExecutiveOrderCompilation` is misnamed for what it will eventually resolve
+   to, and the type should be settled before a resolver is built.
+2. **`3 CFR, 1959-1963 Comp.` is unresolvable by any source**, because it names
+   a volume and no page. The best any source gives is the bound (that volume
+   holds EO 10798–11134). The existing decision to make `page` optional and
+   publish no identifier without it is therefore correct and stays.
+
+Consequence: the non-identity recognition already committed is the right
+resting place, and the *next* step is a typed presidential-document resolver,
+not an EO-number lookup.
+
+### Act-relative citations: what would unlock them (superseded — see above)
 
 Not built, on purpose. `Clean Air Act section 111` is the remaining bulk of the
 ≥127 shared miss, and it is a data problem rather than a grammar problem — the
