@@ -23,7 +23,9 @@ from spicy_regs.ontology.citations import (
     canonical_rin_iri,
     canonical_usc_chapter_iri,
     canonical_usc_iri,
+    docket_reference_as_stated,
     federal_register_identifier,
+    normalize_docket_id,
     normalize_docket_reference,
     normalize_regsgov_identifier,
     normalize_rin,
@@ -716,6 +718,89 @@ def test_a_stripped_label_may_uncover_a_docket_but_never_manufacture_one(stated,
 )
 def test_rin_normalization(value, expected):
     assert normalize_rin(value) == expected
+
+
+@pytest.mark.parametrize(
+    ("stated", "key"),
+    [
+        # The variant shapes docs/corpus-edge-coverage-findings-2026-07-24.md §1
+        # measured, and the three rules named in DOCKET_NORMALIZATION_RULES:
+        # strip the leading decoration, repair whitespace that split a real
+        # identifier, upper-case.
+        ("Docket No. FAA-2026-3485", "FAA-2026-3485"),
+        ("Doc. No. AMS-SC-24-0046", "AMS-SC-24-0046"),
+        ("Docket Number USCG-2026-0762", "USCG-2026-0762"),
+        ("Docket No: OSM-2025-0007", "OSM-2025-0007"),
+        ("docket no. phmsa-2025-0118", "PHMSA-2025-0118"),
+        ("Docket No. Docket No. FSIS-2025-0012", "FSIS-2025-0012"),
+        ("  FAA - 2026 - 3485  ", "FAA-2026-3485"),
+        ("FSIS-2025-0012", "FSIS-2025-0012"),
+        # The strict separator. A decoration must be followed by whitespace or a
+        # colon, so a real identifier whose organization spells one cannot be
+        # truncated into a false match.
+        ("DOC-2005-0010", "DOC-2005-0010"),
+        ("DOCKET-2020-0001", "DOCKET-2020-0001"),
+        ("", ""),
+        ("   ", ""),
+        (None, ""),
+    ],
+)
+def test_the_docket_join_key_strips_decoration_repairs_and_upper_cases(stated, key):
+    assert normalize_docket_id(stated) == key
+
+
+def test_a_bare_label_leaves_a_key_that_is_not_a_docket():
+    """ "Docket No." keys to "NO." — which is why the build drops it first.
+
+    The decoration expression needs whitespace or a colon after the label, and
+    at the end of a bare "Docket No." there is none, so only "Docket " strips.
+    The residue matches no docket and never has (zero collisions across the
+    276,326 dockets in the 54f07a6 pin), but a key made of decoration should not
+    reach a link table at all — so `build_fr_docket_links` drops a reference
+    that states nothing *before* keying it, using
+    :func:`docket_reference_as_stated`, and this asserts why that ordering
+    matters rather than that the residue is harmless.
+    """
+    assert normalize_docket_id("Docket No.") == "NO."
+    assert docket_reference_as_stated("Docket No.") == ""
+
+
+def test_the_docket_join_key_is_a_key_and_not_an_identifier():
+    """Two functions, two jobs, and the difference is load-bearing.
+
+    :func:`normalize_docket_reference` answers "what docket does this reference
+    state?" and refuses anything that is not a Regulations.gov docket.
+    :func:`normalize_docket_id` answers "what do I compare this against?" and
+    refuses nothing — it reduces whatever it is given to a comparison key. A key
+    that matches no docket is simply a key that matches no docket; it never
+    licenses a join on its own.
+    """
+    foreign = "Special Conditions No. 25-893-SC"
+    assert normalize_docket_reference(foreign) is None
+    assert normalize_docket_id(foreign) == "SPECIALCONDITIONSNO.25-893-SC"
+
+    # A shape the identifier grammar refuses because supplying the separator
+    # would be writing the id rather than reading it. As a comparison key the
+    # same string is expressible, and still matches no real docket.
+    assert normalize_docket_reference("Docket No. FSIS 2025-0009") is None
+    assert normalize_docket_id("Docket No. FSIS 2025-0009") == "FSIS2025-0009"
+
+
+def test_the_docket_decoration_grammar_has_one_definition():
+    """The crosswalk tool defined it; the links build needs it; so it moved.
+
+    Same reasoning as the RIN grammar below. A pattern restated in a tool and a
+    transform drifts the moment either is corrected, and this one decides
+    whether 87,681 link rows join.
+    """
+    restating = sorted(
+        str(path.relative_to(REPO_ROOT))
+        for directory in ("src", "tools")
+        for path in (REPO_ROOT / directory).rglob("*.py")
+        if r"(?:docket\s*(?:no|number)?|doc\.?\s*no)" in path.read_text()
+    )
+
+    assert restating == ["src/spicy_regs/ontology/citations.py"]
 
 
 def test_the_rin_grammar_has_one_definition():

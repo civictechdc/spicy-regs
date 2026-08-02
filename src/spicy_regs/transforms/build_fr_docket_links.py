@@ -26,6 +26,24 @@ are distinct: one link per (docket, FR document), however many ways the array
 spelled it. A reference that states nothing at all is the one thing dropped
 rather than quarantined — 54 of the pinned corpus's 893,822 are bare labels
 ("Docket No.", "MM Docket No.") whose stated value is decoration only.
+
+Beside the identifier the table publishes ``docket_key``, the comparison key
+:func:`normalize_docket_id` derives — decoration stripped under the strict
+separator rule, whitespace repaired, upper-cased. It is a **key, not a
+resolution**. Deriving it once here is what
+``tools/build_agency_crosswalk_artifact.py`` was doing on every read to recover
+87,681 link rows the raw join dropped (finding #1, proven in 54f07a6); a joiner
+that keys on the column instead of re-deriving it cannot disagree with the
+table about what the key is.
+
+What the column does **not** do is license a join. The refusal lives with
+whoever holds the docket spine, because only there is the question askable: a
+key that names more than one docket is quarantined, never resolved. This build
+reads ``federal_register.parquet`` alone and has no spine to ask, so it emits
+the key as a pure function of the reference and answers nothing about which
+docket it names. (Zero keys covered two dockets across all 276,326 in the
+54f07a6 pin, so the refusal path is exercised only by tests — which is a reason
+to keep it, not to drop it.)
 """
 
 from pathlib import Path
@@ -33,7 +51,11 @@ from pathlib import Path
 import pyarrow.parquet as pq
 from loguru import logger
 
-from spicy_regs.ontology.citations import docket_reference_as_stated, normalize_docket_reference
+from spicy_regs.ontology.citations import (
+    docket_reference_as_stated,
+    normalize_docket_id,
+    normalize_docket_reference,
+)
 
 
 def build_fr_docket_links(output_dir: Path) -> Path:
@@ -66,6 +88,7 @@ def build_fr_docket_links(output_dir: Path) -> Path:
     for name, function in (
         ("normalize_docket_reference", normalize_docket_reference),
         ("docket_reference_as_stated", docket_reference_as_stated),
+        ("normalize_docket_id", normalize_docket_id),
     ):
         con.create_function(name, function, ["VARCHAR"], "VARCHAR", null_handling="special")
 
@@ -82,6 +105,20 @@ def build_fr_docket_links(output_dir: Path) -> Path:
                 normalize_docket_reference(link.docket_id),
                 docket_reference_as_stated(link.docket_id)
             ) AS docket_id,
+            -- Keyed off the identifier rather than the raw string, because the
+            -- label grammar already uncovered what a department-prefixed label
+            -- was hiding ("DHS Docket No. USCIS-2025-0004"), which the strict
+            -- decoration rule alone cannot reach. NULL rather than '' when
+            -- nothing survives: a column that says "no key" should say so.
+            NULLIF(
+                normalize_docket_id(
+                    COALESCE(
+                        normalize_docket_reference(link.docket_id),
+                        docket_reference_as_stated(link.docket_id)
+                    )
+                ),
+                ''
+            ) AS docket_key,
             fr.document_number,
             fr.title,
             fr.abstract,

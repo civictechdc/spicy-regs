@@ -148,6 +148,13 @@ tables:
       bridge used by `rule_targets`, proceedings, and comment periods.
     columns:
       docket_id: "Referenced regulations.gov docket identifier."
+      docket_key: >-
+        Comparison key for `docket_id`: leading Federal Register docket
+        decorations stripped, internal whitespace repaired, upper-cased. A key,
+        not a resolution — it says what to compare against, never which docket a
+        row names. A key matching more than one docket is a collision the
+        consumer quarantines rather than resolves. Null when nothing survives
+        normalization.
       document_number: "Federal Register document number."
       title: "Federal Register document title."
       abstract: "Federal Register abstract."

@@ -510,6 +510,51 @@ def normalize_docket_reference(reference: object) -> str | None:
     return uncovered
 
 
+#: Decoration must be followed by whitespace or a colon. A bare hyphen does
+#: not qualify, so a real identifier like ``DOC-2005-0010`` (Commerce) or a
+#: hypothetical ``DOCKET-2020-0001`` cannot be truncated into a false match.
+DOCKET_DECORATION_PATTERN = r"^\s*(?:docket\s*(?:no|number)?|doc\.?\s*no)\.?[\s:]+"
+
+DOCKET_NORMALIZATION_RULES = (
+    "strip_leading_docket_decorations",
+    "remove_internal_whitespace",
+    "uppercase",
+)
+
+_DOCKET_DECORATION = re.compile(DOCKET_DECORATION_PATTERN, re.IGNORECASE)
+_INTERNAL_WHITESPACE = re.compile(r"\s+")
+
+
+def normalize_docket_id(value: object) -> str:
+    """Reduce a docket reference to its comparison key.
+
+    A key, not an identifier, and the distinction is what makes it safe.
+    :func:`normalize_docket_reference` answers "what docket does this reference
+    state?" and refuses anything that is not a Regulations.gov docket; this
+    answers "what do I compare it against?" and refuses nothing, because a key
+    that matches no docket is simply a key that matches no docket. Comparing is
+    not identifying, and a key licenses no join on its own — a key that names
+    more than one docket is a collision the joiner quarantines, never resolves.
+
+    Applies :data:`DOCKET_NORMALIZATION_RULES` in order: strip leading Federal
+    Register docket decorations (repeatedly, since some references carry two),
+    remove internal whitespace that split a real identifier, and upper-case.
+    Returns ``""`` when nothing survives.
+
+    Proven in 54f07a6 across 276,326 dockets: 87,681 link rows recovered, zero
+    normalized keys covering two dockets
+    (docs/corpus-edge-coverage-findings-2026-07-24.md finding #1, RULE-010).
+    """
+    text = "" if value is None else str(value).strip()
+    if not text:
+        return ""
+    previous = None
+    while previous != text:
+        previous = text
+        text = _DOCKET_DECORATION.sub("", text).strip()
+    return _INTERNAL_WHITESPACE.sub("", text).upper()
+
+
 def canonical_regsgov_iri(identifier: object) -> str:
     value = normalize_regsgov_identifier(identifier)
     if value is None:

@@ -62,14 +62,16 @@ def _write_federal_register(directory, docket_ids_by_document):
 
 def _links(output_dir):
     table = pq.read_table(output_dir / "fr_docket_links.parquet")
-    return [
-        (row["document_number"], row["docket_id"], row["docket_ids_json"])
-        for row in table.to_pylist()
-    ]
+    return [(row["document_number"], row["docket_id"], row["docket_ids_json"]) for row in table.to_pylist()]
+
+
+def _keys(output_dir):
+    table = pq.read_table(output_dir / "fr_docket_links.parquet")
+    return {(row["docket_id"], row["docket_key"]) for row in table.to_pylist()}
 
 
 def test_a_decorated_docket_reference_still_publishes_the_bare_identifier(tmp_path):
-    """"Docket No. FAA-2026-3485" links the same docket "FAA-2026-3485" does."""
+    """ "Docket No. FAA-2026-3485" links the same docket "FAA-2026-3485" does."""
     _write_federal_register(
         tmp_path,
         {
@@ -161,6 +163,78 @@ def test_a_stringified_null_states_no_docket_at_either_call_site(tmp_path):
     build_fr_docket_links(tmp_path)
 
     assert [docket_id for _, docket_id, _ in _links(tmp_path)] == ["FAA-2026-3485"]
+
+
+def test_the_table_carries_the_join_key_beside_the_identifier_and_the_raw_array(tmp_path):
+    """RULE-010: normalized key, preserved raw value, both published.
+
+    ``tools/build_agency_crosswalk_artifact.py`` derived this key itself on every
+    read, recovering 87,681 link rows the raw join dropped
+    (docs/corpus-edge-coverage-findings-2026-07-24.md §1, proven in 54f07a6).
+    Deriving it here means the table a joiner reads already carries it, and one
+    implementation decides what it is.
+    """
+    _write_federal_register(tmp_path, {"2026-00001": ["Docket No. FAA-2026-3485"]})
+
+    build_fr_docket_links(tmp_path)
+
+    table = pq.read_table(tmp_path / "fr_docket_links.parquet")
+    assert "docket_key" in table.column_names
+    (row,) = table.to_pylist()
+    assert row["docket_key"] == "FAA-2026-3485"
+    assert row["docket_id"] == "FAA-2026-3485"
+    assert json.loads(row["docket_ids_json"]) == ["Docket No. FAA-2026-3485"]
+
+
+def test_the_join_key_recovers_what_the_identifier_grammar_refuses(tmp_path):
+    """The key is a comparison key, so it forms where an identifier does not.
+
+    A reference the Regulations.gov scheme cannot express keeps its stated value
+    in ``docket_id`` — unchanged, quarantined for inspection. Its ``docket_key``
+    is still derived, because comparing is not the same act as identifying, and
+    a key that matches no docket licenses nothing.
+    """
+    _write_federal_register(
+        tmp_path,
+        {
+            "2026-00001": [
+                "Special Conditions No. 25-893-SC",
+                "Docket No. FSIS 2025-0009",
+                "  faa - 2026 - 3485  ",
+            ]
+        },
+    )
+
+    build_fr_docket_links(tmp_path)
+
+    assert _keys(tmp_path) == {
+        ("Special Conditions No. 25-893-SC", "SPECIALCONDITIONSNO.25-893-SC"),
+        ("Docket No. FSIS 2025-0009", "FSIS2025-0009"),
+        ("faa - 2026 - 3485", "FAA-2026-3485"),
+    }
+
+
+def test_the_join_key_matches_what_the_crosswalk_derives_for_itself(tmp_path):
+    """The column and the tool must agree, or the rebuild changes the artifact.
+
+    ``build_agency_crosswalk_artifact`` keys on ``normalize_docket_id`` applied
+    to the emitted ``docket_id``. The column is that same expression, evaluated
+    once at build time instead of once per read.
+    """
+    from spicy_regs.ontology.citations import normalize_docket_id
+
+    stated = [
+        "Docket No. FAA-2026-3485",
+        "DHS Docket No. USCIS-2025-0004",
+        "DOC-2005-0010",
+        "MM Docket No. 98-213",
+        "REG-103193-26",
+    ]
+    _write_federal_register(tmp_path, {"2026-00001": stated})
+
+    build_fr_docket_links(tmp_path)
+
+    assert all(key == normalize_docket_id(docket_id) for docket_id, key in _keys(tmp_path))
 
 
 def test_the_decorated_and_bare_forms_of_one_docket_emit_one_row(tmp_path):

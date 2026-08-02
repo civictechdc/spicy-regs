@@ -56,7 +56,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import re
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -64,6 +63,16 @@ from typing import Any
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+
+# The docket join key this tool proved is now the one the link table publishes,
+# so the grammar lives beside the other identifier grammars rather than here.
+# Values unchanged: the receipt pins DOCKET_DECORATION_PATTERN and
+# DOCKET_NORMALIZATION_RULES, and a rebuild must reproduce it byte for byte.
+from spicy_regs.ontology.citations import (
+    DOCKET_DECORATION_PATTERN,
+    DOCKET_NORMALIZATION_RULES,
+    normalize_docket_id,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -102,20 +111,6 @@ DOCKET_NORMALIZATION_DEFECT = (
     "id. The finding prescribes targeted normalization plus honest quarantine of the "
     "rest -- never force-matching."
 )
-
-#: Decoration must be followed by whitespace or a colon. A bare hyphen does
-#: not qualify, so a real identifier like ``DOC-2005-0010`` (Commerce) or a
-#: hypothetical ``DOCKET-2020-0001`` cannot be truncated into a false match.
-DOCKET_DECORATION_PATTERN = r"^\s*(?:docket\s*(?:no|number)?|doc\.?\s*no)\.?[\s:]+"
-
-DOCKET_NORMALIZATION_RULES = (
-    "strip_leading_docket_decorations",
-    "remove_internal_whitespace",
-    "uppercase",
-)
-
-_DOCKET_DECORATION = re.compile(DOCKET_DECORATION_PATTERN, re.IGNORECASE)
-_WHITESPACE = re.compile(r"\s+")
 
 CROSSWALK_COLUMNS = (
     "crosswalk_id",
@@ -286,25 +281,6 @@ def _share(numerator: int, denominator: int) -> str:
 
 def _flag(value: bool) -> str:
     return "true" if value else "false"
-
-
-def normalize_docket_id(value: object) -> str:
-    """Reduce a docket reference to its comparison key.
-
-    Applies ``DOCKET_NORMALIZATION_RULES`` in order: strip leading Federal
-    Register docket decorations (repeatedly, since some references carry two),
-    remove internal whitespace that split a real identifier, and upper-case.
-    Returns "" when nothing survives.
-    """
-
-    text = _text(value)
-    if not text:
-        return ""
-    previous = None
-    while previous != text:
-        previous = text
-        text = _DOCKET_DECORATION.sub("", text).strip()
-    return _WHITESPACE.sub("", text).upper()
 
 
 def _read_rows(path: Path, columns: tuple[str, ...]) -> list[dict[str, Any]]:

@@ -164,6 +164,7 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
     ],
     "fr_docket_links": [
         ("docket_id", "VARCHAR"),
+        ("docket_key", "VARCHAR"),
         ("document_number", "VARCHAR"),
         ("title", "VARCHAR"),
         ("abstract", "VARCHAR"),

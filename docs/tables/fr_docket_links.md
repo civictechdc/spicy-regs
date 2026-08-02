@@ -10,6 +10,7 @@ Exploded Federal Register-to-regulations.gov link table: one row per Federal Reg
 | Column | Type | Description |
 | --- | --- | --- |
 | `docket_id` | `VARCHAR` | Referenced regulations.gov docket identifier. |
+| `docket_key` | `VARCHAR` | Comparison key for `docket_id`: leading Federal Register docket decorations stripped, internal whitespace repaired, upper-cased. A key, not a resolution — it says what to compare against, never which docket a row names. A key matching more than one docket is a collision the consumer quarantines rather than resolves. Null when nothing survives normalization. |
 | `document_number` | `VARCHAR` | Federal Register document number. |
 | `title` | `VARCHAR` | Federal Register document title. |
 | `abstract` | `VARCHAR` | Federal Register abstract. |
