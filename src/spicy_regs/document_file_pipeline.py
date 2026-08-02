@@ -978,13 +978,15 @@ def _prepare_source_cache_release(
     *,
     released_at: str,
     rulespec_core_path: Path,
+    source_specs: Sequence[Any] | None = None,
 ) -> _PreparedFileRelease:
     # The source list and byte-lock validator are reused from the measured
     # segmentation corpus. The release model and publication path remain here.
     from spicy_regs.corpora.segmentation_evaluation import FULL_DOCUMENT_SPECS, validate_source_cache
 
+    specs = tuple(FULL_DOCUMENT_SPECS if source_specs is None else source_specs)
     cache_dir = Path(cache_dir)
-    validation = validate_source_cache(cache_dir)
+    validation = validate_source_cache(cache_dir, specs=specs)
     if validation.get("status") != "pass":
         failures = validation.get("failures")
         raise DocumentFilePipelineError(f"source cache validation failed: {failures}")
@@ -1010,7 +1012,7 @@ def _prepare_source_cache_release(
     records: list[dict[str, Any]] = []
     rendition_bytes: dict[str, bytes] = {}
     requested_sources: set[str] = set()
-    for spec in FULL_DOCUMENT_SPECS:
+    for spec in specs:
         lock_record = by_case.get(spec.case_id)
         if lock_record is None:
             raise DocumentFilePipelineError(f"source cache is missing case {spec.case_id}")
@@ -1286,19 +1288,26 @@ def build_document_release_from_source_cache(
     *,
     released_at: str,
     rulespec_core_path: Path = DEFAULT_RULESPEC_CORE_PATH,
+    source_specs: Sequence[Any] | None = None,
 ) -> dict[str, Any]:
-    """Build a local conformance release from the 34-file evaluation cache.
+    """Build a local conformance release from a source cache.
 
     The cache lock does not package the code-defined source specifications or
     complete source-issued version metadata.  This helper therefore exercises
     parser depth and addressability only; it is intentionally absent from the
     publication CLI.
+
+    ``source_specs`` defaults to the 34-file segmentation evaluation cache.
+    Supplying it lets a differently-drawn corpus over the same lock contract
+    build a release without copying this path; the ESA body-retrieval corpus
+    is the first such caller.
     """
 
     return _prepare_source_cache_release(
         Path(cache_dir),
         released_at=released_at,
         rulespec_core_path=Path(rulespec_core_path),
+        source_specs=source_specs,
     ).release
 
 

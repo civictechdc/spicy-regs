@@ -649,12 +649,62 @@ def fetch_bodies(
     }
 
 
+def document_specs(
+    manifest: Mapping[str, Any],
+    document_numbers: Sequence[str],
+) -> list[Any]:
+    """Build ``FullDocumentSpec`` rows for the documents that actually sealed.
+
+    The release pipeline is driven by code-defined specs, not by the lock, so
+    a corpus drawn at runtime has to supply its own. Building them here -- from
+    the draw manifest, for exactly the documents that survived the fetch --
+    keeps the spec list and the lock in agreement by construction.
+    """
+
+    from spicy_regs.corpora.segmentation_evaluation import (
+        PUBLIC_DOMAIN_NOTE,
+        FullDocumentSpec,
+    )
+
+    by_number = {_text(entry.get("document_number")): entry for entry in manifest.get("documents", [])}
+    specs: list[Any] = []
+    for number in document_numbers:
+        entry = by_number.get(number)
+        if entry is None:
+            raise BodyCorpusError(f"sealed document is absent from the draw: {number}")
+        specs.append(
+            FullDocumentSpec(
+                case_id=number,
+                profile_id="federal-register-document-v1",
+                source_table="federal_register",
+                key_column="document_number",
+                key_value=number,
+                source_url=_text(entry.get("body_html_url")),
+                target_field="body_html",
+                public_status="public",
+                rights_note=PUBLIC_DOMAIN_NOTE,
+                selection_reason=(
+                    "Endangered Species Act body-retrieval corpus member (50 CFR 17, >=12 Federal Register pages)."
+                ),
+                gold_phrase="",
+                concept_label="endangered and threatened species",
+            )
+        )
+    return specs
+
+
 def _seal_lock(cache_dir: Path, manifest: Mapping[str, Any]) -> dict[str, Any]:
     """Assemble the lock from whatever succeeded, in draw order.
 
     Deriving the lock from per-document receipts rather than from the fetch
     loop is what makes a resumed run produce the same bytes as a single-pass
     run: order comes from the manifest, content from disk.
+
+    The record shape is the one ``corpora/segmentation_evaluation.py`` already
+    validates -- ``case_id``, ``cache_file`` relative to the lock, and a
+    ``source_spec_digest`` over the spec list -- so this cache can be handed
+    to ``validate_source_cache`` and ``build_document_release_from_source_cache``
+    without a second, divergent lock format.
     """
 
     records: list[dict[str, Any]] = []
@@ -666,9 +716,18 @@ def _seal_lock(cache_dir: Path, manifest: Mapping[str, Any]) -> dict[str, Any]:
         receipt = _read_json(receipt_path)
         if receipt.get("status") != "ok":
             continue
-        records.append({key: value for key, value in receipt.items() if key != "status"})
+        record = {key: value for key, value in receipt.items() if key != "status"}
+        record["case_id"] = number
+        record["cache_file"] = f"documents/{receipt['cache_file']}"
+        records.append(record)
+
+    from spicy_regs.corpora.segmentation_evaluation import FORMAT_VERSION, _spec_digest
+
+    specs = document_specs(manifest, [record["case_id"] for record in records])
     lock = {
-        "format_version": LOCK_FORMAT_VERSION,
+        "format_version": FORMAT_VERSION,
+        "source_spec_digest": _spec_digest(specs),
+        "retrieved_on": records[0]["retrieved_on"] if records else None,
         "draw_id": manifest.get("draw_id"),
         "draw_schema_version": manifest.get("schema_version"),
         "source_count": len(records),
@@ -692,7 +751,9 @@ def validate_body_cache(cache_dir: Path) -> dict[str, Any]:
 
     for record in sources:
         number = _text(record.get("document_number"))
-        path = cache_dir / "documents" / _text(record.get("cache_file"))
+        # ``cache_file`` is stored relative to the lock, matching the contract
+        # ``segmentation_evaluation.validate_source_cache`` expects.
+        path = cache_dir / _text(record.get("cache_file"))
         if not path.is_file():
             failures.append(f"{number}: cached body is missing")
             continue
@@ -715,6 +776,97 @@ def validate_body_cache(cache_dir: Path) -> dict[str, Any]:
         "status": "pass" if not failures else "fail",
         "source_count": len(sources),
         "failures": failures,
+    }
+
+
+# --------------------------------------------------------------------------
+# measurement
+# --------------------------------------------------------------------------
+
+_TAG = re.compile(r"<[^>]+>")
+_SCRIPT = re.compile(r"<(script|style)[^>]*>.*?</\1>", re.IGNORECASE | re.DOTALL)
+_WHITESPACE = re.compile(r"\s+")
+
+#: The Federal Register prepends a fixed "Document Headings" explainer to every
+#: body. It is publisher chrome, identical in every document, and it is
+#: reported rather than removed: this corpus keeps exact publisher bytes, so
+#: the measurement states the constant instead of rewriting the evidence.
+BOILERPLATE_MARKER = "Document headings vary by document type"
+
+
+def visible_text(markup: str) -> str:
+    """Tag-stripped, whitespace-collapsed text.
+
+    Deliberately crude and deliberately identical for every corpus measured
+    here. The comparison that matters is against the 34-document baseline,
+    whose members are HTML, XML and PDF-derived text; a smarter HTML-only
+    extractor would measure the two corpora differently and the comparison
+    would say more about the extractor than about the corpora.
+    """
+
+    return _WHITESPACE.sub(" ", _TAG.sub(" ", _SCRIPT.sub(" ", markup))).strip()
+
+
+def measure_corpus(
+    cache_dir: Path,
+    *,
+    jaccard_cap: int = 400,
+    jaccard_seed: int = 7,
+) -> dict[str, Any]:
+    """Measure what the sealed corpus actually is, on its real bodies.
+
+    The pre-fetch draw measured title+abstract vocabulary because that is all
+    that existed offline. This measures the bodies, which is the surface the
+    baseline was measured on and therefore the only honest comparison.
+    """
+
+    cache_dir = Path(cache_dir)
+    lock = _read_json(cache_dir / "source-lock.json")
+    sources = lock.get("sources", [])
+
+    html_bytes: list[int] = []
+    text_chars: list[int] = []
+    token_sets: list[set[str]] = []
+    boilerplate_hits = 0
+
+    for record in sources:
+        payload = (cache_dir / _text(record.get("cache_file"))).read_bytes()
+        text = visible_text(payload.decode("utf-8-sig"))
+        html_bytes.append(len(payload))
+        text_chars.append(len(text))
+        token_sets.append(tokenize(text))
+        if BOILERPLATE_MARKER in text:
+            boilerplate_hits += 1
+
+    def _spread(values: Sequence[int]) -> dict[str, Any]:
+        ordered = sorted(float(value) for value in values)
+        return {
+            "count": len(ordered),
+            "total": int(sum(ordered)),
+            "min": int(ordered[0]) if ordered else None,
+            "p10": _quantile(ordered, 0.10),
+            "median": median(ordered) if ordered else None,
+            "p90": _quantile(ordered, 0.90),
+            "max": int(ordered[-1]) if ordered else None,
+        }
+
+    return {
+        "document_count": len(sources),
+        "source_bytes": _spread(html_bytes),
+        "visible_text_chars": _spread(text_chars),
+        "documents_carrying_publisher_boilerplate": boilerplate_hits,
+        "chunking_relevant": {
+            "note": "chunking is a no-op below ~3000 characters",
+            "documents_over_3000_chars": sum(1 for value in text_chars if value > 3000),
+            "documents_over_30000_chars": sum(1 for value in text_chars if value > 30000),
+        },
+        "vocabulary_competition": {
+            "surface": "body visible text",
+            "tokenizer": "lowercase-alnum-min3-minus-minimal-stoplist",
+            "sample_cap": jaccard_cap,
+            "sample_seed": jaccard_seed,
+            **summarize_distribution(jaccard_distribution(token_sets, cap=jaccard_cap, seed=jaccard_seed)),
+        },
     }
 
 
@@ -765,6 +917,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     validate = commands.add_parser("validate", help="re-verify a fetched cache against its lock")
     validate.add_argument("--cache-dir", type=Path, required=True)
 
+    measure = commands.add_parser("measure", help="measure the sealed corpus on its real bodies")
+    measure.add_argument("--cache-dir", type=Path, required=True)
+    measure.add_argument("--output", type=Path, default=None)
+
+    release = commands.add_parser("release", help="build a v2 DocumentRelease from the sealed cache")
+    release.add_argument("--draw", type=Path, required=True)
+    release.add_argument("--cache-dir", type=Path, required=True)
+    release.add_argument("--output", type=Path, required=True)
+    release.add_argument("--released-at", default="2026-08-02T00:00:00Z")
+
     args = parser.parse_args(argv)
 
     if args.command == "draw":
@@ -807,6 +969,40 @@ def main(argv: Sequence[str] | None = None) -> int:
             stop_at_budget=args.stop_at_budget,
         )
         print(canonical_json(summary))
+        return 0
+
+    if args.command == "measure":
+        report = measure_corpus(args.cache_dir)
+        if args.output is not None:
+            Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.output).write_text(canonical_json(report) + "\n", encoding="utf-8")
+        print(canonical_json(report))
+        return 0
+
+    if args.command == "release":
+        from spicy_regs.document_file_pipeline import build_document_release_from_source_cache
+
+        manifest = _read_json(Path(args.draw))
+        lock = _read_json(Path(args.cache_dir) / "source-lock.json")
+        sealed = [_text(record.get("case_id")) for record in lock.get("sources", [])]
+        built = build_document_release_from_source_cache(
+            Path(args.cache_dir),
+            released_at=args.released_at,
+            source_specs=document_specs(manifest, sealed),
+        )
+        output = Path(args.output)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(canonical_json(built) + "\n", encoding="utf-8")
+        print(
+            canonical_json(
+                {
+                    "document_count": len(built["document_versions"]),
+                    "passage_count": len(built["structural_passages"]),
+                    "release_digest": built["release_digest"],
+                    "output": str(output),
+                }
+            )
+        )
         return 0
 
     report = validate_body_cache(args.cache_dir)

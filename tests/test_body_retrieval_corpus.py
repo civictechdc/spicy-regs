@@ -269,7 +269,7 @@ class TestFetch:
         lock = json.loads((cache / "source-lock.json").read_text())
         assert len(lock["sources"]) == 3
         for record in lock["sources"]:
-            body = (cache / "documents" / record["cache_file"]).read_bytes()
+            body = (cache / record["cache_file"]).read_bytes()
             assert body == BODY
             assert record["source_sha256"] == brc.sha256_bytes(BODY)
             assert record["source_bytes"] == len(BODY)
@@ -417,6 +417,60 @@ class TestFetch:
 # --------------------------------------------------------------------------
 
 
+class TestReleaseCompatibility:
+    """The lock must satisfy the *shared* contract, not a private one.
+
+    Writing a second, divergent lock format would leave two things to keep in
+    agreement. These tests hold the sealed cache to the validator that
+    ``segmentation_evaluation`` and the release pipeline already use.
+    """
+
+    def test_the_sealed_lock_passes_the_shared_source_cache_validator(self, tmp_path: Path) -> None:
+        from spicy_regs.corpora.segmentation_evaluation import validate_source_cache
+
+        cache = tmp_path / "cache"
+        manifest_path = _manifest(tmp_path)
+        brc.fetch_bodies(manifest_path, cache, fetcher=_Recorder({}), sleep=lambda _: None)
+        manifest = json.loads(manifest_path.read_text())
+        numbers = [entry["document_number"] for entry in manifest["documents"]]
+        report = validate_source_cache(cache, specs=brc.document_specs(manifest, numbers))
+        assert report["status"] == "pass", report["failures"]
+        assert report["source_count"] == 3
+
+    def test_specs_cover_exactly_the_documents_that_sealed(self, tmp_path: Path) -> None:
+        """A quarantined document must not appear in the spec list.
+
+        The release builder raises when a spec has no lock record, so the two
+        have to be derived from the same surviving set.
+        """
+        cache = tmp_path / "cache"
+        manifest_path = _manifest(tmp_path)
+        doomed = json.loads(manifest_path.read_text())["documents"][0]["body_html_url"]
+        brc.fetch_bodies(
+            manifest_path,
+            cache,
+            fetcher=_Recorder({doomed: RuntimeError("HTTP 404")}),
+            sleep=lambda _: None,
+        )
+        lock = json.loads((cache / "source-lock.json").read_text())
+        sealed = [record["case_id"] for record in lock["sources"]]
+        assert len(sealed) == 2
+        specs = brc.document_specs(json.loads(manifest_path.read_text()), sealed)
+        assert [spec.case_id for spec in specs] == sealed
+
+    def test_a_document_absent_from_the_draw_is_refused(self, tmp_path: Path) -> None:
+        manifest = json.loads(_manifest(tmp_path).read_text())
+        with pytest.raises(brc.BodyCorpusError, match="absent from the draw"):
+            brc.document_specs(manifest, ["NOT-DRAWN"])
+
+    def test_specs_target_the_body_html_field_the_parser_understands(self, tmp_path: Path) -> None:
+        manifest = json.loads(_manifest(tmp_path, count=1).read_text())
+        spec = brc.document_specs(manifest, ["DOC-000"])[0]
+        assert spec.target_field == "body_html"
+        assert spec.profile_id == "federal-register-document-v1"
+        assert spec.representation == "html"
+
+
 class TestValidate:
     def test_a_clean_cache_passes(self, tmp_path: Path) -> None:
         cache = tmp_path / "cache"
@@ -427,7 +481,7 @@ class TestValidate:
         cache = tmp_path / "cache"
         brc.fetch_bodies(_manifest(tmp_path), cache, fetcher=_Recorder({}), sleep=lambda _: None)
         lock = json.loads((cache / "source-lock.json").read_text())
-        victim = cache / "documents" / lock["sources"][0]["cache_file"]
+        victim = cache / lock["sources"][0]["cache_file"]
         victim.write_bytes(BODY + b"<p>silently added</p>")
         report = brc.validate_body_cache(cache)
         assert report["status"] == "fail"
@@ -437,5 +491,5 @@ class TestValidate:
         cache = tmp_path / "cache"
         brc.fetch_bodies(_manifest(tmp_path), cache, fetcher=_Recorder({}), sleep=lambda _: None)
         lock = json.loads((cache / "source-lock.json").read_text())
-        (cache / "documents" / lock["sources"][0]["cache_file"]).unlink()
+        (cache / lock["sources"][0]["cache_file"]).unlink()
         assert brc.validate_body_cache(cache)["status"] == "fail"

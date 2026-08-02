@@ -824,10 +824,8 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _spec_digest() -> str:
-    return _sha256_bytes(
-        canonical_json([asdict(spec) for spec in FULL_DOCUMENT_SPECS]).encode()
-    )
+def _spec_digest(specs: Sequence[FullDocumentSpec] = FULL_DOCUMENT_SPECS) -> str:
+    return _sha256_bytes(canonical_json([asdict(spec) for spec in specs]).encode())
 
 
 def _http_fetch(spec: FullDocumentSpec) -> FetchResult:
@@ -972,21 +970,34 @@ def _read_json_object(path: Path) -> dict[str, Any]:
     return value
 
 
-def validate_source_cache(cache_dir: Path) -> dict[str, Any]:
+def validate_source_cache(
+    cache_dir: Path,
+    *,
+    specs: Sequence[FullDocumentSpec] = FULL_DOCUMENT_SPECS,
+) -> dict[str, Any]:
+    """Re-verify a source cache against its lock.
+
+    ``specs`` defaults to this module's 34 evaluation specimens. It is a
+    parameter so that other corpora built on the same lock contract -- the
+    ESA body-retrieval corpus is the first -- can reuse this validator
+    instead of copying it. The digest is taken over whichever specs are
+    supplied, so a cache still cannot pass against the wrong source list.
+    """
+
     lock = _read_json_object(cache_dir / "source-lock.json")
     failures: list[str] = []
     if lock.get("format_version") != FORMAT_VERSION:
         failures.append("source lock format version does not match")
-    if lock.get("source_spec_digest") != _spec_digest():
+    if lock.get("source_spec_digest") != _spec_digest(specs):
         failures.append("source specification digest does not match")
     by_case = {
         str(record.get("case_id")): record
         for record in lock.get("sources", [])
         if isinstance(record, dict)
     }
-    if set(by_case) != {spec.case_id for spec in FULL_DOCUMENT_SPECS}:
+    if set(by_case) != {spec.case_id for spec in specs}:
         failures.append("source lock cases do not match declared source specs")
-    for spec in FULL_DOCUMENT_SPECS:
+    for spec in specs:
         record = by_case.get(spec.case_id)
         if record is None:
             continue
@@ -1014,7 +1025,7 @@ def validate_source_cache(cache_dir: Path) -> dict[str, Any]:
     return {
         "status": "pass" if not failures else "fail",
         "source_count": len(by_case),
-        "source_spec_digest": _spec_digest(),
+        "source_spec_digest": _spec_digest(specs),
         "retrieved_on": lock.get("retrieved_on"),
         "failures": failures,
     }
