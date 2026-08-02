@@ -1,0 +1,227 @@
+{
+  "answers": {
+    "can": [
+      "whether BM25 length normalization penalises long bodies",
+      "whether chunking changes retrieval at all",
+      "whether retrieval configurations differ on merit rather than by arithmetic",
+      "ranking quality within one regulatory program"
+    ],
+    "cannot": [
+      "anything cross-agency or cross-publisher (986/993 documents are one agency)",
+      "anything about short documents (12-page floor is structural)",
+      "whether findings generalise beyond the Endangered Species Act",
+      "anything requiring labels; no queries drafted and nothing judged",
+      "document types other than Rules and Proposed Rules"
+    ]
+  },
+  "code": {
+    "branch": "main",
+    "head_commit": "a8d17373a97cbbe6f47e3af0d06ed9c28efa899c",
+    "interpreter": "CPython 3.12.9",
+    "interpreter_pinned_by": [
+      ".python-version",
+      "pyproject.toml requires-python >=3.12,<3.13"
+    ],
+    "state": "committed"
+  },
+  "draw": {
+    "counts": {
+      "by_agency_slugs": {
+        "interior-department,fish-and-wildlife-service": 986,
+        "interior-department,fish-and-wildlife-service,commerce-department,national-oceanic-and-atmospheric-administration": 7
+      },
+      "by_document_type": {
+        "Proposed Rule": 520,
+        "Rule": 473
+      },
+      "by_year": {
+        "2005": 44,
+        "2006": 40,
+        "2007": 41,
+        "2008": 45,
+        "2009": 34,
+        "2010": 44,
+        "2011": 58,
+        "2012": 71,
+        "2013": 93,
+        "2014": 53,
+        "2015": 41,
+        "2016": 45,
+        "2017": 15,
+        "2018": 28,
+        "2019": 23,
+        "2020": 46,
+        "2021": 70,
+        "2022": 56,
+        "2023": 67,
+        "2024": 46,
+        "2025": 18,
+        "2026": 15
+      },
+      "excluded_no_body_url": 0,
+      "selected": 993
+    },
+    "draw_id": "urn:spicyregs:body-retrieval-draw:f5f39ec8ed530e9271896408",
+    "page_span": {
+      "max": 321,
+      "median": 27.0,
+      "min": 12,
+      "p90": 70.0,
+      "total": 37838
+    },
+    "pre_fetch_vocabulary_competition": {
+      "max": 0.9325842696629213,
+      "mean": 0.17909626137845971,
+      "median": 0.16304347826086957,
+      "min": 0.02702702702702703,
+      "p10": 0.10119047619047619,
+      "p25": 0.12612612612612611,
+      "p75": 0.21428571428571427,
+      "p90": 0.27631578947368424,
+      "pair_count": 79800,
+      "sample_cap": 400,
+      "sample_seed": 7,
+      "surface": "title+abstract",
+      "tokenizer": "lowercase-alnum-min3-minus-minimal-stoplist"
+    },
+    "random_draw_control_median_jaccard": 0.019,
+    "selection_reason": "50 CFR 17 is the only candidate program whose title+abstract coherence RISES when restricted to long documents (0.121 -> 0.136); shared ESA vocabulary competes while each document names a different taxon",
+    "selection_rule": {
+      "cfr_parts": [
+        "17"
+      ],
+      "cfr_title": 50,
+      "document_types": [
+        "Rule",
+        "Proposed Rule"
+      ],
+      "min_pages": 12,
+      "min_year": 2005,
+      "topic_substring": "endangered"
+    },
+    "sha256": "sha256:cda211ebbe42d716d7faab8fe18dc52c404f80a5372d63d2c2dc06845ba17fa3"
+  },
+  "fetch": {
+    "lock_sha256": "sha256:e17f003833dba3c058be77f3214f92f071541b538337b630b1e3b49d2d007340",
+    "min_interval_seconds": 1.2,
+    "quarantine_by_reason": {},
+    "quarantined": 0,
+    "requested": 993,
+    "resumed_run_requests_made": 0,
+    "retrieved_on": "2026-08-02",
+    "robots_txt_permits_full_text_path": true,
+    "sealed": 993,
+    "source_spec_digest": "a878b51135cd7774de9ec4a4bb65c531c3b9849b82862f38219550941614ca5f",
+    "user_agent_contactable": true
+  },
+  "follow_ups": [
+    "full_text_xml_url is a cleaner rendition than body_html_url: GPO semantic tags, no site chrome, no zero-width spaces. The fetched HTML carries ~42 U+200B per document which will corrupt BM25 tokens unless the indexer strips them.",
+    "publisher boilerplate is a 584-character constant in all 993 documents; counted, not stripped, because this corpus keeps exact publisher bytes. div.fr-seal-block is the correct selector, NOT div.document-headings which also wraps CFR/docket/RIN."
+  ],
+  "inputs": {
+    "federal_register": {
+      "note": "the previously recorded 80,000 / 15,617 describes output/mixed-real-data-corpus-v2/federal_register.parquet, not this file",
+      "path": "output/rulespec-stabilization-baseline-final/federal_register.parquet",
+      "rows_rule_or_proposed_rule": 195752,
+      "rows_total": 1004233,
+      "sha256": "sha256:ac18315faa8be4a8d3656e758597d672c5d85c23cc6f8fde0ac53c9295b22bf2"
+    }
+  },
+  "measurements": {
+    "baseline_anchor": {
+      "cache_dir": "output/segmentation-source-cache-v2",
+      "document_count": 34,
+      "visible_text_chars": {
+        "median": 80387.0,
+        "total": 5364913
+      },
+      "vocabulary_competition": {
+        "max": 0.5944540727902946,
+        "mean": 0.13025588051522427,
+        "median": 0.13124504361617764,
+        "min": 0.00511538024326475,
+        "p10": 0.04681230494872938,
+        "p25": 0.08177943526904635,
+        "p75": 0.16679003207500617,
+        "p90": 0.22205855275271588,
+        "pair_count": 561,
+        "surface": "body visible text",
+        "tokenizer": "lowercase-alnum-min3-minus-minimal-stoplist"
+      },
+      "why": "the 34-document segmentation corpus, re-measured with this module's tokenizer so the comparison is instrument-independent"
+    },
+    "chunking_relevant": {
+      "documents_over_30000_chars": 992,
+      "documents_over_3000_chars": 993,
+      "note": "chunking is a no-op below ~3000 characters"
+    },
+    "document_count": 993,
+    "documents_carrying_publisher_boilerplate": 993,
+    "source_bytes": {
+      "count": 993,
+      "max": 2807258,
+      "median": 230444.0,
+      "min": 51674,
+      "p10": 128243.0,
+      "p90": 532130.0,
+      "total": 301787891
+    },
+    "visible_text_chars": {
+      "count": 993,
+      "max": 1432103,
+      "median": 164381.0,
+      "min": 22047,
+      "p10": 92119.0,
+      "p90": 379091.0,
+      "total": 210535931
+    },
+    "vocabulary_competition": {
+      "max": 0.8851610157469144,
+      "mean": 0.27863988061701134,
+      "median": 0.294673411147807,
+      "min": 0.010998091861111529,
+      "p10": 0.142921469740634,
+      "p25": 0.24888371190060182,
+      "p75": 0.3280208163929094,
+      "p90": 0.3672758920800696,
+      "pair_count": 79800,
+      "sample_cap": 400,
+      "sample_seed": 7,
+      "surface": "body visible text",
+      "tokenizer": "lowercase-alnum-min3-minus-minimal-stoplist"
+    }
+  },
+  "receipt_id": "urn:spicyregs:body-retrieval-corpus-receipt:1a9e04c3bc0e756258f87502",
+  "release": {
+    "build_seconds": 131,
+    "bytes": 1469615871,
+    "document_count": 993,
+    "note": "a consumer that expects to hold a release in memory will not hold this one",
+    "path": "output/body-retrieval-corpus-2026-08-02/document-release.json",
+    "peak_resident_bytes": 17126719488,
+    "release_digest": "sha256:489beb6ae4100806ef30bbe2bb5d9b634270cabb87f01939978893ecdf38519b",
+    "sha256": "sha256:4b4b0394ad9190fff0e7989fa5de9fc01bf84babf52ea89daeaec083034fbfd0",
+    "structural_passage_count": 726009
+  },
+  "reproducibility": {
+    "boundary": "the lock; everything downstream of it rebuilds byte-identical",
+    "fetch_is_reproducible": false,
+    "measurement_sha256": "sha256:99e6e496711360d539e720f756cb9baa0887dfad4ffce0271174dc17440d683c",
+    "verified_byte_identical_on_rebuild": [
+      "draw-manifest.json",
+      "cache/source-lock.json",
+      "measurement.json",
+      "document-release.json"
+    ]
+  },
+  "scope": {
+    "built": "corpus, lock, measurements, DocumentRelease",
+    "not_done": [
+      "queries drafted",
+      "judging",
+      "retrieval experiments"
+    ],
+    "paid_provider_calls": 0,
+    "pushed": false
+  }
+}
