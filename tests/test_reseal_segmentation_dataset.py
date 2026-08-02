@@ -65,6 +65,9 @@ def _dataset(directory: Path, *, links: list[str]) -> dict[str, Any]:
     return manifest
 
 
+LINKS = ("fr_docket_links.parquet",)
+
+
 def _passing_validator(directory: Path) -> dict[str, Any]:
     members = MODULE.dataset_members(directory)
     return {"status": "pass", "evaluation_id": MODULE.evaluation_id(members), "failures": []}
@@ -89,7 +92,6 @@ def test_seal_delta_reports_no_movement_for_an_untouched_dataset(tmp_path: Path)
     delta = MODULE.seal_delta(manifest["nonmodel_artifacts"], MODULE.dataset_members(tmp_path / "one"))
     assert delta["changed"] == []
     assert delta["missing"] == []
-    assert delta["added"] == []
     assert delta["unchanged_count"] == 3
 
 
@@ -101,7 +103,7 @@ def test_seal_delta_names_exactly_the_member_that_moved(tmp_path: Path) -> None:
     assert [one["name"] for one in delta["changed"]] == ["fr_docket_links.parquet"]
     assert delta["changed"][0]["sealed_sha256"] != delta["changed"][0]["current_sha256"]
     assert delta["unchanged_count"] == 2
-    assert delta["missing"] == [] and delta["added"] == []
+    assert delta["missing"] == []
 
 
 def test_seal_delta_separates_a_missing_member_from_a_moved_one(tmp_path: Path) -> None:
@@ -124,7 +126,7 @@ def test_reseal_copies_every_member_byte_for_byte_and_leaves_the_source_alone(tm
     before = {path.name: path.read_bytes() for path in sorted(source.glob("*.parquet"))}
     output = tmp_path / "resealed"
 
-    MODULE.reseal_segmentation_dataset(source, output, validator=_passing_validator)
+    MODULE.reseal_segmentation_dataset(source, output, allow_changed=LINKS, validator=_passing_validator)
 
     assert {path.name: path.read_bytes() for path in sorted(source.glob("*.parquet"))} == before
     for name, payload in before.items():
@@ -135,7 +137,9 @@ def test_reseal_copies_every_member_byte_for_byte_and_leaves_the_source_alone(tm
 def test_reseal_of_an_untouched_dataset_reproduces_the_same_evaluation_id(tmp_path: Path) -> None:
     source = tmp_path / "one"
     manifest = _dataset(source, links=["x"])
-    result = MODULE.reseal_segmentation_dataset(source, tmp_path / "resealed", validator=_passing_validator)
+    result = MODULE.reseal_segmentation_dataset(
+        source, tmp_path / "resealed", allow_changed=LINKS, validator=_passing_validator
+    )
     assert result["sealed_evaluation_id"] == result["resealed_evaluation_id"] == manifest["evaluation_id"]
     assert result["delta"]["changed"] == []
 
@@ -146,7 +150,7 @@ def test_reseal_records_the_new_identity_and_the_member_that_caused_it(tmp_path:
     _write_parquet(source / "fr_docket_links.parquet", ["x", "y", "z"])
     output = tmp_path / "resealed"
 
-    result = MODULE.reseal_segmentation_dataset(source, output, validator=_passing_validator)
+    result = MODULE.reseal_segmentation_dataset(source, output, allow_changed=LINKS, validator=_passing_validator)
 
     assert result["sealed_evaluation_id"] == manifest["evaluation_id"]
     assert result["resealed_evaluation_id"] != manifest["evaluation_id"]
@@ -166,7 +170,7 @@ def test_reseal_refuses_to_overwrite_an_existing_directory(tmp_path: Path) -> No
     output = tmp_path / "resealed"
     output.mkdir()
     with pytest.raises(MODULE.ResealError, match="already exists"):
-        MODULE.reseal_segmentation_dataset(source, output, validator=_passing_validator)
+        MODULE.reseal_segmentation_dataset(source, output, allow_changed=LINKS, validator=_passing_validator)
 
 
 def test_reseal_fails_closed_when_a_sealed_member_is_missing(tmp_path: Path) -> None:
@@ -174,7 +178,9 @@ def test_reseal_fails_closed_when_a_sealed_member_is_missing(tmp_path: Path) -> 
     _dataset(source, links=["x"])
     (source / "fr_docket_links.parquet").unlink()
     with pytest.raises(MODULE.ResealError, match="fr_docket_links.parquet"):
-        MODULE.reseal_segmentation_dataset(source, tmp_path / "resealed", validator=_passing_validator)
+        MODULE.reseal_segmentation_dataset(
+            source, tmp_path / "resealed", allow_changed=LINKS, validator=_passing_validator
+        )
 
 
 def test_reseal_fails_closed_and_leaves_nothing_behind_when_validation_fails(tmp_path: Path) -> None:
@@ -194,7 +200,64 @@ def test_reseal_writes_the_receipt_the_validator_returned(tmp_path: Path) -> Non
     source = tmp_path / "one"
     _dataset(source, links=["x"])
     output = tmp_path / "resealed"
-    MODULE.reseal_segmentation_dataset(source, output, validator=_passing_validator)
+    MODULE.reseal_segmentation_dataset(source, output, allow_changed=LINKS, validator=_passing_validator)
     receipt = json.loads((output / MODULE.RECEIPT_NAME).read_text(encoding="utf-8"))
     assert receipt["status"] == "pass"
     assert receipt["evaluation_id"] == MODULE.evaluation_id(MODULE.dataset_members(output))
+
+
+# --------------------------------------------------------------------------
+# fail closed on an unlicensed change
+# --------------------------------------------------------------------------
+
+
+def test_reseal_refuses_a_changed_member_that_is_not_allowlisted(tmp_path: Path) -> None:
+    """The whole point: a re-seal must never launder a measurement input.
+
+    Rewriting gold_spans and re-sealing would otherwise produce an
+    honest-looking identity with a passing receipt over changed evidence.
+    """
+    source = tmp_path / "one"
+    _dataset(source, links=["x"])
+    _write_parquet(source / "gold_spans.parquet", ["a", "b", "TAMPERED"])
+
+    with pytest.raises(MODULE.ResealError, match="gold_spans.parquet"):
+        MODULE.reseal_segmentation_dataset(source, tmp_path / "resealed", validator=_passing_validator)
+
+
+def test_reseal_refuses_an_unlicensed_change_even_when_another_is_allowed(tmp_path: Path) -> None:
+    source = tmp_path / "one"
+    _dataset(source, links=["x"])
+    _write_parquet(source / "fr_docket_links.parquet", ["x", "y"])
+    _write_parquet(source / "gold_spans.parquet", ["a", "b", "TAMPERED"])
+
+    with pytest.raises(MODULE.ResealError, match="gold_spans.parquet"):
+        MODULE.reseal_segmentation_dataset(
+            source, tmp_path / "resealed", allow_changed=LINKS, validator=_passing_validator
+        )
+
+
+def test_reseal_with_no_allowlist_refuses_any_change_at_all(tmp_path: Path) -> None:
+    source = tmp_path / "one"
+    _dataset(source, links=["x"])
+    _write_parquet(source / "fr_docket_links.parquet", ["x", "y"])
+    with pytest.raises(MODULE.ResealError, match="fr_docket_links.parquet"):
+        MODULE.reseal_segmentation_dataset(source, tmp_path / "resealed", validator=_passing_validator)
+
+
+def test_reseal_leaves_nothing_behind_when_it_refuses_a_change(tmp_path: Path) -> None:
+    source = tmp_path / "one"
+    _dataset(source, links=["x"])
+    _write_parquet(source / "gold_spans.parquet", ["a", "b", "TAMPERED"])
+    output = tmp_path / "resealed"
+    with pytest.raises(MODULE.ResealError):
+        MODULE.reseal_segmentation_dataset(source, output, validator=_passing_validator)
+    assert not output.exists()
+
+
+def test_cli_default_allowlist_covers_only_excluded_source_tables() -> None:
+    """The CLI's default licence is exactly 'tables the segmenter cannot read'."""
+    changed = ["fr_docket_links.parquet", "comments_index.parquet", "gold_spans.parquet"]
+    allowed = MODULE.default_allowed_changes(changed)
+    assert set(allowed) == {"fr_docket_links.parquet", "comments_index.parquet"}
+    assert "gold_spans.parquet" not in allowed

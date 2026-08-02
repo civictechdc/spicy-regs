@@ -6,18 +6,22 @@ dated Step 4 evidence record names the command that ran this gate locally.
 
 **This gate currently FAILS, and the failure is the finding — not a defect in
 the gate.** As of 2026-08-02 the committed segmenter produces 1,296 selected
-segments where the frozen baseline recorded 1,302. The entire delta is one
-artifact (``congress-bill-v1`` / ``118-hr-8862``), whose ``xml_text`` element
-stream went from 174 slices to 3,428. The baseline parquet was written
-2026-07-24 18:11; ``e0af2b9``, the commit that last changed the element
-adapters, landed 20:37 the same day — so the frozen baseline was produced by
-code that was never committed in that form, and nothing has attested
-corpus-scale parity against committed code since.
+segments where the frozen baseline recorded 1,302. For this arm the whole delta
+is one artifact (``congress-bill-v1`` / ``118-hr-8862``), whose ``xml_text``
+element stream went from 174 slices to 3,428.
 
-Do not "repair" this by moving 1302 to 1296. Whether the new element
-granularity is an improvement to accept or a regression to revert is a
-decision for a human; the gate's job is to keep the divergence visible until
-that decision is made. See
+**No commit explains it.** Exporting ``414964d``'s ``src/`` — whose
+``source.py`` and ``segments.py`` digests are byte-identical to those the
+2026-07-26 receipt recorded while the gate *passed* at 1,302 — and re-running
+this computation today yields 1,296. Identical code, both numbers. The variable
+is environmental and was never pinned: no receipt anywhere recorded an
+interpreter version. The leading suspect is ``source.py::_markup_drafts``, which
+swallows ``AssertionError``/``ValueError`` from a stdlib ``html.parser``
+subclass and silently switches drafting strategy.
+
+Do not "repair" this by moving 1302 to 1296; that would bless an environmental
+drift as a decision. The fix is to identify and pin the variable, then
+re-baseline deliberately. See
 ``docs/evidence/document-segmentation-remeasurement-2026-08-02.md``.
 
 The dataset and scope directories this gate names were re-sealed on 2026-08-02

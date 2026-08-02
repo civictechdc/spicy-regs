@@ -35,7 +35,7 @@ import argparse
 import json
 import shutil
 import sys
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -49,6 +49,7 @@ from spicy_regs.corpora.segmentation_evaluation import (  # noqa: E402
     _nonmodel_artifacts,
     validate_segmentation_evaluation,
 )
+from spicy_regs.docpipeline.source import EXCLUDED_SOURCE_TABLES  # noqa: E402
 
 MANIFEST_NAME = "segmentation-evaluation-manifest.json"
 RECEIPT_NAME = "segmentation-evaluation-receipt.json"
@@ -94,15 +95,23 @@ def seal_delta(
                     "current_sha256": current_digest,
                 }
             )
-    added = sorted(name for name in current if name not in sealed)
     return {
         "changed": changed,
         "missing": missing,
-        "added": added,
         "unchanged_count": unchanged,
         "sealed_count": len(sealed),
         "current_count": len(current),
     }
+
+
+def default_allowed_changes(changed_names: Iterable[str]) -> tuple[str, ...]:
+    """The only changes the CLI licenses without being told to: unreadable tables.
+
+    A member whose table is in ``EXCLUDED_SOURCE_TABLES`` never becomes a
+    ``SourceArtifact``, so rewriting it cannot move a segment boundary. Every
+    other member is potential evidence and must be named explicitly by a human.
+    """
+    return tuple(name for name in changed_names if Path(name).stem in EXCLUDED_SOURCE_TABLES)
 
 
 def _copy_members(source_dir: Path, target_dir: Path, sealed: Mapping[str, Any]) -> None:
@@ -118,6 +127,7 @@ def reseal_segmentation_dataset(
     source_dir: Path,
     output_dir: Path,
     *,
+    allow_changed: Iterable[str] = (),
     validator: Validator = validate_segmentation_evaluation,
 ) -> dict[str, Any]:
     """Copy a dataset, recompute its seal, and record what moved.
@@ -126,6 +136,12 @@ def reseal_segmentation_dataset(
     member byte for byte; only the manifest and receipt are rewritten, and the
     manifest keeps a ``resealed_from`` provenance block naming the identity it
     replaced and the members that forced the replacement.
+
+    **Fails closed.** Every changed member must be named in ``allow_changed``,
+    which is empty by default. Without that, re-sealing would happily absorb a
+    rewritten ``gold_spans.parquet`` and emit an honest-looking identity with a
+    passing receipt over changed evidence — a laundering path, not a re-seal.
+    Naming the members is the human act that makes the re-seal a decision.
     """
     source_dir = Path(source_dir)
     output_dir = Path(output_dir)
@@ -146,6 +162,15 @@ def reseal_segmentation_dataset(
         delta = seal_delta(sealed, members)
         if delta["missing"]:
             raise ResealError(f"the sealed dataset is incomplete: {delta['missing']}")
+        licensed = set(allow_changed)
+        unlicensed = sorted(one["name"] for one in delta["changed"] if one["name"] not in licensed)
+        if unlicensed:
+            raise ResealError(
+                "refusing to re-seal over unlicensed changes: "
+                + ", ".join(unlicensed)
+                + ". A re-seal renames a corpus; it never absorbs new content. "
+                "Name each changed member explicitly if the change is understood and intended."
+            )
         resealed_id = evaluation_id(members)
         resealed = dict(manifest)
         resealed["evaluation_id"] = resealed_id
@@ -184,8 +209,25 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("source_dir", type=Path)
     parser.add_argument("output_dir", type=Path)
+    parser.add_argument(
+        "--allow-changed",
+        action="append",
+        default=[],
+        metavar="MEMBER",
+        help=(
+            "Licence one changed member by file name. Repeatable. Members whose table is in "
+            "EXCLUDED_SOURCE_TABLES are licensed automatically; anything the segmenter can read "
+            "must be named here, deliberately."
+        ),
+    )
     args = parser.parse_args(argv)
-    result = reseal_segmentation_dataset(args.source_dir, args.output_dir)
+
+    manifest = json.loads((args.source_dir / MANIFEST_NAME).read_text(encoding="utf-8"))
+    delta = seal_delta(manifest.get("nonmodel_artifacts", {}), dataset_members(args.source_dir))
+    changed_names = [one["name"] for one in delta["changed"]]
+    allowed = sorted(set(default_allowed_changes(changed_names)) | set(args.allow_changed))
+    result = reseal_segmentation_dataset(args.source_dir, args.output_dir, allow_changed=allowed)
+    result["licensed_changes"] = allowed
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0
 

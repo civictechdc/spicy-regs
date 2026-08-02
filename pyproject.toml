@@ -2,7 +2,12 @@
 name = "spicy-regs"
 version = "0.1.0"
 description = "Immutable regulatory source records, exact document versions, and structural passages"
-requires-python = ">=3.10"
+# Pinned to one minor. Segmentation reads native markup through a stdlib
+# html.parser subclass whose failure mode is swallowed (source.py::_markup_drafts),
+# so an interpreter change can silently alter the element stream and move segment
+# boundaries. That is the leading explanation for the 1,302 -> 1,296 divergence
+# recorded in docs/evidence/document-segmentation-remeasurement-2026-08-02.md.
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "refspec==0.1.0.dev0",
     "beautifulsoup4>=4.13,<5",
