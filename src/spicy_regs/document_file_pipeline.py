@@ -32,7 +32,13 @@ from spicy_regs.document_release import (
     validate_document_release,
     write_document_release,
 )
-from spicy_regs.docpipeline.source import native_structural_passage_spans
+from spicy_regs.docpipeline.source import (
+    SourceRetentionError,
+    check_extraction_retention,
+    native_structural_passage_spans,
+    retention_format_for,
+    visible_retention,
+)
 from spicy_regs.schemas import DOCUMENT
 from spicy_regs.transforms.pdf_text import PAGE_SEPARATOR, PdfTextStatus, extract_pdf_text
 
@@ -212,6 +218,50 @@ def _pypdf_version() -> str:
         return version("pypdf")
     except PackageNotFoundError as error:
         raise DocumentFilePipelineError("pypdf is required to extract captured PDF files") from error
+
+
+def _refuse_thin_markup_parse(
+    text: str,
+    *,
+    media_type: str,
+    source_field: str,
+    subject_id: str,
+) -> None:
+    """Refuse a markup parse that did not account for its own document.
+
+    The gate sits here, at the boundary where a representation is about to be
+    sealed, rather than inside any one extractor — so it constrains the native
+    path today and anything swapped in behind it later. Docling's HTML backend
+    retained 0.27% of a Federal Register rule and reported success; nothing
+    before this forced a parse to justify its own volume.
+    """
+    source_format = retention_format_for(media_type)
+    measured = visible_retention(source_field, text, media_type=media_type)
+    try:
+        check_extraction_retention("native", source_format, measured, subject_id=subject_id)
+    except SourceRetentionError as error:
+        raise DocumentFilePipelineError(str(error)) from error
+
+
+def _refuse_thin_pdf_parse(text: str, payload: bytes, *, subject_id: str) -> None:
+    """Refuse a PDF parse whose text density is below the measured floor.
+
+    A PDF carries no source text to compare against, so the measurement is
+    characters per source byte and its floor is derived from a different
+    population than the markup floors. A scanned page with no OCR lands near
+    zero and is refused here rather than sealed as an empty document.
+    """
+    if not payload:
+        raise DocumentFilePipelineError(f"{subject_id} has no PDF bytes to extract")
+    try:
+        check_extraction_retention(
+            PDF_EXTRACTION_METHOD,
+            "application/pdf",
+            len(text) / len(payload),
+            subject_id=subject_id,
+        )
+    except SourceRetentionError as error:
+        raise DocumentFilePipelineError(str(error)) from error
 
 
 def _pdf_passages(
@@ -601,6 +651,7 @@ def _prepare_captured_rendition_document(
                 f"PDF extraction has failed page ordinals: {list(extraction.failed_page_ordinals)}"
             )
         text = extraction.text
+        _refuse_thin_pdf_parse(text, primary_payload, subject_id=f"{collection}.source-file")
         passages = _pdf_passages(text, extraction.pages)
         evidence_grade = "parser-derived"
         method = PDF_EXTRACTION_METHOD
@@ -618,6 +669,12 @@ def _prepare_captured_rendition_document(
         )
         if not spans:
             raise DocumentFilePipelineError("captured markup has no visible structural passages")
+        _refuse_thin_markup_parse(
+            text,
+            media_type=primary_media_type,
+            source_field=f"{collection}.source-file",
+            subject_id=f"{collection}.source-file",
+        )
         passages = [
             {
                 "end": end,
@@ -818,6 +875,7 @@ def _source_cache_record(
                 f"{case_id} PDF extraction has failed page ordinals: {list(extraction.failed_page_ordinals)}"
             )
         text = extraction.text
+        _refuse_thin_pdf_parse(text, payload, subject_id=case_id)
         passage_specs = _pdf_passages(
             text,
             extraction.pages,
@@ -839,6 +897,12 @@ def _source_cache_record(
         )
         if not spans:
             raise DocumentFilePipelineError(f"{case_id} markup has no visible structural passages")
+        _refuse_thin_markup_parse(
+            text,
+            media_type=media_type,
+            source_field=source_spec.target_field,
+            subject_id=case_id,
+        )
         passage_specs = [
             {
                 "end": end,

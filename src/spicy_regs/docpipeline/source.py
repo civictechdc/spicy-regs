@@ -389,6 +389,16 @@ class SourceError(Exception):
     """One of this module's own invariants did not hold."""
 
 
+class SourceRetentionError(SourceError):
+    """A parse did not account for enough of the document it was given.
+
+    Raised by :func:`check_extraction_retention` at the extraction boundary. The
+    message states the measured retention, the floor it failed, the parser and
+    the format, because a refusal has to be diagnosable from the receipt without
+    rerunning the parse.
+    """
+
+
 # --------------------------------------------------------------------------
 # coordinates and access
 # --------------------------------------------------------------------------
@@ -616,6 +626,7 @@ def _attributes_hide_content(attrs: Sequence[tuple[str, str | None]]) -> bool:
         re.search(r"(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*hidden)\b", style, re.IGNORECASE)
     )
 
+
 _ATOMIC_HEADING_COLUMNS = frozenset({"title", "name", "heading", "legal_business_name"})
 
 
@@ -800,9 +811,7 @@ class _NonContentRangeParser(HTMLParser):
                 starts = [starts for _, starts in removed]
                 del self._stack[index:]
                 if any(starts) and self._active_exclusion_start is not None:
-                    self.ranges.append(
-                        (self._active_exclusion_start, self._tag_end(self._index()))
-                    )
+                    self.ranges.append((self._active_exclusion_start, self._tag_end(self._index())))
                     self._active_exclusion_start = None
                 break
 
@@ -861,9 +870,7 @@ class _NamedElementRangeParser(HTMLParser):
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         del attrs
         normalized = tag.casefold()
-        self._stack.append(
-            (normalized, self._index() if normalized in self._names else None)
-        )
+        self._stack.append((normalized, self._index() if normalized in self._names else None))
 
     def handle_endtag(self, tag: str) -> None:
         normalized = tag.casefold()
@@ -874,9 +881,7 @@ class _NamedElementRangeParser(HTMLParser):
                 del self._stack[index:]
                 for removed_tag, start in removed:
                     if start is not None:
-                        self.ranges[removed_tag].append(
-                            (start, self._tag_end(self._index()))
-                        )
+                        self.ranges[removed_tag].append((start, self._tag_end(self._index())))
                 break
 
 
@@ -1044,18 +1049,12 @@ def native_structural_passage_spans(
                 if text[draft.start_char : draft.end_char].strip()
             )
     exclusions = _non_content_markup_ranges(text)
-    semantic_ranges = (
-        _semantic_html_content_ranges(text)
-        if media_type == "text/html"
-        else None
-    )
+    semantic_ranges = _semantic_html_content_ranges(text) if media_type == "text/html" else None
     output: list[tuple[int, int]] = []
     for draft in drafts:
         candidate_ranges: Sequence[tuple[int, int]] = ((draft.start_char, draft.end_char),)
         if semantic_ranges is not None:
-            candidate_ranges = tuple(
-                _intersect_ranges(draft.start_char, draft.end_char, semantic_ranges)
-            )
+            candidate_ranges = tuple(_intersect_ranges(draft.start_char, draft.end_char, semantic_ranges))
         for candidate_start, candidate_end in candidate_ranges:
             for start, end in _subtract_ranges(
                 candidate_start,
@@ -1066,6 +1065,149 @@ def native_structural_passage_spans(
                 if visible and any(character.isalnum() for character in visible):
                     output.append((start, end))
     return tuple(output)
+
+
+# --------------------------------------------------------------------------
+# the coverage floor: a parse must account for its own document
+# --------------------------------------------------------------------------
+#
+# Docling's HTML backend returned 502 visible characters from a 257,998-byte
+# Federal Register rule and reported success with an empty error list. Coverage
+# did not catch it and could not: regions are gap-free over whatever field they
+# are given, so a field the parser built from 0.27% of a document is still 100%
+# covered. The number that catches it compares what came out against what the
+# source independently says is there, which is what this section measures.
+
+MARKUP_UNIT = "markup-visible"
+"""Extracted visible characters over the source's own visible characters.
+
+Both sides are text a reader would see, computed by the same collector, so the
+ratio means "how much of the document survived".
+"""
+
+DENSITY_UNIT = "parsed-per-source-byte"
+"""Extracted characters per source byte, for formats that carry no source text.
+
+A PDF or an Office file has no text to compare against — the parser is the only
+reader — so this is a density rather than a fraction and it may never be
+compared against :data:`MARKUP_UNIT`.
+"""
+
+
+@dataclass(frozen=True)
+class RetentionFloor:
+    """One declared floor, and the measurement that placed it there."""
+
+    value: float
+    unit: str
+    observed_minimum: float
+    population: str
+
+    def __post_init__(self) -> None:
+        if not 0.0 < self.value < 1.0:
+            raise ValueError("a floor outside (0, 1) either gates nothing or refuses everything")
+        if self.unit not in {MARKUP_UNIT, DENSITY_UNIT}:
+            raise ValueError("a floor has to name the unit it is measured in")
+        if self.observed_minimum <= self.value:
+            raise ValueError("a floor with no margin under the observed minimum is a future false refusal")
+
+    @property
+    def margin(self) -> float:
+        """How far the lowest legitimate document sits above this floor."""
+        return self.observed_minimum / self.value
+
+
+#: Per parser, per format. One global number would be either useless or wrong:
+#: a table-heavy filing legitimately carries less prose than a rule, and a text
+#: density is not the same measurement as a visible-text fraction. Every value
+#: is derived from the distribution recorded in
+#: ``docs/evidence/extraction-tooling-bakeoff-2026-08-02.md``, reproducible with
+#: ``tools/measure_extraction_retention.py``, and none is chosen.
+#:
+#: HTML and XML get different floors because their distributions are different
+#: shapes, not as a matter of taste: HTML carries navigation chrome that a parse
+#: legitimately excludes and spreads from 0.9453 to 0.9987, while XML carries
+#: none and never fell below 0.9930 across 993 Federal Register documents, 7
+#: U.S. Code titles, 4 eCFR titles and 3 bills.
+#:
+#: There is deliberately **no floor for Docling on Office formats**. No DOCX,
+#: PPTX or XLSX population exists in this tree to measure, and declaring a floor
+#: for a population nobody measured would be exactly the taste this gate is
+#: meant to replace. Until one is measured, that parser has no floor and
+#: :func:`check_extraction_retention` refuses it — which is the intended
+#: fail-closed shape, not an oversight.
+RETENTION_FLOORS: dict[str, RetentionFloor] = {
+    "native:text/html": RetentionFloor(
+        value=0.75,
+        unit=MARKUP_UNIT,
+        observed_minimum=0.9453,
+        population="993 Federal Register HTML + 4 GAO HTML + 4 segmentation-cache FR HTML; min is GAO",
+    ),
+    "native:application/xml": RetentionFloor(
+        value=0.85,
+        unit=MARKUP_UNIT,
+        observed_minimum=0.9930,
+        population="993 Federal Register full-text XML + 7 USLM titles + 4 eCFR + 3 bills; min is bill XML",
+    ),
+    "pypdf:application/pdf": RetentionFloor(
+        value=0.005,
+        unit=DENSITY_UNIT,
+        observed_minimum=0.015584,
+        population="18 segmentation-cache PDFs — 9 court opinions, 4 CRS, 4 regulations, 1 bill",
+    ),
+}
+
+
+def retention_format_for(media_type: str) -> str:
+    """Collapse a media type onto the format key its floor is declared under.
+
+    ``text/xml`` and ``application/xml`` are the same population and must not
+    end up with two separately-derived floors, or the same document would be
+    gated differently depending on which header the publisher sent.
+    """
+    normalized = (media_type or "").split(";")[0].strip().casefold()
+    if normalized in {"text/xml", "application/xml"} or normalized.endswith("+xml"):
+        return "application/xml"
+    return normalized
+
+
+def retention_floor_for(parser_id: str, source_format: str) -> RetentionFloor | None:
+    """The declared floor for one parser on one format, or ``None`` if undeclared.
+
+    Undeclared is deliberately not "inherit a default". A new extractor has to
+    state the population its floor came from before it may run, which is the
+    same fail-closed shape as the adapter's ``format_not_implemented``.
+    """
+    return RETENTION_FLOORS.get(f"{parser_id}:{source_format}")
+
+
+def reference_visible_text(text: str) -> str:
+    """The source's own visible text, computed without asking the extractor.
+
+    This is the denominator, and it has to be independent of whatever produced
+    the numerator or the ratio would only say that a tool agrees with itself.
+    """
+    if not isinstance(text, str):
+        raise SourceError("a visible-text reference needs Unicode text")
+    return _indexable_markup_text(text)
+
+
+def visible_retention(source_field: str, text: str, *, media_type: str | None = None) -> float | None:
+    """What fraction of the source's visible text the native passages carry.
+
+    ``None`` when the source has no visible text at all — an empty document is
+    not a retention failure, it is an unmeasurable one, and
+    :func:`check_extraction_retention` treats the two differently.
+    """
+    reference = reference_visible_text(text)
+    if not reference:
+        return None
+    spans = native_structural_passage_spans(source_field, text, media_type=media_type)
+    extracted = sum(len(_indexable_markup_text(text[start:end])) for start, end in spans)
+    # Spans are non-overlapping, so the sum cannot legitimately exceed the
+    # reference; per-span whitespace normalization can still round it fractionally
+    # over, and a ratio above 1.0 would misreport as a healthier parse than exists.
+    return min(1.0, extracted / len(reference))
 
 
 def _json_array_ranges(text: str) -> list[tuple[int, int]] | None:
@@ -1234,12 +1376,111 @@ class SourcePolicy:
     policy_version: str = SOURCE_POLICY_VERSION
     quarantine_reasons: frozenset[str] = DEFAULT_QUARANTINE_REASONS
     parser_enabled: bool = True
+    retention_exemptions: frozenset[str] = frozenset()
+    """Subject ids allowed below their retention floor, each stated by name.
+
+    A legitimate low-retention document — a form, a table-only filing — gets
+    through by being named here, and the resulting :class:`RetentionCheck`
+    records that it was exempted and which id matched. Empty by default: an
+    exemption that nobody had to write down is indistinguishable from a gate
+    that does not work.
+    """
 
     def settles_as_rejected(self, reason: str) -> bool:
         return reason in self.quarantine_reasons
 
 
 DEFAULT_SOURCE_POLICY = SourcePolicy()
+
+
+@dataclass(frozen=True)
+class RetentionCheck:
+    """What the coverage floor measured, and what it decided.
+
+    Recorded whether it passed or failed, so a receipt can state the retention
+    of a healthy parse rather than only the retention of a refused one.
+    """
+
+    parser_id: str
+    source_format: str
+    subject_id: str
+    unit: str
+    measured: float | None
+    floor: float | None
+    exempt: bool = False
+    unmeasurable: bool = False
+
+    @property
+    def passed(self) -> bool:
+        if self.exempt:
+            return True
+        if self.measured is None or self.floor is None:
+            return False
+        return self.measured >= self.floor
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "parser_id": self.parser_id,
+            "source_format": self.source_format,
+            "subject_id": self.subject_id,
+            "unit": self.unit,
+            "measured": self.measured,
+            "floor": self.floor,
+            "exempt": self.exempt,
+            "unmeasurable": self.unmeasurable,
+            "passed": self.passed,
+        }
+
+
+def check_extraction_retention(
+    parser_id: str,
+    source_format: str,
+    measured: float | None,
+    *,
+    subject_id: str,
+    policy: SourcePolicy = DEFAULT_SOURCE_POLICY,
+) -> RetentionCheck:
+    """Refuse a parse that did not account for enough of its own document.
+
+    Sits at the extraction boundary rather than inside any one adapter, so it
+    constrains every extractor this project runs now and every one it adds
+    later. Fails closed in three separate ways, each of which was a way a bad
+    parse could previously have been recorded as a good one:
+
+    * below the declared floor,
+    * no declared floor for this parser and format at all,
+    * a source whose visible text could not be measured.
+
+    Returns the measurement on success so a receipt can state it.
+    """
+    floor = retention_floor_for(parser_id, source_format)
+    exempt = subject_id in policy.retention_exemptions
+    check = RetentionCheck(
+        parser_id=parser_id,
+        source_format=source_format,
+        subject_id=subject_id,
+        unit=floor.unit if floor else "undeclared",
+        measured=measured,
+        floor=floor.value if floor else None,
+        exempt=exempt,
+        unmeasurable=measured is None,
+    )
+    if check.passed:
+        return check
+    if floor is None:
+        raise SourceRetentionError(
+            f"parser {parser_id!r} declares no retention floor for format {source_format!r}: "
+            "an extractor states the population its floor came from before it may run"
+        )
+    if measured is None:
+        raise SourceRetentionError(
+            f"parser {parser_id!r} on format {source_format!r} produced no measurable visible text "
+            f"for {subject_id!r}: retention could not be established against floor {floor.value}"
+        )
+    raise SourceRetentionError(
+        f"parser {parser_id!r} on format {source_format!r} retained {measured:.4f} of {subject_id!r} "
+        f"({floor.unit}), below the floor {floor.value}: a parse has to account for its own document"
+    )
 
 
 # --------------------------------------------------------------------------

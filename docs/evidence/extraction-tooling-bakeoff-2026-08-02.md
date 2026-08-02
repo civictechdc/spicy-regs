@@ -655,3 +655,102 @@ apparent 5.6% deletion is a units mismatch, not a loss (§ HTML, footnote †).
    all 987 FR section markers. The reason to reject these libraries is offsets,
    not deletion — and stating the wrong reason would have made this evaluation
    easy to overturn.
+
+## What was built from this, 2026-08-02 — the coverage floor
+
+**Built and wired.** `check_extraction_retention` in
+`src/spicy_regs/docpipeline/source.py`, called at both markup and both PDF
+boundaries in `src/spicy_regs/document_file_pipeline.py`, where a representation
+is about to be sealed. Tested by `tests/test_docpipeline_extraction_floor.py`
+(30 tests). The distribution is reproducible with
+`tools/measure_extraction_retention.py`.
+
+The exposure this closes is the one measured above: Docling returned 502 visible
+characters from a 257,998-byte rule and reported `ConversionStatus.SUCCESS` with
+an empty error list. Coverage did not catch it and **could not** — regions are
+gap-free over whatever field they are given, so a field built from 0.27% of a
+document is still 100% covered. The number that catches it compares what came
+out against what the source independently says is there.
+
+### The measured retention distribution
+
+Retention is defined per coordinate system, because the formats do not share
+one. `markup-visible` is extracted visible characters over the source's own
+visible characters — both sides computed by the same collector, so the ratio
+means "how much of the document survived". `parsed-per-source-byte` is extracted
+characters per source byte, for formats that carry no source text to compare
+against; it is a density, not a fraction, and the two may never be compared.
+
+| corpus | unit | n | min | p01 | p05 | p50 | max |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Federal Register HTML | markup-visible | 993 | **0.9598** | 0.9854 | 0.9931 | 0.9965 | 0.9987 |
+| Federal Register full-text XML | markup-visible | 993 | **0.9936** | 0.9969 | 0.9977 | 0.9984 | 0.9997 |
+| USLM / U.S. Code XML | markup-visible | 7 | 0.9963 | — | — | 0.9972 | 0.9974 |
+| eCFR XML | markup-visible | 4 | 0.9947 | — | — | 0.9960 | 0.9980 |
+| Bill XML | markup-visible | 3 | **0.9930** | — | — | 0.9982 | 1.0000 |
+| GAO HTML | markup-visible | 4 | **0.9453** | — | — | 0.9645 | 0.9654 |
+| segmentation-cache FR HTML | markup-visible | 4 | 0.9909 | — | — | 0.9961 | 0.9976 |
+| PDF via pypdf | parsed-per-source-byte | 18 | **0.015584** | — | 0.019428 | 0.233897 | 0.558566 |
+
+Against the measured failures: Docling's HTML backend retained **0.0027, 0.0080,
+0.0098 and 0.0122** on the four Federal Register documents probed.
+
+### The floors, and the margin under each
+
+| key | floor | unit | lowest legitimate | margin | population |
+|---|---:|---|---:|---:|---|
+| `native:text/html` | **0.75** | markup-visible | 0.9453 (GAO) | **1.26×** | 1,001 HTML documents |
+| `native:application/xml` | **0.85** | markup-visible | 0.9930 (bill XML) | **1.17×** | 1,007 XML documents |
+| `pypdf:application/pdf` | **0.005** | parsed-per-source-byte | 0.015584 | **3.12×** | 18 PDFs |
+
+HTML and XML get different floors because their distributions are different
+shapes, not as a matter of taste: HTML carries navigation chrome a parse
+legitimately excludes and spreads from 0.9453 to 0.9987, while XML carries none
+and never fell below 0.9930 across 1,007 documents. One number across both would
+have been either loose enough to be useless on XML or tight enough to be wrong
+on HTML.
+
+**Distance to the failures.** The worst Docling failure (0.0122) sits **61×
+below** the HTML floor; the lowest legitimate document sits 1.26× above it.
+`RetentionFloor.__post_init__` refuses any floor at or above its own observed
+minimum, so a later edit cannot quietly remove the margin.
+
+### Verified: zero false refusals
+
+The live gate run over every real document reachable in this tree:
+
+| corpus | n | refused | worst retention |
+|---|---:|---:|---|
+| Federal Register HTML | 993 | **0** | 0.9598 (`2016-17322.html`) |
+| Federal Register full-text XML | 993 | **0** | 0.9936 (`2023-01025.xml`) |
+| GAO HTML | 4 | **0** | 0.9453 (`gao-html-4.html`) |
+| eCFR + bill XML | 7 | **0** | 0.9930 (`bill-xml-extreme.xml`) |
+| USLM | 7 | **0** | 0.9963 (`usc24.xml`) |
+| **total** | **2,004** | **0** | |
+
+### The three ways it fails closed
+
+1. **Below the floor** — the refusal names the measured retention, the floor,
+   the parser, the format and the subject, so a failure is diagnosable from the
+   receipt without rerunning the parse.
+2. **No declared floor for this parser and format.** Undeclared is deliberately
+   not "inherit a default": a new extractor states the population its floor came
+   from before it may run. This is the same shape as the adapter's
+   `format_not_implemented`.
+3. **Unmeasurable** — a source with no visible text is not an extraction the
+   gate can vouch for, and reads differently from a below-floor refusal.
+
+**There is deliberately no floor for Docling on Office formats.** No DOCX, PPTX
+or XLSX population exists in this tree to measure, and declaring a floor for a
+population nobody measured is exactly the taste this gate replaces. Until one is
+measured that parser has no floor and the gate refuses it — intended, not an
+oversight, and the open item this build leaves behind.
+
+### The exemption is stated, never silent
+
+`SourcePolicy.retention_exemptions` is a frozenset of subject ids, **empty by
+default**. A legitimate low-retention document — a form, a table-only filing —
+gets through by being named in it, and the resulting `RetentionCheck` records
+`exempt=True` and which id matched. An exemption nobody had to write down would
+be indistinguishable from a gate that does not work, which is why there is no
+wildcard and no threshold-lowering escape hatch.
