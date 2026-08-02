@@ -18,15 +18,65 @@ search ranking and serving:
 - **SpicySearch** owns query planning, document retrieval, ranking,
   explanations, search receipts, indexes, and query-time coverage.
 
-Build the sealed local M1 source release without another repository checkout:
+Build a release from the checked-in Regulations.gov JSON record and its exact
+four-page PDF:
+
+```bash
+uv run --frozen build-document-release-from-files \
+  --manifest sample-data/mirrulations/document-release-file-manifest-v1.json \
+  --output-dir ./output/mirrulations-document-release
+```
+
+The command verifies both source-file digests, extracts embedded PDF text,
+creates page-derived Unicode passages, validates the release, and writes a
+source-complete distribution. `document-release.json` points to
+content-addressed copies of the exact JSON and PDF bytes under `renditions/`
+and to the captured-file manifest under `receipts/`. The Rulespec Core release
+is a pinned dependency, not a copied file in this distribution; a validator
+must receive the matching Core file through `--rulespec-core`. The repository
+default is a fixture, so this command produces a `conformance` release rather
+than production evidence. The source-byte closure check is also available as a
+separate command:
+
+```bash
+uv run --frozen validate-document-release-distribution \
+  --distribution ./output/mirrulations-document-release
+```
+
+The same publication path handles exact source-native HTML and XML. This
+checked representative contains one congressional bill and one Code of Federal
+Regulations section:
+
+```bash
+uv run --frozen build-document-release-from-files \
+  --manifest sample-data/document-files/document-release-representative-manifest-v1.json \
+  --output-dir output/markup-document-release
+```
+
+The local 34-document evaluation cache exercises PDF, HTML, and XML across
+seven source families and four size bands. It remains evaluation input: its
+lock refers to code-defined source specifications and lacks complete
+source-issued version metadata, so the publication command does not accept it.
+This actual-file release path claims only embedded-text PDF and UTF-8 HTML/XML.
+Scanned PDFs without embedded text fail closed; it does not claim optical
+character recognition or Office-document support. HTML semantic isolation
+recognizes a literal single `<main>` plus `<title>`; publisher layouts that use
+another main-content convention need a source-specific capture adapter before
+publication. Malformed HTML that depends on HTML5 implicit tag closing is also
+outside this conformance slice. PDF parsing currently runs in process, so this
+command is for controlled, digest-pinned capture jobs rather than arbitrary
+user uploads; production intake still needs resource limits and process
+isolation.
+
+The synthetic M1 builder remains a small conformance fixture:
 
 ```bash
 uv run build-document-release --output ./output/document-release-m1.json
 ```
 
-The builder reads repository-local, digest-pinned source and Rulespec Core
-fixtures. It writes canonical JSON and rejects any invalid digest, coordinate,
-classification, projection, or reference.
+It reads repository-local, digest-pinned source and Rulespec Core fixtures and
+rejects any invalid digest, coordinate, classification, projection, or
+reference. It is not evidence that acquired source files were processed.
 
 The checked-in M1 release is
 `src/spicy_regs/fixtures/spicyregs-m1-document-release-v1.json`; consumers pin
