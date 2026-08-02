@@ -74,6 +74,29 @@ _USC_STANDARD = re.compile(
     r"(?:(?:\s+(?:to|through)\s+|\s*[–—]\s*)(?P<range_end>\d+[A-Za-z]?))?",
     re.IGNORECASE,
 )
+#: "49 U.S.C. ch. 311" — a U.S. Code *chapter*, the unit above a section.
+#:
+#: Measured as the largest well-defined slice of the bakeoff's shared-miss cell:
+#: 31 strings neither the project nor CiteURL detected
+#: (docs/evidence/citation-bakeoff-2026-08-02.md, "The measured gain"). The
+#: corpus spells the abbreviation every way it can — "ch.", "Ch", "ch.13" with
+#: no space, "chapter", "Chapter" — and the chapter number may carry a letter
+#: ("chapter 13A").
+#:
+#: Unlike a section, a chapter number never contains a hyphen — there is no
+#: chapter "1395w-4" — so a hyphen after one is always a separator and the range
+#: tail can accept it directly. It still has to be followed by a number:
+#: "22 USC Ch. 34- The Peace Corps Act" cites chapter 34, and the dash there is
+#: punctuation before a title. Whether an accepted pair is really a range is
+#: decided by the ordering rule, never by the separator.
+_USC_CHAPTER = re.compile(
+    r"(?P<title>[1-9]\d*)\s*U\.?\s*S\.?\s*(?:Code\b|C\.?(?:\s*A\.?)?)"
+    r"\s*(?:chapters?|chaps?\.?|chs?\.?)\s*"
+    r"(?P<chapter>\d+[A-Za-z]?)\b"
+    r"(?:(?:\s+(?:to|through)\s+|\s*[-–—]\s*)(?P<chapter_end>\d+[A-Za-z]?)\b)?",
+    re.IGNORECASE,
+)
+
 _USC_LIST_TAIL = re.compile(
     r"(?:,|\band\b|\bor\b)\s*(?P<section>\d+[A-Za-z]?(?:-\d+[A-Za-z]?)?)\b"
     r"(?!\s*(?:U\.?\s*S\.?\s*C|C\.?\s*F\.?\s*R|stat\b))",
@@ -236,6 +259,39 @@ class CfrCitation:
         return canonical_cfr_iri(self.title, self.part, self.section)
 
 
+#: A U.S. Code chapter is not expressible in Rulespec's ``rkaf:us-usc`` lexical
+#: space, which the compiled profile constrains to
+#: ``^urn:rkaf:us:usc:[1-9][0-9]*:[1-9][0-9]*[a-z]*(-[0-9a-z]+)*$`` — a title
+#: and a **section**. Reusing it for a chapter would be worse than merely
+#: irregular: title 5 has both a chapter 131 and a section 131, and they are
+#: different provisions, so ``urn:rkaf:us:usc:5:131`` would name two objects and
+#: be indistinguishable downstream from a correct citation.
+#:
+#: So a chapter takes the route :func:`federal_register_identifier` already
+#: takes for legacy FR document numbers: Rulespec's ``partner-defined`` escape
+#: hatch, under this repo's own URN prefix, until the scheme is broadened.
+USC_CHAPTER_IDENTIFIER_SCHEME = "rkaf:partner-defined"
+
+
+@dataclass(frozen=True)
+class UscChapterCitation:
+    """A U.S. Code chapter: the unit a section belongs to, not a section.
+
+    A range carries its two endpoints and never its members, the same rule
+    :class:`AuthorityCitation` follows for sections and for the same reason —
+    the members between them are not enumerable without inventing chapters.
+    :attr:`iri` names the first chapter, which is a chapter the text states.
+    """
+
+    title: str
+    chapter: str
+    chapter_end: str | None = None
+
+    @property
+    def iri(self) -> str:
+        return canonical_usc_chapter_iri(self.title, self.chapter)
+
+
 @dataclass(frozen=True)
 class ExecutiveOrderCompilation:
     """Where an Executive Order was printed, not which order it is.
@@ -309,6 +365,19 @@ def canonical_usc_iri(title: object, section: object) -> str:
     if not title_number or not section_number or not re.fullmatch(r"\d+[a-z]?(?:-\d+[a-z]?)?", section_number):
         raise ValueError(f"invalid U.S.C. identifier components: title={title!r}, section={section!r}")
     return f"urn:rkaf:us:usc:{title_number}:{section_number}"
+
+
+def canonical_usc_chapter_iri(title: object, chapter: object) -> str:
+    """Expand a U.S. Code chapter under :data:`USC_CHAPTER_IDENTIFIER_SCHEME`.
+
+    Alphabetic suffixes normalize to lowercase, the rule ``rkaf:us-usc`` states
+    for sections, so "chapter 13A" and "chapter 13a" are one chapter.
+    """
+    title_number = _digits(title)
+    chapter_number = _section(chapter)
+    if not title_number or not chapter_number or not re.fullmatch(r"[1-9]\d*[a-z]?", chapter_number):
+        raise ValueError(f"invalid U.S.C. chapter components: title={title!r}, chapter={chapter!r}")
+    return f"urn:spicy-regs:usc-chapter:{title_number}:{chapter_number}"
 
 
 #: A Regulation Identifier Number: a four-digit agency code, then a two-letter
@@ -528,6 +597,57 @@ def parse_cfr_citation(value: object) -> list[CfrCitation]:
                 if candidate not in found:
                     found.append(candidate)
     return found
+
+
+def parse_usc_chapter_citation(value: object) -> list[UscChapterCitation]:
+    """Parse U.S. Code chapter references, in order of appearance.
+
+    A chapter reference needs the code that numbers it. A bare "Chapter 33"
+    names no title, so it identifies nothing and is not read — attaching it to
+    whatever title appeared nearby would be a guess, and the corpus contains
+    exactly that string.
+
+    A listed chapter ("47 U.S.C. chs. 2, 5, 9, 13") is expanded under the title
+    that introduced it, by the same expression and the same stop rule
+    :func:`_usc_list_expansion` uses for sections — so a number that leads a
+    different citation ("46 U.S.C. ch. 553, 49 CFR 1.93(a)") is not taken as a
+    chapter.
+    """
+    if value is None:
+        return []
+    text = str(value).strip()
+    if not text:
+        return []
+    found: list[UscChapterCitation] = []
+    matches = list(_USC_CHAPTER.finditer(text))
+    for index, match in enumerate(matches):
+        title = _digits(match.group("title"))
+        # A chapter number is ordered exactly like a section: numeric stem, then
+        # letter suffix. The pair is a range only when the second endpoint sorts
+        # strictly after the first; otherwise the first chapter stands alone.
+        chapter, chapter_end = _usc_section_range(
+            _section(match.group("chapter")),
+            _section(match.group("chapter_end")),
+        )
+        if not title or not chapter:
+            continue
+        for citation in (
+            UscChapterCitation(title=title, chapter=chapter, chapter_end=chapter_end),
+            *(
+                UscChapterCitation(title=title, chapter=listed)
+                for listed in _listed_chapters(text, match, matches[index + 1 :])
+            ),
+        ):
+            if citation not in found:
+                found.append(citation)
+    return found
+
+
+def _listed_chapters(text: str, match: re.Match[str], later: list[re.Match[str]]) -> list[str]:
+    """Chapter numbers listed after ``match`` and before the next chapter citation."""
+    stop = later[0].start() if later else len(text)
+    listed = (_section(tail.group("section")) for tail in _USC_LIST_TAIL.finditer(text[match.end() : stop]))
+    return [chapter for chapter in listed if chapter]
 
 
 def parse_eo_compilation_citation(value: object) -> list[ExecutiveOrderCompilation]:

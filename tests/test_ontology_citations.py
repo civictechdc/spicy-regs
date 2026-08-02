@@ -11,14 +11,17 @@ import yaml
 
 from spicy_regs.data_dictionary import expected_schemas
 from spicy_regs.ontology.citations import (
+    USC_CHAPTER_IDENTIFIER_SCHEME,
     AuthorityCitation,
     CfrCitation,
     ExecutiveOrderCompilation,
+    UscChapterCitation,
     canonical_cfr_iri,
     canonical_frdoc_iri,
     canonical_pl_iri,
     canonical_regsgov_iri,
     canonical_rin_iri,
+    canonical_usc_chapter_iri,
     canonical_usc_iri,
     federal_register_identifier,
     normalize_docket_reference,
@@ -27,6 +30,7 @@ from spicy_regs.ontology.citations import (
     parse_authority_citation,
     parse_cfr_citation,
     parse_eo_compilation_citation,
+    parse_usc_chapter_citation,
     usc_section_covers,
 )
 from spicy_regs.ontology.llm import validated_external_ids
@@ -191,6 +195,129 @@ def test_a_real_cfr_citation_beside_a_compilation_locator_survives():
     raw = "E.O. 11246, 3 CFR, 1964-1965 Comp., p. 339, implemented at 41 CFR 60"
     assert parse_cfr_citation(raw) == [CfrCitation("41", "60")]
     assert parse_eo_compilation_citation(raw) == [ExecutiveOrderCompilation("1964", "1965", "339")]
+
+
+# Every string below is verbatim from output/citation-bakeoff-2026-08-02
+# (detection.json, cell `neither`) — the largest well-defined slice of the
+# shared-miss cell no evaluated package addresses. 31 of the 32 strings that
+# cell spells with "chapter" name a title; the 32nd is a bare "Chapter 33".
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("5 U.S.C. Ch. 131", UscChapterCitation("5", "131")),
+        ("5 U.S.C. Ch. 63", UscChapterCitation("5", "63")),
+        ("49 U.S.C. ch. 311", UscChapterCitation("49", "311")),
+        ("49 U.S.C. ch. 301", UscChapterCitation("49", "301")),
+        # Every separator spelling the corpus uses: no space after the
+        # abbreviation, no trailing dot, no dot at all, the word written out.
+        ("41 U.S.C. ch.13", UscChapterCitation("41", "13")),
+        ("31 U.S.C. Ch 38", UscChapterCitation("31", "38")),
+        ("40 USC ch 10", UscChapterCitation("40", "10")),
+        ("5 U.S.C. chapter 43", UscChapterCitation("5", "43")),
+        ("54 U.S.C Chapter 3041", UscChapterCitation("54", "3041")),
+        # A lettered chapter, normalized like a U.S.C. section suffix.
+        ("42 U.S.C. chapter 13A", UscChapterCitation("42", "13a")),
+        # Trailing prose is not part of the chapter number.
+        ("22 USC Ch. 34- The Peace Corps Act", UscChapterCitation("22", "34")),
+        ("10 U.S.C. ch. 137 legacy provisions", UscChapterCitation("10", "137")),
+    ],
+)
+def test_a_usc_chapter_citation_is_read_from_the_corpus_spelling(raw, expected):
+    assert parse_usc_chapter_citation(raw) == [expected]
+
+
+def test_a_chapter_list_is_expanded_under_the_title_that_introduces_it():
+    """ "47 U.S.C. chs. 2, 5, 9, 13" names four chapters, not one.
+
+    Same expression and same stop rule the section list expansion uses, so a
+    number that leads a different citation is not swept in as a chapter.
+    """
+    assert parse_usc_chapter_citation("47 U.S.C. chs. 2, 5, 9, 13") == [
+        UscChapterCitation("47", "2"),
+        UscChapterCitation("47", "5"),
+        UscChapterCitation("47", "9"),
+        UscChapterCitation("47", "13"),
+    ]
+    assert parse_usc_chapter_citation("46 U.S.C. ch. 553, 49 CFR 1.93(a)") == [UscChapterCitation("46", "553")]
+    assert parse_usc_chapter_citation("5 U.S.C. ch. 10 and E.O. 12024 (42 FR 61445") == [UscChapterCitation("5", "10")]
+
+
+@pytest.mark.parametrize("raw", ["46 U.S.C. chs. 301 to 309", "46 U.S.C. chs. 301-309"])
+def test_a_chapter_range_publishes_its_endpoints_and_not_its_members(raw):
+    """The rule sections already follow: two endpoints, never the interval.
+
+    A chapter number never contains a hyphen, so unlike a section the plain
+    hyphen is unambiguously a separator here. Whether the pair is a range is
+    still decided by the ordering rule.
+    """
+    (parsed,) = parse_usc_chapter_citation(raw)
+    assert (parsed.chapter, parsed.chapter_end) == ("301", "309")
+    assert parsed.iri == "urn:spicy-regs:usc-chapter:46:301"
+
+
+def test_a_dash_before_a_title_is_not_a_chapter_range():
+    """ "22 USC Ch. 34- The Peace Corps Act" cites chapter 34 and stops there."""
+    assert parse_usc_chapter_citation("22 USC Ch. 34- The Peace Corps Act") == [UscChapterCitation("22", "34")]
+
+
+def test_an_unordered_chapter_pair_is_not_read_as_a_range():
+    (parsed,) = parse_usc_chapter_citation("46 U.S.C. chs. 309 to 301")
+    assert (parsed.chapter, parsed.chapter_end) == ("309", None)
+
+
+def test_a_chapter_needs_the_code_that_gives_it_a_number():
+    """ "Chapter 33" of what? Without a title there is nothing to identify.
+
+    The bare form is the one string in the measured chapter population that
+    names no code, and it stays unread rather than being attached to whatever
+    title happened to appear nearby.
+    """
+    assert parse_usc_chapter_citation("Chapter 33") == []
+    assert parse_usc_chapter_citation("chapter 13A") == []
+    assert parse_usc_chapter_citation("40 CFR chapter I") == []
+
+
+def test_a_chapter_is_not_the_section_that_shares_its_number():
+    """The reason the chapter identifier cannot live in the `us-usc` URN space.
+
+    Title 5 has both a chapter 131 and a section 131, and they are different
+    provisions. Minting `urn:rkaf:us:usc:5:131` for the chapter would publish
+    one identifier for two objects — the worst available outcome, because it is
+    indistinguishable from a correct citation downstream.
+    """
+    chapter = parse_usc_chapter_citation("5 U.S.C. Ch. 131")[0].iri
+    (section,) = parse_authority_citation("5 U.S.C. 131")
+    assert section.canonical_iri == "urn:rkaf:us:usc:5:131"
+    assert chapter != section.canonical_iri
+    assert chapter == "urn:spicy-regs:usc-chapter:5:131"
+
+
+def test_a_chapter_citation_is_not_read_as_a_section():
+    """The section grammar must stay silent on a chapter, in both directions."""
+    for raw in ("5 U.S.C. Ch. 131", "49 U.S.C. ch. 311", "42 U.S.C. chapter 13A"):
+        assert parse_authority_citation(raw) == [AuthorityCitation("other", "failed")]
+    assert parse_usc_chapter_citation("42 U.S.C. 7401") == []
+
+
+def test_the_chapter_identifier_declares_the_scheme_that_can_express_it():
+    """`rkaf:us-usc` is a section space, so a chapter uses the partner escape.
+
+    The compiled Rulespec profile constrains `rkaf:us-usc` to
+    `^urn:rkaf:us:usc:[1-9][0-9]*:[1-9][0-9]*[a-z]*(-[0-9a-z]+)*$` — a title and
+    a *section*. A chapter is not expressible there, so it takes the same route
+    `federal_register_identifier` takes for legacy FR numbers: Rulespec's
+    `partner-defined` escape hatch, under this repo's own URN prefix, until the
+    scheme is broadened.
+    """
+    assert USC_CHAPTER_IDENTIFIER_SCHEME == "rkaf:partner-defined"
+    assert canonical_usc_chapter_iri("49", "311") == "urn:spicy-regs:usc-chapter:49:311"
+    assert canonical_usc_chapter_iri(42, "13A") == "urn:spicy-regs:usc-chapter:42:13a"
+
+
+@pytest.mark.parametrize("chapter", ["", None, "I", "13-A", "0", "chapter"])
+def test_an_unexpressible_chapter_is_refused_rather_than_spelled(chapter):
+    with pytest.raises(ValueError):
+        canonical_usc_chapter_iri("5", chapter)
 
 
 def test_the_compact_key_still_reads_every_title_the_cfr_has():
