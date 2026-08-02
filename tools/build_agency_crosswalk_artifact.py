@@ -56,6 +56,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -88,6 +89,34 @@ TIERS = ("confident", "probable", "ambiguous", "unmapped")
 #: The two agency-*field* joins. Neither reads a docket-id string prefix.
 EVIDENCE_PATHS = ("dockets_fr_links", "documents_fr_doc_num")
 
+DOCKET_NORMALIZATION_POLICY = "docket-id-normalization-v1"
+
+#: The upstream defect this normalization exists to work around. Without it
+#: the join silently drops real edges, which is a data defect and not the
+#: "expected non-overlap" it superficially resembles.
+DOCKET_NORMALIZATION_DEFECT = (
+    "docs/corpus-edge-coverage-findings-2026-07-24.md finding #1 (RULE-010, confirmed): "
+    "build_fr_docket_links.py explodes federal_register.docket_ids_json without "
+    "normalizing the emitted docket_id, so the Federal Register's decorated strings "
+    "('Docket No. FAA-2026-3485') never match the dockets spine, which keys on the bare "
+    "id. The finding prescribes targeted normalization plus honest quarantine of the "
+    "rest -- never force-matching."
+)
+
+#: Decoration must be followed by whitespace or a colon. A bare hyphen does
+#: not qualify, so a real identifier like ``DOC-2005-0010`` (Commerce) or a
+#: hypothetical ``DOCKET-2020-0001`` cannot be truncated into a false match.
+DOCKET_DECORATION_PATTERN = r"^\s*(?:docket\s*(?:no|number)?|doc\.?\s*no)\.?[\s:]+"
+
+DOCKET_NORMALIZATION_RULES = (
+    "strip_leading_docket_decorations",
+    "remove_internal_whitespace",
+    "uppercase",
+)
+
+_DOCKET_DECORATION = re.compile(DOCKET_DECORATION_PATTERN, re.IGNORECASE)
+_WHITESPACE = re.compile(r"\s+")
+
 CROSSWALK_COLUMNS = (
     "crosswalk_id",
     "agency_code",
@@ -114,6 +143,9 @@ CODE_COLUMNS = (
     "confidence_share",
     "support_documents",
     "support_by_path_json",
+    "dockets_path_documents",
+    "documents_path_documents",
+    "evidence_is_documents_only",
     "candidate_count",
     "candidate_slugs_json",
 )
@@ -136,7 +168,7 @@ CFR_COLUMNS = (
     "part_documents",
     "share",
     "rank",
-    "is_primary",
+    "is_most_citing",
 )
 
 QUARANTINE_COLUMNS = (
@@ -147,6 +179,7 @@ QUARANTINE_COLUMNS = (
     "agency_code",
     "docket_ref",
     "raw_value",
+    "occurrence",
     "reasons_json",
 )
 
@@ -173,9 +206,27 @@ SPECIFICITY_LABEL = (
 JOIN_LABEL = (
     "agency codes come from the agency FIELD on dockets (agency_code) and on "
     "documents (agency_code + fr_doc_num), never from docket-id string "
-    "prefixes. fr_docket_links carries many docket ids that are not "
-    "regulations.gov dockets; those rows join to no code and are counted in "
-    "coverage, not quarantined."
+    "prefixes. Link rows that do not match the dockets spine fall into two "
+    "populations that must not be conflated: (1) decorated-but-resolvable ids, "
+    "a known upstream defect recovered by docket-id-normalization-v1 -- see "
+    "docs/corpus-edge-coverage-findings-2026-07-24.md finding #1 (RULE-010); "
+    "and (2) genuine foreign identifiers (FRL-*, REG-*, CMS-*-F, Special "
+    "Conditions No. *) which correctly match no regulations.gov docket and are "
+    "counted in coverage, not quarantined. A normalized key that maps to more "
+    "than one docket is quarantined, never guessed."
+)
+
+CFR_PRIMARY_LABEL = (
+    "cfr-part-agencies.is_most_citing marks the agency named on the most "
+    "documents citing that (title, part). Count ties are broken by greater "
+    "depth in the parent_id chain (the deeper, more specific slug wins), so "
+    "the flag is 'most-citing, then deepest', not a crosswalk resolution. "
+    "It is NOT the owning agency: on "
+    "14 CFR 39 (airworthiness directives) transportation-department outranks "
+    "federal-aviation-administration because the department is named on "
+    "marginally more documents. Consumers wanting the responsible sub-agency "
+    "should use the full ranked candidate list with agency-parents.parquet, "
+    "not this flag."
 )
 
 DENOMINATOR_LABEL = (
@@ -237,6 +288,25 @@ def _flag(value: bool) -> str:
     return "true" if value else "false"
 
 
+def normalize_docket_id(value: object) -> str:
+    """Reduce a docket reference to its comparison key.
+
+    Applies ``DOCKET_NORMALIZATION_RULES`` in order: strip leading Federal
+    Register docket decorations (repeatedly, since some references carry two),
+    remove internal whitespace that split a real identifier, and upper-case.
+    Returns "" when nothing survives.
+    """
+
+    text = _text(value)
+    if not text:
+        return ""
+    previous = None
+    while previous != text:
+        previous = text
+        text = _DOCKET_DECORATION.sub("", text).strip()
+    return _WHITESPACE.sub("", text).upper()
+
+
 def _read_rows(path: Path, columns: tuple[str, ...]) -> list[dict[str, Any]]:
     return pq.read_table(path, columns=list(columns)).to_pylist()
 
@@ -247,6 +317,10 @@ class _Quarantine:
     def __init__(self) -> None:
         self.rows: list[dict[str, Any]] = []
         self.reasons: dict[str, Counter[str]] = defaultdict(Counter)
+        #: Identical defects recur (the same partless CFR reference listed
+        #: twice, the same dangling fr_doc_num on two rows). Content-derived
+        #: ids would collide, so each repeat carries an occurrence ordinal.
+        self._seen: Counter[str] = Counter()
 
     def add(
         self,
@@ -269,6 +343,9 @@ class _Quarantine:
             "raw_value": raw_value,
             "reasons_json": canonical_json(ordered_reasons),
         }
+        fact = canonical_json(row)
+        self._seen[fact] += 1
+        row["occurrence"] = str(self._seen[fact])
         row["quarantine_id"] = stable_id("urn:spicyregs:agency-crosswalk-quarantine", row)
         self.rows.append(row)
         for reason in ordered_reasons:
@@ -475,15 +552,41 @@ def _collect_code_evidence(
     evidence: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
     codes_in_dockets = set(docket_codes.values())
 
+    # The normalized index is what recovers the upstream defect's decorated
+    # references. A key covering more than one real docket is a collision the
+    # tool refuses rather than resolves.
+    normalized_index: dict[str, set[str]] = defaultdict(set)
+    for docket_id in docket_codes:
+        normalized_index[normalize_docket_id(docket_id)].add(docket_id)
+
     link_rows = _read_rows(fr_docket_links, _FR_LINK_COLUMNS)
-    link_unknown_docket = 0
-    link_joined = 0
+    link_foreign = 0
+    link_ambiguous = 0
+    link_joined_raw = 0
+    link_joined_normalized = 0
     for row in link_rows:
         docket_id = _text(row.get("docket_id"))
         code = docket_codes.get(docket_id)
+        via_normalization = False
         if code is None:
-            link_unknown_docket += 1
-            continue
+            key = normalize_docket_id(docket_id)
+            matches = normalized_index.get(key) if key else None
+            if not matches:
+                link_foreign += 1
+                continue
+            if len(matches) > 1:
+                link_ambiguous += 1
+                quarantine.add(
+                    source="fr_docket_links",
+                    evidence_field="docket_id",
+                    reasons=["ambiguous_normalized_docket"],
+                    document_ref=_text(row.get("document_number")) or None,
+                    docket_ref=docket_id,
+                    raw_value=canonical_json(sorted(matches))[:200],
+                )
+                continue
+            code = docket_codes[next(iter(matches))]
+            via_normalization = True
         document_number = _text(row.get("document_number"))
         if not document_number:
             continue
@@ -498,7 +601,10 @@ def _collect_code_evidence(
             )
             continue
         evidence[code]["dockets_fr_links"].add(document_number)
-        link_joined += 1
+        if via_normalization:
+            link_joined_normalized += 1
+        else:
+            link_joined_raw += 1
 
     document_rows = _read_rows(documents, _DOCUMENT_COLUMNS)
     codes_in_documents: set[str] = set()
@@ -530,8 +636,11 @@ def _collect_code_evidence(
         "dockets_rows": len(docket_rows),
         "dockets_rows_with_agency_code": len(docket_codes),
         "fr_docket_links_rows": len(link_rows),
-        "fr_docket_links_rows_with_unknown_docket": link_unknown_docket,
-        "fr_docket_links_rows_joined": link_joined,
+        "fr_docket_links_rows_joined": link_joined_raw + link_joined_normalized,
+        "fr_docket_links_rows_joined_raw": link_joined_raw,
+        "fr_docket_links_rows_joined_after_normalization": link_joined_normalized,
+        "fr_docket_links_rows_with_foreign_identifier": link_foreign,
+        "fr_docket_links_rows_with_ambiguous_normalized_docket": link_ambiguous,
         "documents_rows": len(document_rows),
         "documents_rows_with_fr_doc_num": documents_with_fr_doc_num,
         "documents_rows_joined": documents_joined,
@@ -539,9 +648,7 @@ def _collect_code_evidence(
     return evidence, codes_in_dockets, codes_in_documents, coverage
 
 
-def _rank_candidates(
-    supports: Counter[str], total_documents: int, directory: _AgencyDirectory
-) -> list[str]:
+def _rank_candidates(supports: Counter[str], total_documents: int, directory: _AgencyDirectory) -> list[str]:
     """Order candidate slugs: share, then specificity within the margin.
 
     Candidates within ``SPECIFICITY_MARGIN`` of the best share are treated as
@@ -632,6 +739,9 @@ def _build_code_tables(
             row["crosswalk_id"] = stable_id("urn:spicyregs:agency-crosswalk", row)
             crosswalk_rows.append(row)
 
+        # Membership in the dockets table does not mean the evidence came
+        # from it: a code can be dockets-registered yet drawn entirely from
+        # the thin documents bridge. Downstream needs that distinction.
         code_row = {
             "agency_code": code,
             "in_dockets_table": _flag(code in codes_in_dockets),
@@ -641,6 +751,9 @@ def _build_code_tables(
             "confidence_share": _share(supports[primary] if primary else 0, total_documents),
             "support_documents": str(total_documents),
             "support_by_path_json": support_by_path_json,
+            "dockets_path_documents": str(path_counts["dockets_fr_links"]),
+            "documents_path_documents": str(path_counts["documents_fr_doc_num"]),
+            "evidence_is_documents_only": _flag(total_documents > 0 and path_counts["dockets_fr_links"] == 0),
             "candidate_count": str(len(ordered)),
             "candidate_slugs_json": canonical_json(ordered),
         }
@@ -681,6 +794,8 @@ def _build_cfr_table(
         for document_number in documents:
             for slug in document_slugs.get(document_number, ()):
                 supports[slug] += 1
+        # Most-citing first; ties broken toward the deeper slug. See
+        # CFR_PRIMARY_LABEL -- rank 1 is not the "owning" agency.
         ordered = sorted(
             supports,
             key=lambda slug: (-supports[slug], -directory.depth(slug), slug),
@@ -694,7 +809,7 @@ def _build_cfr_table(
                 "part_documents": str(part_documents),
                 "share": _share(supports[slug], part_documents),
                 "rank": str(rank),
-                "is_primary": _flag(rank == 1),
+                "is_most_citing": _flag(rank == 1),
             }
             row["cfr_agency_id"] = stable_id("urn:spicyregs:cfr-part-agency", row)
             rows.append(row)
@@ -743,9 +858,7 @@ def build_artifact(
     )
     parent_rows = _build_parent_table(directory)
     cfr_rows = _build_cfr_table(cfr_documents, document_slugs, directory)
-    quarantine_rows = sorted(
-        quarantine.rows, key=lambda row: (row["source"], row["quarantine_id"])
-    )
+    quarantine_rows = sorted(quarantine.rows, key=lambda row: (row["source"], row["quarantine_id"]))
 
     output_dir.mkdir(parents=True, exist_ok=True)
     tables = (
@@ -776,12 +889,9 @@ def build_artifact(
         "cfr_title_part_pairs": len(cfr_documents),
         "cfr_part_agency_rows": len(cfr_rows),
         "quarantined_rows_total": len(quarantine_rows),
-        "quarantined_rows_by_source": dict(
-            sorted(Counter(row["source"] for row in quarantine_rows).items())
-        ),
+        "quarantined_rows_by_source": dict(sorted(Counter(row["source"] for row in quarantine_rows).items())),
         "quarantine_by_source_and_reason": {
-            source: dict(sorted(reasons.items()))
-            for source, reasons in sorted(quarantine.reasons.items())
+            source: dict(sorted(reasons.items())) for source, reasons in sorted(quarantine.reasons.items())
         },
     }
 
@@ -796,6 +906,12 @@ def build_artifact(
             "specificity_margin": SPECIFICITY_MARGIN,
         },
         "evidence_paths": list(EVIDENCE_PATHS),
+        "docket_normalization": {
+            "policy": DOCKET_NORMALIZATION_POLICY,
+            "upstream_defect": DOCKET_NORMALIZATION_DEFECT,
+            "rules": list(DOCKET_NORMALIZATION_RULES),
+            "decoration_pattern": DOCKET_DECORATION_PATTERN,
+        },
         "inputs": {
             "federal_register": {
                 "path": _pin_path(federal_register),
@@ -818,10 +934,7 @@ def build_artifact(
                 "rows": coverage["documents_rows"],
             },
         },
-        "artifacts": {
-            name: {"sha256": file_sha256(output_dir / name), "rows": len(rows)}
-            for name, _, rows in tables
-        },
+        "artifacts": {name: {"sha256": file_sha256(output_dir / name), "rows": len(rows)} for name, _, rows in tables},
         "counts": counts,
         "coverage": coverage,
         "coverage_labels": {
@@ -829,6 +942,7 @@ def build_artifact(
             "specificity_note": SPECIFICITY_LABEL,
             "join_note": JOIN_LABEL,
             "denominator_note": DENOMINATOR_LABEL,
+            "cfr_primary_note": CFR_PRIMARY_LABEL,
         },
     }
     receipt["artifact_id"] = stable_id("urn:spicyregs:agency-crosswalk-artifact", receipt)
@@ -837,15 +951,13 @@ def build_artifact(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     candidate = REPO_ROOT / "output/rin-ontology-revision-candidate"
     parser.add_argument("--federal-register", type=Path, default=candidate / "federal_register.parquet")
     parser.add_argument("--dockets", type=Path, default=candidate / "dockets.parquet")
     parser.add_argument("--fr-docket-links", type=Path, default=candidate / "fr_docket_links.parquet")
     parser.add_argument("--documents", type=Path, default=candidate / "documents.parquet")
-    parser.add_argument(
-        "--output", type=Path, default=REPO_ROOT / "output/agency-crosswalk-2026-08-02"
-    )
+    parser.add_argument("--output", type=Path, default=REPO_ROOT / "output/agency-crosswalk-2026-08-02")
     args = parser.parse_args(argv)
 
     receipt = build_artifact(
