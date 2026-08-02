@@ -8,13 +8,14 @@ tests the tables.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from pathlib import Path
 
 import pytest
 
 from spicy_regs.ontology.act_index import (
     ALIAS_YEAR_RULE,
     UNRESOLVED_REASONS,
+    ActIndex,
     ActResolution,
     resolve_act_name,
     resolve_act_relative_citation,
@@ -22,12 +23,7 @@ from spicy_regs.ontology.act_index import (
 from spicy_regs.ontology.citations import find_act_relative_citations, normalize_popular_name
 
 
-@dataclass
-class _Index:
-    table3_key_by_name: dict = field(default_factory=dict)
-    alias_by_name: dict = field(default_factory=dict)
-    classifications: dict = field(default_factory=dict)
-    incomplete_sources: frozenset = frozenset()
+_Index = ActIndex
 
 
 # The real rows, from uscode.house.gov, for the acts these tests resolve.
@@ -37,6 +33,8 @@ INDEX = _Index(
         "employee retirement income security act of 1974": "93-406",
         "toxic substances control act": "94-469",
         "one big beautiful bill act": "119-21",
+        "taxpayer certainty and disaster tax relief act of 2020": "116-260",
+        "secure 2.0 act of 2022": "117-328",
     },
     alias_by_name={
         "erisa": "employee retirement income security act",
@@ -44,13 +42,24 @@ INDEX = _Index(
     },
     classifications={
         "1955:360": {
-            "111": ("42", "7411", None),
-            "112": ("42", "7412", None),
-            "150-159": ("42", "7450-7459", "Rep."),
-            "301": ("42", "7601 et seq.", None),
+            "111": (("42", "7411", None),),
+            "112": (("42", "7412", None),),
+            "150-159": (("42", "7450-7459", "Rep."),),
+            "301": (("42", "7601 et seq.", None),),
         },
-        "93-406": {"803": ("29", "1193b", None)},
-        "94-469": {"5": ("15", "2604", None)},
+        "93-406": {"803": (("29", "1193b", None),)},
+        "94-469": {"5": (("15", "2604", None),)},
+        # The real rows for the two ambiguous pairs, from the sealed artifact.
+        # Table III is keyed by the enacting Public Law, and 116-260 carries 94
+        # popular names; nothing in the citation says which act is meant.
+        "116-260": {
+            "107": (
+                ("20", "80t-5", None),
+                ("33", "701h-3", None),
+                ("49", "60122", None),
+            )
+        },
+        "117-328": {"120": (("2", "1912", None), ("23", "104 nt", "Elim."))},
     },
     incomplete_sources=frozenset({"119-21"}),
 )
@@ -176,3 +185,56 @@ def test_a_resolution_always_states_exactly_one_of_an_identifier_or_a_reason():
         ActResolution(citation, iri="urn:rkaf:us:usc:42:7411", unresolved_reason="act_not_in_index")
     with pytest.raises(ValueError):
         ActResolution(citation, unresolved_reason="because-i-said-so")
+
+
+@pytest.mark.parametrize(
+    ("act", "section", "would_have_been"),
+    [
+        # The wrong identity this refusal replaces. `sec. 107 of the Taxpayer
+        # Certainty and Disaster Tax Relief Act of 2020` resolved to
+        # urn:rkaf:us:usc:49:60122 -- pipeline-safety civil penalties, for a tax
+        # act -- because the single-valued map kept whichever of three rows the
+        # artifact's row sort happened to leave last.
+        ("Taxpayer Certainty and Disaster Tax Relief Act of 2020", "107", "urn:rkaf:us:usc:49:60122"),
+        # And the one whose refusal only *looked* principled: under first-wins
+        # this minted urn:rkaf:us:usc:2:1912 (Legislative Branch approps); under
+        # last-wins it answered `classification_not_current`, a refusal for the
+        # wrong reason.
+        ("SECURE 2.0 Act of 2022", "120", "urn:rkaf:us:usc:2:1912"),
+    ],
+)
+def test_a_public_law_carrying_several_acts_refuses_rather_than_picks(act, section, would_have_been):
+    """Table III is keyed by the enacting Public Law, not by the act.
+
+    116-260 carries 94 popular names and 117-328 carries 70, so one
+    (table3_key, act_section) can name classifications belonging to different
+    acts. Nothing in the citation discriminates them, so nothing here chooses.
+    """
+    from spicy_regs.ontology.citations import ActRelativeCitation
+
+    resolution = resolve_act_relative_citation(
+        ActRelativeCitation(act, normalize_popular_name(act), section), index=INDEX
+    )
+    assert resolution.iri is None
+    assert resolution.unresolved_reason == "act_section_ambiguous"
+
+
+def test_the_ambiguity_refusal_does_not_swallow_a_single_row_answer():
+    """One row is still an answer; only a genuine tie refuses."""
+    assert _resolve("Clean Air Act section 111").iri == "urn:rkaf:us:usc:42:7411"
+
+
+def test_the_index_loads_from_the_sealed_artifact():
+    """The measurement must be reproducible from the pinned bytes, not a fixture."""
+    artifact = Path(__file__).resolve().parents[1] / "output" / "usc-act-index-2026-08-02"
+    if not (artifact / "receipt.json").exists():
+        pytest.skip("artifact not built in this checkout (output/ is gitignored)")
+    index = ActIndex.from_artifact(artifact)
+
+    assert index.table3_key_by_name["clean air act"] == "1955:360"
+    assert index.alias_by_name["erisa"] == "employee retirement income security act"
+    assert index.incomplete_sources == frozenset({"119-21"})
+    # Every row survives the load: a single-valued map lost 1,060 of 10,976.
+    assert sum(len(v) for s in index.classifications.values() for v in s.values()) == 10976
+    assert index.classifications["1955:360"]["111"] == (("42", "7411", None),)
+    assert len(index.classifications["116-260"]["107"]) == 3

@@ -79,11 +79,12 @@ def test_parse_cfr_fixture_forms(raw, expected):
 def test_the_compact_key_refuses_a_title_the_cfr_does_not_have(raw):
     """Regression: ``'5401-5405'`` published ``urn:rkaf:us:cfr:5401:5405``.
 
-    Every other CFR branch is anchored by the literal "CFR" (``_CFR_STANDARD``)
-    or by the word "part" (``_CFR_TITLE_PART``), so an implausible title there
-    is still a title the source text called one. The compact branch has no
-    anchor at all — it reads a bare ``N-M`` as title-part — so the only thing
-    left to hold it closed is the range the CFR actually has.
+    The bound is the CFR's own and every branch now carries it. It was applied
+    here first, on the reasoning that the anchored branches were held in place
+    by the literal "CFR" or the word "part". That reasoning was wrong — see
+    ``test_an_anchored_branch_is_bounded_by_the_same_titles``, where an anchored
+    branch reached ``urn:rkaf:us:cfr:2300:2336`` on a publishing path. An
+    implausible title is implausible whatever anchored it.
     """
     assert parse_cfr_citation(raw) == []
 
@@ -145,10 +146,16 @@ def test_the_compilation_year_was_being_published_as_a_cfr_part(raw, phantom):
     """Regression: the year in a compilation locator read as a part number.
 
     `urn:rkaf:us:cfr:3:1978` is not a part of the CFR; 1978 is the compilation
-    volume. Reachable only from free text — both production callers of
-    `parse_cfr_citation` read `cfr_references_json`, which carries structured
-    objects — so this is the same latent class as `'5401-5405'`, found the same
-    way and closed the same way.
+    volume.
+
+    An earlier version of this docstring said the class was reachable only from
+    free text "because both production callers read `cfr_references_json`, which
+    carries structured objects". False for the Unified Agenda: `rkaf_projection`
+    feeds this function 3,998 distinct bare free-text values from
+    `unified_agenda.cfr_references_json`, on a publishing path — see
+    `test_an_anchored_branch_is_bounded_by_the_same_titles`. These particular
+    strings are Federal Register authority prose and are not in that column, so
+    they stay latent; the general claim was wrong.
     """
     assert phantom not in parse_cfr_citation(raw)
     assert parse_cfr_citation(raw) == []
@@ -332,6 +339,54 @@ def test_the_chapter_identifier_declares_the_scheme_that_can_express_it():
 def test_an_unexpressible_chapter_is_refused_rather_than_spelled(chapter):
     with pytest.raises(ValueError):
         canonical_usc_chapter_iri("5", chapter)
+
+
+@pytest.mark.parametrize(
+    ("raw", "phantom"),
+    [
+        # LIVE, on a publishing path. `rkaf_projection` feeds
+        # `parse_cfr_citation` free text from `unified_agenda.cfr_references_json`
+        # -- 3,998 distinct bare values -- and this one published a title the
+        # CFR does not have, in 14 generations. `_CFR_TITLE_PART` reads
+        # "<N>, Part <M>" and was never bounded, so "of 2 CFR" at the end of the
+        # sentence did not save it: the expression matched "2300, Part 2336".
+        ("Part 2300, Part 2336, and Part 2339 of 2 CFR", "urn:rkaf:us:cfr:2300:2336"),
+        ("Title 2300, Part 2336", "urn:rkaf:us:cfr:2300:2336"),
+    ],
+)
+def test_an_anchored_branch_is_bounded_by_the_same_titles(raw, phantom):
+    """The anchor was never the guarantee; the title range is.
+
+    The compact-key fix assumed a branch anchored on "CFR" or "part" could only
+    read a title the source text called one. It can read a *part* number as one
+    instead, which is how a real Unified Agenda value minted title 2300.
+    """
+    assert phantom not in [citation.iri for citation in parse_cfr_citation(raw)]
+
+
+def test_a_real_title_beside_an_out_of_range_number_still_parses():
+    """Bounding refuses the phantom without refusing the citation beside it."""
+    assert parse_cfr_citation("2 CFR Part 2336") == [CfrCitation("2", "2336")]
+    assert parse_cfr_citation("Title 40, Part 60") == [CfrCitation("40", "60")]
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        # The separator set, closed rather than enumerated. "through" is the
+        # ordinary legal spelling of the range "to" was added for.
+        "3 CFR 1949 through 1953 Comp.",
+        "3 CFR 1949 thru 1953 Comp.",
+        "3 CFR 1949 and 1953 Comp.",
+        "3 CFR 1949/1953 Comp.",
+        "3 CFR 1949 to 1953, Comp, p. 1002",
+        "3 CFR, 1949-1953 Comp, p. 1002",
+    ],
+)
+def test_every_spelling_of_a_compilation_volume_range_is_refused(raw):
+    """Whatever joins two years in a compilation citation, it is not a part."""
+    assert parse_cfr_citation(raw) == []
+    assert parse_eo_compilation_citation(raw)
 
 
 def test_the_compact_key_still_reads_every_title_the_cfr_has():
@@ -949,14 +1004,28 @@ def test_an_act_relative_citation_is_read_from_the_index(raw, expected):
     assert [(c.act_name, c.section) for c in found] == expected
 
 
-def test_the_longest_known_name_wins():
+@pytest.mark.parametrize(
+    ("raw", "act"),
+    [
+        # Forward scan, `_longest_name_before`.
+        ("Clean Air Act Amendments of 1977 sec. 5", "Clean Air Act Amendments of 1977"),
+        # Inverted scan, `_longest_name_after`. This is the case that actually
+        # discriminates: the shorter name is a *prefix* here, so a shortest-match
+        # rule reads "Clean Air Act" and cites the parent statute instead of the
+        # amending one. Pinning only the forward scan left this free to shorten.
+        ("sec. 5 of the Clean Air Act Amendments of 1977", "Clean Air Act Amendments of 1977"),
+        ("section 5 of Clean Air Act Amendments of 1977", "Clean Air Act Amendments of 1977"),
+    ],
+)
+def test_the_longest_known_name_wins(raw, act):
     """ "Clean Air Act Amendments of 1977" is a different act from "Clean Air Act".
 
-    Both are in the index and one ends with the other, so a shortest-match rule
-    would silently cite the wrong statute.
+    The two share a Table III key today, so no identity moves yet — but that is
+    an accident of the data, not a property of the rule, which is why the rule
+    is pinned rather than left to the corpus to enforce.
     """
-    (found,) = find_act_relative_citations("Clean Air Act Amendments of 1977 sec. 5", act_names=_ACT_NAMES)
-    assert found.act_name == "Clean Air Act Amendments of 1977"
+    (found,) = find_act_relative_citations(raw, act_names=_ACT_NAMES)
+    assert found.act_name == act
 
 
 @pytest.mark.parametrize(

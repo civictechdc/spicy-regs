@@ -20,9 +20,10 @@ guess in place of one.
 from __future__ import annotations
 
 import re
+import json
 from collections.abc import Mapping
-from dataclasses import dataclass
-from typing import Protocol
+from dataclasses import dataclass, field
+from pathlib import Path
 
 from spicy_regs.ontology.citations import (
     ActRelativeCitation,
@@ -65,6 +66,15 @@ UNRESOLVED_REASONS = (
     #: Table III names a target the ``rkaf:us-usc`` lexical space cannot spell
     #: (a note, a range, an "et seq.").
     "usc_section_not_expressible",
+    #: Table III is keyed by the **enacting Public Law**, not by the act, and a
+    #: Public Law may carry many acts: 116-260 carries 94 popular names, 117-328
+    #: carries 70. So one ``(table3_key, act_section)`` can name several
+    #: classifications belonging to different acts, and nothing in the citation
+    #: discriminates them. 471 of 9,916 pairs in the sealed artifact are like
+    #: this. Choosing among them is how ``sec. 107 of the Taxpayer Certainty and
+    #: Disaster Tax Relief Act of 2020`` became ``urn:rkaf:us:usc:49:60122`` --
+    #: pipeline-safety civil penalties, for a tax act.
+    "act_section_ambiguous",
 )
 
 
@@ -87,18 +97,60 @@ class ActResolution:
             raise ValueError(f"undeclared unresolved reason: {self.unresolved_reason!r}")
 
 
-class ActIndex(Protocol):
-    """The two joins, however they are loaded."""
+@dataclass(frozen=True)
+class ActIndex:
+    """The two joins, loaded from the pinned artifact or built for a test."""
 
     #: normalized popular name -> Table III key, for acts that have one.
-    table3_key_by_name: Mapping[str, str]
+    table3_key_by_name: Mapping[str, str] = field(default_factory=dict)
     #: normalized popular name -> the normalized name it redirects to.
-    alias_by_name: Mapping[str, str]
-    #: Table III key -> act section -> (usc_title, usc_section, status).
-    classifications: Mapping[str, Mapping[str, tuple[str | None, str | None, str | None]]]
+    alias_by_name: Mapping[str, str] = field(default_factory=dict)
+    #: Table III key -> act section -> **every** classification row for it.
+    #:
+    #: A tuple, not a single row, because Table III is keyed by the enacting
+    #: Public Law rather than by the act. A single-valued mapping here silently
+    #: discarded 1,060 of the sealed artifact's 10,976 rows and let the survivor
+    #: be chosen by the row sort -- which is not a citation rule.
+    classifications: Mapping[str, Mapping[str, tuple[tuple[str | None, str | None, str | None], ...]]] = field(
+        default_factory=dict
+    )
     #: Table III keys whose page could not be read. Distinguishes "this act
     #: classifies nothing here" from "we could not look".
-    incomplete_sources: frozenset[str]
+    incomplete_sources: frozenset[str] = frozenset()
+
+    @classmethod
+    def from_artifact(cls, artifact_dir: Path) -> ActIndex:
+        """Load the index from a sealed ``usc-act-index-artifact-v1`` directory.
+
+        The measurement any caller reports has to be reproducible from the
+        pinned bytes. Before this existed the only loader was a test fixture,
+        so the published 67/47/20 depended on a collapse policy that appeared
+        in no committed code -- and first-wins and last-wins gave different
+        answers.
+        """
+        import pyarrow.parquet as pq
+
+        directory = Path(artifact_dir)
+        receipt = json.loads((directory / "receipt.json").read_text(encoding="utf-8"))
+        table3_key_by_name: dict[str, str] = {}
+        alias_by_name: dict[str, str] = {}
+        for row in pq.read_table(directory / "usc-popular-names.parquet").to_pylist():
+            if row["content_type"] == "cite" and row["table3_key"]:
+                table3_key_by_name.setdefault(row["name_key"], row["table3_key"])
+            if row["see_also_key"]:
+                alias_by_name.setdefault(row["name_key"], row["see_also_key"])
+        classifications: dict[str, dict[str, tuple]] = {}
+        for row in pq.read_table(directory / "usc-act-sections.parquet").to_pylist():
+            by_section = classifications.setdefault(row["table3_key"], {})
+            by_section[row["act_section"]] = by_section.get(row["act_section"], ()) + (
+                (row["usc_title"], row["usc_section"], row["status"]),
+            )
+        return cls(
+            table3_key_by_name=table3_key_by_name,
+            alias_by_name=alias_by_name,
+            classifications=classifications,
+            incomplete_sources=frozenset(hole["table3_key"] for hole in receipt.get("source_incomplete", ())),
+        )
 
 
 def resolve_act_name(name: str, index: ActIndex) -> str | None:
@@ -137,11 +189,16 @@ def resolve_act_relative_citation(citation: ActRelativeCitation, *, index: ActIn
     table3_key = index.table3_key_by_name[act_key]
     if table3_key in index.incomplete_sources:
         return ActResolution(citation, act_key=act_key, table3_key=table3_key, unresolved_reason="source_incomplete")
-    row = index.classifications.get(table3_key, {}).get(citation.section)
+    rows = index.classifications.get(table3_key, {}).get(citation.section, ())
     common = {"act_key": act_key, "table3_key": table3_key}
-    if row is None:
+    if not rows:
         return ActResolution(citation, **common, unresolved_reason="act_section_not_classified")
-    usc_title, usc_section, status = row
+    if len(rows) > 1:
+        # Several acts share this Public Law and nothing in the citation says
+        # which one. Refuse: the source text often carries the discriminator
+        # ("Division EE"), but reading it is a separate, reviewable change.
+        return ActResolution(citation, **common, unresolved_reason="act_section_ambiguous")
+    usc_title, usc_section, status = rows[0]
     if status:
         return ActResolution(citation, **common, unresolved_reason="classification_not_current")
     if not (usc_title and usc_section):

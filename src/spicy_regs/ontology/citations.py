@@ -58,7 +58,12 @@ _CFR_TITLE_PART = re.compile(
 _EO_COMPILATION = re.compile(
     r"\b3\s*C\.?\s*F\.?\s*R\.?\s*,?\s*"
     r"(?P<start>(?:1[789]|20)\d{2})"
-    r"(?:(?:\s*[-–—]\s*|\s+to\s+)(?P<end>(?:1[789]|20)\d{2}))?"
+    # The separator set is closed, not enumerated. Whatever joins two years in
+    # front of "Comp." is punctuation between a volume's endpoints -- a dash, a
+    # slash, "to", "through", "thru", "and" -- and none of it is ever a part
+    # number. Enumerating instead left "through", the ordinary legal spelling,
+    # still minting urn:rkaf:us:cfr:3:1949.
+    r"(?:\s*(?:[-–—/]|to|thru|through|and)\s*(?P<end>(?:1[789]|20)\d{2}))?"
     r"\s*,?\s*Comp\.?"
     r"(?:\s*,?\s*(?:pp?\.?|pages?)\s*(?P<page>\d+))?",
     re.IGNORECASE,
@@ -583,6 +588,13 @@ def _cfr_from_match(match: re.Match[str]) -> CfrCitation | None:
     raw_section = match.groupdict().get("section")
     section = _cfr_section(raw_section)
     if not title or not part:
+        return None
+    # Every branch carries the title bound, not only the unanchored one. The
+    # anchor was never the guarantee: `_CFR_TITLE_PART` reads "<N>, Part <M>",
+    # so a *part* number can be read as a title, and a real Unified Agenda value
+    # -- "Part 2300, Part 2336, and Part 2339 of 2 CFR" -- published
+    # urn:rkaf:us:cfr:2300:2336 in 14 generations from a publishing path.
+    if not _cfr_title_exists(title):
         return None
     if raw_section is not None and section is None:
         return None
