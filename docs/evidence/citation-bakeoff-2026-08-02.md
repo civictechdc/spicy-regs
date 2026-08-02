@@ -465,6 +465,8 @@ above was recomputed; the artifact is still the one this document pins.
 | # | Landed | Recommendation |
 |---|---|---|
 | `1400140` | Compact-key title bound (1–50) | 3 |
+| `2aa74b1` | Act-relative grammar against the OLRC name index | 4/6 |
+| `a802985` | OLRC Popular Name Tool + Table III readers | 4/6 |
 | `5d8dffd` | `U.S. Code` / `U.S.C.A.` / `I.R.C.` / `Pub. Law` spellings | 1 |
 | `8e680d9` | `3 CFR … Comp.` recognized, never identified | 2 |
 | `ef6c2d5` | U.S.C. chapter grammar + chapter URN | 4 |
@@ -483,21 +485,96 @@ a different `detection.json`, and that is expected, not drift.
 
 Two things the fixers found that this document did not:
 
-- **The compilation form was already being misread, in a spelling not in the
+- **The compilation form was already being misread, in spellings not in the
   citeurl-only cell.** The five strings above all write `3 CFR,` with a comma,
   which `_CFR_STANDARD` could not cross — so they were undetected, exactly as
-  recorded. The same corpus writes the form *without* the comma eight more
+  recorded. The same corpus writes the form in variant spellings **ten** more
   times, and every one of those was read as a CFR part: `3 CFR 1978 Comp. p.
   142` → `urn:rkaf:us:cfr:3:1978`. So the project did make CiteURL's mistake;
   it just made it on strings that landed in the agreement cell, where nothing
-  was adjudicated. Nine phantom CFR citations were withdrawn in total (the
-  eight above plus `'5401-5405'`), and none of them was ever live —
-  `parse_cfr_citation`'s two production callers read `cfr_references_json`,
-  which carries structured objects.
+  was adjudicated. **Eleven** phantom CFR citations are withdrawn in total (the
+  ten above plus `'5401-5405'`), and after the fix **no compilation string
+  mints a CFR identity at all** — verified by re-running the full 4,777-string
+  differential, where the CFR delta is 11 strings, all withdrawals, and the
+  authority delta is unchanged at 9, all gains.
+
+  Two of those ten were found by adversarial review *after* the first fix, in
+  exactly the class it closed: `_EO_COMPILATION` could not cross a comma placed
+  before "Comp" (`3 CFR 1979, Comp. p. 435`) nor a `to`-spelled volume range
+  (`3 CFR 1949 to 1953, Comp, p. 1002`), so both still minted a phantom part.
+  Every separator in that form is now optional and none of them decides
+  anything. Both strings are named regressions.
+
+  ~~The same corpus writes the form without the comma eight more times~~ and
+  ~~nine phantom CFR citations were withdrawn~~ — the first fix withdrew nine;
+  the population is ten plus the compact key.
 - **The chapter slice is 35 strings, not 31.** Four more carry a chapter
   citation inside a string another grammar also fired on, so they were never in
   the `neither` cell. 38 chapter citations across 35 strings; 33 of the strings
   are in the shared-miss cell.
+- **The chapter/section collision is attested, not hypothetical.** The argument
+  for keeping chapters out of the `rkaf:us-usc` URN space was made from a
+  constructed example (title 5 chapter 131 vs section 131). The corpus supplies
+  four real ones: this same population cites **title 49 chapter 301 and title 49
+  section 301**, and likewise (10, 55), (46, 701) and (5, 10). Under a shared
+  URN space each of those four pairs would collapse to one identifier naming two
+  different provisions. All four are now the fixture.
+
+### Corrections to the implementation claims, 2026-08-02 (adversarial review)
+
+Struck text is kept so the error is auditable, as in the corrections above.
+
+1. **The compilation population is 19 locators across 18 strings** as of
+   `8e680d9`, and **21 across 20** after the follow-up fix. ~~18 locators
+   recognized across 16 strings~~ undercounted it.
+2. **`'5401-5405'` was not unreachable from production.** The commit body for
+   `1400140` says "nothing in the pipeline feeds the branch a bare string". That
+   is false: `spicy_regs/ontology/receipt.py` (lines 1026, 1168, 1672) feeds
+   `parse_cfr_citation` bare `cfr_ref` strings by design, as its identifier
+   round-trip check. The true and stronger statement is: **the only bare-string
+   caller is the receipt's own round-trip, and no published value has a title
+   above 50 — verified across 12 generations, ~6,473 distinct keys.** The defect
+   was therefore unreachable *by data* rather than *by call graph*, which is a
+   weaker guarantee than the commit claimed and a real one nonetheless.
+3. **`_PUBLIC_LAW` over-accepts two spellings.** Collapsing the alternation to
+   `pub(?:lic)?\.?\s*l(?:aw)?\.?` also matches `publiclaw 117-58` and
+   `publ 117-58`. Zero occurrences in the 4,777-string corpus, and neither
+   spelling means anything else in legal prose, so it is recorded rather than
+   tightened — tightening risks the real no-space spelling `Pub.L.`.
+4. **`rkaf:partner-defined` is a kernel-level scheme.** The U.S. Code chapter
+   identifier follows the `federal_register_identifier` precedent, but that
+   precedent is itself off-profile: `partner-defined` is absent from the
+   `#USRegulatoryIdentifierScheme` enumeration the us-rulemaking profile
+   constrains. The chapter URN inherits that position knowingly. It remains
+   preferable to a collision inside `rkaf:us-usc` (see the four attested
+   collisions above), but it is a scheme question for RefSpec, not a settled
+   one.
+
+### Publication chain: two tables are now code-ahead-of-data
+
+Neither is a defect and neither is publishable by this loop; both ride the same
+decision.
+
+* **`fr_docket_links` gained `docket_key`.** All 21 local generations carrying
+  the table were rebuilt (56 s total; 893,766 rows in ~6 s each), so local state
+  is consistent. **Published R2 data is not**, and the exposure is one-sided:
+  `spicy_regs.ontology.receipt` is fail-closed and will refuse a stale
+  generation, but `.github/workflows/deploy-docs.yml:60` runs the data-dictionary
+  reconcile with `|| true`, so a docs deploy would publish a dictionary
+  advertising `docket_key` while live R2 lacks it. The failure would land on a
+  consumer, which is the wrong party. The workflow line now carries a comment
+  naming this; the `|| true` is deliberately **not** changed here, because
+  turning a docs deploy into a gate is a publication decision.
+  On the pinned `rin-ontology-revision-candidate`: 893,766 rows, zero null keys,
+  and the key joins 147,863 rows to the docket spine against 143,558 on the raw
+  identifier. That gain is small precisely because the links build already
+  applied the *label* grammar; the 87,681 rows 54f07a6 recovered were measured
+  against a links table with no normalization at all. **Zero normalized keys
+  cover more than one docket**, across all 276,326 — so the ambiguity refusal is
+  still exercised only by tests.
+* **`authority_edges` is value-stale by 9 rows**, all gains, from the spelling
+  variants. The schema is unchanged, so nothing breaks; the rows are simply
+  absent until a rebuild.
 
 ### Act-relative citations: what would unlock them
 

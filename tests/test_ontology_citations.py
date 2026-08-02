@@ -133,6 +133,12 @@ def test_a_compilation_locator_never_becomes_a_cfr_citation(raw, _expected):
         ("3 CFR 1978 Comp., p. 142.", CfrCitation("3", "1978")),
         ("3 CFR 1979 Comp. p. 435", CfrCitation("3", "1979")),
         ("E.O. 12600 (3 CFR 1987 Comp. p. 235)", CfrCitation("3", "1987")),
+        # Found by adversarial review of the first fix, in exactly the class it
+        # closed. A comma may also fall *before* "Comp", and the volume range
+        # may be spelled "to" rather than dashed -- neither of which the first
+        # expression could cross, so both still minted a phantom part.
+        ("3 CFR 1949 to 1953, Comp, p. 1002", CfrCitation("3", "1949")),
+        ("3 CFR 1979, Comp. p. 435", CfrCitation("3", "1979")),
     ],
 )
 def test_the_compilation_year_was_being_published_as_a_cfr_part(raw, phantom):
@@ -281,19 +287,23 @@ def test_a_chapter_needs_the_code_that_gives_it_a_number():
     assert parse_usc_chapter_citation("40 CFR chapter I") == []
 
 
-def test_a_chapter_is_not_the_section_that_shares_its_number():
+@pytest.mark.parametrize(("title", "number"), [("5", "10"), ("10", "55"), ("46", "701"), ("49", "301")])
+def test_a_chapter_is_not_the_section_that_shares_its_number(title, number):
     """The reason the chapter identifier cannot live in the `us-usc` URN space.
 
-    Title 5 has both a chapter 131 and a section 131, and they are different
-    provisions. Minting `urn:rkaf:us:usc:5:131` for the chapter would publish
-    one identifier for two objects — the worst available outcome, because it is
-    indistinguishable from a correct citation downstream.
+    These four pairs are not hypothetical. Each is attested in
+    output/citation-bakeoff-2026-08-02: the same corpus cites title 49 chapter
+    301 *and* title 49 section 301, title 10 chapter 55 *and* section 55, and so
+    on for all four. They are different provisions. Minting
+    `urn:rkaf:us:usc:49:301` for the chapter would publish one identifier for
+    two objects — the worst available outcome, because it is indistinguishable
+    from a correct citation downstream.
     """
-    chapter = parse_usc_chapter_citation("5 U.S.C. Ch. 131")[0].iri
-    (section,) = parse_authority_citation("5 U.S.C. 131")
-    assert section.canonical_iri == "urn:rkaf:us:usc:5:131"
-    assert chapter != section.canonical_iri
-    assert chapter == "urn:spicy-regs:usc-chapter:5:131"
+    (chapter,) = parse_usc_chapter_citation(f"{title} U.S.C. ch. {number}")
+    (section,) = parse_authority_citation(f"{title} U.S.C. {number}")
+    assert section.canonical_iri == f"urn:rkaf:us:usc:{title}:{number}"
+    assert chapter.iri == f"urn:spicy-regs:usc-chapter:{title}:{number}"
+    assert chapter.iri != section.canonical_iri
 
 
 def test_a_chapter_citation_is_not_read_as_a_section():

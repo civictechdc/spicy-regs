@@ -56,6 +56,17 @@ jobs:
       - name: Reconcile in-code schema against live R2 parquet
         # Non-blocking: surfaces drift without failing the deploy if R2 is
         # briefly unavailable. Remove `|| true` to make it a hard gate.
+        #
+        # KNOWN EXPOSURE (2026-08-02). Because this is non-blocking, a schema
+        # column added in code but not yet republished to R2 will be advertised
+        # by the generated data dictionary while the live parquet lacks it, and
+        # the failure lands on a consumer rather than on this deploy. That is
+        # live right now for `fr_docket_links.docket_key`. The ingestion receipt
+        # (spicy_regs.ontology.receipt) IS fail-closed and refuses a stale
+        # generation, so the pipeline is safe; only the published docs are ahead
+        # of the published data. See docs/evidence/citation-bakeoff-2026-08-02.md,
+        # "Publication chain". Making this a hard gate is a publication decision
+        # and is deliberately not taken here.
         run: uv run spicy-regs-dict check --source r2 || true
 
       - name: Generate table pages

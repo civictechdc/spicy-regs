@@ -50,10 +50,16 @@ _CFR_TITLE_PART = re.compile(
 #: Both the single-year volume ("1977 Comp.") and the multi-year one
 #: ("1949-1953 Comp") occur; the page is optional, because a volume alone
 #: locates no single order.
+#: A comma may fall on either side of the volume — "3 CFR, 1977 Comp." and
+#: "3 CFR 1979, Comp." both occur — and the range may be spelled rather than
+#: dashed ("1949 to 1953"). Every separator here is punctuation around the two
+#: facts that matter, the volume and the page, so each is optional and none of
+#: them decides anything.
 _EO_COMPILATION = re.compile(
     r"\b3\s*C\.?\s*F\.?\s*R\.?\s*,?\s*"
-    r"(?P<start>(?:1[789]|20)\d{2})(?:\s*[-–—]\s*(?P<end>(?:1[789]|20)\d{2}))?\s*"
-    r"Comp\.?"
+    r"(?P<start>(?:1[789]|20)\d{2})"
+    r"(?:(?:\s*[-–—]\s*|\s+to\s+)(?P<end>(?:1[789]|20)\d{2}))?"
+    r"\s*,?\s*Comp\.?"
     r"(?:\s*,?\s*(?:pp?\.?|pages?)\s*(?P<page>\d+))?",
     re.IGNORECASE,
 )
