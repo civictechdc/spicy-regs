@@ -214,6 +214,85 @@ def parse_table3(document: str) -> list[Table3Record]:
     return records
 
 
+#: An alias may point at a name the tool does not itself list. "ERISA" points at
+#: "Employee Retirement Income Security Act", and the only entry by that name is
+#: "Employee Retirement Income Security Act **of 1974**". The year is how the
+#: tool distinguishes acts, so it cannot be dropped from the target — it can
+#: only be supplied, and only when exactly one act supplies it.
+_YEAR_SUFFIX = re.compile(r"\s+of\s+(?:1[789]|20)\d{2}$")
+
+
+@dataclass(frozen=True)
+class PopularNameIndex:
+    """The join from a name in prose to the act it names.
+
+    Built from :func:`parse_popular_names` output by
+    :meth:`from_records`. Keys are normalized popular names — the caller
+    supplies the normalizer, so the grammar and the index cannot disagree about
+    what "Clean Air Act." and "clean air act" have in common.
+    """
+
+    table3_key_by_name: dict[str, str]
+    usc_anchor_by_name: dict[str, tuple[str, str]]
+    alias_by_name: dict[str, str]
+    #: Names that differ only by a trailing "of YYYY", grouped by the stem.
+    _by_year_stem: dict[str, list[str]]
+
+    @classmethod
+    def from_records(cls, records: list[PopularNameRecord], *, normalize) -> PopularNameIndex:
+        table3_key_by_name: dict[str, str] = {}
+        usc_anchor_by_name: dict[str, tuple[str, str]] = {}
+        alias_by_name: dict[str, str] = {}
+        by_year_stem: dict[str, list[str]] = {}
+        for record in records:
+            key = normalize(record.name)
+            if record.see_also:
+                alias_by_name.setdefault(key, normalize(record.see_also))
+            if record.content_type != "cite" or not record.table3_key:
+                continue
+            if key not in table3_key_by_name:
+                table3_key_by_name[key] = record.table3_key
+                stem = _YEAR_SUFFIX.sub("", key)
+                if stem != key:
+                    by_year_stem.setdefault(stem, []).append(key)
+            if record.usc_title and record.usc_section:
+                usc_anchor_by_name.setdefault(key, (record.usc_title, record.usc_section))
+        return cls(table3_key_by_name, usc_anchor_by_name, alias_by_name, by_year_stem)
+
+    @property
+    def names(self) -> frozenset[str]:
+        """Every name the grammar may recognize, aliases included."""
+        return frozenset(self.table3_key_by_name) | frozenset(self.alias_by_name)
+
+    def resolve(self, name: str, *, _depth: int = 8) -> str | None:
+        """The act a name refers to, following aliases. ``None`` when unresolved.
+
+        Three ways to answer nothing, and all three are refusals rather than
+        guesses: a name the tool does not list, an alias chain that cycles or
+        runs deeper than the tool ever nests, and an alias whose target names
+        several acts distinguished only by year — "Clean Air Act Amendments"
+        would be 1966, 1970 and 1977, and picking one would be inventing a
+        citation the source did not make.
+        """
+        seen: set[str] = set()
+        current = name
+        for _ in range(_depth):
+            if current in self.table3_key_by_name:
+                return current
+            candidates = self._by_year_stem.get(current, ())
+            if len(candidates) == 1:
+                return candidates[0]
+            if current in seen or current not in self.alias_by_name:
+                return None
+            seen.add(current)
+            current = self.alias_by_name[current]
+        return None
+
+    def table3_key(self, name: str) -> str | None:
+        resolved = self.resolve(name)
+        return self.table3_key_by_name.get(resolved) if resolved else None
+
+
 def fetch(url: str, *, cache_dir: Path | None = None) -> str:
     """Fetch a page, optionally through an on-disk cache.
 

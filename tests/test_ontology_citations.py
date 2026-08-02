@@ -25,7 +25,9 @@ from spicy_regs.ontology.citations import (
     canonical_usc_iri,
     docket_reference_as_stated,
     federal_register_identifier,
+    find_act_relative_citations,
     normalize_docket_id,
+    normalize_popular_name,
     normalize_docket_reference,
     normalize_regsgov_identifier,
     normalize_rin,
@@ -889,3 +891,111 @@ def test_rulespec_profile_inventories_every_public_table():
     inventory = set(re.findall(r"^\| `([^`]+)` \|", profile, re.MULTILINE))
 
     assert inventory == set(expected_schemas())
+
+
+# The act-relative grammar is dictionary-driven: recognition is a longest match
+# against the Popular Name Tool's 13,627 names, not a shape heuristic. A generic
+# "capitalised words then Act" expression run over the 4,777 sealed authority
+# strings matches "U.S.C." 108 times, which is why the index is the grammar.
+_ACT_NAMES = frozenset(
+    normalize_popular_name(name)
+    for name in (
+        "Clean Air Act",
+        "Clean Air Act Amendments of 1977",
+        "Employee Retirement Income Security Act",
+        "ERISA",
+        "Federal Food, Drug, and Cosmetic Act",
+        "Modernization of Cosmetics Regulation Act of 2022",
+        "Social Security Act",
+        "Toxic Substances Control Act",
+    )
+)
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # The minimal pair the bakeoff drew opposite verdicts on. Both are the
+        # same citation and both now read the same way.
+        ("Clean Air Act sec. 112", [("Clean Air Act", "112")]),
+        ("Clean Air Act Section 112", [("Clean Air Act", "112")]),
+        ("Clean Air Act section 111", [("Clean Air Act", "111")]),
+        # Subsection detail is excluded, exactly as a U.S.C. section's is.
+        ("Clean Air Act sec. 111(b)(1)(B)", [("Clean Air Act", "111")]),
+        ("Clean Air Act §112", [("Clean Air Act", "112")]),
+        # The act name may be introduced by prose.
+        ("promulgated under the Clean Air Act sec. 112", [("Clean Air Act", "112")]),
+        # An alias is a name like any other; resolving it is the index's job.
+        ("ERISA sec. 803", [("ERISA", "803")]),
+        # The inverted spelling the corpus also uses.
+        (
+            "sec. 3505 of the Modernization of Cosmetics Regulation Act of 2022",
+            [("Modernization of Cosmetics Regulation Act of 2022", "3505")],
+        ),
+    ],
+)
+def test_an_act_relative_citation_is_read_from_the_index(raw, expected):
+    found = find_act_relative_citations(raw, act_names=_ACT_NAMES)
+    assert [(c.act_name, c.section) for c in found] == expected
+
+
+def test_the_longest_known_name_wins():
+    """ "Clean Air Act Amendments of 1977" is a different act from "Clean Air Act".
+
+    Both are in the index and one ends with the other, so a shortest-match rule
+    would silently cite the wrong statute.
+    """
+    (found,) = find_act_relative_citations("Clean Air Act Amendments of 1977 sec. 5", act_names=_ACT_NAMES)
+    assert found.act_name == "Clean Air Act Amendments of 1977"
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        # No section: naming an act is not citing a provision of one.
+        "Clean Air Act",
+        "authority under the Clean Air Act, as amended",
+        # A name the index does not carry. The corpus writes these and they stay
+        # unread: guessing that "INA" means the Immigration and Nationality Act
+        # is exactly the inference the identity fence exists to stop.
+        "INA sec. 103(a)(1)",
+        "PHS Act secs. 2791(b)(5) and 2792",
+        "ACA sec. 1557",
+        # The 108 false positives a shape heuristic produced.
+        "42 U.S.C. 7401",
+        "42 U.S.C. sec. 7401",
+        "5 U.S.C. sec. 553",
+        # A section marker with nothing in front of it.
+        "sec. 112",
+        "",
+    ],
+)
+def test_an_act_the_index_does_not_name_is_not_read(raw):
+    assert find_act_relative_citations(raw, act_names=_ACT_NAMES) == []
+
+
+def test_one_string_may_cite_two_acts():
+    found = find_act_relative_citations(
+        "Clean Air Act sec. 112 and Toxic Substances Control Act section 6",
+        act_names=_ACT_NAMES,
+    )
+    assert [(c.act_name, c.section) for c in found] == [
+        ("Clean Air Act", "112"),
+        ("Toxic Substances Control Act", "6"),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("stated", "key"),
+    [
+        ("Clean Air Act", "clean air act"),
+        ("  Clean   Air  Act  ", "clean air act"),
+        ("Clean Air Act.", "clean air act"),
+        ("Federal Food, Drug, and Cosmetic Act", "federal food, drug, and cosmetic act"),
+        # The tool writes a curly apostrophe; prose usually writes a straight one.
+        ("Workers’ Compensation Act", "workers' compensation act"),
+        ("Wagner–Peyser Act", "wagner-peyser act"),
+    ],
+)
+def test_a_popular_name_joins_on_one_normalized_key(stated, key):
+    assert normalize_popular_name(stated) == key

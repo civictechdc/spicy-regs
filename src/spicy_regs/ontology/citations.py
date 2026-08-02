@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, replace
+from collections.abc import Container
 from typing import cast
 from urllib.parse import quote
 
@@ -642,6 +643,111 @@ def parse_cfr_citation(value: object) -> list[CfrCitation]:
                 if candidate not in found:
                     found.append(candidate)
     return found
+
+
+#: A section reference, in the spellings the corpus uses after an act name:
+#: "sec. 112", "section 111", "secs. 2791", "§112".
+_ACT_SECTION = re.compile(
+    r"(?:sec(?:tion)?s?\.?|§{1,2})\s*(?P<section>\d+[A-Za-z]?)",
+    re.IGNORECASE,
+)
+
+#: The inverted spelling: "sec. 3505 of the Modernization of Cosmetics ... Act".
+_ACT_SECTION_OF_THE = re.compile(r"\A\s*of\s+(?:the\s+)?", re.IGNORECASE)
+
+#: No popular name in the Popular Name Tool is longer than this many words, and
+#: bounding the backward scan keeps recognition linear in the length of the text
+#: rather than quadratic.
+_MAX_ACT_NAME_WORDS = 24
+
+#: Punctuation a name may pick up from the sentence around it.
+_NAME_EDGE = re.compile(r"^[\s(\"'“”]+|[\s,;:.)\"'“”]+$")
+_CURLY_APOSTROPHE = re.compile(r"[’‘`]")
+_LONG_DASH = re.compile(r"[–—]")
+
+
+def normalize_popular_name(name: object) -> str:
+    """The key a popular name joins on.
+
+    Case, whitespace, sentence punctuation and the difference between a curly
+    and a straight apostrophe are all spelling, not identity: the Popular Name
+    Tool writes "Workers’ Compensation Act" and prose writes "Workers'
+    Compensation Act", and they are one act. Internal commas are kept, because
+    "Federal Food, Drug, and Cosmetic Act" is how that act is named.
+    """
+    text = _NAME_EDGE.sub("", str(name or ""))
+    text = _CURLY_APOSTROPHE.sub("'", _LONG_DASH.sub("-", text))
+    return re.sub(r"\s+", " ", text).strip().lower()
+
+
+@dataclass(frozen=True)
+class ActRelativeCitation:
+    """A provision cited through the act that created it.
+
+    "Clean Air Act section 111" identifies a real provision, but names no code,
+    title or section number — it resolves only through the Office of the Law
+    Revision Counsel's tables (``spicy_regs.sources.uscode_olrc``), so this type
+    carries what the text said and nothing it did not.
+    """
+
+    act_name: str
+    act_key: str
+    section: str
+
+
+def find_act_relative_citations(text: object, *, act_names: Container[str]) -> list[ActRelativeCitation]:
+    """Find act-relative citations whose act ``act_names`` knows.
+
+    **The index is the grammar.** ``act_names`` holds normalized popular names —
+    in production, the 13,627 the OLRC publishes — and a span is an act name
+    only if the index says so. The alternative, recognizing a shape
+    (capitalized words ending in "Act"), was measured against the 4,777 sealed
+    authority strings and matched "U.S.C." 108 times.
+
+    Longest match wins, because one popular name may end with another: the Clean
+    Air Act Amendments of 1977 are not the Clean Air Act, and a shortest-match
+    rule would silently cite the wrong statute.
+
+    An act this index does not name is not read. The corpus writes "INA sec.
+    103(a)(1)" and "PHS Act secs. 2791(b)(5)", and inferring which acts those
+    abbreviate is precisely the guess the identity fence exists to stop.
+    """
+    document = "" if text is None else str(text)
+    found: list[ActRelativeCitation] = []
+    for marker in _ACT_SECTION.finditer(document):
+        section = _section(marker.group("section"))
+        named = _longest_name_before(document[: marker.start()], act_names) or _longest_name_after(
+            document[marker.end() :], act_names
+        )
+        if section is None or named is None:
+            continue
+        citation = ActRelativeCitation(act_name=named, act_key=normalize_popular_name(named), section=section)
+        if citation not in found:
+            found.append(citation)
+    return found
+
+
+def _longest_name_before(before: str, act_names: Container[str]) -> str | None:
+    """The longest known act name ending where a section reference begins."""
+    words = before.split()
+    for length in range(min(_MAX_ACT_NAME_WORDS, len(words)), 0, -1):
+        candidate = " ".join(words[-length:])
+        if normalize_popular_name(candidate) in act_names:
+            return _NAME_EDGE.sub("", candidate)
+    return None
+
+
+def _longest_name_after(after: str, act_names: Container[str]) -> str | None:
+    """The longest known act name in "… of the <Act>" following a section."""
+    opening = _ACT_SECTION_OF_THE.match(after)
+    if opening is None:
+        return None
+    words = after[opening.end() :].split()
+    for length in range(min(_MAX_ACT_NAME_WORDS, len(words)), 0, -1):
+        candidate = " ".join(words[:length])
+        if normalize_popular_name(candidate) in act_names:
+            return _NAME_EDGE.sub("", candidate)
+    return None
 
 
 def parse_usc_chapter_citation(value: object) -> list[UscChapterCitation]:

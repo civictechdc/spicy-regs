@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import pytest
 
+from spicy_regs.ontology.citations import normalize_popular_name
 from spicy_regs.sources.uscode_olrc import (
+    PopularNameIndex,
     PopularNameRecord,
     Table3Record,
     parse_popular_names,
@@ -178,3 +180,86 @@ def test_an_entry_with_no_name_is_skipped_rather_than_published_nameless():
         )
         == []
     )
+
+
+def _index():
+    return PopularNameIndex.from_records(parse_popular_names(POPULAR_NAMES), normalize=normalize_popular_name)
+
+
+def test_the_index_joins_a_name_to_the_act_it_names():
+    index = _index()
+    assert index.table3_key("clean air act") == "1955:360"
+    assert index.usc_anchor_by_name["clean air act"] == ("42", "7401")
+
+
+def test_an_alias_resolves_to_the_act_it_points_at():
+    """ "Air Pollution Control Act" is the Clean Air Act under its older name."""
+    assert _index().table3_key("air pollution control act") == "1955:360"
+
+
+def test_an_alias_target_the_tool_does_not_list_is_reached_through_its_year():
+    """The measured ERISA case, and the largest act in the sealed corpus.
+
+    "ERISA" points at "Employee Retirement Income Security Act". The tool lists
+    no entry by that name — only "… Act of 1974". The year is how the tool
+    distinguishes acts, so it cannot be dropped from the target; it can only be
+    supplied, and only when exactly one act supplies it.
+    """
+    index = PopularNameIndex.from_records(
+        parse_popular_names(
+            POPULAR_NAMES
+            + """
+<div id='ERISA1974' class='popular-name-table-entry' release-point='119-102' item='4560'>
+    <p class='popular-name'>Employee Retirement Income Security Act of 1974</p>
+    <p class='popular-name-information' content-type='cite' t3searchkey='93-406' datekey='1974-09-02' usckey='29:1001'>Sept. 2, <a href="/table3/93_406.htm">1974</a></p>
+  </div>
+"""
+        ),
+        normalize=normalize_popular_name,
+    )
+    assert index.resolve("erisa") == "employee retirement income security act of 1974"
+    assert index.table3_key("erisa") == "93-406"
+
+
+def test_a_target_several_acts_could_supply_is_refused():
+    """ "Clean Air Act Amendments" is 1966, 1970 and 1977. Picking one is inventing."""
+    index = PopularNameIndex.from_records(
+        parse_popular_names(
+            """
+<div id='A' class='popular-name-table-entry' release-point='119-102'>
+    <p class='popular-name'>CAAA</p>
+    <p class='popular-name-information' content-type='see'>See Clean Air Act Amendments</p>
+  </div>
+<div id='B' class='popular-name-table-entry' release-point='119-102'>
+    <p class='popular-name'>Clean Air Act Amendments of 1966</p>
+    <p class='popular-name-information' content-type='cite' t3searchkey='89-675'>x</p>
+  </div>
+<div id='C' class='popular-name-table-entry' release-point='119-102'>
+    <p class='popular-name'>Clean Air Act Amendments of 1977</p>
+    <p class='popular-name-information' content-type='cite' t3searchkey='95-95'>x</p>
+  </div>
+"""
+        ),
+        normalize=normalize_popular_name,
+    )
+    assert index.resolve("caaa") is None
+
+
+def test_an_alias_cycle_terminates_without_an_answer():
+    index = PopularNameIndex.from_records(
+        parse_popular_names(
+            """
+<div id='A' class='popular-name-table-entry'><p class='popular-name'>A Act</p>
+  <p class='popular-name-information' content-type='see'>See B Act</p></div>
+<div id='B' class='popular-name-table-entry'><p class='popular-name'>B Act</p>
+  <p class='popular-name-information' content-type='see'>See A Act</p></div>
+"""
+        ),
+        normalize=normalize_popular_name,
+    )
+    assert index.resolve("a act") is None
+
+
+def test_the_index_offers_aliases_to_the_grammar_as_matchable_names():
+    """The grammar must be able to match "ERISA" before the index resolves it."""
+    assert {"clean air act", "erisa", "air pollution control act"} <= _index().names
