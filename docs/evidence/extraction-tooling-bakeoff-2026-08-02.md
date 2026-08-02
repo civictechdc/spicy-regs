@@ -754,3 +754,141 @@ gets through by being named in it, and the resulting `RetentionCheck` records
 `exempt=True` and which id matched. An exemption nobody had to write down would
 be indistinguishable from a gate that does not work, which is why there is no
 wildcard and no threshold-lowering escape hatch.
+
+## What was built from this, 2026-08-02 — PyMuPDF adopted for PDFs
+
+**The AGPL block was lifted deliberately, so the swap was made.** The survey's
+recommendation was "keep pypdf; PyMuPDF is better on every measured axis and
+blocked solely by licence." With the licence question answered, PyMuPDF is now
+the parser for **new** PDF captures.
+
+`src/spicy_regs/transforms/pdf_text_pymupdf.py` is a **new parser**, not an edit
+of `pdf_text.py`. Tested by `tests/test_transforms_pdf_text_pymupdf.py`
+(20 tests). `pymupdf>=1.28,<1.29` is pinned in `pyproject.toml`, because a
+parser change moves extracted text and extracted text is sealed.
+
+### Re-measured through the parser that ships, not the survey harness
+
+18 real PDFs, `spicy_regs.transforms.pdf_text_pymupdf` against
+`spicy_regs.transforms.pdf_text`:
+
+| | pypdf 6.14.2 | PyMuPDF 1.28.0 |
+|---|---:|---:|
+| characters recovered | 2,850,117 | **2,851,024** (+0.03%) |
+| wall time, 18 documents | 7.07 s | **2.77 s** (2.55× faster) |
+| page-count agreement | — | **18 / 18** |
+| per-document delta | — | −0.05% … +0.11% |
+| per-word bounding boxes | none | yes |
+
+The survey's headline numbers hold through the real path: +0.07% became +0.03%,
+2.5× became 2.55×. **The text-volume case remains a wash** — per document the
+delta runs both ways and no document moved by more than 0.11%. The parser was
+adopted for **speed and per-word coordinates**, not for volume, and the
+retention floor records exactly that.
+
+### What changes for documents already captured with pypdf: nothing
+
+This is the constraint the swap was subject to, and it is enforced in code and
+in tests rather than asserted:
+
+* `_extract_pdf_with(method, ...)` takes the parser **by name**. The locked path
+  reads `lock_record["extraction_method"]` and extracts with *that* parser, so a
+  pypdf-sealed record keeps reproducing under pypdf byte for byte with the new
+  parser installed and the default already switched away.
+  `test_the_named_parser_decides_not_the_default` pins it.
+* An unknown parser name **fails closed** rather than falling back to a default.
+  A silent fallback is the one way this check could lie: a lock naming a parser
+  this build lacks would otherwise verify against a different one.
+* The receipt records `method`, `method_version` (the version *imported*, not
+  requested) and `method_config`, which now carries
+  `reading_order: content-stream` for PyMuPDF — recording that the parser does
+  **not** re-infer a reading order the PDF already states. `sort=False` is
+  load-bearing, not incidental.
+* Re-extraction produces a **new release with its own digest**. No existing
+  release is edited. Nothing retroactively moves.
+* Each parser declares its **own** retention floor over its **own** measured
+  population: `pymupdf:application/pdf` at 0.005 against an observed minimum of
+  0.015571, margin 3.11× — indistinguishable from pypdf's, because the two
+  recover the same text.
+
+One process note, recorded because it affected attribution: the
+`document_file_pipeline.py` half of this wiring landed inside commit `58b144c`,
+authored by a concurrent agent that staged the shared file while this work was
+in progress. The code is correct and tested; the commit message does not
+describe it.
+
+## The VLM parsing experiment — feasibility established, experiment not run
+
+**Recommendation: architecturally fine, not worth the dependency yet. Do not
+adopt. The honest next step is smaller than the one proposed.**
+
+### It is wrong for markup formats, and this document's own data says so
+
+Not tested there, deliberately. FR HTML, FR XML, USLM and eCFR carry
+*authoritative stated structure*; a model would infer what the document already
+declares. The measurement above shows generated text scores **0.000** on
+`unit_exact` and loses ~10% of three-token windows. For those formats a VLM is
+strictly worse than reading the markup, and no experiment is needed to know it.
+
+### For PDFs the provenance objection genuinely does not apply
+
+PDF text extraction is **already** a derivation — the platform records
+`evidence_grade: parser-derived` and targets `PARSED_TEXT_TARGET` precisely
+because there is no source text to be exact against. A different derivation does
+not violate the contract; it changes which derivation produced the sealed text,
+and that is recorded in `method`/`method_version`/`method_config`. Combined with
+capture-once-seal-pin, run-to-run variation stops mattering. **The safety
+argument holds.**
+
+### Docling's VLM pipeline at our pin: verified, with a caveat
+
+Verified by introspecting the installed package rather than assuming:
+
+| Question | Answer at docling 2.115.0 |
+|---|---|
+| `VlmPipeline`, `VlmPipelineOptions`, `ApiVlmOptions` exist? | **Yes**, all import cleanly |
+| Remote OpenAI-compatible endpoint supported? | **Yes** — `ApiVlmOptions.url`, gated behind `enable_remote_services` (default `False`, raises `OperationNotAllowed` otherwise) |
+| Gemini supported specifically? | **No Gemini-aware code path** — `grep -rni gemini` over the installed package returns **zero matches**. Gemini's OpenAI-compatible endpoint (`https://generativelanguage.googleapis.com/v1beta/openai/`) is structurally usable, but is an **undocumented, untested user configuration**, not a supported path |
+| Sends text or page images? | **Rasterized page images** — one PNG per page, base64-embedded, at `scale=2.0` default |
+
+`enable_remote_services` defaults to `False` because "the main purpose of Docling
+is to run local models which are not sharing any user data with remote
+services." Turning it on is a deliberate act, which is the right shape.
+
+### Estimated cost, and why the experiment was not run
+
+At `gemini-2.5-flash-lite` ($0.10/1M input, $0.40/1M output), ~1,032 image tokens
+per page at docling's default scale, 18 PDFs ≈ 1,500 pages: **≈$0.46–$1.06**,
+well inside the $15 cap. Cost is not the blocker.
+
+The blocker is that **the experiment as scoped would not answer the question it
+was asked to answer**, for three reasons found while establishing feasibility:
+
+1. **The comparison would measure docling's DocTags preset, not "a VLM".**
+   Docling's default response format is DocTags — verbose, bounding-box-annotated
+   XML-like output. A poor result would not distinguish "VLMs infer structure
+   badly" from "this preset serialises badly", and a good one would be equally
+   ambiguous.
+2. **There is no gold structure for these 18 PDFs to score against.** "Better
+   structure than PyMuPDF" needs an adjudicated answer for each document, and
+   this project has a standing rule about what counts as human review. Scoring
+   passage quality by eyeballing markdown is the "prose readability" measure the
+   brief explicitly ruled out.
+3. **The population is the wrong one for the decision.** PDFs are a minority of
+   this corpus — the Federal Register bodies are 993 HTML and 993 XML documents
+   against 18 PDFs in the segmentation cache. Even a large PDF structure
+   improvement moves little retrieval quality here, which is the honest reading
+   the brief asked for and it is the one the data supports.
+
+### What would actually be worth running, and when
+
+Not a docling VLM bakeoff. **A gold-anchored structure comparison on court
+opinions and GAO reports**, the two formats where PDF structure is genuinely
+ambiguous and where a real finding is plausible — with (a) an adjudicated
+structural answer for a small sample, (b) a lean response format chosen by us
+rather than DocTags, and (c) a retrieval metric downstream, not a readability
+judgement. That is a bounded experiment with a real gate, and it should be
+queued behind anything that touches the 1,986 markup documents, because that is
+where this corpus actually lives.
+
+**Spend on this line so far: $0.00.** No provider call was made.

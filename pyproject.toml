@@ -23,7 +23,13 @@ dependencies = [
     "cyclopts",
     "loguru",
     "mcp>=1.10.0",
-    "pypdf>=6.14,<7",
+    "pypdf>=6.14,<7", # incumbent PDF parser; representations sealed under it stay sealed
+    # Adopted 2026-08-02 on docs/evidence/extraction-tooling-bakeoff-2026-08-02.md:
+    # +0.07% text and 2.5x faster than pypdf across 18 real PDFs, with per-word
+    # bounding boxes pypdf cannot provide. Local, model-free, no network, no
+    # per-document cost. Pinned to one minor because a parser change moves
+    # extracted text, and extracted text is sealed.
+    "pymupdf>=1.28,<1.29", # AGPL-3.0 or commercial Artifex licence — a deliberate choice
     "pyyaml", # data dictionary descriptions (src/spicy_regs/data_dictionary.py)
     "jsonschema>=4.23", # strict structured-output and locked-corpus validation
     "rdflib>=7.1,<8", # file-only RefSpec vocabulary-atlas reader

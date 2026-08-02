@@ -1155,6 +1155,18 @@ RETENTION_FLOORS: dict[str, RetentionFloor] = {
         observed_minimum=0.015584,
         population="18 segmentation-cache PDFs — 9 court opinions, 4 CRS, 4 regulations, 1 bill",
     ),
+    # Adopted 2026-08-02. Measured over the same 18 PDFs through the shipped
+    # parser, not through the survey harness: the density distribution is
+    # indistinguishable from pypdf's (min 0.015571 against 0.015584) because the
+    # two recover the same text — +0.03% in total, and per document the delta
+    # runs both ways between -0.05% and +0.11%. The parser was adopted for speed
+    # and per-word coordinates, not for volume, and this floor says so.
+    "pymupdf:application/pdf": RetentionFloor(
+        value=0.005,
+        unit=DENSITY_UNIT,
+        observed_minimum=0.015571,
+        population="the same 18 segmentation-cache PDFs, re-measured through spicy_regs.transforms.pdf_text_pymupdf",
+    ),
 }
 
 

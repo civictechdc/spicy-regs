@@ -5028,9 +5028,21 @@ PROVIDER_PACKAGES = ("docling", "docling_core")
 content-layer behavior, so a module importing it has reached into the provider's
 object model just as surely as one importing ``docling``."""
 
-# The real-provider suite is the one place outside the adapter that may touch the
-# provider: it exists to hold the adapter to the pinned releases.
-ALLOWED_PROVIDER_IMPORTERS = frozenset({ADAPTER_PATH, REAL_PROVIDER_TESTS})
+BAKEOFF_WORKER = REPOSITORY_ROOT / "tools" / "extraction_bakeoff_worker.py"
+
+# Two places outside the adapter may touch the provider, each for a stated reason
+# and each named individually so the set stays auditable.
+#
+# * the real-provider suite, which exists to hold the adapter to the pinned
+#   releases;
+# * the extraction bakeoff worker, which measures Docling *against* this
+#   project's parsers and is executed out-of-process by
+#   ``tools/run_extraction_bakeoff.py`` in a throwaway interpreter. It imports
+#   the provider lazily, inside one function, and nothing it produces reaches
+#   production code — it emits JSON metrics on stdout. It is what makes the
+#   Docling findings in ``docs/evidence/extraction-tooling-bakeoff-2026-08-02.md``
+#   reproducible; dropping the import would make that evidence unverifiable.
+ALLOWED_PROVIDER_IMPORTERS = frozenset({ADAPTER_PATH, REAL_PROVIDER_TESTS, BAKEOFF_WORKER})
 
 # Not this project's code: virtual environments, caches, build output, and
 # vendored front-end packages, at any depth.
@@ -5118,7 +5130,7 @@ def test_neither_provider_package_is_imported_outside_the_adapter() -> None:
     # And the boundary is real in both directions: the adapter is the only module
     # that reaches ``docling`` at all, and nothing needs ``docling_core`` except
     # the suite that builds provider objects to check the adapter against them.
-    assert importers["docling"] == {ADAPTER_PATH, REAL_PROVIDER_TESTS}
+    assert importers["docling"] == {ADAPTER_PATH, REAL_PROVIDER_TESTS, BAKEOFF_WORKER}
     assert importers["docling_core"] == {REAL_PROVIDER_TESTS}
 
 

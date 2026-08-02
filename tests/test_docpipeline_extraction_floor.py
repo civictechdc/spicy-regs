@@ -253,7 +253,17 @@ class TestTheGateIsWiredAtTheBoundary:
         )
 
         with pytest.raises(DocumentFilePipelineError):
-            _refuse_thin_pdf_parse("", b"", subject_id="empty")
+            _refuse_thin_pdf_parse("", b"", subject_id="empty", method="pymupdf")
+
+    def test_each_pdf_parser_is_gated_under_its_own_floor(self) -> None:
+        """The gate looks up the parser that actually ran, not a default."""
+        from spicy_regs.document_file_pipeline import DocumentFilePipelineError, _refuse_thin_pdf_parse
+
+        for method in ("pypdf", "pymupdf"):
+            with pytest.raises(DocumentFilePipelineError):
+                _refuse_thin_pdf_parse("x" * 10, b"0" * 100_000, subject_id="scanned", method=method)
+        with pytest.raises(DocumentFilePipelineError):
+            _refuse_thin_pdf_parse("x" * 5000, b"0" * 100_000, subject_id="ok", method="unknown-parser")
 
     def test_a_pdf_yielding_almost_no_text_is_refused(self) -> None:
         from spicy_regs.document_file_pipeline import (
@@ -262,7 +272,7 @@ class TestTheGateIsWiredAtTheBoundary:
         )
 
         with pytest.raises(DocumentFilePipelineError):
-            _refuse_thin_pdf_parse("x" * 10, b"0" * 100_000, subject_id="scanned-no-ocr")
+            _refuse_thin_pdf_parse("x" * 10, b"0" * 100_000, subject_id="scanned-no-ocr", method="pymupdf")
 
     def test_xml_media_types_share_one_declared_floor(self) -> None:
         """The same document must not be gated differently by header spelling."""
