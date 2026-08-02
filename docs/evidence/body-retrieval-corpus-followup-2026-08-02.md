@@ -32,6 +32,7 @@ admits, end to end, and the snapshot is queryable:
 | **993 documents, HTML** (permissive) | **993** | **726,009** | **3,274 s (54.6 min)** | **15.81 GB** | **1.73 GB** |
 | **993 documents, XML** (permissive) | **993** | **333,363** | **990 s (16.5 min)** | 20.9 GB | 1.33 GB |
 | **993 documents, XML** (**production policy**) | **520 admitted** | 159,179 | **566 s** | 18.4 GB | 609 MB |
+| **993 documents, HTML** (**production policy**) | **520 admitted** | 347,441 | 2,879 s | 12.0 GB | 798 MB |
 
 Materializing the 1.47 GB release costs **5.36 GB** resident and 4.9 s — a ~3.6x
 inflation from Python object overhead, which is ordinary. The remaining 10 GB
@@ -115,13 +116,17 @@ withdrawn.
 Not the permissive fixture policy the repo's experiments use — the production
 `known-source-profiles-v1` / `search-document-types-v1` pair:
 
-| | before the fix | after |
-|---|---|---|
-| reaches the allowlist | **no** — refused at `observed_at` | **yes** |
-| documents admitted | **0** | **520** |
-| chunks | 0 | 520 |
-| passages | 0 | 159,179 |
-| build | refused | 566 s, 18.4 GB peak, 609 MB index |
+| | before the fix | after (XML) | after (HTML) |
+|---|---|---|---|
+| reaches the allowlist | **no** — refused at `observed_at` | **yes** | **yes** |
+| documents admitted | **0** | **520** | **520** |
+| chunks | 0 | 520 | 520 |
+| passages | 0 | 159,179 | 347,441 |
+| build | refused | 566 s, 609 MB index | 2,879 s, 798 MB index |
+
+Both renditions admit **exactly the same 520 documents**, which is the check
+that the fix is in the release construction and not in one format's quirks —
+and XML gets there **5.1x faster**.
 
 **520 of 993 admitted, and the other 473 are excluded by policy rather than by
 defect** — `search-document-types-v1` admits `Notice` and `Proposed Rule` for

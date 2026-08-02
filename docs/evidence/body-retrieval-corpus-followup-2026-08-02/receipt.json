@@ -1,0 +1,234 @@
+{
+  "admission_path": {
+    "evidence": "spicysearch/canonical.py:386-392 read_json is json.loads(path.read_text()); adapters.py takes a parsed Mapping; no incremental parser anywhere on the path",
+    "materialization_cost": {
+      "release_bytes": 1469615871,
+      "rss_gb": 5.36,
+      "seconds": 4.9
+    },
+    "materializes": true,
+    "scaling": {
+      "note": "time is the constraint, not memory: 50x the documents cost 88x the time (37s -> 3274s) while memory grew 16x",
+      "superlinear": true
+    },
+    "streams": false
+  },
+  "admission_results": {
+    "html_20_permissive": {
+      "documents_admitted": 20,
+      "index_bytes": 41693184,
+      "peak_rss_gb": 0.98,
+      "seconds": 37.2
+    },
+    "html_993_permissive": {
+      "build_seconds": 3274.2,
+      "documents_in_release": 993,
+      "passages_in_release": 726009,
+      "peak_rss_gb": 15.81,
+      "read_json_seconds": 4.9,
+      "rss_after_read_gb": 5.36,
+      "search_duckdb_bytes": 1728065536,
+      "status": "OK",
+      "total_seconds": 3279.1
+    },
+    "html_993_production": {
+      "build_seconds": 2878.6,
+      "documents_in_release": 993,
+      "passages_in_release": 726009,
+      "peak_rss_gb": 12.03,
+      "read_json_seconds": 5.0,
+      "rss_after_read_gb": 5.36,
+      "search_duckdb_bytes": 798502912,
+      "status": "OK",
+      "total_seconds": 2883.6
+    },
+    "xml_20_permissive": {
+      "documents_admitted": 20,
+      "index_bytes": 31207424,
+      "peak_rss_gb": 1.33,
+      "seconds": 11.0
+    },
+    "xml_993_permissive": {
+      "build_seconds": 990.0,
+      "documents_in_release": 993,
+      "passages_in_release": 333363,
+      "peak_rss_gb": 20.9,
+      "read_json_seconds": 3.5,
+      "rss_after_read_gb": 5.59,
+      "search_duckdb_bytes": 1327247360,
+      "status": "OK",
+      "total_seconds": 993.5
+    },
+    "xml_993_production": {
+      "build_seconds": 566.0,
+      "chunks": 520,
+      "documents_admitted": 520,
+      "documents_in_release": 993,
+      "passages": 159179,
+      "passages_in_release": 333363,
+      "peak_rss_gb": 18.41,
+      "read_json_seconds": 3.1,
+      "rss_after_read_gb": 5.83,
+      "search_duckdb_bytes": 609759232,
+      "status": "OK",
+      "total_seconds": 569.1
+    }
+  },
+  "artifacts": {
+    "draw_manifest": {
+      "sha256": "sha256:cda211ebbe42d716d7faab8fe18dc52c404f80a5372d63d2c2dc06845ba17fa3"
+    },
+    "html_document_release": {
+      "bytes": 1469593455,
+      "sha256": "sha256:c9492fd0783111702375cfb13e8e715505776cbb04d1dce04d60f25022c41942"
+    },
+    "html_measurement": {
+      "sha256": "sha256:c5e20234089b9c93cbcbe4b1751c64a32d18e4eb9fb859878d4eec497d64e192"
+    },
+    "html_source_lock": {
+      "sha256": "sha256:f4648e60147fdf2f80a5a33507cee90ce6eee403890130af4a060a9d71a54487"
+    },
+    "xml_document_release": {
+      "bytes": 801837566,
+      "sha256": "sha256:123a77e9b40cc8a09c7e4c53b35b3696cef36548745adb10f64000dc9488239d"
+    },
+    "xml_measurement": {
+      "sha256": "sha256:b3e580d1153fc687f0f1b96883819f206ad3edc56c2fa9e8ebbfa41f5ba6f6e8"
+    },
+    "xml_source_lock": {
+      "sha256": "sha256:bc0df82b00074d8e5bbf881e4388ed7b0ce9e65c93fa031dfd94cbf6a11d501a"
+    }
+  },
+  "code": {
+    "branch": "main",
+    "head_commit_at_write_time": "ca9f1c39c63a2d4eb276a32db62fa0cf51330692",
+    "interpreter": "CPython 3.12.9",
+    "measurements_produced_at_commit": "58b144c",
+    "note": "a second agent commits to this repo concurrently; this work is 8707323..58b144c",
+    "state": "committed"
+  },
+  "false_lead_eliminated": {
+    "claim": "the publisher spelling federal-register vs federal_register blocks admission",
+    "verdict": "withdrawn; adapters.py:1461-1465 _source_key maps it explicitly"
+  },
+  "guards_retained": [
+    "Cloudflare interstitial detection: HTTP 200 with HTML would otherwise seal ~1000 identical error pages and every retrieval number would describe Cloudflare",
+    "URLs are read or systematically derived from the publisher's own URL, never rebuilt from a recorded publication date",
+    "per-rendition media-type check",
+    "secret scan over every JSON written",
+    "require_capture_instants: a dateless cache is refused at construction"
+  ],
+  "one_chunk_per_document_confirmed_at_scale": {
+    "chunks": 993,
+    "documents": 993,
+    "max_chunk_text_chars": 2337620,
+    "median_chunk_text_chars": 207666,
+    "note": "median chunk is 6.8x the prior corpus's only chunk; this is the BM25 length-normalization case, now indexed and queryable",
+    "passages": 726009,
+    "prior_corpus_single_chunk_chars": 30487
+  },
+  "production_policy_outcome": {
+    "before_the_fix": 0,
+    "context": "the campaign's '~12% admitted' figure is 12% of records on an 82-record synthetic benchmark, never measured against real data; against a real corpus it was 0%",
+    "documents_admitted": 520,
+    "documents_in_release": 993,
+    "excluded": 473,
+    "exclusion_is_policy_not_defect": true,
+    "exclusion_reason": "search-document-types-v1 admits Notice and Proposed Rule for the Federal Register and does not admit Rule",
+    "policies": [
+      "known-source-profiles-v1",
+      "search-document-types-v1"
+    ],
+    "share_admitted": 0.524
+  },
+  "receipt_id": "urn:spicyregs:body-corpus-followup-receipt:fc7bc0faef88b5e78b99048a",
+  "release_defects_found_and_fixed": [
+    {
+      "defect": "SourceRenditionCapture.observed_at was a bare calendar date",
+      "fix": "the fetcher records a real per-document capture instant; require_capture_instants refuses to build from a dateless cache",
+      "fix_required_a_refetch": true,
+      "repair_reason": "patching the field in a copy breaks the release's own digest check",
+      "repairable_downstream": false,
+      "value_observed": "2026-08-02 (the fetch date at day granularity, not a publication date)",
+      "why_it_blocks": "adapters.py:283-288 requires a timezone-aware instant and refuses BEFORE any allowlist runs",
+      "why_upstream": "spicy-regs _require_capture_observation (document_file_pipeline.py:87-106) explicitly permits a date OR an instant, so it sealed cleanly here and was refused there"
+    },
+    {
+      "defect": "document_type was the constant 'Federal Register document' on all 993",
+      "fix": "the publisher's own type is carried from the drawn parquet row through to the release: 520 Proposed Rule, 473 Rule",
+      "repairable_downstream": false,
+      "threaded_as_parameter_not_a_spec_field": "adding it to FullDocumentSpec would change _spec_digest and break validation of the sealed 34-document segmentation cache",
+      "why_it_blocks": "a constant makes every type allowlist a no-op; a policy admitting {Notice, Proposed Rule} matches nothing, so Rule and Proposed Rule are excluded identically and the corpus admits 0%",
+      "why_upstream": "_SOURCE_CACHE_DOCUMENT_TYPES carries one string per source profile, which suits a fixture corpus and not a real one"
+    },
+    {
+      "defect": "a v2 release needs its published distribution, not a bare release JSON",
+      "fix": "publish_document_release_from_source_cache added; only the file-manifest path had a publish counterpart"
+    }
+  ],
+  "renditions": {
+    "corpus_property_is_rendition_independent": {
+      "html_median_jaccard": 0.294673411147807,
+      "note": "a difference of 0.0002; vocabulary competition is a property of the documents drawn, not the file format",
+      "xml_median_jaccard": 0.2945040363257697
+    },
+    "draw_id": "urn:spicyregs:body-retrieval-draw:f5f39ec8ed530e9271896408",
+    "html": {
+      "documents": 993,
+      "documents_with_publisher_chrome": 993,
+      "fragment_share_under_100_chars": 0.4083,
+      "median_pairwise_jaccard": 0.294673411147807,
+      "retrieved_on": "2026-08-02T21:40:20Z",
+      "structural_passages": 726009,
+      "visible_text_total": 210535931,
+      "zero_width_space_entities": 10114
+    },
+    "metadata_regions_probed": {
+      "document_pairs": 30,
+      "identical_between_renditions": true,
+      "regions": [
+        "RIN",
+        "CFR part",
+        "agency name",
+        "ACTION",
+        "SUMMARY",
+        "DATES",
+        "FOR FURTHER INFORMATION",
+        "Federal Register page"
+      ]
+    },
+    "same_draw": true,
+    "verdict": "XML. Zero entities, zero chrome, 98.3% of the text, 100% of the metadata regions, 6.8% fragmentation against 40.8%, and 990s to admit against 3274s. Both renditions are kept over the same draw digest so the rendition is a controlled variable rather than a confound.",
+    "xml": {
+      "documents": 993,
+      "documents_with_publisher_chrome": 0,
+      "fragment_share_under_100_chars": 0.0679,
+      "median_pairwise_jaccard": 0.2945040363257697,
+      "retrieved_on": "2026-08-02T20:28:06Z",
+      "structural_passages": 333363,
+      "visible_text_total": 206998714,
+      "zero_width_space_entities": 0
+    },
+    "xml_url_derivation": "the publisher's own HTML URL with /full_text/html/ -> /full_text/xml/ and .html -> .xml; verified against the API full_text_xml_url field for 2005-2026, then 993/993 fetched with zero quarantine",
+    "zero_width_space_correction": {
+      "measured": "no raw U+200B at all; 10,114 &#8203; entities across 993 documents (mean 10.2), only inside displayed URLs",
+      "withdrawn_claim": "~42 zero-width spaces per document"
+    }
+  },
+  "reproducibility": {
+    "boundary": "the lock; everything downstream rebuilds byte-identical",
+    "fetch_is_reproducible": false,
+    "refetch_is_the_strongest_check": "993 HTML documents fetched a second time; the re-measurement digest is identical, so the publisher served the same bytes",
+    "resumed_runs_made_zero_requests": true
+  },
+  "scope": {
+    "paid_provider_calls": 0,
+    "pushed": false,
+    "questions": [
+      "can spicysearch admit this corpus, and does its admission path stream or materialize",
+      "is the GPO XML rendition the better instrument than body_html",
+      "do the two reported release-construction defects reproduce, and does fixing them make the corpus admissible under the REAL policy"
+    ],
+    "spicysearch_access": "read-only; the probe imports its code and writes only to /tmp"
+  }
+}
