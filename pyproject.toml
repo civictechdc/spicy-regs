@@ -122,6 +122,7 @@ build-document-acceptance-scope = "spicy_regs.corpora.document_acceptance_scope:
 build-document-release = "spicy_regs.document_release:main"
 build-document-release-from-files = "spicy_regs.document_file_pipeline:main"
 validate-document-release-distribution = "spicy_regs.document_file_pipeline:validate_distribution_main"
+segment-document-release = "spicy_regs.docpipeline.document_release_segments:main"
 run-relation-exclusion-evaluation = "spicy_regs.corpora.relation_exclusion_evaluation:main"
 validate-relation-exclusion-v2 = "spicy_regs.corpora.relation_exclusion_evaluation_v2:main"
 
