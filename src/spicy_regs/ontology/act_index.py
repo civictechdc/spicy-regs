@@ -150,8 +150,10 @@ class ActIndex:
     #: Absent for an act that states no division, which is how "spans the whole
     #: public law" is represented rather than asserted.
     division_by_name: Mapping[str, tuple[str, int]] = field(default_factory=dict)
-    #: Table III key -> ordered division start pages, for bounding each range.
-    division_starts: Mapping[str, tuple[int, ...]] = field(default_factory=dict)
+    #: Table III key -> ordered ``(division, first page)`` pairs. Keyed by
+    #: division rather than by act, because a division may contain many acts and
+    #: it is the division that bounds the range.
+    division_starts: Mapping[str, tuple[tuple[str, int], ...]] = field(default_factory=dict)
 
     def act_page_range(self, act_key: str) -> tuple[int, int] | None:
         """The Statutes at Large pages an act occupies, or ``None`` if unbounded.
@@ -163,9 +165,21 @@ class ActIndex:
         stated = self.division_by_name.get(act_key)
         if stated is None:
             return None
-        _, start = stated
+        division, _act_start = stated
         table3_key = self.table3_key_by_name.get(act_key)
-        later = [p for p in self.division_starts.get(table3_key, ()) if p > start]
+        starts = self.division_starts.get(table3_key, ())
+        # The range is the DIVISION's, not the act's. Many popular names are a
+        # title inside a division rather than the whole of one -- the AI in
+        # Government Act of 2020 begins at 134 Stat. 2286 inside div. U -- so
+        # ending the range at the next *act* truncates the division and drops
+        # its later sections. Validation against the Code's own source credits
+        # caught exactly that: 936 of 1,350 testable acts had USLM pages
+        # outside the act-derived range, and none outside the division-derived
+        # one.
+        start = min((p for d, p in starts if d == division), default=None)
+        if start is None:
+            return None
+        later = [p for _, p in starts if p > start]
         return (start, min(later) if later else 1 << 30)
 
     @classmethod
@@ -185,7 +199,7 @@ class ActIndex:
         table3_key_by_name: dict[str, str] = {}
         alias_by_name: dict[str, str] = {}
         division_by_name: dict[str, tuple[str, int]] = {}
-        starts: dict[str, set[int]] = {}
+        starts: dict[str, dict[str, int]] = {}
         for row in pq.read_table(directory / "usc-popular-names.parquet").to_pylist():
             if row["content_type"] == "cite" and row["table3_key"]:
                 table3_key_by_name.setdefault(row["name_key"], row["table3_key"])
@@ -196,7 +210,12 @@ class ActIndex:
                     row["name_key"], (row["division"], int(row["statutes_at_large_page"]))
                 )
                 if row["table3_key"]:
-                    starts.setdefault(row["table3_key"], set()).add(int(row["statutes_at_large_page"]))
+                    # One entry per division, at its earliest page: an act that
+                    # begins mid-division must not become a boundary.
+                    page = int(row["statutes_at_large_page"])
+                    by_div = starts.setdefault(row["table3_key"], {})
+                    key = row["division"]
+                    by_div[key] = min(by_div.get(key, page), page)
         classifications: dict[str, dict[str, tuple]] = {}
         for row in pq.read_table(directory / "usc-act-sections.parquet").to_pylist():
             by_section = classifications.setdefault(row["table3_key"], {})
@@ -210,7 +229,9 @@ class ActIndex:
             classifications=classifications,
             incomplete_sources=frozenset(hole["table3_key"] for hole in receipt.get("source_incomplete", ())),
             division_by_name=division_by_name,
-            division_starts={k: tuple(sorted(v)) for k, v in starts.items()},
+            division_starts={
+                k: tuple(sorted(v.items(), key=lambda item: item[1])) for k, v in starts.items()
+            },
         )
 
 
@@ -269,12 +290,23 @@ def resolve_act_relative_citation(citation: ActRelativeCitation, *, index: ActIn
     page_range = index.act_page_range(act_key)
     if page_range is not None and len(rows) > 1:
         low, high = page_range
-        inside = tuple(row for row in rows if row[3] is not None and low <= row[3] < high)
+        inside = tuple(row for row in rows if row[3] is not None and low <= row[3] <= high)
         if not inside:
-            # Every classification of this act section belongs to a sibling act
-            # in another division. The section is not this act's.
+            # Every classification of this act section lies outside the citing
+            # act's division, so the section belongs to a sibling act. This
+            # direction is sound even though the range is only an upper bound:
+            # a page outside a range that is too WIDE is outside the true one.
             return ActResolution(citation, **common, unresolved_reason="act_section_outside_act")
-        rows = inside
+        # The converse is NOT sound and is deliberately not taken. The range is
+        # derived from popular-name start pages, and popular names do not mark
+        # division boundaries -- a division whose acts the tool does not name
+        # leaves the previous range overrunning into it. Measured against the
+        # Code's own source credits, 6.6% of the pages such a range accepts
+        # (2,240 of 34,113) belong to a different division. Narrowing to a
+        # single row on that basis would mint exactly the wrong identifier this
+        # whole line of work exists to prevent, so a surviving tie still
+        # refuses. Resolving them needs USLM's per-section division, which is
+        # measured and recommended in the evidence doc.
     if len(rows) > 1:
         # Nothing available discriminates them: either the act states no
         # division, or several rows sit inside the one it states.

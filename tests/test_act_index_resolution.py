@@ -70,7 +70,10 @@ INDEX = _Index(
         "taxpayer certainty and disaster tax relief act of 2020": ("EE", 3038),
         "secure 2.0 act of 2022": ("T", 5275),
     },
-    division_starts={"116-260": (1182, 2221, 2615, 3038), "117-328": (4462, 4926, 5275)},
+    division_starts={
+        "116-260": (("R", 2221), ("AA", 2615), ("EE", 3038)),
+        "117-328": (("A", 4462), ("M", 4926), ("T", 5275)),
+    },
 )
 
 
@@ -243,10 +246,16 @@ def test_a_section_outside_the_citing_acts_division_is_not_its_section(
     assert all(page < division_start for page in pages), "the fixture must encode the real pages"
 
 
-def test_the_division_range_picks_the_row_that_is_inside_it():
-    """When one candidate falls in the act's division, that one is the answer.
+def test_a_surviving_tie_inside_the_range_still_refuses():
+    """The range narrows, but it does not decide. This is the safety property.
 
-    This is the resolving half: refusing everything would be safe and useless.
+    The range is derived from popular-name start pages, and popular names do not
+    mark division boundaries: a division whose acts the Popular Name Tool does
+    not name leaves the previous range overrunning into it. Measured against the
+    U.S. Code's own source credits, 2,240 of 34,113 pages such a range accepts
+    (6.6%) belong to a different division. Narrowing to one row on that basis
+    would mint the wrong identifier this work exists to prevent, so a tie that
+    survives the range refuses.
     """
     from spicy_regs.ontology.citations import ActRelativeCitation
 
@@ -258,7 +267,8 @@ def test_the_division_range_picks_the_row_that_is_inside_it():
         ),
         index=INDEX,
     )
-    assert resolution.iri == "urn:rkaf:us:usc:26:9801", "the row at 3100 is inside div. EE"
+    assert resolution.iri is None
+    assert resolution.unresolved_reason == "act_section_ambiguous"
 
 
 def test_an_act_that_states_no_division_narrows_nothing():
