@@ -38,6 +38,25 @@ _CFR_TITLE_PART = re.compile(
     re.IGNORECASE,
 )
 
+#: "3 CFR, 1977 Comp., p. 123" — a Title 3 *compilation* locator.
+#:
+#: Title 3 of the CFR is the annual compilation of presidential documents, so
+#: this form points at the page an Executive Order was printed on. It is not a
+#: CFR section reference and there is no 3 CFR § 1977. Only title 3 compiles
+#: presidential documents, so only title 3 is recognized: another title's
+#: "Comp." is a form this parser has never seen and has no meaning to give.
+#:
+#: Both the single-year volume ("1977 Comp.") and the multi-year one
+#: ("1949-1953 Comp") occur; the page is optional, because a volume alone
+#: locates no single order.
+_EO_COMPILATION = re.compile(
+    r"\b3\s*C\.?\s*F\.?\s*R\.?\s*,?\s*"
+    r"(?P<start>(?:1[789]|20)\d{2})(?:\s*[-–—]\s*(?P<end>(?:1[789]|20)\d{2}))?\s*"
+    r"Comp\.?"
+    r"(?:\s*,?\s*(?:pp?\.?|pages?)\s*(?P<page>\d+))?",
+    re.IGNORECASE,
+)
+
 _USC_STANDARD = re.compile(
     r"(?P<title>[1-9]\d*)\s*U\.?\s*S\.?\s*"
     # The code names itself three ways on this corpus: abbreviated ("U.S.C."),
@@ -215,6 +234,39 @@ class CfrCitation:
     @property
     def iri(self) -> str:
         return canonical_cfr_iri(self.title, self.part, self.section)
+
+
+@dataclass(frozen=True)
+class ExecutiveOrderCompilation:
+    """Where an Executive Order was printed, not which order it is.
+
+    "3 CFR, 1977 Comp., p. 123" locates a presidential document by the page of
+    the Title 3 annual compilation it appears on. The order is what the string
+    identifies; the page is only how it points there.
+
+    **This type carries no identifier, and that is the whole point.** Two wrong
+    answers are available and both are refused. Reading it as a CFR section
+    mints ``urn:rkaf:us:cfr:3:1977`` for a section that does not exist — the
+    reading the bakeoff found in CiteURL (``title=3, section=1977``), which
+    additionally discards the page, the one component that identifies the order.
+    Reading it as an Executive Order requires an order number that is not in the
+    string, so publishing one would be an invention.
+
+    Resolving it honestly needs an index this repo does not have: a mapping from
+    (Title 3 compilation volume, page) to Executive Order number. The Federal
+    Register tables carry ``executive_order_number`` beside an *FR* volume and
+    page, which is a different citation system; ``cfr_sections`` carries
+    current-edition section metadata from GovInfo, not historical compilations.
+    A resolver would need the compilation's own front matter or GovInfo's
+    Title 3 compilation packages, neither of which is ingested.
+
+    Until then the honest output is the locator itself, typed so a consumer
+    cannot mistake it for an identifier.
+    """
+
+    compilation_start: str
+    compilation_end: str | None = None
+    page: str | None = None
 
 
 @dataclass(frozen=True)
@@ -440,9 +492,21 @@ def parse_cfr_citation(value: object) -> list[CfrCitation]:
             return []
         return [citation]
 
+    # A Title 3 compilation locator ("3 CFR, 1977 Comp., p. 123") opens on
+    # something a CFR expression can read as title-and-part, and the reading is
+    # wrong: it names a page in the presidential compilation, not a section.
+    # Refusing its span — rather than the whole string — leaves a real citation
+    # standing beside it. See :class:`ExecutiveOrderCompilation`.
+    compilations = [match.span() for match in _EO_COMPILATION.finditer(text)]
+
+    def locates_a_compilation(position: int) -> bool:
+        return any(start <= position < end for start, end in compilations)
+
     found: list[CfrCitation] = []
     for pattern in (_CFR_STANDARD, _CFR_TITLE_PART):
         for match in pattern.finditer(text):
+            if locates_a_compilation(match.start()):
+                continue
             citation = _cfr_from_match(match)
             if citation is not None and citation not in found:
                 found.append(citation)
@@ -451,14 +515,42 @@ def parse_cfr_citation(value: object) -> list[CfrCitation]:
     # the first part; expand simple trailing part numbers under the same title.
     if found:
         first = found[0]
-        tail_start = next(iter(_CFR_STANDARD.finditer(text)), None)
+        tail_start = next(
+            (match for match in _CFR_STANDARD.finditer(text) if not locates_a_compilation(match.start())),
+            None,
+        )
         if tail_start:
             tail = text[tail_start.end() :]
             for match in re.finditer(r"(?:,|\band\b|\bor\b)\s*(\d+)(?!\s*C\.?F\.?R\.?)", tail, re.IGNORECASE):
+                if locates_a_compilation(tail_start.end() + match.start()):
+                    continue
                 candidate = CfrCitation(first.title, str(int(match.group(1))), None)
                 if candidate not in found:
                     found.append(candidate)
     return found
+
+
+def parse_eo_compilation_citation(value: object) -> list[ExecutiveOrderCompilation]:
+    """Recognize Title 3 compilation locators without identifying anything.
+
+    Returns one :class:`ExecutiveOrderCompilation` per locator in the text, in
+    order of appearance. The type carries no identifier on purpose — see its
+    docstring for the two wrong answers this refuses and the index that would
+    make a right one possible.
+    """
+    if value is None:
+        return []
+    text = str(value).strip()
+    if not text:
+        return []
+    return [
+        ExecutiveOrderCompilation(
+            compilation_start=match.group("start"),
+            compilation_end=match.group("end"),
+            page=match.group("page"),
+        )
+        for match in _EO_COMPILATION.finditer(text)
+    ]
 
 
 def _usc_list_expansion(text: str) -> list[tuple[str, str, str | None]]:

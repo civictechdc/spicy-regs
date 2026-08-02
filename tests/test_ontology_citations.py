@@ -13,6 +13,7 @@ from spicy_regs.data_dictionary import expected_schemas
 from spicy_regs.ontology.citations import (
     AuthorityCitation,
     CfrCitation,
+    ExecutiveOrderCompilation,
     canonical_cfr_iri,
     canonical_frdoc_iri,
     canonical_pl_iri,
@@ -25,6 +26,7 @@ from spicy_regs.ontology.citations import (
     normalize_rin,
     parse_authority_citation,
     parse_cfr_citation,
+    parse_eo_compilation_citation,
     usc_section_covers,
 )
 from spicy_regs.ontology.llm import validated_external_ids
@@ -76,6 +78,119 @@ def test_the_compact_key_refuses_a_title_the_cfr_does_not_have(raw):
     left to hold it closed is the range the CFR actually has.
     """
     assert parse_cfr_citation(raw) == []
+
+
+# The five Title 3 compilation strings, verbatim from
+# output/citation-bakeoff-2026-08-02 (detection.json, cell citeurl_only). They
+# are the identity half of the bakeoff's 14 in-scope wins.
+_EO_COMPILATION_STRINGS = (
+    ("3 CFR, 1949-1953 Comp, p. 1002", ExecutiveOrderCompilation("1949", "1953", "1002")),
+    ("3 CFR, 1959-1963 Comp.", ExecutiveOrderCompilation("1959", "1963", None)),
+    ("3 CFR, 1977 Comp., p. 123", ExecutiveOrderCompilation("1977", None, "123")),
+    ("3 CFR, 1977 Comp., p. 123.", ExecutiveOrderCompilation("1977", None, "123")),
+    ("3 CFR, 1980 Comp., p. 298", ExecutiveOrderCompilation("1980", None, "298")),
+)
+
+
+@pytest.mark.parametrize(("raw", "expected"), _EO_COMPILATION_STRINGS)
+def test_a_title_3_compilation_locator_is_recognized_as_what_it_is(raw, expected):
+    """The form locates an Executive Order by compilation page, not a CFR section."""
+    assert parse_eo_compilation_citation(raw) == [expected]
+
+
+@pytest.mark.parametrize(("raw", "_expected"), _EO_COMPILATION_STRINGS)
+def test_a_compilation_locator_never_becomes_a_cfr_citation(raw, _expected):
+    """Regression: there is no 3 CFR § 1977, and reading one is the wrong parse.
+
+    This is the reading the bakeoff found in CiteURL (`title=3, section=1977`,
+    with the page — the part that identifies the order — discarded). These five
+    spellings carry a comma the project's CFR expressions could not cross, so
+    they were undetected rather than misread; the sibling test below covers the
+    spellings that *were* misread.
+    """
+    assert parse_cfr_citation(raw) == []
+
+
+@pytest.mark.parametrize(
+    ("raw", "phantom"),
+    [
+        # Every string is verbatim from the sealed corpus, beside the CFR
+        # citation `_CFR_STANDARD` drew from it before the refusal existed. The
+        # comma is what had been holding the wrong reading off: "3 CFR, 1977"
+        # does not match, "3 CFR 1977" does, and the corpus writes it both ways.
+        ("3 C.F.R. 1978 Comp. p. 142", CfrCitation("3", "1978")),
+        ("3 CFR 1949-1953 Comp., p. 970, as amended by E.O. 12038", CfrCitation("3", "1949")),
+        ("3 CFR 1977 Comp., p. 158)", CfrCitation("3", "1977")),
+        ("3 CFR 1978 Comp. p. 142", CfrCitation("3", "1978")),
+        ("3 CFR 1978 Comp., p. 142.", CfrCitation("3", "1978")),
+        ("3 CFR 1979 Comp. p. 435", CfrCitation("3", "1979")),
+        ("E.O. 12600 (3 CFR 1987 Comp. p. 235)", CfrCitation("3", "1987")),
+    ],
+)
+def test_the_compilation_year_was_being_published_as_a_cfr_part(raw, phantom):
+    """Regression: the year in a compilation locator read as a part number.
+
+    `urn:rkaf:us:cfr:3:1978` is not a part of the CFR; 1978 is the compilation
+    volume. Reachable only from free text — both production callers of
+    `parse_cfr_citation` read `cfr_references_json`, which carries structured
+    objects — so this is the same latent class as `'5401-5405'`, found the same
+    way and closed the same way.
+    """
+    assert phantom not in parse_cfr_citation(raw)
+    assert parse_cfr_citation(raw) == []
+    assert parse_eo_compilation_citation(raw)
+
+
+def test_one_string_may_locate_two_compilations():
+    raw = (
+        "E.O. 12372 (July 14, 1982), 47 FR 30959, 3 CFR, 1982 Comp., p. 197, "
+        "as amended by E.O. 12416 (April 8, 1983), 48 FR 15887, 3 CFR, 1983 Comp., p. 186."
+    )
+    assert parse_eo_compilation_citation(raw) == [
+        ExecutiveOrderCompilation("1982", None, "197"),
+        ExecutiveOrderCompilation("1983", None, "186"),
+    ]
+
+
+def test_a_compilation_locator_carries_no_identifier():
+    """A typed recognition, deliberately not an identifier.
+
+    The repo has no index from a Title 3 compilation page to an Executive Order
+    number, so the honest output is the located page — never an EO number the
+    parser would have to invent, and never a CFR section that does not exist.
+    """
+    (located,) = parse_eo_compilation_citation("3 CFR, 1977 Comp., p. 123")
+    assert not hasattr(located, "iri")
+    assert not hasattr(located, "canonical_iri")
+    assert (located.compilation_start, located.compilation_end, located.page) == ("1977", None, "123")
+
+
+def test_a_compilation_volume_without_a_page_locates_no_single_order():
+    """A multi-year volume with no page names a volume, not an order.
+
+    "3 CFR, 1959-1963 Comp." locates five years of presidential documents. The
+    page is what would narrow it to one, and there is none.
+    """
+    (located,) = parse_eo_compilation_citation("3 CFR, 1959-1963 Comp.")
+    assert located.page is None
+
+
+def test_only_title_3_compiles_presidential_documents():
+    """The annual compilation that carries Executive Orders is Title 3's.
+
+    Another title's "Comp." would be a form this parser has never seen and has
+    no meaning to give, so it is refused rather than recognized emptily.
+    """
+    assert parse_eo_compilation_citation("40 CFR, 1977 Comp., p. 123") == []
+    assert parse_eo_compilation_citation("3 CFR 1977") == []
+    assert parse_eo_compilation_citation("40 CFR 60") == []
+
+
+def test_a_real_cfr_citation_beside_a_compilation_locator_survives():
+    """The refusal covers the locator's own span and nothing else."""
+    raw = "E.O. 11246, 3 CFR, 1964-1965 Comp., p. 339, implemented at 41 CFR 60"
+    assert parse_cfr_citation(raw) == [CfrCitation("41", "60")]
+    assert parse_eo_compilation_citation(raw) == [ExecutiveOrderCompilation("1964", "1965", "339")]
 
 
 def test_the_compact_key_still_reads_every_title_the_cfr_has():
