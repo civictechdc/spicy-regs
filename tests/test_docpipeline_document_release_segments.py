@@ -20,9 +20,11 @@ from typing import Any
 
 import pytest
 
+import spicy_regs.docpipeline.document_release_segments as adapter_module
 from spicy_regs.docpipeline.document_release_segments import (
     ADAPTER_STEP,
     ADAPTER_VERSION,
+    JOIN_SEPARATOR,
     MODEL_INPUT_FORMAT_VERSION,
     RECEIPT_NAME,
     SELECTED_SETTINGS_ID,
@@ -34,11 +36,13 @@ from spicy_regs.docpipeline.document_release_segments import (
     PassageCoverageMismatchError,
     PassageDigestMismatchError,
     ReleaseSealError,
+    ReleaseValidationError,
     UnknownFormatVersionError,
     UnsupportedCoordinateSystemError,
     adapt_document_release,
     check_release_reversibility,
     main,
+    model_input_file_stem,
     segment_document_release,
     settings_id,
     write_model_input_segments,
@@ -63,7 +67,12 @@ from spicy_regs.document_file_pipeline import (
     build_document_release_from_file_manifest,
     publish_document_release_from_file_manifest,
 )
-from spicy_regs.document_release import seal_document_release
+from spicy_regs.document_release import (
+    DEFAULT_FIXTURE_PATH,
+    build_document_release,
+    canonical_digest,
+    seal_document_release,
+)
 from spicy_regs.ontology.segmentation import TiktokenCounter
 
 
@@ -540,3 +549,377 @@ def test_the_tool_entry_reads_a_release_path_and_writes_a_pass_receipt(
         == hashlib.sha256((distribution / "document-release.json").read_bytes()).hexdigest()
     )
     assert printed["receipt_sha256"] == receipt["receipt_sha256"]
+
+
+# --------------------------------------------------------------------------
+# the release contract itself: the validator closes what this adapter cannot see
+# --------------------------------------------------------------------------
+
+
+def test_a_sealed_but_invalid_release_is_refused_by_the_release_validator(
+    release: dict[str, Any],
+) -> None:
+    """Four shapes this adapter's own checks accept and the release contract does not.
+
+    Each corrupts something at the Rulespec seam: ambiguous evidence resolution
+    keys, a fragment selector that cites the wrong span, colliding output file
+    names, and coverage that points at a passage nobody sealed.
+    """
+
+    def duplicate_passage_id(body: dict[str, Any]) -> None:
+        passages = sorted(body["structural_passages"], key=lambda item: int(item["start"]))
+        passages[1]["passage_id"] = passages[0]["passage_id"]
+        body["structural_passages"] = sorted(passages, key=lambda item: str(item["passage_id"]))
+
+    def fragment_selector_mismatch(body: dict[str, Any]) -> None:
+        projection = body["structural_passages"][0]["source_fragment_projection"]
+        projection["selector"] = {
+            "coordinate_system": "unicode-codepoints-half-open",
+            "end": 42,
+            "selector_type": "TextPositionSelector",
+            "start": 0,
+        }
+
+    def duplicate_representation_id(body: dict[str, Any]) -> None:
+        representation = json.loads(json.dumps(body["text_representations"][0]))
+        body["text_representations"] = [representation, representation]
+
+    def dangling_coverage_passage_ref(body: dict[str, Any]) -> None:
+        for region in body["passage_coverage"][0]["regions"]:
+            if region["state"] == "processed":
+                region["passage_ref"] = "urn:spicyregs:structural-passage:" + "4" * 64
+                return
+
+    for mutate in (
+        duplicate_passage_id,
+        fragment_selector_mismatch,
+        duplicate_representation_id,
+        dangling_coverage_passage_ref,
+    ):
+        with pytest.raises(ReleaseValidationError):
+            adapt_document_release(_reseal(release, mutate))
+
+
+def test_the_checked_in_release_passes_the_validator_unchanged(release: dict[str, Any]) -> None:
+    assert adapt_document_release(release)
+
+
+# --------------------------------------------------------------------------
+# file names may not escape the output directory
+# --------------------------------------------------------------------------
+
+
+def test_a_representation_id_that_would_escape_the_output_directory_is_hashed() -> None:
+    hostile = "urn:spicyregs:text-representation:../../escaped"
+
+    stem = model_input_file_stem(hostile)
+
+    assert "/" not in stem and ".." not in stem
+    assert stem == hashlib.sha256(hostile.encode("utf-8")).hexdigest()
+    assert model_input_file_stem("urn:spicyregs:text-representation:" + "a" * 64) == "a" * 64
+
+
+def test_a_hostile_representation_id_writes_inside_the_output_directory(tmp_path: Path) -> None:
+    hostile = "urn:spicyregs:text-representation:../../escaped"
+    stem = model_input_file_stem(hostile)
+
+    target = adapter_module._contained_output_path(tmp_path / "out", f"segments/{stem}.json")
+
+    assert target.resolve().is_relative_to((tmp_path / "out").resolve())
+    with pytest.raises(ModelInputWriteError):
+        adapter_module._contained_output_path(tmp_path / "out", "segments/../../escaped.json")
+
+
+# --------------------------------------------------------------------------
+# the receipt does not depend on where it was run
+# --------------------------------------------------------------------------
+
+
+def test_the_receipt_is_identical_from_two_working_directories(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    distribution = tmp_path / "distribution"
+    publish_document_release_from_file_manifest(DEFAULT_FILE_MANIFEST_PATH, distribution)
+    release_path = distribution / "document-release.json"
+
+    first_home = tmp_path / "run-one"
+    second_home = tmp_path / "run-two"
+    first_home.mkdir()
+    second_home.mkdir()
+
+    monkeypatch.chdir(first_home)
+    first = adapter_module.segment_release_path(
+        release_path, first_home / "model-input", settings=_settings(), counter=COUNTER
+    )
+    monkeypatch.chdir(second_home)
+    second = adapter_module.segment_release_path(
+        release_path, second_home / "model-input", settings=_settings(), counter=COUNTER
+    )
+
+    assert first == second
+    assert first["receipt_sha256"] == second["receipt_sha256"]
+    assert "/" not in first["release"]["release_path"] or not Path(first["release"]["release_path"]).is_absolute()
+
+
+# --------------------------------------------------------------------------
+# secrets never reach a published model input
+# --------------------------------------------------------------------------
+
+
+SECRET_TOKEN = "sk-proj-AAAABBBBCCCCDDDDEEEEFFFF"
+
+
+def _secret_bearing_release() -> dict[str, Any]:
+    """A real M1 fixture release whose sealed passage text carries a fake key.
+
+    The token goes inside a passage the fixture seals end to end, so it reaches a
+    published model input rather than landing in an excluded span.
+    """
+    fixture = json.loads(DEFAULT_FIXTURE_PATH.read_text(encoding="utf-8"))
+    for record in fixture["records"]:
+        for passage in record.get("passages") or []:
+            if passage.get("representation_path") == "title" and passage.get("end") == "full":
+                record["content"]["title"] += f" contact {SECRET_TOKEN}"
+                passage["expected_text"] = record["content"]["title"]
+                fixture["fixture_digest"] = canonical_digest(
+                    {key: value for key, value in fixture.items() if key != "fixture_digest"}
+                )
+                return build_document_release(fixture)
+    raise AssertionError("the M1 fixture no longer seals a whole title passage")
+
+
+def test_secret_like_content_in_a_sealed_release_reaches_the_artifact_scan() -> None:
+    adapted = adapt_document_release(_secret_bearing_release())
+
+    assert any(one.artifact.secret_rules for one in adapted)
+    assert "openai-project-key" in {rule for one in adapted for rule in one.artifact.secret_rules}
+
+
+def test_a_clean_release_claims_no_secret_rules(release: dict[str, Any]) -> None:
+    assert all(one.artifact.secret_rules == () for one in adapt_document_release(release))
+
+
+def test_publication_refuses_when_a_model_input_file_would_carry_a_secret(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(ModelInputWriteError) as caught:
+        write_model_input_segments(
+            _secret_bearing_release(),
+            tmp_path / "model-input",
+            settings=_settings(),
+            counter=COUNTER,
+        )
+
+    assert "openai-project-key" in str(caught.value)
+    assert not (tmp_path / "model-input" / RECEIPT_NAME).exists()
+
+
+# --------------------------------------------------------------------------
+# every refusal is typed
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["evidence_grade", "passage_policy_version", "selected_text_digest", "start", "end"],
+)
+def test_a_passage_missing_a_required_field_refuses_with_a_typed_error(release: dict[str, Any], field: str) -> None:
+    def mutate(body: dict[str, Any]) -> None:
+        del body["structural_passages"][0][field]
+
+    with pytest.raises(DocumentReleaseSegmentError):
+        adapt_document_release(_reseal(release, mutate))
+
+
+def test_a_fragment_projection_missing_its_identifier_refuses_with_a_typed_error(
+    release: dict[str, Any],
+) -> None:
+    def mutate(body: dict[str, Any]) -> None:
+        del body["structural_passages"][0]["source_fragment_projection"]["fragment_id"]
+
+    with pytest.raises(DocumentReleaseSegmentError):
+        adapt_document_release(_reseal(release, mutate))
+
+
+def test_an_artifact_projection_missing_its_identifier_refuses_with_a_typed_error(
+    release: dict[str, Any],
+) -> None:
+    def mutate(body: dict[str, Any]) -> None:
+        del body["text_representations"][0]["artifact_projection"]["artifact_id"]
+
+    with pytest.raises(DocumentReleaseSegmentError):
+        adapt_document_release(_reseal(release, mutate))
+
+
+# --------------------------------------------------------------------------
+# a receipt that can say no
+# --------------------------------------------------------------------------
+
+
+def test_a_release_that_yields_no_segments_is_a_failing_receipt(
+    release: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(adapter_module, "segment_document_release", lambda *a, **k: ())
+
+    receipt = write_model_input_segments(release, tmp_path / "model-input", settings=_settings(), counter=COUNTER)
+
+    assert receipt["final_state"] == "fail"
+    assert receipt["failures"]
+    assert receipt["counts"]["segment_count"] == 0
+
+
+def test_the_tool_entry_exits_nonzero_on_a_failing_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    distribution = tmp_path / "distribution"
+    publish_document_release_from_file_manifest(DEFAULT_FILE_MANIFEST_PATH, distribution)
+    monkeypatch.setattr(adapter_module, "segment_document_release", lambda *a, **k: ())
+
+    exit_code = main(
+        [
+            "--release",
+            str(distribution / "document-release.json"),
+            "--output-dir",
+            str(tmp_path / "model-input"),
+        ]
+    )
+
+    assert exit_code == 1
+    assert json.loads(capsys.readouterr().out)["status"] == "fail"
+
+
+# --------------------------------------------------------------------------
+# the reversibility guard proved as a guard
+# --------------------------------------------------------------------------
+
+
+def _drift(result: Any, **slice_changes: Any) -> Any:
+    from dataclasses import replace
+
+    segment = result.outcome.segments[0]
+    drifted = replace(segment.slices[0], **slice_changes)
+    segment = replace(segment, slices=(drifted, *segment.slices[1:]))
+    outcome = replace(result.outcome, segments=(segment, *result.outcome.segments[1:]))
+    return replace(result, outcome=outcome)
+
+
+def test_the_reversibility_guard_refuses_a_slice_whose_text_drifted(
+    release: dict[str, Any],
+) -> None:
+    """Self-consistent drift: the slice agrees with its own digest and lies anyway."""
+    result = segment_document_release(release, settings=_settings(), counter=COUNTER)[0]
+    forged = "not the release text"
+    drifted = _drift(
+        result,
+        text=forged,
+        text_sha256=hashlib.sha256(forged.encode()).hexdigest(),
+    )
+
+    with pytest.raises(PassageDigestMismatchError):
+        check_release_reversibility(release, [drifted])
+
+
+def test_the_reversibility_guard_refuses_a_slice_whose_digest_drifted(
+    release: dict[str, Any],
+) -> None:
+    result = segment_document_release(release, settings=_settings(), counter=COUNTER)[0]
+    drifted = _drift(result, text_sha256="0" * 64)
+
+    with pytest.raises(PassageDigestMismatchError):
+        check_release_reversibility(release, [drifted])
+
+
+def test_the_reversibility_guard_refuses_a_slice_outside_its_sealed_passage(
+    release: dict[str, Any],
+) -> None:
+    result = segment_document_release(release, settings=_settings(), counter=COUNTER)[0]
+    binding = result.adapted.bindings[0]
+    exact = _representation(release)["unicode_text"]
+    beyond = binding.end + 20
+    drifted = _drift(
+        result,
+        start_char=binding.start,
+        end_char=beyond,
+        text=exact[binding.start : beyond],
+        text_sha256=hashlib.sha256(exact[binding.start : beyond].encode()).hexdigest(),
+    )
+
+    with pytest.raises(PassageBoundaryError):
+        check_release_reversibility(release, [drifted])
+
+
+# --------------------------------------------------------------------------
+# mutations the first round left alive
+# --------------------------------------------------------------------------
+
+
+def test_a_representation_digest_lie_is_caught_even_when_every_passage_agrees_with_it(
+    release: dict[str, Any],
+) -> None:
+    """A self-consistent lie: only the text-covering check can see it."""
+    lie = "sha256:" + hashlib.sha256(b"another document entirely").hexdigest()
+
+    def mutate(body: dict[str, Any]) -> None:
+        representation = body["text_representations"][0]
+        representation["text_digest"] = lie
+        representation["artifact_projection"]["content_digest"] = lie
+        for passage in body["structural_passages"]:
+            passage["representation_digest"] = lie
+            passage["source_fragment_projection"]["source_artifact_digest"] = lie
+
+    with pytest.raises(PassageDigestMismatchError):
+        adapt_document_release(_reseal(release, mutate))
+
+
+def test_the_settings_id_is_derived_from_the_settings_not_the_frozen_constant() -> None:
+    other = _settings(max_tokens=512, min_tokens=128, overlap_tokens=16)
+
+    assert settings_id(other) == "structure-overlap-512"
+    assert settings_id(other) != SELECTED_SETTINGS_ID
+
+
+def test_field_coverage_is_derived_from_the_tiling_it_describes(
+    release: dict[str, Any],
+) -> None:
+    one = adapt_document_release(release)[0]
+    coverage = one.artifact.coverage[0]
+    exact = _representation(release)["unicode_text"]
+    sealed = sum(item.end - item.start for item in one.bindings)
+    excluded = sum(
+        int(region["end"]) - int(region["start"])
+        for item in release["passage_coverage"]
+        for region in item["regions"]
+        if region["state"] == "excluded"
+    )
+
+    assert coverage.field_chars == len(exact)
+    assert coverage.covered_chars == sealed + excluded == len(exact)
+    assert coverage.covered_chars + coverage.uncovered_chars == len(exact)
+    assert coverage.uncovered_chars == 0
+    assert coverage.durable_chars == sealed
+    assert coverage.syntax_chars == excluded
+    assert coverage.region_count == len(one.artifact.regions)
+    assert coverage.fragment_count == len(one.bindings)
+
+
+# --------------------------------------------------------------------------
+# seam honesty: joined text is not one contiguous source run
+# --------------------------------------------------------------------------
+
+
+def test_a_joined_segment_declares_that_its_text_is_not_contiguous(release: dict[str, Any], tmp_path: Path) -> None:
+    receipt = write_model_input_segments(
+        release,
+        tmp_path / "model-input",
+        settings=_settings(max_tokens=16_000),
+        counter=COUNTER,
+    )
+    document = json.loads((tmp_path / "model-input" / receipt["outputs"][0]["path"]).read_text(encoding="utf-8"))
+
+    joined = [segment for segment in document["segments"] if len(segment["slices"]) > 1]
+    single = [segment for segment in document["segments"] if len(segment["slices"]) == 1]
+
+    assert joined
+    assert all(segment["contiguous"] is False for segment in joined)
+    assert all(segment["join_separator"] == JOIN_SEPARATOR == "\n" for segment in joined)
+    assert all(segment["contiguous"] is True for segment in single)
+    for segment in joined:
+        assert JOIN_SEPARATOR.join(one["text"] for one in segment["slices"]) == segment["text"]

@@ -45,11 +45,26 @@ The mapping, and why each half is what it is:
   full (method, version, configuration digest) into the model-input file and the
   receipt.
 
+``parser_invoked`` on the adapted artifact is always ``False``: it records
+whether the source step's *contained Office parser* ran, and it did not run here.
+Whatever produced the representation text ran inside the release, before this
+module was reached, and is reported on ``evidence_grade`` and the method fields.
+
 What comes out is a directory of temporary model-input segment files plus a
 sealed receipt. Those files are the whole seam to the Rulespec Extrapolator:
 file-only, no import, no Rulespec-side consumer built here. Every slice in them
 names the sealed passage and source fragment it came from, so evidence a model
 cites can be resolved back to the release without this module in the loop.
+
+**Reading one model-input file — the rule a consumer must not get wrong.** Only
+``segments[].slices[]`` are citable spans. Each slice carries ``start``, ``end``,
+``text``, ``text_sha256``, and the ``passage_id`` and ``fragment_id`` it came
+from, and its offsets address the sealed representation text directly. A
+segment's ``text`` is those slices joined with ``join_separator``, so when
+``contiguous`` is false the segment spans a sealed passage boundary and the
+characters between those passages are *not* in it. An offset into a segment's
+``text`` is therefore not a source offset, and evidence must never be recorded
+against one.
 
 Everything fails closed: an unknown ``format_version``, a release whose seal does
 not cover its body, a digest that does not cover the text it names, a passage
@@ -62,6 +77,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -91,10 +107,16 @@ from spicy_regs.docpipeline.source import (
 from spicy_regs.document_release import (
     ACTUAL_FILE_FORMAT_VERSION,
     COORDINATE_SYSTEM,
+    DEFAULT_RULESPEC_CORE_PATH,
     FORMAT_VERSION,
+    DocumentReleaseError,
     canonical_digest,
     canonical_json,
+    validate_document_release,
 )
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+"""The repository root, used to keep absolute scratch paths out of receipts."""
 
 ADAPTER_STEP = "document-release-segment"
 
@@ -132,6 +154,12 @@ OUTSIDE_PASSAGE_CONTENT_LAYER = "furniture"
 EXCLUDED_COVERAGE_REASON = "outside-sealed-structural-passages"
 """The release's own word for text no sealed passage selected."""
 
+JOIN_SEPARATOR = "\n"
+"""What ``ProcessingSegment.text`` puts between slices. See ``contiguous`` below."""
+
+_SAFE_FILE_STEM = re.compile(r"[0-9a-z-]{1,120}")
+"""A record-id tail safe to use as a file name, by the shape ids actually take."""
+
 
 # --------------------------------------------------------------------------
 # typed refusals
@@ -168,6 +196,18 @@ class PassageBoundaryError(DocumentReleaseSegmentError):
 
 class PassageCoverageMismatchError(DocumentReleaseSegmentError):
     """The sealed coverage record disagrees with the passages beside it."""
+
+
+class ReleaseValidationError(DocumentReleaseSegmentError):
+    """The release contract itself refused this release.
+
+    Raised when :func:`~spicy_regs.document_release.validate_document_release`
+    rejects a release that is sealed and structurally adaptable. The release
+    validator rebuilds every record and byte-compares, so it catches what an
+    adapter reading fields cannot: duplicate record identifiers, a fragment
+    projection whose selector cites a different span than its passage, and
+    coverage that names a passage nobody sealed.
+    """
 
 
 class ModelInputWriteError(DocumentReleaseSegmentError):
@@ -235,7 +275,7 @@ class AdaptedRepresentation:
     @property
     def file_stem(self) -> str:
         """A deterministic, filesystem-safe name for this representation."""
-        return self.representation_id.rsplit(":", 1)[-1]
+        return model_input_file_stem(self.representation_id)
 
 
 @dataclass(frozen=True)
@@ -261,6 +301,48 @@ def settings_id(settings: SegmentSettings) -> str:
 
 def _settings_facts(settings: SegmentSettings) -> dict[str, Any]:
     return {"settings_id": settings_id(settings), "settings_sha256": settings.digest, **settings.identity()}
+
+
+# --------------------------------------------------------------------------
+# names and paths
+# --------------------------------------------------------------------------
+
+
+def model_input_file_stem(representation_id: str) -> str:
+    """A file name for one representation that cannot leave its directory.
+
+    A record identifier is data, not a name this module chose: nothing stops a
+    release from carrying ``…:../../escaped``. The tail is used only when it has
+    the shape identifiers actually take; anything else is replaced by a digest of
+    the whole identifier, which is deterministic, collision-free, and inert.
+    """
+    tail = representation_id.rsplit(":", 1)[-1]
+    if _SAFE_FILE_STEM.fullmatch(tail):
+        return tail
+    return hashlib.sha256(representation_id.encode("utf-8")).hexdigest()
+
+
+def _contained_output_path(output_dir: Path, relative: str) -> Path:
+    """Resolve one published path, refusing anything that leaves ``output_dir``."""
+    root = Path(output_dir).resolve()
+    target = (root / Path(*relative.split("/"))).resolve()
+    if target != root and root not in target.parents:
+        raise ModelInputWriteError(f"published path {relative!r} leaves the output directory")
+    return target
+
+
+def _pin_path(path: Path) -> str:
+    """Record a repo-relative path when possible, else the basename.
+
+    Keeping absolute scratch paths out of the receipt keeps the same input
+    byte-identical from any working directory. Ported from the same idiom in
+    ``tools/build_date_event_artifact.py``.
+    """
+    resolved = Path(path).resolve()
+    try:
+        return str(resolved.relative_to(REPO_ROOT))
+    except ValueError:
+        return resolved.name
 
 
 # --------------------------------------------------------------------------
@@ -373,7 +455,14 @@ def _bind_passages(
     representation: Mapping[str, Any],
     text: str,
 ) -> list[Mapping[str, Any]]:
-    representation_id = representation["representation_id"]
+    representation_id = _require_text(representation.get("representation_id"), "representation id")
+    representation_digest = _require_text(representation.get("text_digest"), "representation text digest")
+    representation_artifact_id = _require_text(
+        _require_mapping(representation.get("artifact_projection"), "representation artifact projection").get(
+            "artifact_id"
+        ),
+        "representation artifact id",
+    )
     selected = [
         _require_mapping(record, "structural passage")
         for record in _require_list(release.get("structural_passages"), "structural_passages")
@@ -402,7 +491,11 @@ def _bind_passages(
             raise PassageBoundaryError(f"passage [{start}, {end}) overlaps the passage that ends at {cursor}")
         cursor = end
         _check_coordinate_system(record.get("coordinate_system"), f"passage {record.get('passage_id')!r}")
-        if record.get("representation_digest") != representation["text_digest"]:
+        _require_text(record.get("passage_id"), "passage id")
+        _require_text(record.get("evidence_grade"), "passage evidence grade")
+        _require_text(record.get("passage_policy_version"), "passage policy version")
+        _require_text(record.get("selected_text_digest"), "passage selected text digest")
+        if record.get("representation_digest") != representation_digest:
             raise PassageDigestMismatchError(
                 f"passage {record.get('passage_id')!r} names another representation digest"
             )
@@ -411,9 +504,10 @@ def _bind_passages(
                 f"passage {record.get('passage_id')!r} digest does not cover its exact text"
             )
         projection = _require_mapping(record.get("source_fragment_projection"), "passage source fragment projection")
-        if projection.get("source_artifact_ref") != representation["artifact_projection"]["artifact_id"]:
+        _require_text(projection.get("fragment_id"), "passage fragment id")
+        if projection.get("source_artifact_ref") != representation_artifact_id:
             raise PassageBindingError(f"passage {record.get('passage_id')!r} fragment names another artifact")
-        if projection.get("source_artifact_digest") != representation["text_digest"]:
+        if projection.get("source_artifact_digest") != representation_digest:
             raise PassageBindingError(f"passage {record.get('passage_id')!r} fragment names another artifact digest")
         if projection.get("selected_text_digest") != record.get("selected_text_digest"):
             raise PassageDigestMismatchError(
@@ -455,7 +549,25 @@ def _check_against_sealed_coverage(
         )
 
 
-def adapt_document_release(release: Mapping[str, Any]) -> tuple[AdaptedRepresentation, ...]:
+def _check_release_contract(release: Mapping[str, Any], rulespec_core_path: Path) -> None:
+    """Run the release's own validator and re-raise its refusal as a typed one.
+
+    Deliberately after this module's structural checks and before anything is
+    returned, so a caller gets the precise, seam-shaped refusal when this adapter
+    can name the problem, and the release contract's verdict when it cannot.
+    Nothing is returned or written until both agree.
+    """
+    try:
+        validate_document_release(release, rulespec_core_path=Path(rulespec_core_path))
+    except DocumentReleaseError as error:
+        raise ReleaseValidationError(f"the release contract refused this release: {error}") from error
+
+
+def adapt_document_release(
+    release: Mapping[str, Any],
+    *,
+    rulespec_core_path: Path = DEFAULT_RULESPEC_CORE_PATH,
+) -> tuple[AdaptedRepresentation, ...]:
     """Adapt every sealed text representation into a segmenter-ready artifact."""
     release = _require_mapping(release, "DocumentRelease")
     _check_format_version(release)
@@ -523,7 +635,7 @@ def adapt_document_release(release: Mapping[str, Any]) -> tuple[AdaptedRepresent
                     artifact_sha256=content_sha256,
                     coordinates=SOURCE_FIELD_COORDINATES,
                     evidence_grade=(
-                        str(passage["evidence_grade"])
+                        _require_text(passage.get("evidence_grade"), "passage evidence grade")
                         if passage is not None
                         else str(representation.get("evidence_grade", ""))
                     ),
@@ -537,19 +649,36 @@ def adapt_document_release(release: Mapping[str, Any]) -> tuple[AdaptedRepresent
             if passage is not None:
                 bindings.append(
                     PassageBinding(
-                        passage_id=str(passage["passage_id"]),
-                        fragment_id=str(passage["source_fragment_projection"]["fragment_id"]),
+                        passage_id=_require_text(passage.get("passage_id"), "passage id"),
+                        fragment_id=_require_text(
+                            _require_mapping(
+                                passage.get("source_fragment_projection"), "passage source fragment projection"
+                            ).get("fragment_id"),
+                            "passage fragment id",
+                        ),
                         region_id=region_id,
                         start=start,
                         end=end,
-                        selected_text_digest=str(passage["selected_text_digest"]),
-                        evidence_grade=str(passage["evidence_grade"]),
-                        passage_policy_version=str(passage["passage_policy_version"]),
+                        selected_text_digest=_require_text(
+                            passage.get("selected_text_digest"), "passage selected text digest"
+                        ),
+                        evidence_grade=_require_text(passage.get("evidence_grade"), "passage evidence grade"),
+                        passage_policy_version=_require_text(
+                            passage.get("passage_policy_version"), "passage policy version"
+                        ),
                     )
                 )
 
+        covered_chars = sum(end - start for start, end, _ in tiles)
+        durable_chars = sum(end - start for start, end, record in tiles if record is not None)
+        if covered_chars != len(text):
+            # The tiling is built to span the text end to end; proving it here
+            # means the coverage numbers below are checked, not assumed.
+            raise PassageCoverageMismatchError(
+                f"representation {representation_id!r} tiles cover {covered_chars} of {len(text)} characters"
+            )
         artifact = SourceArtifact(
-            artifact_id=str(projection["artifact_id"]),
+            artifact_id=_require_text(projection.get("artifact_id"), "representation artifact id"),
             content_sha256=content_sha256,
             subject_type=RELEASE_SUBJECT_TYPE,
             subject_id=document_version_ref,
@@ -574,17 +703,20 @@ def adapt_document_release(release: Mapping[str, Any]) -> tuple[AdaptedRepresent
                     source_field=source_field,
                     field_origin=SOURCE_NATIVE_FIELD,
                     field_chars=len(text),
-                    covered_chars=sum(end - start for start, end, _ in tiles),
-                    durable_chars=sum(end - start for start, end, record in tiles if record is not None),
-                    syntax_chars=sum(end - start for start, end, record in tiles if record is None),
+                    covered_chars=covered_chars,
+                    durable_chars=durable_chars,
+                    syntax_chars=covered_chars - durable_chars,
                     container_chars=0,
-                    uncovered_chars=0,
+                    # Derived from the tiling, never asserted: the tiles cover the
+                    # text end to end by construction, and a construction that
+                    # stopped doing so would say so here instead of claiming zero.
+                    uncovered_chars=len(text) - covered_chars,
                     gaps=(),
                     region_count=len(regions),
                     fragment_count=len(bindings),
                 ),
             ),
-            secret_rules=(),
+            secret_rules=tuple(sorted(scan_text_for_secrets(text))),
         )
         adapted.append(
             AdaptedRepresentation(
@@ -605,6 +737,7 @@ def adapt_document_release(release: Mapping[str, Any]) -> tuple[AdaptedRepresent
                 context_fields=context_fields,
             )
         )
+    _check_release_contract(release, rulespec_core_path)
     return tuple(adapted)
 
 
@@ -618,6 +751,7 @@ def segment_document_release(
     *,
     settings: SegmentSettings,
     counter: TokenCounter,
+    rulespec_core_path: Path = DEFAULT_RULESPEC_CORE_PATH,
 ) -> tuple[RepresentationSegmentation, ...]:
     """Adapt one sealed release and segment it with the settings as supplied.
 
@@ -629,7 +763,7 @@ def segment_document_release(
             adapted=adapted,
             outcome=segment_artifact(adapted.artifact, settings=settings, counter=counter),
         )
-        for adapted in adapt_document_release(release)
+        for adapted in adapt_document_release(release, rulespec_core_path=rulespec_core_path)
     )
     check_release_reversibility(release, results)
     return results
@@ -705,11 +839,17 @@ def _segment_record(result: RepresentationSegmentation, segment: Any) -> dict[st
     return {
         "char_count": segment.char_count,
         "content_digest": segment.content_digest,
+        # ``text`` is the newline JOIN of ``slices``. When a segment carries more
+        # than one slice it spans a sealed passage boundary, and the characters
+        # between those passages — which no passage selected — are not in it. A
+        # consumer must cite ``slices[]``, never an offset into ``text``.
+        "contiguous": len(segment.slices) <= 1,
         "context": {
             "artifact_context": dict(segment.context.artifact_context),
             "headings": list(segment.context.headings),
         },
         "input_limit": segment.input_limit,
+        "join_separator": JOIN_SEPARATOR,
         "next_segment_id": segment.next_segment_id,
         "ordinal": segment.ordinal,
         "overlap_chars": segment.overlap_chars,
@@ -781,6 +921,7 @@ def write_model_input_segments(
     settings: SegmentSettings,
     counter: TokenCounter,
     release_path: Path | None = None,
+    rulespec_core_path: Path = DEFAULT_RULESPEC_CORE_PATH,
 ) -> dict[str, Any]:
     """Segment one sealed release into temporary model-input files and a receipt.
 
@@ -791,10 +932,13 @@ def write_model_input_segments(
     if output_dir.exists() and any(output_dir.iterdir()):
         raise ModelInputWriteError(f"output directory is not empty: {output_dir}")
 
-    results = segment_document_release(release, settings=settings, counter=counter)
+    results = segment_document_release(
+        release, settings=settings, counter=counter, rulespec_core_path=rulespec_core_path
+    )
 
     inputs: list[dict[str, Any]] = []
     documents: list[tuple[str, dict[str, Any]]] = []
+    seen_paths: set[str] = set()
     for result in results:
         adapted = result.adapted
         inputs.append(
@@ -809,12 +953,11 @@ def write_model_input_segments(
                 "text_chars": len(adapted.text),
             }
         )
-        documents.append(
-            (
-                f"{SEGMENT_DIRECTORY}/{adapted.file_stem}.json",
-                model_input_document(release, result, settings=settings),
-            )
-        )
+        relative = f"{SEGMENT_DIRECTORY}/{adapted.file_stem}.json"
+        if relative in seen_paths:
+            raise ModelInputWriteError(f"two representations would publish to one path: {relative}")
+        seen_paths.add(relative)
+        documents.append((relative, model_input_document(release, result, settings=settings)))
 
     outcomes = [result.outcome for result in results]
     segments = [segment for outcome in outcomes for segment in outcome.segments]
@@ -831,8 +974,16 @@ def write_model_input_segments(
     }
     if release_path is not None:
         release_path = Path(release_path)
-        release_facts["release_path"] = str(release_path)
+        release_facts["release_path"] = _pin_path(release_path)
         release_facts["release_path_sha256"] = hashlib.sha256(release_path.read_bytes()).hexdigest()
+
+    failures: list[str] = [
+        f"check {check['name']} failed: {check['detail']}" for check in checks if check["status"] == "fail"
+    ]
+    if not results:
+        failures.append("the release carried no text representation to segment")
+    if not segments:
+        failures.append("segmentation produced no model input")
 
     receipt = _sealed_receipt(
         {
@@ -850,7 +1001,8 @@ def write_model_input_segments(
                 "slice_count": sum(len(segment.slices) for segment in segments),
                 "uncovered_chars": sum(one.uncovered_chars for one in coverage),
             },
-            "final_state": "pass" if all(check["status"] != "fail" for check in checks) else "fail",
+            "failures": failures,
+            "final_state": "fail" if failures else "pass",
             "format_version": MODEL_INPUT_FORMAT_VERSION,
             "inputs": inputs,
             "outputs": [
@@ -867,17 +1019,26 @@ def write_model_input_segments(
             "step": ADAPTER_STEP,
         }
     )
-    matched = scan_text_for_secrets(canonical_json(receipt))
-    if matched:
-        raise ModelInputWriteError(f"receipt carries secret-like content: {sorted(matched)}")
+    # Scan what is actually published, not only the receipt. The receipt carries
+    # identifiers and digests; the model-input files carry the whole document
+    # body, which is where secret-like content in a sealed release would be.
+    # Reported by relative path and rule, the same shape ``scan_tree_for_secrets``
+    # reports, so a refusal names the file a reader would have to go look at.
+    scanned = {
+        path: sorted(matched)
+        for path, document in (*documents, (RECEIPT_NAME, receipt))
+        if (matched := scan_text_for_secrets(canonical_json(document)))
+    }
+    if scanned:
+        raise ModelInputWriteError(f"refusing to publish secret-like content: {scanned}")
 
     output_dir.mkdir(parents=True, exist_ok=True)
     for path, document in documents:
-        written = _write_canonical(output_dir / Path(*path.split("/")), document)
+        written = _write_canonical(_contained_output_path(output_dir, path), document)
         expected = next(one["sha256"] for one in receipt["outputs"] if one["path"] == path)
         if written != expected:
             raise ModelInputWriteError(f"published model input {path} differs from its receipt digest")
-    _write_canonical(output_dir / RECEIPT_NAME, receipt)
+    _write_canonical(_contained_output_path(output_dir, RECEIPT_NAME), receipt)
     return receipt
 
 
@@ -903,6 +1064,7 @@ def segment_release_path(
     *,
     settings: SegmentSettings,
     counter: TokenCounter,
+    rulespec_core_path: Path = DEFAULT_RULESPEC_CORE_PATH,
 ) -> dict[str, Any]:
     """DocumentRelease path in; temporary model-input files and a receipt out."""
     release_path = Path(release_path)
@@ -912,6 +1074,7 @@ def segment_release_path(
         settings=settings,
         counter=counter,
         release_path=release_path,
+        rulespec_core_path=rulespec_core_path,
     )
 
 
@@ -919,6 +1082,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Segment a sealed DocumentRelease into temporary model-input files")
     parser.add_argument("--release", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--rulespec-core", type=Path, default=DEFAULT_RULESPEC_CORE_PATH)
     args = parser.parse_args(argv)
 
     from spicy_regs.ontology.segmentation import TiktokenCounter
@@ -930,10 +1094,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.output_dir,
         settings=settings,
         counter=counter,
+        rulespec_core_path=args.rulespec_core,
     )
     print(
         canonical_json(
             {
+                "failures": receipt["failures"],
                 "output_dir": str(args.output_dir),
                 "receipt_sha256": receipt["receipt_sha256"],
                 "release_digest": receipt["release"]["release_digest"],
