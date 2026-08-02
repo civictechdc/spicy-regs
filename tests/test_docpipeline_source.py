@@ -77,6 +77,7 @@ from spicy_regs.docpipeline.source import (
     build_source_artifact,
     build_source_artifacts,
     processing_regions,
+    native_structural_passage_spans,
     profile_for_table,
     source_checks,
     write_source_tables,
@@ -335,6 +336,133 @@ def test_markup_prolog_stays_in_coverage_and_never_becomes_a_fragment() -> None:
     coverage = next(one for one in artifact.coverage if one.source_field == "federal_register.body_html")
     assert coverage.syntax_chars == len(prolog[0].text) > 0
     assert coverage.uncovered_chars == 0
+
+
+def test_native_structural_passage_spans_expose_visible_exact_markup_regions() -> None:
+    text = '<?xml version="1.0"?><section><title>Scope</title><p>Alpha rule.</p><p>Beta rule.</p></section>'
+
+    spans = native_structural_passage_spans("cfr_sections.xml_text", text)
+    pieces = [text[start:end] for start, end in spans]
+
+    assert len(spans) == 3
+    assert all(left_end <= right_start for (_, left_end), (right_start, _) in zip(spans, spans[1:]))
+    assert any("Scope" in piece for piece in pieces)
+    assert any("Alpha rule." in piece for piece in pieces)
+    assert any("Beta rule." in piece for piece in pieces)
+    assert all("<?xml" not in piece for piece in pieces)
+
+
+def test_native_structural_passage_spans_exclude_non_content_markup() -> None:
+    text = (
+        "<html><head><title>PFAS report</title>"
+        "<style>.hidden { display: none; }</style>"
+        "<script>window.tracking = true;</script></head>"
+        "<body><nav><p>Site navigation</p></nav><main>"
+        "<!-- analytics marker --><noscript><iframe>tracking</iframe></noscript>"
+        "<p hidden>hidden sentence</p><p aria-hidden='true'>also hidden</p>"
+        "<p style='display:none'>still hidden</p>"
+        "<p>Facilities must sample quarterly.</p><p>(</p>"
+        "<p>Before icon <svg><path d='M0 0 L10 10'/></svg> after icon.</p>"
+        "</main><footer><p>Site footer</p></footer></body></html>"
+    )
+
+    spans = native_structural_passage_spans(
+        "gao_reports.full_text",
+        text,
+        media_type="text/html",
+    )
+    pieces = [text[start:end] for start, end in spans]
+    selected = "\n".join(pieces)
+
+    assert "PFAS report" in selected
+    assert "Facilities must sample quarterly." in selected
+    assert "display: none" not in selected
+    assert "window.tracking" not in selected
+    assert "Site navigation" not in selected
+    assert "Site footer" not in selected
+    assert "analytics marker" not in selected
+    assert "tracking" not in selected
+    assert "hidden sentence" not in selected
+    assert "also hidden" not in selected
+    assert "still hidden" not in selected
+    assert "<svg" not in selected
+    assert "<path" not in selected
+    assert "Before icon" in selected
+    assert "after icon." in selected
+    assert all(any(character.isalnum() for character in piece) for piece in pieces)
+
+
+def test_native_structural_passage_spans_exclude_non_content_without_block_tags() -> None:
+    text = (
+        "<html><body><script>secret()</script>"
+        "<span>Visible rule.</span><span hidden>Hidden rule.</span>"
+        "</body></html>"
+    )
+
+    spans = native_structural_passage_spans(
+        "gao_reports.full_text",
+        text,
+        media_type="text/html",
+    )
+    selected = "\n".join(text[start:end] for start, end in spans)
+
+    assert "Visible rule." in selected
+    assert "secret()" not in selected
+    assert "Hidden rule." not in selected
+
+
+def test_html_title_nested_in_main_does_not_duplicate_a_passage() -> None:
+    text = (
+        "<html><body><main><title>Inline title</title>"
+        "<p>Visible rule.</p></main></body></html>"
+    )
+
+    spans = native_structural_passage_spans(
+        "gao_reports.full_text",
+        text,
+        media_type="text/html",
+    )
+    selected = "\n".join(text[start:end] for start, end in spans)
+
+    assert all(
+        left_end <= right_start
+        for (_, left_end), (right_start, _) in zip(spans, spans[1:])
+    )
+    assert selected.count("Inline title") == 1
+    assert selected.count("Visible rule.") == 1
+
+
+def test_release_visibility_filter_does_not_change_existing_source_heading_context() -> None:
+    body = "<h1>Scope<script>private</script></h1><p>Visible rule.</p>"
+    record = SourceRecord(
+        profile=FEDERAL_REGISTER_PROFILE,
+        row={"document_number": "2026-12345", "title": "PFAS Rule", "body_html": body},
+    )
+
+    artifact = built(record)
+    paragraph = next(
+        region
+        for region in field_regions(artifact, "federal_register.body_html")
+        if "Visible rule." in region.text
+    )
+
+    # The v3 source-policy IDs were minted with the original markup collector.
+    # The actual-file release visibility filter must not silently change them.
+    assert paragraph.heading_path == ("Scopeprivate",)
+
+
+def test_xml_head_elements_remain_searchable() -> None:
+    text = "<ROOT><HEAD>Substantive CFR heading</HEAD><P>Required conduct.</P></ROOT>"
+
+    spans = native_structural_passage_spans(
+        "cfr_sections.xml_text",
+        text,
+        media_type="application/xml",
+    )
+    selected = "\n".join(text[start:end] for start, end in spans)
+
+    assert "Substantive CFR heading" in selected
+    assert "Required conduct." in selected
 
 
 def test_structured_array_containers_cover_without_becoming_fragments() -> None:

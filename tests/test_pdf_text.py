@@ -23,10 +23,22 @@ def test_preserves_page_boundaries() -> None:
     result = extract_pdf_text(make_pdf(["First page", "Second page"]))
     assert result.status is PdfTextStatus.OK
     assert result.page_count == 2
+    assert result.pages == ("First page", "Second page")
     assert "First page" in result.text
     assert "Second page" in result.text
     # The two pages are separated by a blank line, not run together.
     assert "\n\n" in result.text
+
+
+def test_can_preserve_parser_whitespace_for_a_locked_extraction() -> None:
+    result = extract_pdf_text(
+        make_pdf(["First page", "Second page"]),
+        page_separator="\n\f\n",
+        page_whitespace="preserve",
+    )
+
+    assert result.status is PdfTextStatus.OK
+    assert result.text == "\n\f\n".join(result.pages)
 
 
 def test_textless_pdf_is_empty_not_error() -> None:

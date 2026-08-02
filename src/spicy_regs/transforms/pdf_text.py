@@ -21,6 +21,7 @@ from __future__ import annotations
 import io
 from dataclasses import dataclass
 from enum import Enum
+from typing import Literal
 
 from pypdf import PdfReader
 from pypdf.errors import PyPdfError
@@ -55,18 +56,29 @@ class PdfTextResult:
     text: str
     page_count: int
     error: str | None = None
+    pages: tuple[str, ...] = ()
+    failed_page_ordinals: tuple[int, ...] = ()
 
     @property
     def ok(self) -> bool:
         return self.status is PdfTextStatus.OK
 
 
-def extract_pdf_text(data: bytes) -> PdfTextResult:
+def extract_pdf_text(
+    data: bytes,
+    *,
+    page_separator: str = PAGE_SEPARATOR,
+    page_whitespace: Literal["preserve", "strip"] = "strip",
+) -> PdfTextResult:
     """Extract embedded text from PDF ``data``.
 
     Never raises: every failure mode is mapped to a :class:`PdfTextResult`
     carrying a non-OK :class:`PdfTextStatus`.
     """
+    if not isinstance(page_separator, str) or not page_separator:
+        raise ValueError("page_separator must be a non-empty string")
+    if page_whitespace not in {"preserve", "strip"}:
+        raise ValueError("page_whitespace must be 'preserve' or 'strip'")
     if not data:
         return PdfTextResult(PdfTextStatus.ERROR, "", 0, error="empty input")
 
@@ -88,16 +100,37 @@ def extract_pdf_text(data: bytes) -> PdfTextResult:
         pages = reader.pages
         page_count = len(pages)
         parts: list[str] = []
-        for page in pages:
+        failed_page_ordinals: list[int] = []
+        for ordinal, page in enumerate(pages, start=1):
             # One bad page shouldn't sink the whole document.
             try:
                 parts.append(page.extract_text() or "")
             except Exception:  # noqa: BLE001 - pypdf raises a wide variety here
                 parts.append("")
+                failed_page_ordinals.append(ordinal)
     except (PyPdfError, OSError, ValueError) as exc:
         return PdfTextResult(PdfTextStatus.ERROR, "", 0, error=str(exc))
 
-    text = PAGE_SEPARATOR.join(p.strip() for p in parts).strip()
+    normalized_pages = (
+        tuple(part.strip() for part in parts)
+        if page_whitespace == "strip"
+        else tuple(parts)
+    )
+    text = page_separator.join(normalized_pages)
+    if page_whitespace == "strip":
+        text = text.strip()
     if not text:
-        return PdfTextResult(PdfTextStatus.EMPTY, "", page_count)
-    return PdfTextResult(PdfTextStatus.OK, text, page_count)
+        return PdfTextResult(
+            PdfTextStatus.EMPTY,
+            "",
+            page_count,
+            pages=normalized_pages,
+            failed_page_ordinals=tuple(failed_page_ordinals),
+        )
+    return PdfTextResult(
+        PdfTextStatus.OK,
+        text,
+        page_count,
+        pages=normalized_pages,
+        failed_page_ordinals=tuple(failed_page_ordinals),
+    )

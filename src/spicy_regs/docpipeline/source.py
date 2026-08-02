@@ -597,6 +597,25 @@ _MARKUP_BLOCKS = frozenset(
 
 _MARKUP_HEADINGS = frozenset({"chapter", "enum", "h1", "h2", "h3", "h4", "h5", "h6", "header", "part", "title"})
 
+_NON_CONTENT_MARKUP = frozenset({"iframe", "noscript", "script", "style", "svg", "template"})
+
+_HTML_VOID_TAGS = frozenset(
+    {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
+)
+
+
+def _attributes_hide_content(attrs: Sequence[tuple[str, str | None]]) -> bool:
+    normalized = {name.casefold(): value for name, value in attrs}
+    if "hidden" in normalized or "inert" in normalized:
+        return True
+    aria_hidden = normalized.get("aria-hidden")
+    if isinstance(aria_hidden, str) and aria_hidden.casefold().strip() == "true":
+        return True
+    style = normalized.get("style")
+    return isinstance(style, str) and bool(
+        re.search(r"(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*hidden)\b", style, re.IGNORECASE)
+    )
+
 _ATOMIC_HEADING_COLUMNS = frozenset({"title", "name", "heading", "legal_business_name"})
 
 
@@ -704,8 +723,223 @@ class _TextCollector(HTMLParser):
         self.parts.append(data)
 
 
+class _IndexableTextCollector(HTMLParser):
+    """Collect visible text for new release passages without changing v3 IDs."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self._stack: list[tuple[str, bool]] = []
+        self._suppression_depth = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        normalized = tag.casefold()
+        suppress = normalized in _NON_CONTENT_MARKUP or _attributes_hide_content(attrs)
+        if normalized not in _HTML_VOID_TAGS:
+            self._stack.append((normalized, suppress))
+            self._suppression_depth += int(suppress)
+
+    def handle_endtag(self, tag: str) -> None:
+        normalized = tag.casefold()
+        for index in range(len(self._stack) - 1, -1, -1):
+            if self._stack[index][0] == normalized:
+                removed = self._stack[index:]
+                self._suppression_depth -= sum(int(suppress) for _, suppress in removed)
+                del self._stack[index:]
+                break
+
+    def handle_data(self, data: str) -> None:
+        if self._suppression_depth == 0:
+            self.parts.append(data)
+
+
+class _NonContentRangeParser(HTMLParser):
+    """Locate exact source ranges consumers must never index as prose."""
+
+    def __init__(self, text: str) -> None:
+        super().__init__(convert_charrefs=False)
+        self._text = text
+        self._line_starts = [0]
+        self._line_starts.extend(match.end() for match in re.finditer("\n", text))
+        self._stack: list[tuple[str, bool]] = []
+        self._active_exclusion_start: int | None = None
+        self.ranges: list[tuple[int, int]] = []
+
+    def _index(self) -> int:
+        line, offset = self.getpos()
+        return self._line_starts[line - 1] + offset
+
+    def _tag_end(self, start: int) -> int:
+        close = self._text.find(">", start)
+        return len(self._text) if close < 0 else close + 1
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        normalized = tag.casefold()
+        excluded = normalized in _NON_CONTENT_MARKUP or _attributes_hide_content(attrs)
+        start = self._index()
+        if normalized in _HTML_VOID_TAGS:
+            if excluded:
+                self.ranges.append((start, self._tag_end(start)))
+            return
+        starts_exclusion = excluded and self._active_exclusion_start is None
+        if starts_exclusion:
+            self._active_exclusion_start = start
+        self._stack.append((normalized, starts_exclusion))
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag.casefold() in _NON_CONTENT_MARKUP or _attributes_hide_content(attrs):
+            start = self._index()
+            self.ranges.append((start, self._tag_end(start)))
+
+    def handle_endtag(self, tag: str) -> None:
+        normalized = tag.casefold()
+        for index in range(len(self._stack) - 1, -1, -1):
+            open_tag, _ = self._stack[index]
+            if open_tag == normalized:
+                removed = self._stack[index:]
+                starts = [starts for _, starts in removed]
+                del self._stack[index:]
+                if any(starts) and self._active_exclusion_start is not None:
+                    self.ranges.append(
+                        (self._active_exclusion_start, self._tag_end(self._index()))
+                    )
+                    self._active_exclusion_start = None
+                break
+
+    def handle_comment(self, data: str) -> None:
+        del data
+        start = self._index()
+        close = self._text.find("-->", start)
+        self.ranges.append((start, len(self._text) if close < 0 else close + 3))
+
+    def close(self) -> None:
+        super().close()
+        if self._active_exclusion_start is not None:
+            self.ranges.append((self._active_exclusion_start, len(self._text)))
+        self._stack.clear()
+        self._active_exclusion_start = None
+
+
+def _non_content_markup_ranges(text: str) -> tuple[tuple[int, int], ...]:
+    parser = _NonContentRangeParser(text)
+    try:
+        parser.feed(text)
+        parser.close()
+    except (AssertionError, ValueError):
+        return ()
+    merged: list[tuple[int, int]] = []
+    for start, end in sorted(parser.ranges):
+        if end <= start:
+            continue
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    return tuple(merged)
+
+
+class _NamedElementRangeParser(HTMLParser):
+    """Locate exact source ranges for a small set of semantic HTML elements."""
+
+    def __init__(self, text: str, names: frozenset[str]) -> None:
+        super().__init__(convert_charrefs=False)
+        self._text = text
+        self._names = names
+        self._line_starts = [0]
+        self._line_starts.extend(match.end() for match in re.finditer("\n", text))
+        self._stack: list[tuple[str, int | None]] = []
+        self.ranges: dict[str, list[tuple[int, int]]] = {name: [] for name in names}
+
+    def _index(self) -> int:
+        line, offset = self.getpos()
+        return self._line_starts[line - 1] + offset
+
+    def _tag_end(self, start: int) -> int:
+        close = self._text.find(">", start)
+        return len(self._text) if close < 0 else close + 1
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        del attrs
+        normalized = tag.casefold()
+        self._stack.append(
+            (normalized, self._index() if normalized in self._names else None)
+        )
+
+    def handle_endtag(self, tag: str) -> None:
+        normalized = tag.casefold()
+        for index in range(len(self._stack) - 1, -1, -1):
+            open_tag, _ = self._stack[index]
+            if open_tag == normalized:
+                removed = self._stack[index:]
+                del self._stack[index:]
+                for removed_tag, start in removed:
+                    if start is not None:
+                        self.ranges[removed_tag].append(
+                            (start, self._tag_end(self._index()))
+                        )
+                break
+
+
+def _semantic_html_content_ranges(text: str) -> tuple[tuple[int, int], ...] | None:
+    parser = _NamedElementRangeParser(text, frozenset({"main", "title"}))
+    try:
+        parser.feed(text)
+        parser.close()
+    except (AssertionError, ValueError):
+        return None
+    mains = parser.ranges["main"]
+    if len(mains) != 1:
+        return None
+    merged: list[tuple[int, int]] = []
+    for start, end in sorted([*parser.ranges["title"], mains[0]]):
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    return tuple(merged)
+
+
+def _intersect_ranges(
+    start: int,
+    end: int,
+    allowed: Sequence[tuple[int, int]],
+) -> Iterator[tuple[int, int]]:
+    for allowed_start, allowed_end in allowed:
+        overlap_start = max(start, allowed_start)
+        overlap_end = min(end, allowed_end)
+        if overlap_start < overlap_end:
+            yield overlap_start, overlap_end
+
+
+def _subtract_ranges(
+    start: int,
+    end: int,
+    exclusions: Sequence[tuple[int, int]],
+) -> Iterator[tuple[int, int]]:
+    cursor = start
+    for excluded_start, excluded_end in exclusions:
+        if excluded_end <= cursor:
+            continue
+        if excluded_start >= end:
+            break
+        if excluded_start > cursor:
+            yield cursor, min(excluded_start, end)
+        cursor = max(cursor, excluded_end)
+        if cursor >= end:
+            break
+    if cursor < end:
+        yield cursor, end
+
+
 def _visible_markup_text(value: str) -> str:
     parser = _TextCollector()
+    parser.feed(value)
+    parser.close()
+    return " ".join("".join(parser.parts).split())
+
+
+def _indexable_markup_text(value: str) -> str:
+    parser = _IndexableTextCollector()
     parser.feed(value)
     parser.close()
     return " ".join("".join(parser.parts).split())
@@ -772,6 +1006,66 @@ def _markup_drafts(source_field: str, text: str) -> list[_RegionDraft] | None:
             )
         )
     return result
+
+
+def native_structural_passage_spans(
+    source_field: str,
+    text: str,
+    *,
+    media_type: str | None = None,
+) -> tuple[tuple[int, int], ...]:
+    """Return non-overlapping, visible structural spans over exact native text.
+
+    The release pipeline uses the same native markup boundaries as the source
+    artifact pipeline.  Syntax-only regions remain accounted for by release
+    coverage but do not become passages consumers might quote or rank.
+    """
+
+    if not source_field or not isinstance(text, str):
+        raise SourceError("native structural spans require a source field and Unicode text")
+    if media_type is not None and not isinstance(media_type, str):
+        raise SourceError("native structural spans media type must be a string")
+    drafts = _markup_drafts(source_field, text)
+    if drafts is None:
+        if text.lstrip().startswith("<") and ">" in text:
+            drafts = [
+                _RegionDraft(
+                    kind="markup-document",
+                    source_field=source_field,
+                    start_char=0,
+                    end_char=len(text),
+                )
+            ]
+        else:
+            drafts = _prose_drafts(source_field, text)
+            return tuple(
+                (draft.start_char, draft.end_char)
+                for draft in drafts
+                if text[draft.start_char : draft.end_char].strip()
+            )
+    exclusions = _non_content_markup_ranges(text)
+    semantic_ranges = (
+        _semantic_html_content_ranges(text)
+        if media_type == "text/html"
+        else None
+    )
+    output: list[tuple[int, int]] = []
+    for draft in drafts:
+        candidate_ranges: Sequence[tuple[int, int]] = ((draft.start_char, draft.end_char),)
+        if semantic_ranges is not None:
+            candidate_ranges = tuple(
+                _intersect_ranges(draft.start_char, draft.end_char, semantic_ranges)
+            )
+        for candidate_start, candidate_end in candidate_ranges:
+            for start, end in _subtract_ranges(
+                candidate_start,
+                candidate_end,
+                exclusions,
+            ):
+                visible = _indexable_markup_text(text[start:end])
+                if visible and any(character.isalnum() for character in visible):
+                    output.append((start, end))
+    return tuple(output)
 
 
 def _json_array_ranges(text: str) -> list[tuple[int, int]] | None:
