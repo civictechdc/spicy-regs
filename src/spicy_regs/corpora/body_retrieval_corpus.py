@@ -870,6 +870,65 @@ def measure_corpus(
     }
 
 
+def measure_anchor(
+    cache_dir: Path,
+    *,
+    jaccard_cap: int = 400,
+    jaccard_seed: int = 7,
+) -> dict[str, Any]:
+    """Measure the 34-document segmentation cache with the identical method.
+
+    Without this the corpus's Jaccard number floats free: the 0.140 baseline
+    was taken on a different surface with an unrecorded tokenizer, so quoting
+    a new number against it would be comparing two instruments. Re-measuring
+    the old corpus here makes the comparison mean something -- and if this
+    function does not roughly reproduce ~0.14, the method is wrong and the
+    corpus number should not be trusted either.
+
+    Extraction is delegated to ``segmentation_evaluation._extract_text`` so
+    that PDF members are read the way that corpus reads them; only the
+    downstream tokenizer and Jaccard are shared with the body corpus.
+    """
+
+    from spicy_regs.corpora.segmentation_evaluation import (
+        FULL_DOCUMENT_SPECS,
+        _extract_text,
+    )
+
+    cache_dir = Path(cache_dir)
+    lock = _read_json(cache_dir / "source-lock.json")
+    by_case = {_text(record.get("case_id")): record for record in lock.get("sources", [])}
+
+    token_sets: list[set[str]] = []
+    text_chars: list[int] = []
+    for spec in FULL_DOCUMENT_SPECS:
+        record = by_case.get(spec.case_id)
+        if record is None:
+            continue
+        payload = (cache_dir / _text(record.get("cache_file"))).read_bytes()
+        try:
+            raw, _method, _version = _extract_text(spec, payload)
+        except Exception:  # noqa: BLE001 - a member we cannot read is simply not measured
+            continue
+        text = visible_text(raw)
+        text_chars.append(len(text))
+        token_sets.append(tokenize(text))
+
+    ordered = sorted(float(value) for value in text_chars)
+    return {
+        "document_count": len(token_sets),
+        "visible_text_chars": {
+            "median": median(ordered) if ordered else None,
+            "total": int(sum(ordered)),
+        },
+        "vocabulary_competition": {
+            "surface": "body visible text",
+            "tokenizer": "lowercase-alnum-min3-minus-minimal-stoplist",
+            **summarize_distribution(jaccard_distribution(token_sets, cap=jaccard_cap, seed=jaccard_seed)),
+        },
+    }
+
+
 # --------------------------------------------------------------------------
 # command line
 # --------------------------------------------------------------------------
@@ -920,6 +979,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     measure = commands.add_parser("measure", help="measure the sealed corpus on its real bodies")
     measure.add_argument("--cache-dir", type=Path, required=True)
     measure.add_argument("--output", type=Path, default=None)
+    measure.add_argument("--anchor-cache", type=Path, default=None)
 
     release = commands.add_parser("release", help="build a v2 DocumentRelease from the sealed cache")
     release.add_argument("--draw", type=Path, required=True)
@@ -973,6 +1033,15 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "measure":
         report = measure_corpus(args.cache_dir)
+        if args.anchor_cache is not None:
+            report["baseline_anchor"] = {
+                "cache_dir": str(args.anchor_cache),
+                "why": (
+                    "the 34-document segmentation corpus, re-measured with this "
+                    "module's tokenizer so the comparison is instrument-independent"
+                ),
+                **measure_anchor(args.anchor_cache),
+            }
         if args.output is not None:
             Path(args.output).parent.mkdir(parents=True, exist_ok=True)
             Path(args.output).write_text(canonical_json(report) + "\n", encoding="utf-8")

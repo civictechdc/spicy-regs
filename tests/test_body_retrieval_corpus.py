@@ -471,6 +471,53 @@ class TestReleaseCompatibility:
         assert spec.representation == "html"
 
 
+class TestMeasure:
+    def test_visible_text_strips_markup_and_scripts(self) -> None:
+        markup = "<div><script>var x = 'habitat';</script><p>Critical  habitat</p></div>"
+        assert brc.visible_text(markup) == "Critical habitat"
+
+    def test_visible_text_collapses_whitespace_so_layout_is_not_vocabulary(self) -> None:
+        assert brc.visible_text("<p>a\n\n\tb</p>") == "a b"
+
+    def test_measure_reports_counts_bytes_and_body_jaccard(self, tmp_path: Path) -> None:
+        cache = tmp_path / "cache"
+        brc.fetch_bodies(_manifest(tmp_path), cache, fetcher=_Recorder({}), sleep=lambda _: None)
+        report = brc.measure_corpus(cache)
+        assert report["document_count"] == 3
+        assert report["source_bytes"]["total"] == len(BODY) * 3
+        assert report["vocabulary_competition"]["pair_count"] == 3
+        # Identical bodies compete perfectly; the metric must say so.
+        assert report["vocabulary_competition"]["median"] == pytest.approx(1.0)
+
+    def test_measure_counts_documents_above_the_chunking_threshold(self, tmp_path: Path) -> None:
+        """Below ~3000 characters chunking is a no-op, so the count is the point."""
+        cache = tmp_path / "cache"
+        manifest = _manifest(tmp_path, count=2)
+        urls = [d["body_html_url"] for d in json.loads(manifest.read_text())["documents"]]
+        long_body = b"<p>" + b"habitat conservation " * 500 + b"</p>"
+        brc.fetch_bodies(
+            manifest,
+            cache,
+            fetcher=_Recorder({urls[0]: long_body}),
+            sleep=lambda _: None,
+        )
+        report = brc.measure_corpus(cache)
+        assert report["chunking_relevant"]["documents_over_3000_chars"] == 1
+
+    def test_measure_counts_publisher_boilerplate_rather_than_removing_it(self, tmp_path: Path) -> None:
+        """Exact publisher bytes are kept; the constant is reported, not deleted."""
+        cache = tmp_path / "cache"
+        manifest = _manifest(tmp_path, count=1)
+        url = json.loads(manifest.read_text())["documents"][0]["body_html_url"]
+        with_chrome = b"<div><p>Document headings vary by document type</p><p>Body</p></div>"
+        brc.fetch_bodies(manifest, cache, fetcher=_Recorder({url: with_chrome}), sleep=lambda _: None)
+        report = brc.measure_corpus(cache)
+        assert report["documents_carrying_publisher_boilerplate"] == 1
+        # and the bytes are still exactly what the publisher served
+        lock = json.loads((cache / "source-lock.json").read_text())
+        assert (cache / lock["sources"][0]["cache_file"]).read_bytes() == with_chrome
+
+
 class TestValidate:
     def test_a_clean_cache_passes(self, tmp_path: Path) -> None:
         cache = tmp_path / "cache"
