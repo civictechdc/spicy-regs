@@ -39,7 +39,12 @@ _CFR_TITLE_PART = re.compile(
 )
 
 _USC_STANDARD = re.compile(
-    r"(?P<title>[1-9]\d*)\s*U\.?\s*S\.?\s*C\.?"
+    r"(?P<title>[1-9]\d*)\s*U\.?\s*S\.?\s*"
+    # The code names itself three ways on this corpus: abbreviated ("U.S.C."),
+    # written out ("49 U.S. Code 106"), and as the annotated edition
+    # ("50 U.S.C.A. 4701(a)"). All three are the same code, so all three read to
+    # the same title and section.
+    r"(?:Code\b|C\.?(?:\s*A\.?)?)"
     r"(?:\s*(?:§{1,2}|sections?|secs?\.?))?\s*"
     r"(?P<section>\d+[A-Za-z]?(?:-\d+[A-Za-z]?)?)"
     # A spelled range tail. The hyphenated spelling is already inside
@@ -60,8 +65,26 @@ _USC_TITLE_FORM = re.compile(
     r"\s+of\s+title\s+(?P<title>[1-9]\d*)",
     re.IGNORECASE,
 )
+#: A code that names itself instead of its title number. The Internal Revenue
+#: Code *is* title 26 of the U.S. Code, so "I.R.C. 337(d)" and "26 U.S.C.
+#: 337(d)" are two spellings of one section and must reach one identifier. The
+#: title is read off the code the text names, never inferred from anything else,
+#: which is why each such code gets its own expression and its own pinned title
+#: in :data:`_NAMED_CODE_USC_TITLE` rather than a shared "guess the code" rule.
+#:
+#: The abbreviation is three letters and appears inside ordinary words, so the
+#: expression is anchored on a word boundary and publishes nothing without a
+#: section behind it — naming a code is not citing one.
+_INTERNAL_REVENUE_CODE = re.compile(
+    r"\bI\.?\s*R\.?\s*C\.?(?:\s*(?:§{1,2}|sections?|secs?\.?))?\s*"
+    r"(?P<section>\d+[A-Za-z]?(?:-\d+[A-Za-z]?)?)",
+    re.IGNORECASE,
+)
+_NAMED_CODE_USC_TITLE: dict[re.Pattern[str], str] = {_INTERNAL_REVENUE_CODE: "26"}
+
 _PUBLIC_LAW = re.compile(
-    r"(?:public\s+law|pub\.?\s*l\.?|p\.?\s*l\.?)\s*(?:no\.?\s*)?"
+    # "Public Law", "Pub. L.", "Pub. Law", "P.L." — one law, four spellings.
+    r"(?:pub(?:lic)?\.?\s*l(?:aw)?\.?|p\.?\s*l\.?)\s*(?:no\.?\s*)?"
     r"(?P<congress>[1-9]\d*)\s*[-–—]\s*(?P<number>[1-9]\d*)",
     re.IGNORECASE,
 )
@@ -491,11 +514,15 @@ def parse_authority_citation(value: object) -> list[AuthorityCitation]:
     patterns: tuple[tuple[re.Pattern[str], str], ...] = (
         (_USC_STANDARD, "usc"),
         (_USC_TITLE_FORM, "usc"),
+        (_INTERNAL_REVENUE_CODE, "usc"),
         (_PUBLIC_LAW, "public_law"),
         (_STATUTES_AT_LARGE, "statute_at_large"),
         (_EXECUTIVE_ORDER, "eo"),
     )
     for pattern, authority_type in patterns:
+        # A named code states its title without spelling a number, so the title
+        # comes from the expression that recognized the code.
+        named_code_title = _NAMED_CODE_USC_TITLE.get(pattern)
         for match in pattern.finditer(text):
             if authority_type == "usc":
                 usc_section, usc_section_end = _usc_section_range(
@@ -513,7 +540,7 @@ def parse_authority_citation(value: object) -> list[AuthorityCitation]:
                 citation = AuthorityCitation(
                     authority_type="usc",
                     parse_status=_status_for_span(text, match.start(), covered_end),
-                    usc_title=_digits(match.group("title")),
+                    usc_title=_digits(match.groupdict().get("title")) or named_code_title,
                     usc_section=usc_section,
                     usc_section_end=usc_section_end,
                 )

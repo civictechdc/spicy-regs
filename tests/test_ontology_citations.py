@@ -122,6 +122,65 @@ def test_parse_authority_fixture_forms(raw, expected):
     assert parse_authority_citation(raw) == [expected]
 
 
+# Every string below is verbatim from output/citation-bakeoff-2026-08-02
+# (detection.json, cell citeurl_only) — the regex half of the 14 in-scope wins
+# in docs/evidence/citation-bakeoff-2026-08-02.md, corrected Recommendation 1.
+# They are spellings of forms the project already parses, so each one must reach
+# the identity the standard spelling already mints and no other.
+@pytest.mark.parametrize(
+    ("raw", "iris"),
+    [
+        # "U.S. Code" written out rather than abbreviated.
+        ("49 U.S. Code 106", ["urn:rkaf:us:usc:49:106"]),
+        ("49 U.S. Code 44715", ["urn:rkaf:us:usc:49:44715"]),
+        # U.S.C. *Annotated* — a publisher's edition of the same code.
+        ("50 U.S.C.A. 4701(a)", ["urn:rkaf:us:usc:50:4701"]),
+        # The Internal Revenue Code is title 26, so naming it states a title.
+        ("I.R.C. 337(d)", ["urn:rkaf:us:usc:26:337"]),
+        ("IRC 382(m)", ["urn:rkaf:us:usc:26:382"]),
+        # The literal spelling "Pub. Law". The en dash was never the gap —
+        # _PUBLIC_LAW already accepts [-–—], and 119-21 uses a plain hyphen.
+        ("Pub. Law 111–296", ["urn:rkaf:us:pl:111-296"]),
+        (
+            "Pub. Law 119-21, sec. 70301 and 70434(g), One Big Beautiful Bill Act",
+            ["urn:rkaf:us:pl:119-21"],
+        ),
+    ],
+)
+def test_a_bakeoff_spelling_variant_mints_the_standard_identity(raw, iris):
+    assert [citation.canonical_iri for citation in parse_authority_citation(raw)] == iris
+
+
+@pytest.mark.parametrize(
+    ("variant", "standard"),
+    [
+        ("49 U.S. Code 106", "49 U.S.C. 106"),
+        ("49 U.S. Code 44715", "49 U.S.C. 44715"),
+        ("50 U.S.C.A. 4701(a)", "50 U.S.C. 4701(a)"),
+        ("I.R.C. 337(d)", "26 U.S.C. 337(d)"),
+        ("IRC 382(m)", "26 U.S.C. 382(m)"),
+        ("Pub. Law 111–296", "Pub. L. No. 111–296"),
+    ],
+)
+def test_a_spelling_variant_parses_to_exactly_what_the_standard_spelling_does(variant, standard):
+    """Not merely the same identity: the same citation, status and all.
+
+    A variant that parsed to a *different* status would be a second reading of
+    one citation, and the two spellings would stop being interchangeable.
+    """
+    assert parse_authority_citation(variant) == parse_authority_citation(standard)
+
+
+def test_the_named_code_grammar_does_not_fire_without_a_section():
+    """Naming a code is not citing one; the section is what identifies.
+
+    The abbreviation is short enough to appear by accident, so it publishes
+    nothing unless a section follows it.
+    """
+    for raw in ("I.R.C.", "the IRC", "IRCA 1986", "circ 12"):
+        assert parse_authority_citation(raw) == [AuthorityCitation("other", "failed")]
+
+
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
