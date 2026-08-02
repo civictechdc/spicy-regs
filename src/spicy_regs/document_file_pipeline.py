@@ -51,16 +51,11 @@ LOCKED_PDF_EXTRACTION_CONFIG = {
     "page_whitespace": "preserve",
 }
 DEFAULT_FILE_MANIFEST_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "sample-data"
-    / "mirrulations"
-    / "document-release-file-manifest-v1.json"
+    Path(__file__).resolve().parents[2] / "sample-data" / "mirrulations" / "document-release-file-manifest-v1.json"
 )
 
 _SUPPORTED_PRIMARY_MEDIA_TYPES = frozenset({"application/pdf"})
-_SUPPORTED_CAPTURED_TEXT_MEDIA_TYPES = frozenset(
-    {"application/pdf", "application/xml", "text/html", "text/xml"}
-)
+_SUPPORTED_CAPTURED_TEXT_MEDIA_TYPES = frozenset({"application/pdf", "application/xml", "text/html", "text/xml"})
 _SOURCE_CACHE_DOCUMENT_TYPES: dict[str, tuple[str, str, str]] = {
     "cfr-section-v1": ("cfr", "sections", "CFR section"),
     "congress-bill-v1": ("congress", "bills", "Congressional bill"),
@@ -97,25 +92,17 @@ def _require_capture_observation(value: object, label: str) -> str:
         try:
             parsed_date = date.fromisoformat(observation)
         except ValueError as error:
-            raise DocumentFilePipelineError(
-                f"{label} must be an exact ISO date or timezone-aware instant"
-            ) from error
+            raise DocumentFilePipelineError(f"{label} must be an exact ISO date or timezone-aware instant") from error
         if parsed_date.isoformat() != observation:
-            raise DocumentFilePipelineError(
-                f"{label} must be an exact ISO date or timezone-aware instant"
-            )
+            raise DocumentFilePipelineError(f"{label} must be an exact ISO date or timezone-aware instant")
         return observation
     normalized = observation[:-1] + "+00:00" if observation.endswith("Z") else observation
     try:
         parsed_instant = datetime.fromisoformat(normalized)
     except ValueError as error:
-        raise DocumentFilePipelineError(
-            f"{label} must be an exact ISO date or timezone-aware instant"
-        ) from error
+        raise DocumentFilePipelineError(f"{label} must be an exact ISO date or timezone-aware instant") from error
     if parsed_instant.tzinfo is None or parsed_instant.utcoffset() is None:
-        raise DocumentFilePipelineError(
-            f"{label} must be an exact ISO date or timezone-aware instant"
-        )
+        raise DocumentFilePipelineError(f"{label} must be an exact ISO date or timezone-aware instant")
     return observation
 
 
@@ -128,8 +115,7 @@ def _require_mapping(value: object, label: str) -> Mapping[str, Any]:
 def _require_exact_keys(value: Mapping[str, Any], expected: set[str], label: str) -> None:
     if set(value) != expected:
         raise DocumentFilePipelineError(
-            f"{label} keys differ; missing={sorted(expected - set(value))}, "
-            f"unexpected={sorted(set(value) - expected)}"
+            f"{label} keys differ; missing={sorted(expected - set(value))}, unexpected={sorted(set(value) - expected)}"
         )
 
 
@@ -211,9 +197,7 @@ def _read_exact_bytes(path: Path, expected_digest: str, *, label: str) -> bytes:
         raise DocumentFilePipelineError(f"cannot read {label}: {path}") from error
     actual = "sha256:" + hashlib.sha256(payload).hexdigest()
     if actual != expected_digest:
-        raise DocumentFilePipelineError(
-            f"{label} bytes digest differs: expected {expected_digest}, observed {actual}"
-        )
+        raise DocumentFilePipelineError(f"{label} bytes digest differs: expected {expected_digest}, observed {actual}")
     return payload
 
 
@@ -291,9 +275,7 @@ def _prepare_regulations_document(
     if not isinstance(captures, list) or not captures:
         raise DocumentFilePipelineError("document captures must be a non-empty array")
     if (publisher, collection) != ("regulations.gov", "documents"):
-        raise DocumentFilePipelineError(
-            "the first actual-file adapter supports regulations.gov documents only"
-        )
+        raise DocumentFilePipelineError("the first actual-file adapter supports regulations.gov documents only")
     if document["adapter"] != "regulations-json-pdf/v1":
         raise DocumentFilePipelineError("Regulations.gov document adapter differs")
     source_spec = _require_mapping(document["source_record"], "document source_record")
@@ -380,9 +362,7 @@ def _prepare_regulations_document(
                 _require_string(expected_bytes_path, "rendition expected_bytes_path"),
             )
             if isinstance(expected_size, bool) or not isinstance(expected_size, int) or expected_size != len(payload):
-                raise DocumentFilePipelineError(
-                    f"rendition {rendition_key} byte count differs from its source record"
-                )
+                raise DocumentFilePipelineError(f"rendition {rendition_key} byte count differs from its source record")
         source_url_value = _resolve_path(
             source_content,
             _require_string(rendition["source_url_path"], "rendition source_url_path"),
@@ -394,10 +374,7 @@ def _prepare_regulations_document(
             if not any(
                 attachment.get("url") == source_rendition_url
                 and str(attachment.get("format") or "").casefold() == expected_format
-                and (
-                    expected_bytes_path is None
-                    or attachment.get("size") == len(payload)
-                )
+                and (expected_bytes_path is None or attachment.get("size") == len(payload))
                 for attachment in flattened_attachments
             ):
                 raise DocumentFilePipelineError(
@@ -611,16 +588,12 @@ def _prepare_captured_rendition_document(
     if primary_payload is None or primary_media_type is None or primary_digest is None:
         raise DocumentFilePipelineError("captured document primary rendition does not exist")
     if primary_media_type not in _SUPPORTED_CAPTURED_TEXT_MEDIA_TYPES:
-        raise DocumentFilePipelineError(
-            f"unsupported captured primary rendition media type: {primary_media_type}"
-        )
+        raise DocumentFilePipelineError(f"unsupported captured primary rendition media type: {primary_media_type}")
 
     if primary_media_type == "application/pdf":
         extraction = extract_pdf_text(primary_payload)
         if extraction.status is not PdfTextStatus.OK:
-            raise DocumentFilePipelineError(
-                f"PDF text extraction failed closed with status {extraction.status.value}"
-            )
+            raise DocumentFilePipelineError(f"PDF text extraction failed closed with status {extraction.status.value}")
         if len(extraction.pages) != extraction.page_count:
             raise DocumentFilePipelineError("PDF page text does not close against the parser page count")
         if extraction.failed_page_ordinals:
@@ -766,23 +739,17 @@ def _prepare_file_release(
 
     fixture: dict[str, Any] = {
         "acquisition_release_ref": (
-            "urn:spicyregs:acquisition-release:file-manifest:"
-            + manifest_digest.removeprefix("sha256:")
+            "urn:spicyregs:acquisition-release:file-manifest:" + manifest_digest.removeprefix("sha256:")
         ),
         "coverage_gaps": manifest["coverage_gaps"],
         "fixture_id": (
-            _require_string(manifest["manifest_id"], "manifest ID")
-            + "@"
-            + manifest_digest.removeprefix("sha256:")
+            _require_string(manifest["manifest_id"], "manifest ID") + "@" + manifest_digest.removeprefix("sha256:")
         ),
         "format_version": FIXTURE_FORMAT_VERSION,
         "links": [],
         "records": records,
         "released_at": manifest["released_at"],
-        "requested_sources": [
-            f"{source}#selection={manifest_digest}"
-            for source in manifest["requested_sources"]
-        ],
+        "requested_sources": [f"{source}#selection={manifest_digest}" for source in manifest["requested_sources"]],
     }
     fixture["fixture_digest"] = canonical_digest(fixture)
     release = build_document_release(
@@ -795,10 +762,7 @@ def _prepare_file_release(
         source_input_type="CapturedFileManifest",
     )
     validate_document_release(release, rulespec_core_path=rulespec_core_path)
-    declared_paths = {
-        str(rendition["source_native_path"])
-        for rendition in release["source_renditions"]
-    }
+    declared_paths = {str(rendition["source_native_path"]) for rendition in release["source_renditions"]}
     if declared_paths != set(rendition_bytes):
         raise DocumentFilePipelineError("release rendition paths do not close against captured bytes")
     return _PreparedFileRelease(
@@ -851,8 +815,7 @@ def _source_cache_record(
             )
         if extraction.failed_page_ordinals:
             raise DocumentFilePipelineError(
-                f"{case_id} PDF extraction has failed page ordinals: "
-                f"{list(extraction.failed_page_ordinals)}"
+                f"{case_id} PDF extraction has failed page ordinals: {list(extraction.failed_page_ordinals)}"
             )
         text = extraction.text
         passage_specs = _pdf_passages(
@@ -923,9 +886,7 @@ def _source_cache_record(
                         lock_record.get("retrieved_on"),
                         f"{case_id} retrieved_on",
                     ),
-                    "retrieval_receipt_ref": (
-                        "receipts/" + lock_digest.removeprefix("sha256:") + ".json"
-                    ),
+                    "retrieval_receipt_ref": ("receipts/" + lock_digest.removeprefix("sha256:") + ".json"),
                 }
             ],
             "collection": collection,
@@ -1023,9 +984,7 @@ def _prepare_source_cache_release(
             lock_digest=lock_digest,
         )
         records.append(record)
-        requested_sources.add(
-            f"{record['publisher']}:{record['collection']}#selection={lock_digest}"
-        )
+        requested_sources.add(f"{record['publisher']}:{record['collection']}#selection={lock_digest}")
         if distribution_path in rendition_bytes and rendition_bytes[distribution_path] != payload:
             raise DocumentFilePipelineError("source cache rendition distribution path collision")
         rendition_bytes[distribution_path] = payload
@@ -1033,8 +992,7 @@ def _prepare_source_cache_release(
     _require_string(lock.get("retrieved_on"), "source cache retrieved_on")
     fixture: dict[str, Any] = {
         "acquisition_release_ref": (
-            "urn:spicyregs:acquisition-release:source-lock:"
-            + lock_digest.removeprefix("sha256:")
+            "urn:spicyregs:acquisition-release:source-lock:" + lock_digest.removeprefix("sha256:")
         ),
         "coverage_gaps": [],
         "fixture_id": "source-lock:" + lock_digest.removeprefix("sha256:"),
@@ -1096,9 +1054,7 @@ def _captured_manifest_file_overrides(
         )
         renditions = document.get("renditions")
         if not isinstance(renditions, list) or not renditions:
-            raise DocumentFilePipelineError(
-                f"captured manifest document {document_index} has no renditions"
-            )
+            raise DocumentFilePipelineError(f"captured manifest document {document_index} has no renditions")
         for rendition_index, raw_rendition in enumerate(renditions):
             rendition = _require_mapping(
                 raw_rendition,
@@ -1119,9 +1075,7 @@ def _captured_manifest_file_overrides(
             )
             previous = overrides.get(source_path)
             if previous is not None and previous != target:
-                raise DocumentFilePipelineError(
-                    "captured manifest reuses one source path for different renditions"
-                )
+                raise DocumentFilePipelineError("captured manifest reuses one source path for different renditions")
             overrides[source_path] = target
     return overrides
 
@@ -1172,9 +1126,7 @@ def validate_document_release_distribution(
             "distribution source input path",
         )
         if input_path not in receipt_refs:
-            raise DocumentFilePipelineError(
-                "published source input is not one of the capture evidence files"
-            )
+            raise DocumentFilePipelineError("published source input is not one of the capture evidence files")
         target = _contained_distribution_file(
             distribution_dir,
             input_path,
@@ -1197,9 +1149,7 @@ def validate_document_release_distribution(
             if not isinstance(declared_sources, list) or {
                 str(source).partition("#selection=")[0] for source in release_sources
             } != set(declared_sources):
-                raise DocumentFilePipelineError(
-                    "release requested sources differ from the captured manifest"
-                )
+                raise DocumentFilePipelineError("release requested sources differ from the captured manifest")
             expected = _prepare_file_release(
                 target,
                 rulespec_core_path=Path(rulespec_core_path),
@@ -1252,10 +1202,7 @@ def _publish_prepared_release(
         prepared.release,
         rulespec_core_path=rulespec_core_path,
     )
-    receipt_refs = {
-        str(capture["retrieval_receipt_ref"])
-        for capture in prepared.release["source_rendition_captures"]
-    }
+    receipt_refs = {str(capture["retrieval_receipt_ref"]) for capture in prepared.release["source_rendition_captures"]}
     if receipt_refs != set(prepared.supporting_bytes):
         raise DocumentFilePipelineError("capture receipt references do not close against published files")
     validated = validate_document_release_distribution(
@@ -1309,6 +1256,35 @@ def build_document_release_from_source_cache(
         rulespec_core_path=Path(rulespec_core_path),
         source_specs=source_specs,
     ).release
+
+
+def publish_document_release_from_source_cache(
+    cache_dir: Path,
+    output_dir: Path,
+    *,
+    released_at: str,
+    rulespec_core_path: Path = DEFAULT_RULESPEC_CORE_PATH,
+    source_specs: Sequence[Any] | None = None,
+) -> dict[str, Any]:
+    """Write the release JSON, its exact source bytes, and its capture receipt.
+
+    A consumer of a v2 release needs the published *distribution*, not a bare
+    release file -- spicysearch refuses the latter with "build from the
+    directory, not the file". Only the file-manifest path had a publish
+    counterpart, so a source-cache release could be built but never admitted.
+    """
+
+    prepared = _prepare_source_cache_release(
+        Path(cache_dir),
+        released_at=released_at,
+        rulespec_core_path=Path(rulespec_core_path),
+        source_specs=source_specs,
+    )
+    return _publish_prepared_release(
+        prepared,
+        Path(output_dir),
+        rulespec_core_path=Path(rulespec_core_path),
+    )
 
 
 def publish_document_release_from_file_manifest(

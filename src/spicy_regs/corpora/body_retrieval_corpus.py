@@ -1106,6 +1106,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     release.add_argument("--output", type=Path, required=True)
     release.add_argument("--released-at", default="2026-08-02T00:00:00Z")
     release.add_argument("--rendition", choices=tuple(RENDITIONS), default="html")
+    release.add_argument(
+        "--distribution",
+        type=Path,
+        default=None,
+        help="also publish the v2 distribution directory a consumer needs to admit it",
+    )
 
     args = parser.parse_args(argv)
 
@@ -1170,16 +1176,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if args.command == "release":
-        from spicy_regs.document_file_pipeline import build_document_release_from_source_cache
+        from spicy_regs.document_file_pipeline import (
+            build_document_release_from_source_cache,
+            publish_document_release_from_source_cache,
+        )
 
         manifest = _read_json(Path(args.draw))
         lock = _read_json(Path(args.cache_dir) / "source-lock.json")
         sealed = [_text(record.get("case_id")) for record in lock.get("sources", [])]
-        built = build_document_release_from_source_cache(
-            Path(args.cache_dir),
-            released_at=args.released_at,
-            source_specs=document_specs(manifest, sealed, rendition=args.rendition),
-        )
+        specs = document_specs(manifest, sealed, rendition=args.rendition)
+        if args.distribution is not None:
+            built = publish_document_release_from_source_cache(
+                Path(args.cache_dir),
+                Path(args.distribution),
+                released_at=args.released_at,
+                source_specs=specs,
+            )
+        else:
+            built = build_document_release_from_source_cache(
+                Path(args.cache_dir),
+                released_at=args.released_at,
+                source_specs=specs,
+            )
         output = Path(args.output)
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(canonical_json(built) + "\n", encoding="utf-8")
