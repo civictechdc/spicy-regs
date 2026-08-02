@@ -1,4 +1,4 @@
-"""Resolve an act-relative citation through the pinned OLRC act index.
+"""Resolve an act-relative citation through the two pinned OLRC sources.
 
 "Clean Air Act section 111" names no code, title or section number. Resolving it
 is two joins over the artifact ``tools/build_usc_act_index_artifact.py`` seals:
@@ -7,6 +7,21 @@ is two joins over the artifact ``tools/build_usc_act_index_artifact.py`` seals:
    act's Table III key.
 2. **act section → U.S.C. section.** Table III's classification of every section
    of that act.
+
+**And a second, independent source with its own coverage.** The U.S. Code's own
+source credits state, per section, the act section that added it *and the
+division of the enacting public law* — the discriminator Table III lacks, since
+Table III is keyed by the public law alone.
+``tools/build_usc_source_credit_artifact.py`` seals them and
+:class:`SourceCreditIndex` reads them.
+
+The two are **complementary, not a tiebreaker over one another**. Measured on
+release point 119-102: of the 222 unambiguous credit triples whose public law
+Table III was also fetched for, **176 have no in-division Table III row at all**
+— ``26 U.S.C. 6038E`` among them, which is why no amount of discriminating
+between Table III's rows for (116-260, §107) could ever have found it. So
+:func:`resolve_act_relative_citation` consults both, records which one answered,
+and **refuses when they answer differently** (:data:`SOURCE_COMPOSITION_RULE`).
 
 Every answer here is *derived* from those tables at call time. There is no
 checked-in lookup of answers: the tables are the evidence, and a resolution that
@@ -66,7 +81,46 @@ ALIAS_MAX_DEPTH = 8
 #: T, title I, sec. 107, ... 134 Stat. 2276", and 2276 falls in div. T's range.
 DIVISION_RULE = "act-division-statutes-at-large-range-v1"
 
+#: How the two sources compose.
+#:
+#: Both are consulted, always. Either may answer alone; when both answer the
+#: same identifier the resolution says ``both``; when they answer *different*
+#: identifiers the resolution **refuses**. A disagreement is a finding about one
+#: source's coverage, not a tie to be broken — the measured cause is an act
+#: section that classified to more than one place, where each source retains a
+#: different one. (114-94, div. C, §32101) is the real example: Table III says
+#: 22 U.S.C. 2714a, the credits say 26 U.S.C. 7345, and both are true, because
+#: 22 U.S.C. 2714a's credit carries no enactment construction and the strict
+#: rule does not retain it. Naming one of the two would be arbitrary.
+SOURCE_COMPOSITION_RULE = "table3-and-source-credits-consulted-disagreement-refuses-v1"
+
+#: What the source-credit index had to say, whether or not it decided anything.
+#: A consumer counts these, and it must be able to tell "no key to look under"
+#: from "looked and found nothing" from "found several".
+SOURCE_CREDIT_STATUSES = (
+    #: No index was supplied, so the second source was not consulted at all.
+    "not_consulted",
+    #: The act names no public law and division to look under — a pre-1957
+    #: session-law chapter such as the Clean Air Act's ``1955:360``, or an act
+    #: the Popular Name Tool states no division for.
+    "no_key",
+    #: Looked, and the credits say nothing about that act section.
+    "absent",
+    #: The credits name several U.S. Code sections for it. Plural is not silent,
+    #: and it is not an answer either.
+    "multi_target",
+    #: Exactly one U.S. Code section.
+    "resolved",
+)
+
+#: Which source produced a published identifier.
+ANSWERING_SOURCES = ("table3", "source_credits", "both")
+
 _YEAR_SUFFIX = re.compile(r"\s+of\s+(?:1[789]|20)\d{2}$")
+
+#: A Table III key that is also a public law number, which is what the source
+#: credits are keyed by. ``1955:360`` is a session-law chapter and is not one.
+_PUBLIC_LAW_KEY = re.compile(r"^[1-9]\d{0,2}-[1-9]\d*$")
 
 #: Every way this module declines to publish an identifier. Codes are data, not
 #: prose: a consumer counts them, and an artifact records them per citation.
@@ -104,6 +158,9 @@ UNRESOLVED_REASONS = (
     #: The citation names a division and the act it names sits in a different
     #: one. The source disagrees with itself about which act is meant.
     "act_division_conflict",
+    #: Both sources answered, and they named different U.S. Code sections.
+    #: See :data:`SOURCE_COMPOSITION_RULE` — this is a finding, not a tie.
+    "sources_disagree",
 )
 
 
@@ -118,12 +175,32 @@ class ActResolution:
     usc_section: str | None = None
     iri: str | None = None
     unresolved_reason: str | None = None
+    #: Which of the two sources produced the identifier, one of
+    #: :data:`ANSWERING_SOURCES`. ``None`` whenever there is no identifier.
+    answered_by: str | None = None
+    #: What Table III said, resolved or not — kept even when the other source
+    #: answered, because "Table III lacks this classification" is the coverage
+    #: fact the complementarity claim rests on.
+    table3_reason: str | None = None
+    #: One of :data:`SOURCE_CREDIT_STATUSES`.
+    source_credit_status: str = "not_consulted"
+    #: Where the answering source says the enactment sits in the Statutes at
+    #: Large. Only the credits state this per section; Table III states it per
+    #: classification row.
+    statutes_at_large_volume: str | None = None
+    statutes_at_large_page: str | None = None
 
     def __post_init__(self) -> None:
         if (self.iri is None) == (self.unresolved_reason is None):
             raise ValueError("a resolution states an identifier or a reason, never both or neither")
         if self.unresolved_reason is not None and self.unresolved_reason not in UNRESOLVED_REASONS:
             raise ValueError(f"undeclared unresolved reason: {self.unresolved_reason!r}")
+        if (self.answered_by is None) != (self.iri is None):
+            raise ValueError("an identifier names the source that produced it, and a refusal names none")
+        if self.answered_by is not None and self.answered_by not in ANSWERING_SOURCES:
+            raise ValueError(f"undeclared answering source: {self.answered_by!r}")
+        if self.source_credit_status not in SOURCE_CREDIT_STATUSES:
+            raise ValueError(f"undeclared source-credit status: {self.source_credit_status!r}")
 
 
 @dataclass(frozen=True)
@@ -235,6 +312,99 @@ class ActIndex:
         )
 
 
+@dataclass(frozen=True)
+class SourceCreditTarget:
+    """One U.S. Code section a source credit says an act section added."""
+
+    usc_title: str
+    usc_section: str
+    statutes_at_large_volume: str | None = None
+    statutes_at_large_page: str | None = None
+
+
+@dataclass(frozen=True)
+class SourceCreditAnswer:
+    """What the second source had to say about one (law, division, section)."""
+
+    status: str
+    usc_title: str | None = None
+    usc_section: str | None = None
+    statutes_at_large_volume: str | None = None
+    statutes_at_large_page: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.status not in SOURCE_CREDIT_STATUSES:
+            raise ValueError(f"undeclared source-credit status: {self.status!r}")
+
+
+@dataclass(frozen=True)
+class SourceCreditIndex:
+    """The U.S. Code's own source credits, keyed the way a citation asks.
+
+    ``(public law, division, act section) -> U.S. Code section``, with the
+    Statutes at Large page carried. A key naming several sections answers
+    ``multi_target`` and never picks one — the artifact keeps every row and
+    marks them, so "the source said two things" stays distinguishable from "the
+    source said nothing".
+    """
+
+    targets: Mapping[tuple[str, str, str], tuple[SourceCreditTarget, ...]] = field(default_factory=dict)
+
+    @classmethod
+    def from_rows(cls, rows) -> SourceCreditIndex:
+        """Build from ``(law, division, section, title, usc_section, volume, page)``."""
+        collected: dict[tuple[str, str, str], list[SourceCreditTarget]] = {}
+        for law, division, act_section, usc_title, usc_section, volume, page in rows:
+            target = SourceCreditTarget(usc_title, usc_section, volume, page)
+            bucket = collected.setdefault((law, division, act_section), [])
+            if target not in bucket:
+                bucket.append(target)
+        return cls(targets={k: tuple(v) for k, v in collected.items()})
+
+    @classmethod
+    def from_artifact(cls, artifact_dir: Path) -> SourceCreditIndex:
+        """Load from a sealed ``usc-source-credit-artifact-v1`` directory."""
+        import pyarrow.parquet as pq
+
+        directory = Path(artifact_dir)
+        # Reading the receipt is not decoration: it fails loudly when the
+        # directory is not this artifact, rather than yielding an empty index
+        # that would look like a source with no coverage.
+        json.loads((directory / "receipt.json").read_text(encoding="utf-8"))
+        return cls.from_rows(
+            (
+                row["public_law"],
+                row["division"],
+                row["act_section"],
+                row["usc_title"],
+                row["usc_section"],
+                row["statutes_at_large_volume"],
+                row["statutes_at_large_page"],
+            )
+            for row in pq.read_table(directory / "usc-source-credits.parquet").to_pylist()
+        )
+
+    def targets_for(self, public_law: str, division: str, act_section: str) -> tuple[SourceCreditTarget, ...]:
+        return self.targets.get((public_law, division, act_section), ())
+
+    def lookup(self, public_law: str | None, division: str | None, act_section: str) -> SourceCreditAnswer:
+        if not public_law or not division:
+            return SourceCreditAnswer(status="no_key")
+        found = self.targets_for(public_law, division, act_section)
+        if not found:
+            return SourceCreditAnswer(status="absent")
+        if len({(t.usc_title, t.usc_section) for t in found}) > 1:
+            return SourceCreditAnswer(status="multi_target")
+        target = found[0]
+        return SourceCreditAnswer(
+            status="resolved",
+            usc_title=target.usc_title,
+            usc_section=target.usc_section,
+            statutes_at_large_volume=target.statutes_at_large_volume,
+            statutes_at_large_page=target.statutes_at_large_page,
+        )
+
+
 def resolve_act_name(name: str, index: ActIndex) -> str | None:
     """The act a popular name refers to, following aliases. ``None`` when none.
 
@@ -242,17 +412,24 @@ def resolve_act_name(name: str, index: ActIndex) -> str | None:
     failing cases: an unlisted name, a chain that cycles or runs past
     :data:`ALIAS_MAX_DEPTH`, and a target several acts could supply.
     """
-    by_stem: dict[str, list[str]] = {}
-    for known in index.table3_key_by_name:
-        stem = _YEAR_SUFFIX.sub("", known)
-        if stem != known:
-            by_stem.setdefault(stem, []).append(known)
+    # Built on first need rather than on every call. A name already in the index
+    # returns before the year rule is consulted, and the index carries 13,626
+    # names -- rebuilding the stem map for each of a sweep's tens of thousands
+    # of lookups costs more than the whole rest of the resolution. The order of
+    # the checks below is unchanged, so the answer is too.
+    by_stem: dict[str, list[str]] | None = None
 
     seen: set[str] = set()
     current = normalize_popular_name(name)
     for _ in range(ALIAS_MAX_DEPTH):
         if current in index.table3_key_by_name:
             return current
+        if by_stem is None:
+            by_stem = {}
+            for known in index.table3_key_by_name:
+                stem = _YEAR_SUFFIX.sub("", known)
+                if stem != known:
+                    by_stem.setdefault(stem, []).append(known)
         supplied = by_stem.get(current, ())
         if len(supplied) == 1:
             return supplied[0]
@@ -263,30 +440,23 @@ def resolve_act_name(name: str, index: ActIndex) -> str | None:
     return None
 
 
-def resolve_act_relative_citation(citation: ActRelativeCitation, *, index: ActIndex) -> ActResolution:
-    """Resolve one act-relative citation to a U.S.C. identifier, or say why not."""
-    act_key = resolve_act_name(citation.act_key, index)
-    if act_key is None:
-        return ActResolution(citation, unresolved_reason="act_not_in_index")
-    table3_key = index.table3_key_by_name[act_key]
+def _resolve_through_table3(
+    citation: ActRelativeCitation, index: ActIndex, act_key: str, table3_key: str
+) -> tuple[str | None, str | None, str | None, str | None, int | None]:
+    """Table III's answer: ``(iri, usc_title, usc_section, reason, page)``.
+
+    Exactly one of ``iri`` and ``reason`` is set. Unchanged from the single-source
+    resolver — the second source composes with this, it does not alter it.
+    """
     if table3_key in index.incomplete_sources:
-        return ActResolution(citation, act_key=act_key, table3_key=table3_key, unresolved_reason="source_incomplete")
+        return None, None, None, "source_incomplete", None
     rows = index.classifications.get(table3_key, {}).get(citation.section, ())
-    common = {"act_key": act_key, "table3_key": table3_key}
     if not rows:
-        return ActResolution(citation, **common, unresolved_reason="act_section_not_classified")
+        return None, None, None, "act_section_not_classified", None
     # Several acts may share this public law. The citing act's division bounds a
     # page range in the Statutes at Large, and a row belongs to the act whose
     # range contains it. An act stating no division spans the whole law and
     # narrows nothing, so its rows are left as they are.
-    # A division the citation itself names is the strongest discriminator there
-    # is, because it comes from the source rather than from a range. If it
-    # contradicts the division of the act the name resolved to, the two halves
-    # disagree about which act is meant and nothing here picks a winner.
-    stated = index.division_by_name.get(act_key)
-    if citation.division and stated and citation.division != stated[0]:
-        return ActResolution(citation, **common, unresolved_reason="act_division_conflict")
-
     page_range = index.act_page_range(act_key)
     if page_range is not None and len(rows) > 1:
         low, high = page_range
@@ -296,7 +466,7 @@ def resolve_act_relative_citation(citation: ActRelativeCitation, *, index: ActIn
             # act's division, so the section belongs to a sibling act. This
             # direction is sound even though the range is only an upper bound:
             # a page outside a range that is too WIDE is outside the true one.
-            return ActResolution(citation, **common, unresolved_reason="act_section_outside_act")
+            return None, None, None, "act_section_outside_act", None
         # The converse is NOT sound and is deliberately not taken. The range is
         # derived from popular-name start pages, and popular names do not mark
         # division boundaries -- a division whose acts the tool does not name
@@ -305,25 +475,136 @@ def resolve_act_relative_citation(citation: ActRelativeCitation, *, index: ActIn
         # (2,240 of 34,113) belong to a different division. Narrowing to a
         # single row on that basis would mint exactly the wrong identifier this
         # whole line of work exists to prevent, so a surviving tie still
-        # refuses. Resolving them needs USLM's per-section division, which is
-        # measured and recommended in the evidence doc.
+        # refuses -- and the second source, which needs no range at all, is what
+        # decides the ones that are decidable.
     if len(rows) > 1:
         # Nothing available discriminates them: either the act states no
         # division, or several rows sit inside the one it states.
-        return ActResolution(citation, **common, unresolved_reason="act_section_ambiguous")
-    usc_title, usc_section, status, _page = rows[0]
+        return None, None, None, "act_section_ambiguous", None
+    usc_title, usc_section, status, page = rows[0]
     if status:
-        return ActResolution(citation, **common, unresolved_reason="classification_not_current")
+        return None, None, None, "classification_not_current", None
     if not (usc_title and usc_section):
-        return ActResolution(citation, **common, unresolved_reason="act_section_not_classified")
+        return None, None, None, "act_section_not_classified", None
     try:
-        iri = canonical_usc_iri(usc_title, usc_section)
+        return canonical_usc_iri(usc_title, usc_section), usc_title, usc_section, None, page
     except ValueError:
+        return None, usc_title, usc_section, "usc_section_not_expressible", None
+
+
+def resolve_act_relative_citation(
+    citation: ActRelativeCitation,
+    *,
+    index: ActIndex,
+    source_credits: SourceCreditIndex | None = None,
+) -> ActResolution:
+    """Resolve one act-relative citation to a U.S.C. identifier, or say why not.
+
+    Both sources are consulted and the resolution records which one answered;
+    see :data:`SOURCE_COMPOSITION_RULE`. Omitting ``source_credits`` leaves the
+    Table III answer exactly as it was, labelled ``not_consulted``.
+    """
+    act_key = resolve_act_name(citation.act_key, index)
+    if act_key is None:
+        return ActResolution(citation, unresolved_reason="act_not_in_index")
+    table3_key = index.table3_key_by_name[act_key]
+    common = {"act_key": act_key, "table3_key": table3_key}
+
+    # A division the citation itself names is the strongest discriminator there
+    # is, because it comes from the source rather than from a range. If it
+    # contradicts the division of the act the name resolved to, the two halves
+    # disagree about which act is meant and nothing here picks a winner.
+    stated = index.division_by_name.get(act_key)
+    if citation.division and stated and citation.division != stated[0]:
+        return ActResolution(citation, **common, unresolved_reason="act_division_conflict")
+
+    iri, usc_title, usc_section, table3_reason, page = _resolve_through_table3(
+        citation, index, act_key, table3_key
+    )
+
+    # -- the second source ---------------------------------------------------
+    # Consulted even when Table III already answered, because a disagreement is
+    # a finding; and consulted even when Table III's page could not be read,
+    # because a hole in one source is exactly what a second source is for.
+    if source_credits is None:
+        credit = SourceCreditAnswer(status="not_consulted")
+    else:
+        division = stated[0] if stated else citation.division
+        public_law = table3_key if _PUBLIC_LAW_KEY.fullmatch(table3_key or "") else None
+        credit = source_credits.lookup(public_law, division, citation.section)
+
+    credit_iri: str | None = None
+    credit_reason: str | None = None
+    if credit.status == "resolved":
+        try:
+            credit_iri = canonical_usc_iri(credit.usc_title, credit.usc_section)
+        except ValueError:
+            credit_reason = "usc_section_not_expressible"
+
+    shared = {
+        **common,
+        "table3_reason": table3_reason,
+        "source_credit_status": credit.status,
+    }
+
+    if iri is not None and credit_iri is not None:
+        if iri != credit_iri:
+            # Two answers is not an answer. Measured cause: an act section that
+            # classified to more than one place, where each source retains a
+            # different one.
+            return ActResolution(citation, **shared, unresolved_reason="sources_disagree")
         return ActResolution(
             citation,
-            **common,
+            **shared,
             usc_title=usc_title,
             usc_section=usc_section,
-            unresolved_reason="usc_section_not_expressible",
+            iri=iri,
+            answered_by="both",
+            statutes_at_large_volume=credit.statutes_at_large_volume,
+            statutes_at_large_page=credit.statutes_at_large_page,
         )
-    return ActResolution(citation, **common, usc_title=usc_title, usc_section=usc_section, iri=iri)
+    if credit_iri is not None:
+        return ActResolution(
+            citation,
+            **shared,
+            usc_title=credit.usc_title,
+            usc_section=credit.usc_section,
+            iri=credit_iri,
+            answered_by="source_credits",
+            statutes_at_large_volume=credit.statutes_at_large_volume,
+            statutes_at_large_page=credit.statutes_at_large_page,
+        )
+    if iri is not None:
+        return ActResolution(
+            citation,
+            **shared,
+            usc_title=usc_title,
+            usc_section=usc_section,
+            iri=iri,
+            answered_by="table3",
+            statutes_at_large_page=str(page) if page is not None else None,
+        )
+    # Neither answered. Table III's reason is reported unchanged, so the second
+    # source can only ever add a resolution or refuse a disagreement -- with one
+    # exception, and it is an exception about truthfulness rather than about
+    # precedence. `act_section_not_classified` is the only Table III reason that
+    # asserts a plain absence, and the credits can falsify it: if they found a
+    # classification the `rkaf:us-usc` space cannot spell, saying "not
+    # classified" would publish an absence of knowledge as knowledge. Every
+    # other reason stays true about Table III's own rows whatever the credits
+    # say, so it stands.
+    if credit_reason is not None and table3_reason in {None, "act_section_not_classified"}:
+        return ActResolution(
+            citation,
+            **shared,
+            usc_title=credit.usc_title,
+            usc_section=credit.usc_section,
+            unresolved_reason=credit_reason,
+        )
+    return ActResolution(
+        citation,
+        **shared,
+        usc_title=usc_title,
+        usc_section=usc_section,
+        unresolved_reason=table3_reason or "act_section_not_classified",
+    )
