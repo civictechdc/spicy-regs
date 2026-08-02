@@ -234,13 +234,13 @@ BODY = b"<div class='preamble'><p>Critical habitat for the species.</p></div>"
 class _Recorder:
     """A fetcher that serves canned responses and records politeness."""
 
-    def __init__(self, responses: dict[str, object]) -> None:
+    def __init__(self, responses: dict[str, bytes | Exception]) -> None:
         self.responses = responses
         self.calls: list[str] = []
 
     def __call__(self, url: str) -> brc.FetchResult:
         self.calls.append(url)
-        outcome = self.responses.get(url, BODY)
+        outcome: bytes | Exception = self.responses.get(url, BODY)
         if isinstance(outcome, Exception):
             raise outcome
         return brc.FetchResult(

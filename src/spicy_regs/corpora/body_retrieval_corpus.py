@@ -374,7 +374,7 @@ def build_draw(
     page_counts = sorted(document["pages"] or 0 for document in documents)
     agencies = Counter(document["agency_slugs"] for document in documents)
     types = Counter(document["document_type"] for document in documents)
-    years = Counter(document["publication_date"][:4] for document in documents)
+    years = Counter(_text(row.get("publication_date"))[:4] for row in with_url)
 
     manifest: dict[str, Any] = {
         "schema_version": DRAW_SCHEMA_VERSION,
