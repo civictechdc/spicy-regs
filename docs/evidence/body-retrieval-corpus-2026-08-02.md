@@ -199,12 +199,22 @@ expects to hold a release in memory will not hold this one.
 **`full_text_xml_url` is a cleaner source than `body_html_url`.** The Federal
 Register publishes a GPO-tagged XML rendition (`<AGENCY> <CFR> <RIN> <SUM>
 <EFFDATE> <REGTEXT> <HD> <FTNT> <PRTPAGE>`) with no site chrome and no
-zero-width spaces. The HTML we fetched carries ~42 `&#8203;` zero-width spaces
-per document, injected into URLs for line-breaking, which will corrupt BM25
-tokens unless the indexer strips them. HTML was fetched anyway because it is
-the field the parquet carries, the field `native_structural_passage_spans`
-handles, and the field the brief specified; switching rendition mid-build would
-have been a scope change rather than a fix. It is the highest-value follow-up.
+zero-width spaces. HTML was fetched anyway because it is the field the parquet
+carries, the field `native_structural_passage_spans` handles, and the field the
+brief specified; switching rendition mid-build would have been a scope change
+rather than a fix. It is the highest-value follow-up.
+
+> **Correction (same day, after measuring it).** An earlier version of this
+> section said the HTML carries "~42 zero-width spaces per document". That was
+> repeated from a survey rather than measured, and it is wrong in both kind and
+> magnitude. There are **no raw U+200B characters at all**; there are `&#8203;`
+> **HTML entities**, at a median of **2 per document** (max 24, min 0) across the
+> 56 documents measured, and they appear **only inside displayed URLs**
+> (`https://www.fws.gov/&#8203;sites/&#8203;default/…`). The defect is real —
+> a consumer that resolves entities gets broken URL tokens, and one that does
+> not gets a literal `8203` token — but it is confined to URLs, not prose. The
+> corrected figures and the rendition comparison are in
+> [the follow-up record](body-retrieval-corpus-followup-2026-08-02.md).
 
 **Publisher boilerplate is present and constant.** All 993 documents carry the
 same 584-character "Document Headings" explainer — 0.4–0.6% of a typical body.
@@ -222,8 +232,8 @@ is, and everything downstream of it is. Verified by rebuild:
 | artifact | sha256 | rebuild |
 |---|---|---|
 | `draw-manifest.json` | `cda211eb…7fa3` | byte-identical |
-| `cache/source-lock.json` | `e17f0038…d340` | byte-identical |
-| `measurement.json` | `99e6e496…d683c` | byte-identical |
+| `cache/source-lock.json` | `4990435c…c996` | byte-identical |
+| `measurement.json` | re-measured in the follow-up | byte-identical |
 | `document-release.json` | `4b4b0394…fbfd0` | byte-identical |
 
 The draw is a pure function of the input parquet
