@@ -604,6 +604,32 @@ class TestMeasure:
         report = brc.measure_corpus(cache)
         assert report["chunking_relevant"]["documents_over_3000_chars"] == 1
 
+    def test_measure_reports_passage_fragmentation_not_just_a_count(self, tmp_path: Path) -> None:
+        """A raw passage count hides the difference between the renditions.
+
+        HTML yields more passages than XML, but a third of them are sub-100
+        character spans that are not retrieval units. The fragment share is
+        what makes 'sparser' distinguishable from 'coarser'.
+        """
+        cache = tmp_path / "cache"
+        manifest = _manifest(tmp_path, count=1)
+        url = json.loads(manifest.read_text())["documents"][0]["body_html_url"]
+        markup = b"<div>" + b"<p>x</p>" * 5 + b"<p>" + b"habitat " * 200 + b"</p></div>"
+        brc.fetch_bodies(manifest, cache, fetcher=_Recorder({url: markup}), sleep=lambda _: None)
+        passages = brc.measure_corpus(cache)["structural_passages"]
+        assert passages["total"] >= 6
+        assert passages["fragments_under_100_chars"] >= 5
+        assert 0.0 < passages["fragment_share"] <= 1.0
+
+    def test_measure_counts_zero_width_entities_as_the_publisher_writes_them(self, tmp_path: Path) -> None:
+        """Counting only decoded U+200B reports zero and misses the defect."""
+        cache = tmp_path / "cache"
+        manifest = _manifest(tmp_path, count=1)
+        url = json.loads(manifest.read_text())["documents"][0]["body_html_url"]
+        body = b"<p>https://www.fws.gov/&#8203;sites/&#8203;default/x</p>"
+        brc.fetch_bodies(manifest, cache, fetcher=_Recorder({url: body}), sleep=lambda _: None)
+        assert brc.measure_corpus(cache)["zero_width_space_entities"] == 2
+
     def test_measure_counts_publisher_boilerplate_rather_than_removing_it(self, tmp_path: Path) -> None:
         """Exact publisher bytes are kept; the constant is reported, not deleted."""
         cache = tmp_path / "cache"

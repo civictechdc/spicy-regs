@@ -909,19 +909,36 @@ def measure_corpus(
     lock = _read_json(cache_dir / "source-lock.json")
     sources = lock.get("sources", [])
 
+    from spicy_regs.docpipeline.source import native_structural_passage_spans
+
+    rendition = _text(lock.get("rendition")) or "html"
+    target_field = RENDITIONS[rendition]["target_field"]
+    media_type = RENDITIONS[rendition]["media_type"]
+
     html_bytes: list[int] = []
     text_chars: list[int] = []
     token_sets: list[set[str]] = []
+    passage_counts: list[int] = []
+    passage_lengths: list[int] = []
+    zero_width_entities = 0
     boilerplate_hits = 0
 
     for record in sources:
         payload = (cache_dir / _text(record.get("cache_file"))).read_bytes()
-        text = visible_text(payload.decode("utf-8-sig"))
+        raw = payload.decode("utf-8-sig")
+        text = visible_text(raw)
         html_bytes.append(len(payload))
         text_chars.append(len(text))
         token_sets.append(tokenize(text))
+        # Counted as the entity, which is how the publisher writes it. Only a
+        # consumer that resolves entities ever sees U+200B, so counting the
+        # decoded character alone would report zero and miss the defect.
+        zero_width_entities += raw.count("&#8203;") + raw.count("​")
         if BOILERPLATE_MARKER in text:
             boilerplate_hits += 1
+        spans = native_structural_passage_spans(target_field, raw, media_type=media_type)
+        passage_counts.append(len(spans))
+        passage_lengths.extend(end - start for start, end in spans)
 
     def _spread(values: Sequence[int]) -> dict[str, Any]:
         ordered = sorted(float(value) for value in values)
@@ -937,9 +954,25 @@ def measure_corpus(
 
     return {
         "document_count": len(sources),
+        "rendition": rendition,
         "source_bytes": _spread(html_bytes),
         "visible_text_chars": _spread(text_chars),
         "documents_carrying_publisher_boilerplate": boilerplate_hits,
+        "zero_width_space_entities": zero_width_entities,
+        "structural_passages": {
+            "total": sum(passage_counts),
+            "per_document": _spread(passage_counts),
+            "length": _spread(passage_lengths),
+            # A sub-100-character span is not a retrieval unit. The share of
+            # them is how fragmented a rendition is, and it is the difference
+            # between the two renditions that a raw passage count hides.
+            "fragments_under_100_chars": sum(1 for length in passage_lengths if length < 100),
+            "fragment_share": (
+                round(sum(1 for length in passage_lengths if length < 100) / len(passage_lengths), 4)
+                if passage_lengths
+                else None
+            ),
+        },
         "chunking_relevant": {
             "note": "chunking is a no-op below ~3000 characters",
             "documents_over_3000_chars": sum(1 for value in text_chars if value > 3000),
