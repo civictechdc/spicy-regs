@@ -246,7 +246,9 @@ class _Recorder:
         return brc.FetchResult(
             content=outcome,
             resolved_url=url,
-            media_type="text/html",
+            # The publisher answers text/xml for the XML rendition; serving
+            # text/html for it is exactly what the media-type guard rejects.
+            media_type="text/xml" if url.endswith(".xml") else "text/html",
             status_code=200,
             etag=None,
             last_modified=None,
@@ -469,6 +471,85 @@ class TestReleaseCompatibility:
         assert spec.target_field == "body_html"
         assert spec.profile_id == "federal-register-document-v1"
         assert spec.representation == "html"
+
+
+class TestRendition:
+    """The same sealed draw, fetched in a second rendition.
+
+    The document set is fixed by the draw manifest; only which file the
+    publisher serves for each document changes. Deriving the XML URL from the
+    HTML one keeps the two corpora provably over the same 993 documents
+    without redrawing, so the manifest digest still identifies both.
+    """
+
+    def test_the_xml_url_is_derived_from_the_published_html_url(self) -> None:
+        assert (
+            brc.xml_url_for("https://www.federalregister.gov/documents/full_text/html/2026/07/21/2026-14636.html")
+            == "https://www.federalregister.gov/documents/full_text/xml/2026/07/21/2026-14636.xml"
+        )
+
+    def test_the_derivation_preserves_the_publisher_s_own_date_path(self) -> None:
+        """The date path is copied, never reconstructed -- a guessed one 404s."""
+        assert "/2005/06/07/" in brc.xml_url_for(
+            "https://www.federalregister.gov/documents/full_text/html/2005/06/07/05-11167.html"
+        )
+
+    def test_an_unexpected_url_shape_is_refused_rather_than_mangled(self) -> None:
+        for bad in (
+            "https://www.federalregister.gov/documents/2026-14636",
+            "https://example.com/full_text/html/a/b/c/x.html",
+            "",
+        ):
+            with pytest.raises(brc.BodyCorpusError, match="cannot derive"):
+                brc.xml_url_for(bad)
+
+    def test_fetching_the_xml_rendition_uses_the_derived_url_and_suffix(self, tmp_path: Path) -> None:
+        cache = tmp_path / "cache"
+        manifest_path = _manifest(tmp_path, count=1)
+        recorder = _Recorder({})
+        brc.fetch_bodies(
+            manifest_path,
+            cache,
+            fetcher=recorder,
+            sleep=lambda _: None,
+            rendition="xml",
+        )
+        assert recorder.calls[0].endswith(".xml")
+        assert "/full_text/xml/" in recorder.calls[0]
+        lock = json.loads((cache / "source-lock.json").read_text())
+        assert lock["sources"][0]["cache_file"] == "documents/DOC-000.xml"
+
+    def test_the_xml_rendition_targets_the_xml_field_the_parser_understands(self, tmp_path: Path) -> None:
+        manifest = json.loads(_manifest(tmp_path, count=1).read_text())
+        spec = brc.document_specs(manifest, ["DOC-000"], rendition="xml")[0]
+        assert spec.target_field == "xml_text"
+        assert spec.representation == "xml"
+
+    def test_the_two_renditions_cover_exactly_the_same_documents(self, tmp_path: Path) -> None:
+        manifest_path = _manifest(tmp_path, count=3)
+        html_cache, xml_cache = tmp_path / "h", tmp_path / "x"
+        brc.fetch_bodies(manifest_path, html_cache, fetcher=_Recorder({}), sleep=lambda _: None)
+        brc.fetch_bodies(manifest_path, xml_cache, fetcher=_Recorder({}), sleep=lambda _: None, rendition="xml")
+        html_lock = json.loads((html_cache / "source-lock.json").read_text())
+        xml_lock = json.loads((xml_cache / "source-lock.json").read_text())
+        assert [r["case_id"] for r in html_lock["sources"]] == [r["case_id"] for r in xml_lock["sources"]]
+        assert html_lock["draw_id"] == xml_lock["draw_id"]
+
+    def test_the_recorded_retrieval_stamp_is_a_timezone_aware_instant(self, tmp_path: Path) -> None:
+        """spicysearch refuses a bare date for a capture observation.
+
+        spicy-regs' own contract permits either, so a date sealed cleanly here
+        and was then rejected downstream. Recording the real instant satisfies
+        both without inventing precision after the fact.
+        """
+        from datetime import datetime
+
+        cache = tmp_path / "cache"
+        brc.fetch_bodies(_manifest(tmp_path, count=1), cache, fetcher=_Recorder({}), sleep=lambda _: None)
+        stamp = json.loads((cache / "source-lock.json").read_text())["sources"][0]["retrieved_on"]
+        parsed = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+        assert parsed.tzinfo is not None
+        assert stamp.endswith("Z")
 
 
 class TestSecretScan:

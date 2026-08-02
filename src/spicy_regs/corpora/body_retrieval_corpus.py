@@ -63,6 +63,7 @@ import time
 from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -105,6 +106,20 @@ DEFAULT_MAX_RETRIES = 5
 #: (see ``sources/pdf.py:22-27``), and an anonymous crawler on a public index
 #: is impolite regardless.
 USER_AGENT = "spicy-regs-body-retrieval-corpus/1.0 (+https://github.com/civictechdc/spicy-regs; research corpus build)"
+
+#: The publisher serves each document in several renditions. ``body_html`` is
+#: the field the parquet carries; ``xml_text`` is the GPO-tagged rendition,
+#: which has no site chrome and no ``&#8203;`` line-break entities inside URLs.
+#: Both are exact publisher bytes over the *same* drawn document set.
+RENDITIONS: dict[str, dict[str, str]] = {
+    "html": {"suffix": ".html", "target_field": "body_html", "media_type": "text/html"},
+    "xml": {"suffix": ".xml", "target_field": "xml_text", "media_type": "application/xml"},
+}
+
+_HTML_FULL_TEXT = re.compile(
+    r"^(?P<prefix>https://www\.federalregister\.gov/documents/full_text/)html/"
+    r"(?P<path>\d{4}/\d{2}/\d{2}/[^/]+)\.html$"
+)
 
 _TOKEN = re.compile(r"[a-z0-9]+")
 
@@ -151,6 +166,22 @@ def scan_for_secrets(payload: object, where: str) -> None:
 # --------------------------------------------------------------------------
 # vocabulary competition
 # --------------------------------------------------------------------------
+
+
+def xml_url_for(html_url: str) -> str:
+    """Derive the GPO XML rendition URL from the published HTML one.
+
+    The publisher's *own* date path is copied, never reconstructed: a path
+    rebuilt from a document's recorded publication date 404s whenever the two
+    disagree, which they do. Verified against the API's ``full_text_xml_url``
+    field for documents spanning 2005-2026; a shape this does not recognise
+    raises rather than producing a plausible-looking wrong URL.
+    """
+
+    match = _HTML_FULL_TEXT.match(_text(html_url))
+    if match is None:
+        raise BodyCorpusError(f"cannot derive an XML rendition URL from {html_url!r}")
+    return f"{match['prefix']}xml/{match['path']}.xml"
 
 
 def tokenize(text: str | None) -> set[str]:
@@ -495,7 +526,18 @@ _INTERSTITIAL_MARKERS = (
 )
 
 
-def _classify_body(payload: bytes, media_type: str, resolved_url: str = "") -> str | None:
+_ACCEPTED_MEDIA_TYPES: dict[str, frozenset[str]] = {
+    "html": frozenset({"", "text/html", "application/xhtml+xml", "text/plain"}),
+    "xml": frozenset({"", "text/xml", "application/xml", "text/plain"}),
+}
+
+
+def _classify_body(
+    payload: bytes,
+    media_type: str,
+    resolved_url: str = "",
+    rendition: str = "html",
+) -> str | None:
     """Return a quarantine reason, or ``None`` when the body is usable.
 
     Checked before sealing because a corpus of error pages is worse than a
@@ -511,7 +553,7 @@ def _classify_body(payload: bytes, media_type: str, resolved_url: str = "") -> s
     window = payload[:8192]
     if any(marker in window for marker in _INTERSTITIAL_MARKERS):
         return "blocked-interstitial"
-    if media_type and media_type not in {"", "text/html", "application/xhtml+xml", "text/plain"}:
+    if media_type and media_type not in _ACCEPTED_MEDIA_TYPES[rendition]:
         return "unexpected-media-type"
     try:
         text = payload.decode("utf-8-sig")
@@ -552,6 +594,7 @@ def fetch_bodies(
     max_requests: int | None = None,
     stop_at_budget: bool = False,
     retrieved_on: str | None = None,
+    rendition: str = "html",
 ) -> dict[str, Any]:
     """Fetch every drawn body politely and resumably, then seal the lock.
 
@@ -574,7 +617,14 @@ def fetch_bodies(
     (cache_dir / "documents").mkdir(parents=True, exist_ok=True)
     (cache_dir / "receipts").mkdir(parents=True, exist_ok=True)
     load = fetcher or http_fetch
-    stamp = retrieved_on or time.strftime("%Y-%m-%d")
+    if rendition not in RENDITIONS:
+        raise BodyCorpusError(f"unsupported rendition {rendition!r}")
+    suffix = RENDITIONS[rendition]["suffix"]
+    #: A timezone-aware instant, not a calendar date. spicy-regs' capture
+    #: contract accepts either, but spicysearch requires the instant, so a
+    #: date seals cleanly here and is refused downstream. Recording the real
+    #: retrieval time satisfies both without inventing precision afterwards.
+    stamp = retrieved_on or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     quarantine_rows: list[dict[str, Any]] = []
     reasons: Counter[str] = Counter()
@@ -585,8 +635,9 @@ def fetch_bodies(
         if not isinstance(entry, Mapping):
             raise BodyCorpusError("draw manifest document entries must be objects")
         number = _text(entry.get("document_number"))
-        url = _text(entry.get("body_html_url"))
-        cache_file = f"{number}.html"
+        html_url = _text(entry.get("body_html_url"))
+        url = html_url if rendition == "html" else xml_url_for(html_url)
+        cache_file = f"{number}{suffix}"
         body_path = cache_dir / "documents" / cache_file
         receipt_path = _receipt_path(cache_dir, number)
 
@@ -619,7 +670,7 @@ def fetch_bodies(
             receipt_path.unlink(missing_ok=True)
             continue
 
-        reason = _classify_body(result.content, result.media_type, result.resolved_url)
+        reason = _classify_body(result.content, result.media_type, result.resolved_url, rendition)
         if reason is not None:
             reasons[reason] += 1
             quarantine_rows.append(
@@ -657,7 +708,7 @@ def fetch_bodies(
         )
         fetched += 1
 
-    lock = _seal_lock(cache_dir, manifest)
+    lock = _seal_lock(cache_dir, manifest, rendition=rendition)
     _write_json(
         cache_dir / "quarantine.json",
         {
@@ -679,6 +730,8 @@ def fetch_bodies(
 def document_specs(
     manifest: Mapping[str, Any],
     document_numbers: Sequence[str],
+    *,
+    rendition: str = "html",
 ) -> list[Any]:
     """Build ``FullDocumentSpec`` rows for the documents that actually sealed.
 
@@ -693,12 +746,16 @@ def document_specs(
         FullDocumentSpec,
     )
 
+    if rendition not in RENDITIONS:
+        raise BodyCorpusError(f"unsupported rendition {rendition!r}")
+    target_field = RENDITIONS[rendition]["target_field"]
     by_number = {_text(entry.get("document_number")): entry for entry in manifest.get("documents", [])}
     specs: list[Any] = []
     for number in document_numbers:
         entry = by_number.get(number)
         if entry is None:
             raise BodyCorpusError(f"sealed document is absent from the draw: {number}")
+        html_url = _text(entry.get("body_html_url"))
         specs.append(
             FullDocumentSpec(
                 case_id=number,
@@ -706,8 +763,8 @@ def document_specs(
                 source_table="federal_register",
                 key_column="document_number",
                 key_value=number,
-                source_url=_text(entry.get("body_html_url")),
-                target_field="body_html",
+                source_url=html_url if rendition == "html" else xml_url_for(html_url),
+                target_field=target_field,
                 public_status="public",
                 rights_note=PUBLIC_DOMAIN_NOTE,
                 selection_reason=(
@@ -720,7 +777,7 @@ def document_specs(
     return specs
 
 
-def _seal_lock(cache_dir: Path, manifest: Mapping[str, Any]) -> dict[str, Any]:
+def _seal_lock(cache_dir: Path, manifest: Mapping[str, Any], *, rendition: str = "html") -> dict[str, Any]:
     """Assemble the lock from whatever succeeded, in draw order.
 
     Deriving the lock from per-document receipts rather than from the fetch
@@ -750,13 +807,14 @@ def _seal_lock(cache_dir: Path, manifest: Mapping[str, Any]) -> dict[str, Any]:
 
     from spicy_regs.corpora.segmentation_evaluation import FORMAT_VERSION, _spec_digest
 
-    specs = document_specs(manifest, [record["case_id"] for record in records])
+    specs = document_specs(manifest, [record["case_id"] for record in records], rendition=rendition)
     lock = {
         "format_version": FORMAT_VERSION,
         "source_spec_digest": _spec_digest(specs),
         "retrieved_on": records[0]["retrieved_on"] if records else None,
         "draw_id": manifest.get("draw_id"),
         "draw_schema_version": manifest.get("schema_version"),
+        "rendition": rendition,
         "source_count": len(records),
         "sources": records,
     }
@@ -999,6 +1057,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     fetch.add_argument("--min-interval-seconds", type=float, default=DEFAULT_MIN_INTERVAL_SECONDS)
     fetch.add_argument("--max-requests", type=int, default=None)
     fetch.add_argument("--stop-at-budget", action="store_true")
+    fetch.add_argument("--rendition", choices=tuple(RENDITIONS), default="html")
 
     validate = commands.add_parser("validate", help="re-verify a fetched cache against its lock")
     validate.add_argument("--cache-dir", type=Path, required=True)
@@ -1013,6 +1072,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     release.add_argument("--cache-dir", type=Path, required=True)
     release.add_argument("--output", type=Path, required=True)
     release.add_argument("--released-at", default="2026-08-02T00:00:00Z")
+    release.add_argument("--rendition", choices=tuple(RENDITIONS), default="html")
 
     args = parser.parse_args(argv)
 
@@ -1054,6 +1114,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             min_interval_seconds=args.min_interval_seconds,
             max_requests=args.max_requests,
             stop_at_budget=args.stop_at_budget,
+            rendition=args.rendition,
         )
         print(canonical_json(summary))
         return 0
@@ -1084,7 +1145,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         built = build_document_release_from_source_cache(
             Path(args.cache_dir),
             released_at=args.released_at,
-            source_specs=document_specs(manifest, sealed),
+            source_specs=document_specs(manifest, sealed, rendition=args.rendition),
         )
         output = Path(args.output)
         output.parent.mkdir(parents=True, exist_ok=True)
