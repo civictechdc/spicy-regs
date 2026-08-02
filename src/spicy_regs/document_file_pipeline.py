@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path, PurePosixPath
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from spicy_regs.document_release import (
     ACTUAL_FILE_FORMAT_VERSION,
@@ -40,11 +40,27 @@ from spicy_regs.docpipeline.source import (
     visible_retention,
 )
 from spicy_regs.schemas import DOCUMENT
-from spicy_regs.transforms.pdf_text import PAGE_SEPARATOR, PdfTextStatus, extract_pdf_text
+from spicy_regs.transforms.pdf_text import PAGE_SEPARATOR, PdfTextResult, PdfTextStatus, extract_pdf_text
+from spicy_regs.transforms.pdf_text_pymupdf import (
+    PYMUPDF_EXTRACTION_METHOD,
+    extract_pdf_text_pymupdf,
+    pymupdf_version,
+)
 
 
 FILE_MANIFEST_FORMAT_VERSION = "spicyregs-document-files/v1"
 PDF_EXTRACTION_METHOD = "pypdf"
+DEFAULT_PDF_EXTRACTION_METHOD = PYMUPDF_EXTRACTION_METHOD
+"""What a *new* extraction uses.
+
+Adopted 2026-08-02 on ``docs/evidence/extraction-tooling-bakeoff-2026-08-02.md``.
+Changing this never moves an already-sealed document: a lock records the parser
+it was sealed under and :func:`_extract_pdf_with` is handed that name, so a
+pypdf-sealed record keeps reproducing under pypdf byte for byte. What changes is
+which parser fills the ``primary-text`` slot for documents captured from now on,
+and the release that results is a new immutable object with its own digest —
+never an edit of an existing one.
+"""
 PDF_EXTRACTION_CONFIG = {
     "mode": "embedded-text-only",
     "page_separator": PAGE_SEPARATOR,
@@ -220,6 +236,45 @@ def _pypdf_version() -> str:
         raise DocumentFilePipelineError("pypdf is required to extract captured PDF files") from error
 
 
+def _extract_pdf_with(
+    method: str,
+    payload: bytes,
+    *,
+    page_separator: str,
+    page_whitespace: Literal["preserve", "strip"],
+) -> tuple[PdfTextResult, str, str]:
+    """Extract with the *named* parser, and report the version actually imported.
+
+    The name is an input rather than a constant because a sealed record must
+    reproduce under the parser it was sealed with. Adopting a better parser
+    changes what new captures use; it may not reach backwards and move a
+    document that is already sealed.
+
+    An unknown name fails closed rather than falling back to a default — a
+    silent fallback would let a lock naming a parser this build does not have
+    verify against a different one, which is the one way this check could lie.
+    """
+    if method == PDF_EXTRACTION_METHOD:
+        result = extract_pdf_text(payload, page_separator=page_separator, page_whitespace=page_whitespace)
+        return result, method, _pypdf_version()
+    if method == PYMUPDF_EXTRACTION_METHOD:
+        result = extract_pdf_text_pymupdf(payload, page_separator=page_separator, page_whitespace=page_whitespace)
+        return result, method, pymupdf_version()
+    raise DocumentFilePipelineError(
+        f"PDF extraction method {method!r} is not one this build can run "
+        f"({PDF_EXTRACTION_METHOD!r}, {PYMUPDF_EXTRACTION_METHOD!r})"
+    )
+
+
+def _pdf_extraction_config(method: str, *, locked: bool) -> dict[str, str]:
+    """The effective configuration recorded beside the parser and its version."""
+    base = dict(LOCKED_PDF_EXTRACTION_CONFIG if locked else PDF_EXTRACTION_CONFIG)
+    if method == PYMUPDF_EXTRACTION_METHOD:
+        base["text_flags"] = "default"
+        base["reading_order"] = "content-stream"
+    return base
+
+
 def _refuse_thin_markup_parse(
     text: str,
     *,
@@ -243,7 +298,7 @@ def _refuse_thin_markup_parse(
         raise DocumentFilePipelineError(str(error)) from error
 
 
-def _refuse_thin_pdf_parse(text: str, payload: bytes, *, subject_id: str) -> None:
+def _refuse_thin_pdf_parse(text: str, payload: bytes, *, subject_id: str, method: str) -> None:
     """Refuse a PDF parse whose text density is below the measured floor.
 
     A PDF carries no source text to compare against, so the measurement is
@@ -255,7 +310,7 @@ def _refuse_thin_pdf_parse(text: str, payload: bytes, *, subject_id: str) -> Non
         raise DocumentFilePipelineError(f"{subject_id} has no PDF bytes to extract")
     try:
         check_extraction_retention(
-            PDF_EXTRACTION_METHOD,
+            method,
             "application/pdf",
             len(text) / len(payload),
             subject_id=subject_id,
@@ -641,7 +696,9 @@ def _prepare_captured_rendition_document(
         raise DocumentFilePipelineError(f"unsupported captured primary rendition media type: {primary_media_type}")
 
     if primary_media_type == "application/pdf":
-        extraction = extract_pdf_text(primary_payload)
+        extraction, pdf_method, pdf_method_version = _extract_pdf_with(
+            DEFAULT_PDF_EXTRACTION_METHOD, primary_payload, page_separator=PAGE_SEPARATOR, page_whitespace="strip"
+        )
         if extraction.status is not PdfTextStatus.OK:
             raise DocumentFilePipelineError(f"PDF text extraction failed closed with status {extraction.status.value}")
         if len(extraction.pages) != extraction.page_count:
@@ -651,12 +708,12 @@ def _prepare_captured_rendition_document(
                 f"PDF extraction has failed page ordinals: {list(extraction.failed_page_ordinals)}"
             )
         text = extraction.text
-        _refuse_thin_pdf_parse(text, primary_payload, subject_id=f"{collection}.source-file")
+        _refuse_thin_pdf_parse(text, primary_payload, subject_id=f"{collection}.source-file", method=pdf_method)
         passages = _pdf_passages(text, extraction.pages)
         evidence_grade = "parser-derived"
-        method = PDF_EXTRACTION_METHOD
-        method_version = _pypdf_version()
-        method_config = PDF_EXTRACTION_CONFIG
+        method = pdf_method
+        method_version = pdf_method_version
+        method_config = _pdf_extraction_config(pdf_method, locked=False)
     else:
         try:
             text = primary_payload.decode("utf-8-sig")
@@ -835,12 +892,20 @@ def _source_cache_record(
     lock_record: Mapping[str, Any],
     source_spec: Any,
     lock_digest: str,
+    document_type_override: str | None = None,
 ) -> tuple[dict[str, Any], str, bytes]:
     profile_id = _require_string(source_spec.profile_id, "source cache profile ID")
     try:
         publisher, collection, document_type = _SOURCE_CACHE_DOCUMENT_TYPES[profile_id]
     except KeyError as error:
         raise DocumentFilePipelineError(f"unclassified source-cache profile: {profile_id}") from error
+    # The per-profile constant names the *kind* of thing captured, which is all
+    # a fixture corpus needs. A real corpus must carry the publisher's own
+    # document type instead: a constant makes every downstream type allowlist a
+    # no-op, so "Rule" and "Proposed Rule" are excluded identically and the
+    # corpus admits nothing at all.
+    if document_type_override is not None:
+        document_type = _require_string(document_type_override, f"{source_spec.case_id} document type")
     case_id = _require_string(source_spec.case_id, "source cache case ID")
     if lock_record.get("case_id") != case_id:
         raise DocumentFilePipelineError(f"source lock record differs for case {case_id}")
@@ -861,7 +926,9 @@ def _source_cache_record(
     distribution_path = _distribution_path(expected_digest, cache_file)
 
     if source_spec.representation == "pdf":
-        extraction = extract_pdf_text(
+        locked_method = lock_record.get("extraction_method")
+        extraction, pdf_method, pdf_method_version = _extract_pdf_with(
+            locked_method if isinstance(locked_method, str) and locked_method else DEFAULT_PDF_EXTRACTION_METHOD,
             payload,
             page_separator=LOCKED_PDF_PAGE_SEPARATOR,
             page_whitespace="preserve",
@@ -875,16 +942,16 @@ def _source_cache_record(
                 f"{case_id} PDF extraction has failed page ordinals: {list(extraction.failed_page_ordinals)}"
             )
         text = extraction.text
-        _refuse_thin_pdf_parse(text, payload, subject_id=case_id)
+        _refuse_thin_pdf_parse(text, payload, subject_id=case_id, method=pdf_method)
         passage_specs = _pdf_passages(
             text,
             extraction.pages,
             page_separator=LOCKED_PDF_PAGE_SEPARATOR,
         )
         evidence_grade = "parser-derived"
-        method = PDF_EXTRACTION_METHOD
-        method_version = _pypdf_version()
-        method_config = LOCKED_PDF_EXTRACTION_CONFIG
+        method = pdf_method
+        method_version = pdf_method_version
+        method_config = _pdf_extraction_config(pdf_method, locked=True)
     else:
         try:
             text = payload.decode("utf-8-sig")
@@ -1004,6 +1071,7 @@ def _prepare_source_cache_release(
     released_at: str,
     rulespec_core_path: Path,
     source_specs: Sequence[Any] | None = None,
+    document_types: Mapping[str, str] | None = None,
 ) -> _PreparedFileRelease:
     # The source list and byte-lock validator are reused from the measured
     # segmentation corpus. The release model and publication path remain here.
@@ -1046,6 +1114,7 @@ def _prepare_source_cache_release(
             lock_record=lock_record,
             source_spec=spec,
             lock_digest=lock_digest,
+            document_type_override=(None if document_types is None else document_types.get(spec.case_id)),
         )
         records.append(record)
         requested_sources.add(f"{record['publisher']}:{record['collection']}#selection={lock_digest}")
@@ -1300,6 +1369,7 @@ def build_document_release_from_source_cache(
     released_at: str,
     rulespec_core_path: Path = DEFAULT_RULESPEC_CORE_PATH,
     source_specs: Sequence[Any] | None = None,
+    document_types: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Build a local conformance release from a source cache.
 
@@ -1319,6 +1389,7 @@ def build_document_release_from_source_cache(
         released_at=released_at,
         rulespec_core_path=Path(rulespec_core_path),
         source_specs=source_specs,
+        document_types=document_types,
     ).release
 
 
@@ -1329,6 +1400,7 @@ def publish_document_release_from_source_cache(
     released_at: str,
     rulespec_core_path: Path = DEFAULT_RULESPEC_CORE_PATH,
     source_specs: Sequence[Any] | None = None,
+    document_types: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Write the release JSON, its exact source bytes, and its capture receipt.
 
@@ -1343,6 +1415,7 @@ def publish_document_release_from_source_cache(
         released_at=released_at,
         rulespec_core_path=Path(rulespec_core_path),
         source_specs=source_specs,
+        document_types=document_types,
     )
     return _publish_prepared_release(
         prepared,

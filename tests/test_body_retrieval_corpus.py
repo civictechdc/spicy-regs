@@ -552,6 +552,66 @@ class TestRendition:
         assert stamp.endswith("Z")
 
 
+class TestReleaseAdmissibility:
+    """Two fields decide whether a consumer can take this release at all.
+
+    Both were produced wrong while every upstream check passed, which is the
+    point: the builder validated its own invariants and still emitted
+    something spicysearch refuses before any allowlist runs.
+    """
+
+    def test_the_real_federal_register_type_is_carried_not_a_constant(
+        self, tmp_path: Path
+    ) -> None:
+        """A constant document type makes every type allowlist a no-op.
+
+        Stamping "Federal Register document" on every document means a policy
+        admitting {Notice, Proposed Rule} matches nothing -- Rules and Proposed
+        Rules are excluded identically, so the corpus admits 0%.
+        """
+        rows = [
+            _row("DOC-000", document_type="Rule"),
+            _row("DOC-001", document_type="Proposed Rule"),
+        ]
+        manifest = brc.build_draw(rows, rule=DEFAULT_RULE, source_digest="sha256:aa")
+        assert brc.document_types_for(manifest, ["DOC-000", "DOC-001"]) == {
+            "DOC-000": "Rule",
+            "DOC-001": "Proposed Rule",
+        }
+
+    def test_a_document_absent_from_the_draw_has_no_invented_type(self) -> None:
+        manifest = brc.build_draw([_row("DOC-000")], rule=DEFAULT_RULE, source_digest="sha256:aa")
+        with pytest.raises(brc.BodyCorpusError, match="absent from the draw"):
+            brc.document_types_for(manifest, ["NOT-DRAWN"])
+
+    def test_a_bare_date_capture_observation_is_refused_at_build_time(
+        self, tmp_path: Path
+    ) -> None:
+        """spicy-regs' own contract permits a date; the consumer does not.
+
+        Permitting it here means the defect is only discovered by the consumer,
+        after a 55-minute build. This refuses at construction instead.
+        """
+        cache = tmp_path / "cache"
+        manifest_path = _manifest(tmp_path, count=1)
+        brc.fetch_bodies(
+            manifest_path,
+            cache,
+            fetcher=_Recorder({}),
+            sleep=lambda _: None,
+            retrieved_on="2026-08-02",
+        )
+        with pytest.raises(brc.BodyCorpusError, match="timezone-aware"):
+            brc.require_capture_instants(cache)
+
+    def test_a_recorded_instant_passes_the_same_check(self, tmp_path: Path) -> None:
+        cache = tmp_path / "cache"
+        brc.fetch_bodies(
+            _manifest(tmp_path, count=1), cache, fetcher=_Recorder({}), sleep=lambda _: None
+        )
+        assert brc.require_capture_instants(cache) == 1
+
+
 class TestSecretScan:
     def test_a_keyed_source_url_is_refused_rather_than_sealed(self, tmp_path: Path) -> None:
         """A signed URL in the draw would be copied verbatim into the lock."""

@@ -777,6 +777,58 @@ def document_specs(
     return specs
 
 
+def document_types_for(
+    manifest: Mapping[str, Any],
+    document_numbers: Sequence[str],
+) -> dict[str, str]:
+    """The publisher's own document type per drawn document.
+
+    The release pipeline otherwise stamps one constant per source profile
+    ("Federal Register document"). That is fine for a fixture corpus and fatal
+    for a real one: a constant makes every downstream type allowlist a no-op,
+    so ``Rule`` and ``Proposed Rule`` are excluded identically and the corpus
+    admits nothing. The real type was in the parquet the draw read; this
+    carries it the rest of the way.
+    """
+
+    by_number = {_text(entry.get("document_number")): entry for entry in manifest.get("documents", [])}
+    types: dict[str, str] = {}
+    for number in document_numbers:
+        entry = by_number.get(number)
+        if entry is None:
+            raise BodyCorpusError(f"sealed document is absent from the draw: {number}")
+        document_type = _text(entry.get("document_type"))
+        if not document_type:
+            raise BodyCorpusError(f"drawn document carries no document type: {number}")
+        types[number] = document_type
+    return types
+
+
+def require_capture_instants(cache_dir: Path) -> int:
+    """Refuse to build a release whose captures carry a bare calendar date.
+
+    spicy-regs' own capture contract accepts a date *or* an instant, so a date
+    seals cleanly here and is then refused by the consumer -- after a build
+    that takes the better part of an hour. Failing at construction turns a
+    downstream mystery into a local error, and the fix is a refetch, which is
+    the only thing that can honestly supply the missing precision.
+    """
+
+    lock = _read_json(Path(cache_dir) / "source-lock.json")
+    bare = [
+        _text(record.get("case_id"))
+        for record in lock.get("sources", [])
+        if len(_text(record.get("retrieved_on"))) == 10
+    ]
+    if bare:
+        raise BodyCorpusError(
+            f"{len(bare)} capture observations are a bare calendar date, not a "
+            f"timezone-aware instant (first: {bare[0]}). Refetch this rendition; "
+            "a date cannot be upgraded to an instant without inventing precision."
+        )
+    return len(lock.get("sources", []))
+
+
 def _seal_lock(cache_dir: Path, manifest: Mapping[str, Any], *, rendition: str = "html") -> dict[str, Any]:
     """Assemble the lock from whatever succeeded, in draw order.
 
@@ -1185,18 +1237,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         lock = _read_json(Path(args.cache_dir) / "source-lock.json")
         sealed = [_text(record.get("case_id")) for record in lock.get("sources", [])]
         specs = document_specs(manifest, sealed, rendition=args.rendition)
+        types = document_types_for(manifest, sealed)
+        require_capture_instants(Path(args.cache_dir))
         if args.distribution is not None:
             built = publish_document_release_from_source_cache(
                 Path(args.cache_dir),
                 Path(args.distribution),
                 released_at=args.released_at,
                 source_specs=specs,
+                document_types=types,
             )
         else:
             built = build_document_release_from_source_cache(
                 Path(args.cache_dir),
                 released_at=args.released_at,
                 source_specs=specs,
+                document_types=types,
             )
         output = Path(args.output)
         output.parent.mkdir(parents=True, exist_ok=True)
