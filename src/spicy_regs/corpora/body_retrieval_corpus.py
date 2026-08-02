@@ -118,8 +118,34 @@ _STOPWORDS = frozenset(
 )
 
 
+#: A build must not seal a secret. The scan is over what is written, not what
+#: was read, so a credential in an environment variable cannot reach the file.
+#: Convention and pattern follow ``tools/build_usc_act_index_artifact.py:103``.
+_SECRET_LIKE = re.compile(r"\b(?:sk-(?:proj-)?[A-Za-z0-9_-]{20,}|api[_-]?key=[^\s&]{8,})\b", re.IGNORECASE)
+
+
 class BodyCorpusError(RuntimeError):
     """Raised when the corpus cannot be drawn, fetched, or sealed honestly."""
+
+
+def scan_for_secrets(payload: object, where: str) -> None:
+    """Refuse to seal a secret-like value.
+
+    Source URLs are the realistic carrier here: a signed or keyed URL in a
+    draw manifest would be copied verbatim into the lock and the receipt.
+    """
+
+    def walk(value: object, path: str) -> None:
+        if isinstance(value, Mapping):
+            for key, item in value.items():
+                walk(item, f"{path}.{key}")
+        elif isinstance(value, (list, tuple)):
+            for index, item in enumerate(value):
+                walk(item, f"{path}[{index}]")
+        elif value is not None and _SECRET_LIKE.search(str(value)):
+            raise BodyCorpusError(f"refusing to seal a secret-like value in {path}")
+
+    walk(payload, where)
 
 
 # --------------------------------------------------------------------------
@@ -511,6 +537,7 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
+    scan_for_secrets(payload, path.name)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(canonical_json(payload) + "\n", encoding="utf-8")
 

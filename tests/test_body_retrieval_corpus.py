@@ -471,6 +471,25 @@ class TestReleaseCompatibility:
         assert spec.representation == "html"
 
 
+class TestSecretScan:
+    def test_a_keyed_source_url_is_refused_rather_than_sealed(self, tmp_path: Path) -> None:
+        """A signed URL in the draw would be copied verbatim into the lock."""
+        row = _row("A")
+        row["body_html_url"] = "https://www.federalregister.gov/x.html?api_key=abcd1234efgh"
+        manifest = brc.build_draw([row], rule=DEFAULT_RULE, source_digest="sha256:aa")
+        path = tmp_path / "draw.json"
+        path.write_text(brc.canonical_json(manifest) + "\n", encoding="utf-8")
+        with pytest.raises(brc.BodyCorpusError, match="secret-like"):
+            brc.fetch_bodies(path, tmp_path / "cache", fetcher=_Recorder({}), sleep=lambda _: None)
+
+    def test_ordinary_federal_register_urls_pass(self, tmp_path: Path) -> None:
+        brc.scan_for_secrets({"url": _row("A")["body_html_url"]}, "draw")
+
+    def test_the_scan_reaches_nested_values(self) -> None:
+        with pytest.raises(brc.BodyCorpusError, match=r"payload\.rows\[1\]\.token"):
+            brc.scan_for_secrets({"rows": [{"token": "fine"}, {"token": "sk-proj-" + "a" * 24}]}, "payload")
+
+
 class TestMeasure:
     def test_visible_text_strips_markup_and_scripts(self) -> None:
         markup = "<div><script>var x = 'habitat';</script><p>Critical  habitat</p></div>"
