@@ -151,6 +151,7 @@ refspec = { path = "RefSpec", editable = true }
 # and are excluded from the default run so the unit suite stays hermetic. The
 # dedicated "Integration (live data)" workflow runs them via `-m integration`.
 addopts = "-m 'not integration'"
+testpaths = ["tests"]
 markers = [
     "integration: live test against external data (anonymous Mirrulations S3); run in the Integration CI workflow, not the default suite",
     "legacy_rulespec_combined: pre-Core/Extrapolator compatibility proof; requires the exact clean historical Rulespec checkout",
