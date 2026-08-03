@@ -1,0 +1,458 @@
+{
+  "experimental": true,
+  "format": "spicyregs-source-profile-catalog/experimental-v0",
+  "profileCatalogDigest": "sha256:f0ffc8a5f3bbb871c6824d3f7ea1f3f64f51652281ce6819d1404ff2c2f3cec1",
+  "profileCatalogId": "urn:spicyregs:profile-catalog:f0ffc8a5f3bbb871c6824d3f7ea1f3f64f51652281ce6819d1404ff2c2f3cec1",
+  "profiles": [
+    {
+      "access": {
+        "basis": "us-federal-public-record",
+        "scope": "public"
+      },
+      "active": true,
+      "allowedSchemes": [
+        "subject"
+      ],
+      "idColumns": [
+        "granule_id"
+      ],
+      "mode": "hierarchical-document",
+      "profileId": "cfr-section-v1",
+      "regionAdapterId": "hierarchical-text:source-elements-v2",
+      "sourceTable": "cfr_sections",
+      "subjectType": "cfr_section",
+      "textColumns": [
+        "heading",
+        "cfr_ref",
+        "title",
+        "part",
+        "section",
+        "text",
+        "full_text",
+        "xml_text"
+      ]
+    },
+    {
+      "access": {
+        "basis": "us-federal-public-record",
+        "scope": "public"
+      },
+      "active": true,
+      "allowedSchemes": [
+        "subject",
+        "regulated_entity"
+      ],
+      "idColumns": [
+        "bill_id"
+      ],
+      "mode": "hierarchical-document",
+      "profileId": "congress-bill-v1",
+      "regionAdapterId": "hierarchical-text:source-elements-v2",
+      "sourceTable": "congress_bills",
+      "subjectType": "congress_bill",
+      "textColumns": [
+        "title",
+        "latest_action_text",
+        "origin_chamber",
+        "summary",
+        "full_text",
+        "xml_text"
+      ]
+    },
+    {
+      "access": {
+        "basis": "us-federal-public-record",
+        "scope": "public"
+      },
+      "active": true,
+      "allowedSchemes": [
+        "subject",
+        "regulated_entity"
+      ],
+      "idColumns": [
+        "cl_docket_id"
+      ],
+      "mode": "atomic-record",
+      "profileId": "court-docket-v1",
+      "regionAdapterId": "atomic-fields:source-elements-v2",
+      "sourceTable": "court_dockets",
+      "subjectType": "court_docket",
+      "textColumns": [
+        "case_name_full",
+        "case_name",
+        "nature_of_suit",
+        "cause",
+        "court_citation_string",
+        "opinion_text",
+        "html_text",
+        "full_text"
+      ]
+    },
+    {
+      "access": {
+        "basis": "us-federal-public-record",
+        "scope": "public"
+      },
+      "active": true,
+      "allowedSchemes": [
+        "subject",
+        "regulated_entity"
+      ],
+      "idColumns": [
+        "opinion_id"
+      ],
+      "mode": "hierarchical-document",
+      "profileId": "court-opinion-v1",
+      "regionAdapterId": "hierarchical-text:source-elements-v2",
+      "sourceTable": "court_opinions",
+      "subjectType": "court_opinion",
+      "textColumns": [
+        "case_name",
+        "docket_number",
+        "citation",
+        "date_decided",
+        "opinion_type",
+        "holding",
+        "html_with_citations",
+        "plain_text",
+        "pdf_text"
+      ]
+    },
+    {
+      "access": {
+        "basis": "us-federal-public-record",
+        "scope": "public"
+      },
+      "active": true,
+      "allowedSchemes": [
+        "subject"
+      ],
+      "idColumns": [
+        "report_id"
+      ],
+      "mode": "hierarchical-document",
+      "profileId": "crs-report-v1",
+      "regionAdapterId": "hierarchical-text:source-elements-v2",
+      "sourceTable": "crs_reports",
+      "subjectType": "crs_report",
+      "textColumns": [
+        "title",
+        "report_type",
+        "status",
+        "abstract",
+        "full_text",
+        "pdf_text"
+      ]
+    },
+    {
+      "access": {
+        "basis": "us-federal-public-record",
+        "scope": "public"
+      },
+      "active": true,
+      "allowedSchemes": [
+        "subject",
+        "regulated_entity"
+      ],
+      "idColumns": [
+        "id_submission"
+      ],
+      "mode": "hierarchical-document",
+      "profileId": "fcc-filing-v1",
+      "regionAdapterId": "hierarchical-text:source-elements-v2",
+      "sourceTable": "fcc_filings",
+      "subjectType": "fcc_filing",
+      "textColumns": [
+        "submission_type",
+        "text_data",
+        "express_comment",
+        "bureaus_json",
+        "lawfirms_json",
+        "full_text"
+      ]
+    },
+    {
+      "access": {
+        "basis": "us-federal-public-record",
+        "scope": "public"
+      },
+      "active": true,
+      "allowedSchemes": [
+        "subject",
+        "regulated_entity"
+      ],
+      "idColumns": [
+        "id_proceeding"
+      ],
+      "mode": "atomic-record",
+      "profileId": "fcc-proceeding-v1",
+      "regionAdapterId": "atomic-fields:source-elements-v2",
+      "sourceTable": "fcc_proceedings",
+      "subjectType": "fcc_proceeding",
+      "textColumns": [
+        "name",
+        "description",
+        "rulemaking_or_docket",
+        "bureau_name"
+      ]
+    },
+    {
+      "access": {
+        "basis": "us-federal-public-record",
+        "scope": "public"
+      },
+      "active": true,
+      "allowedSchemes": [
+        "regulated_entity"
+      ],
+      "idColumns": [
+        "committee_id"
+      ],
+      "mode": "atomic-record",
+      "profileId": "fec-committee-v1",
+      "regionAdapterId": "atomic-fields:source-elements-v2",
+      "sourceTable": "fec_committees",
+      "subjectType": "fec_committee",
+      "textColumns": [
+        "name",
+        "committee_type_full",
+        "organization_type_full",
+        "party_full",
+        "candidate_ids_json"
+      ]
+    },
+    {
+      "access": {
+        "basis": "us-federal-public-record",
+        "scope": "public"
+      },
+      "active": true,
+      "allowedSchemes": [
+        "subject",
+        "regulated_entity"
+      ],
+      "idColumns": [
+        "document_number"
+      ],
+      "mode": "hierarchical-document",
+      "profileId": "federal-register-document-v1",
+      "regionAdapterId": "hierarchical-text:source-elements-v2",
+      "sourceTable": "federal_register",
+      "subjectType": "federal_register_document",
+      "textColumns": [
+        "title",
+        "abstract",
+        "document_type",
+        "agency_slugs",
+        "body_text",
+        "body_html",
+        "full_text"
+      ]
+    },
+    {
+      "access": {
+        "basis": "us-federal-public-record",
+        "scope": "public"
+      },
+      "active": true,
+      "allowedSchemes": [
+        "subject",
+        "regulated_entity"
+      ],
+      "idColumns": [
+        "report_id"
+      ],
+      "mode": "hierarchical-document",
+      "profileId": "gao-report-v1",
+      "regionAdapterId": "hierarchical-text:source-elements-v2",
+      "sourceTable": "gao_reports",
+      "subjectType": "gao_report",
+      "textColumns": [
+        "title",
+        "abstract",
+        "report_type",
+        "agencies_json",
+        "full_text",
+        "pdf_text"
+      ]
+    },
+    {
+      "access": {
+        "basis": "us-federal-public-record",
+        "scope": "public"
+      },
+      "active": true,
+      "allowedSchemes": [
+        "subject",
+        "regulated_entity"
+      ],
+      "idColumns": [
+        "filing_uuid"
+      ],
+      "mode": "structured-children",
+      "profileId": "lobbying-filing-v1",
+      "regionAdapterId": "structured-children:source-elements-v2",
+      "sourceTable": "lobbying_filings",
+      "subjectType": "lobbying_filing",
+      "textColumns": [
+        "client_name",
+        "registrant_name",
+        "lobbying_activities_json",
+        "government_entities_json"
+      ]
+    },
+    {
+      "access": {
+        "basis": "us-federal-public-record",
+        "scope": "public"
+      },
+      "active": false,
+      "allowedSchemes": [
+        "subject",
+        "regulated_entity"
+      ],
+      "idColumns": [
+        "comment_id"
+      ],
+      "mode": "hierarchical-document",
+      "profileId": "regulations-comment-v1",
+      "regionAdapterId": "hierarchical-text:source-elements-v2",
+      "sourceTable": "comments",
+      "subjectType": "comment",
+      "textColumns": [
+        "title",
+        "comment",
+        "text_content",
+        "organization",
+        "category"
+      ]
+    },
+    {
+      "access": {
+        "basis": "us-federal-public-record",
+        "scope": "public"
+      },
+      "active": true,
+      "allowedSchemes": [
+        "subject",
+        "regulated_entity"
+      ],
+      "idColumns": [
+        "docket_id"
+      ],
+      "mode": "atomic-record",
+      "profileId": "regulations-docket-v2",
+      "regionAdapterId": "atomic-fields:source-elements-v2",
+      "sourceTable": "dockets",
+      "subjectType": "docket",
+      "textColumns": [
+        "title",
+        "abstract"
+      ]
+    },
+    {
+      "access": {
+        "basis": "us-federal-public-record",
+        "scope": "public"
+      },
+      "active": true,
+      "allowedSchemes": [
+        "subject",
+        "regulated_entity"
+      ],
+      "idColumns": [
+        "document_id"
+      ],
+      "mode": "hierarchical-document",
+      "profileId": "regulations-document-v2",
+      "regionAdapterId": "hierarchical-text:source-elements-v2",
+      "sourceTable": "documents",
+      "subjectType": "document",
+      "textColumns": [
+        "title"
+      ]
+    },
+    {
+      "access": {
+        "basis": "us-federal-public-record",
+        "scope": "public"
+      },
+      "active": true,
+      "allowedSchemes": [
+        "regulated_entity"
+      ],
+      "idColumns": [
+        "uei"
+      ],
+      "mode": "atomic-record",
+      "profileId": "sam-entity-v1",
+      "regionAdapterId": "atomic-fields:source-elements-v2",
+      "sourceTable": "sam_entities",
+      "subjectType": "sam_entity",
+      "textColumns": [
+        "legal_business_name",
+        "dba_name",
+        "entity_type_desc",
+        "entity_structure_desc",
+        "purpose_of_registration_desc",
+        "primary_naics"
+      ]
+    },
+    {
+      "access": {
+        "basis": "us-federal-public-record",
+        "scope": "public"
+      },
+      "active": true,
+      "allowedSchemes": [
+        "subject",
+        "regulated_entity"
+      ],
+      "idColumns": [
+        "rin",
+        "agenda_edition"
+      ],
+      "mode": "atomic-record",
+      "profileId": "unified-agenda-observation-v1",
+      "regionAdapterId": "atomic-fields:source-elements-v2",
+      "sourceTable": "unified_agenda",
+      "subjectType": "regulatory_agenda_observation",
+      "textColumns": [
+        "title",
+        "abstract",
+        "rule_stage",
+        "priority_category",
+        "cfr_references_json",
+        "legal_authority_json"
+      ]
+    },
+    {
+      "access": {
+        "basis": "us-federal-public-record",
+        "scope": "public"
+      },
+      "active": true,
+      "allowedSchemes": [
+        "regulated_entity"
+      ],
+      "idColumns": [
+        "recipient_id"
+      ],
+      "mode": "atomic-record",
+      "profileId": "usaspending-recipient-v1",
+      "regionAdapterId": "atomic-fields:source-elements-v2",
+      "sourceTable": "usaspending_recipients",
+      "subjectType": "usaspending_recipient",
+      "textColumns": [
+        "name",
+        "recipient_level"
+      ]
+    }
+  ],
+  "recordedAt": "2026-08-03T12:00:00Z",
+  "summary": {
+    "activeProfileCount": 16,
+    "deferredProfileCount": 1,
+    "profileCount": 17
+  }
+}

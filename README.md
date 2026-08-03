@@ -18,6 +18,28 @@ search ranking and serving:
 - **SpicySearch** owns query planning, document retrieval, ranking,
   explanations, search receipts, indexes, and query-time coverage.
 
+SpicyRegs also publishes experimental, digest-pinned source-profile facts in
+[`policies/`](policies/). `source-profile-catalog-v0.json` describes the 17
+source profiles without loading the document pipeline.
+`profile-resource-applicability-v0.json` records only source-native
+relationships to resources in the pinned RefSpec catalog. Search admission,
+facets, expansion, and ranking remain SpicySearch decisions.
+
+Regenerate the checked files from the selected RefSpec catalog with:
+
+```bash
+uv run python tools/generate_source_profile_artifacts.py --write
+```
+
+To build the same two artifacts into a caller-selected directory, run:
+
+```bash
+uv run build-source-profile-artifacts \
+  --applicability-input policies/profile-resource-applicability-input-v0.json \
+  --refspec-catalog RefSpec/portfolio/resource-catalog-v0.json \
+  --output output/source-profile-artifacts
+```
+
 Build a release from the checked-in Regulations.gov JSON record and its exact
 four-page PDF:
 

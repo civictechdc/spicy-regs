@@ -133,6 +133,7 @@ run-artifact-retrieval-baseline = "spicy_regs.corpora.artifact_retrieval_baselin
 build-document-acceptance-scope = "spicy_regs.corpora.document_acceptance_scope:main"
 build-document-release = "spicy_regs.document_release:main"
 build-document-release-from-files = "spicy_regs.document_file_pipeline:main"
+build-source-profile-artifacts = "spicy_regs.source_profile_artifacts_cli:main"
 validate-document-release-distribution = "spicy_regs.document_file_pipeline:validate_distribution_main"
 segment-document-release = "spicy_regs.docpipeline.document_release_segments:main"
 run-relation-exclusion-evaluation = "spicy_regs.corpora.relation_exclusion_evaluation:main"

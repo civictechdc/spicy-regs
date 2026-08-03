@@ -1,0 +1,567 @@
+{
+  "applicabilityDigest": "sha256:0671caded698822217485275b9b2ddcfacc1286a177769b0b3b7a85026acf427",
+  "applicabilityId": "urn:spicyregs:applicability:0671caded698822217485275b9b2ddcfacc1286a177769b0b3b7a85026acf427",
+  "experimental": true,
+  "format": "spicyregs-profile-resource-applicability/experimental-v0",
+  "profileCatalog": {
+    "digest": "sha256:f0ffc8a5f3bbb871c6824d3f7ea1f3f64f51652281ce6819d1404ff2c2f3cec1",
+    "id": "urn:spicyregs:profile-catalog:f0ffc8a5f3bbb871c6824d3f7ea1f3f64f51652281ce6819d1404ff2c2f3cec1"
+  },
+  "profiles": [
+    {
+      "evidenceFields": [
+        "CFR hierarchy",
+        "citation",
+        "edition",
+        "point-in-time status",
+        "USLM structure"
+      ],
+      "knownGap": "Evidence is limited to the declared source-native fields; distribution availability is stated by the pinned RefSpec catalog.",
+      "profileId": "cfr-section-v1",
+      "resourceRelationships": [
+        {
+          "relationships": [
+            "sourceAssignedVocabulary"
+          ],
+          "resourceId": "cfr-list-of-subjects"
+        },
+        {
+          "relationships": [
+            "nativeIdentifier",
+            "nativeStructure"
+          ],
+          "resourceId": "ecfr-govinfo-cfr-structure"
+        },
+        {
+          "relationships": [
+            "nativeStructure"
+          ],
+          "resourceId": "uslm"
+        }
+      ]
+    },
+    {
+      "evidenceFields": [
+        "bill type",
+        "action",
+        "version",
+        "committee",
+        "BioGuide identity",
+        "USLM structure"
+      ],
+      "knownGap": "Evidence is limited to the declared source-native fields; distribution availability is stated by the pinned RefSpec catalog.",
+      "profileId": "congress-bill-v1",
+      "resourceRelationships": [
+        {
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier",
+            "nativeStructure"
+          ],
+          "resourceId": "congress-billstatus-native-controls"
+        },
+        {
+          "relationships": [
+            "sourceAssignedVocabulary"
+          ],
+          "resourceId": "crs-legislative-subject-terms"
+        },
+        {
+          "relationships": [
+            "sourceAssignedVocabulary"
+          ],
+          "resourceId": "crs-policy-areas"
+        },
+        {
+          "relationships": [
+            "nativeIdentifier"
+          ],
+          "resourceId": "federal-legislative-identifiers"
+        },
+        {
+          "relationships": [
+            "nativeStructure"
+          ],
+          "resourceId": "uslm"
+        }
+      ]
+    },
+    {
+      "evidenceFields": [
+        "court identity",
+        "Nature of Suit",
+        "case identity",
+        "party",
+        "CourtListener status",
+        "date",
+        "access"
+      ],
+      "knownGap": "Evidence is limited to the declared source-native fields; distribution availability is stated by the pinned RefSpec catalog.",
+      "profileId": "court-docket-v1",
+      "resourceRelationships": [
+        {
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier"
+          ],
+          "resourceId": "court-identifiers-and-controls"
+        },
+        {
+          "relationships": [
+            "nativeCodeOrClassification"
+          ],
+          "resourceId": "nature-of-suit"
+        }
+      ]
+    },
+    {
+      "evidenceFields": [
+        "court identity",
+        "opinion type",
+        "version",
+        "citation",
+        "case identity",
+        "package identity"
+      ],
+      "knownGap": "Evidence is limited to the declared source-native fields; distribution availability is stated by the pinned RefSpec catalog.",
+      "profileId": "court-opinion-v1",
+      "resourceRelationships": [
+        {
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier"
+          ],
+          "resourceId": "court-identifiers-and-controls"
+        }
+      ]
+    },
+    {
+      "evidenceFields": [
+        "legislative subject term",
+        "policy area",
+        "product topic",
+        "product type",
+        "edition",
+        "status",
+        "report number",
+        "bill",
+        "committee"
+      ],
+      "knownGap": "Evidence is limited to the declared source-native fields; distribution availability is stated by the pinned RefSpec catalog.",
+      "profileId": "crs-report-v1",
+      "resourceRelationships": [
+        {
+          "relationships": [
+            "sourceAssignedVocabulary"
+          ],
+          "resourceId": "crs-legislative-subject-terms"
+        },
+        {
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier",
+            "sourceAssignedVocabulary"
+          ],
+          "resourceId": "crs-native-controls"
+        },
+        {
+          "relationships": [
+            "sourceAssignedVocabulary"
+          ],
+          "resourceId": "crs-policy-areas"
+        }
+      ]
+    },
+    {
+      "evidenceFields": [
+        "ECFS filing description",
+        "filer",
+        "author",
+        "FRN",
+        "bureau",
+        "filing status",
+        "access status",
+        "attachment type",
+        "genre map version"
+      ],
+      "knownGap": "Evidence is limited to the declared source-native fields; distribution availability is stated by the pinned RefSpec catalog.",
+      "profileId": "fcc-filing-v1",
+      "resourceRelationships": [
+        {
+          "relationships": [
+            "nativeCodeOrClassification"
+          ],
+          "resourceId": "cfr47-procedure"
+        },
+        {
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier",
+            "nativeStructure"
+          ],
+          "resourceId": "fcc-ecfs-native-controls"
+        },
+        {
+          "relationships": [
+            "sourceAssignedVocabulary"
+          ],
+          "resourceId": "federal-register-api-topics"
+        },
+        {
+          "relationships": [
+            "nativeIdentifier"
+          ],
+          "resourceId": "frn-authority"
+        }
+      ]
+    },
+    {
+      "evidenceFields": [
+        "ECFS proceeding number",
+        "rulemaking flag",
+        "bureau",
+        "status",
+        "date",
+        "47 CFR procedure class"
+      ],
+      "knownGap": "Evidence is limited to the declared source-native fields; distribution availability is stated by the pinned RefSpec catalog.",
+      "profileId": "fcc-proceeding-v1",
+      "resourceRelationships": [
+        {
+          "relationships": [
+            "nativeCodeOrClassification"
+          ],
+          "resourceId": "cfr47-procedure"
+        },
+        {
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier",
+            "nativeStructure"
+          ],
+          "resourceId": "fcc-ecfs-native-controls"
+        },
+        {
+          "relationships": [
+            "nativeIdentifier"
+          ],
+          "resourceId": "frn-authority"
+        }
+      ]
+    },
+    {
+      "evidenceFields": [
+        "committee ID",
+        "committee type",
+        "designation",
+        "organization type",
+        "party",
+        "sponsor",
+        "candidate",
+        "cycle",
+        "effective date"
+      ],
+      "knownGap": "Evidence is limited to the declared source-native fields; distribution availability is stated by the pinned RefSpec catalog.",
+      "profileId": "fec-committee-v1",
+      "resourceRelationships": [
+        {
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier"
+          ],
+          "resourceId": "fec-native-controls"
+        },
+        {
+          "relationships": [
+            "nativeIdentifier"
+          ],
+          "resourceId": "federal-legislative-identifiers"
+        }
+      ]
+    },
+    {
+      "evidenceFields": [
+        "topic",
+        "category",
+        "presidential subtype",
+        "toc_subject",
+        "agency",
+        "RIN",
+        "docket",
+        "CFR citation",
+        "version"
+      ],
+      "knownGap": "Evidence is limited to the declared source-native fields; distribution availability is stated by the pinned RefSpec catalog.",
+      "profileId": "federal-register-document-v1",
+      "resourceRelationships": [
+        {
+          "relationships": [
+            "sourceAssignedVocabulary"
+          ],
+          "resourceId": "federal-register-api-topics"
+        },
+        {
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier",
+            "nativeStructure"
+          ],
+          "resourceId": "federal-register-native-controls"
+        },
+        {
+          "relationships": [
+            "nativeIdentifier"
+          ],
+          "resourceId": "rin-authority"
+        }
+      ]
+    },
+    {
+      "evidenceFields": [
+        "GAO report ID",
+        "topic",
+        "product type",
+        "date",
+        "agency",
+        "recommendation",
+        "evidence depth"
+      ],
+      "knownGap": "Evidence is limited to the declared source-native fields; distribution availability is stated by the pinned RefSpec catalog.",
+      "profileId": "gao-report-v1",
+      "resourceRelationships": [
+        {
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier"
+          ],
+          "resourceId": "gao-native-controls"
+        },
+        {
+          "relationships": [
+            "sourceAssignedVocabulary"
+          ],
+          "resourceId": "gao-topics"
+        }
+      ]
+    },
+    {
+      "evidenceFields": [
+        "general issue code",
+        "filing type",
+        "period",
+        "status",
+        "client",
+        "registrant",
+        "government target",
+        "amendment"
+      ],
+      "knownGap": "Evidence is limited to the declared source-native fields; distribution availability is stated by the pinned RefSpec catalog.",
+      "profileId": "lobbying-filing-v1",
+      "resourceRelationships": [
+        {
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier",
+            "sourceAssignedVocabulary"
+          ],
+          "resourceId": "lda-native-controls"
+        }
+      ]
+    },
+    {
+      "evidenceFields": [
+        "submitter",
+        "attachment",
+        "participation category",
+        "privacy behavior"
+      ],
+      "knownGap": "Evidence is limited to the declared source-native fields; distribution availability is stated by the pinned RefSpec catalog.",
+      "profileId": "regulations-comment-v1",
+      "resourceRelationships": [
+        {
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier",
+            "nativeStructure"
+          ],
+          "resourceId": "regulations-gov-native-controls"
+        }
+      ]
+    },
+    {
+      "evidenceFields": [
+        "docket type",
+        "agency",
+        "docket ID",
+        "RIN"
+      ],
+      "knownGap": "Evidence is limited to the declared source-native fields; distribution availability is stated by the pinned RefSpec catalog.",
+      "profileId": "regulations-docket-v2",
+      "resourceRelationships": [
+        {
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier",
+            "nativeStructure"
+          ],
+          "resourceId": "regulations-gov-native-controls"
+        },
+        {
+          "relationships": [
+            "nativeIdentifier"
+          ],
+          "resourceId": "rin-authority"
+        }
+      ]
+    },
+    {
+      "evidenceFields": [
+        "document type",
+        "attachment type",
+        "agency",
+        "docket ID",
+        "Federal Register number",
+        "date"
+      ],
+      "knownGap": "Evidence is limited to the declared source-native fields; distribution availability is stated by the pinned RefSpec catalog.",
+      "profileId": "regulations-document-v2",
+      "resourceRelationships": [
+        {
+          "relationships": [
+            "sourceAssignedVocabulary"
+          ],
+          "resourceId": "federal-register-api-topics"
+        },
+        {
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier",
+            "nativeStructure"
+          ],
+          "resourceId": "regulations-gov-native-controls"
+        }
+      ]
+    },
+    {
+      "evidenceFields": [
+        "UEI",
+        "CAGE",
+        "NAICS",
+        "legal name",
+        "registration status",
+        "location",
+        "Federal Hierarchy"
+      ],
+      "knownGap": "Evidence is limited to the declared source-native fields; distribution availability is stated by the pinned RefSpec catalog.",
+      "profileId": "sam-entity-v1",
+      "resourceRelationships": [
+        {
+          "relationships": [
+            "nativeIdentifier"
+          ],
+          "resourceId": "entity-identifier-authorities"
+        },
+        {
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier"
+          ],
+          "resourceId": "federal-hierarchy"
+        },
+        {
+          "relationships": [
+            "nativeCodeOrClassification"
+          ],
+          "resourceId": "naics"
+        }
+      ]
+    },
+    {
+      "evidenceFields": [
+        "RIN",
+        "agency",
+        "stage",
+        "priority",
+        "timetable",
+        "legal authority",
+        "CFR reference",
+        "related RIN",
+        "NAICS"
+      ],
+      "knownGap": "Evidence is limited to the declared source-native fields; distribution availability is stated by the pinned RefSpec catalog.",
+      "profileId": "unified-agenda-observation-v1",
+      "resourceRelationships": [
+        {
+          "relationships": [
+            "nativeCodeOrClassification"
+          ],
+          "resourceId": "naics"
+        },
+        {
+          "relationships": [
+            "nativeIdentifier"
+          ],
+          "resourceId": "rin-authority"
+        },
+        {
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier"
+          ],
+          "resourceId": "unified-agenda-native-controls"
+        }
+      ]
+    },
+    {
+      "evidenceFields": [
+        "recipient ID",
+        "UEI",
+        "CAGE",
+        "NAICS",
+        "PSC",
+        "Federal Hierarchy",
+        "status",
+        "vintage"
+      ],
+      "knownGap": "Evidence is limited to the declared source-native fields; distribution availability is stated by the pinned RefSpec catalog.",
+      "profileId": "usaspending-recipient-v1",
+      "resourceRelationships": [
+        {
+          "relationships": [
+            "nativeIdentifier"
+          ],
+          "resourceId": "entity-identifier-authorities"
+        },
+        {
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier"
+          ],
+          "resourceId": "federal-hierarchy"
+        },
+        {
+          "relationships": [
+            "nativeCodeOrClassification"
+          ],
+          "resourceId": "naics"
+        },
+        {
+          "relationships": [
+            "nativeCodeOrClassification"
+          ],
+          "resourceId": "psc"
+        }
+      ]
+    }
+  ],
+  "recordedAt": "2026-08-03T12:00:00Z",
+  "refspecResourceCatalog": {
+    "digest": "sha256:c0bcce7318ac6fedce2e0c51e77186ef32cf5c9d1039aa2170d7b28422de7dbe",
+    "id": "urn:ref:resource-catalog:c0bcce7318ac6fedce2e0c51e77186ef32cf5c9d1039aa2170d7b28422de7dbe"
+  },
+  "summary": {
+    "profileCount": 17,
+    "referencedResourceCount": 26,
+    "resourceRelationshipCount": 44
+  }
+}

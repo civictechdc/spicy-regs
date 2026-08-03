@@ -1,0 +1,534 @@
+{
+  "format": "spicyregs-profile-resource-applicability-input/experimental-v0",
+  "recordedAt": "2026-08-03T12:00:00Z",
+  "profiles": [
+    {
+      "profileId": "regulations-docket-v2",
+      "evidenceFields": [
+        "docket type",
+        "agency",
+        "docket ID",
+        "RIN"
+      ],
+      "resourceRelationships": [
+        {
+          "resourceId": "regulations-gov-native-controls",
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier",
+            "nativeStructure"
+          ]
+        },
+        {
+          "resourceId": "rin-authority",
+          "relationships": [
+            "nativeIdentifier"
+          ]
+        }
+      ]
+    },
+    {
+      "profileId": "regulations-document-v2",
+      "evidenceFields": [
+        "document type",
+        "attachment type",
+        "agency",
+        "docket ID",
+        "Federal Register number",
+        "date"
+      ],
+      "resourceRelationships": [
+        {
+          "resourceId": "federal-register-api-topics",
+          "relationships": [
+            "sourceAssignedVocabulary"
+          ]
+        },
+        {
+          "resourceId": "regulations-gov-native-controls",
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier",
+            "nativeStructure"
+          ]
+        }
+      ]
+    },
+    {
+      "profileId": "regulations-comment-v1",
+      "evidenceFields": [
+        "submitter",
+        "attachment",
+        "participation category",
+        "privacy behavior"
+      ],
+      "resourceRelationships": [
+        {
+          "resourceId": "regulations-gov-native-controls",
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier",
+            "nativeStructure"
+          ]
+        }
+      ]
+    },
+    {
+      "profileId": "federal-register-document-v1",
+      "evidenceFields": [
+        "topic",
+        "category",
+        "presidential subtype",
+        "toc_subject",
+        "agency",
+        "RIN",
+        "docket",
+        "CFR citation",
+        "version"
+      ],
+      "resourceRelationships": [
+        {
+          "resourceId": "federal-register-api-topics",
+          "relationships": [
+            "sourceAssignedVocabulary"
+          ]
+        },
+        {
+          "resourceId": "federal-register-native-controls",
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier",
+            "nativeStructure"
+          ]
+        },
+        {
+          "resourceId": "rin-authority",
+          "relationships": [
+            "nativeIdentifier"
+          ]
+        }
+      ]
+    },
+    {
+      "profileId": "unified-agenda-observation-v1",
+      "evidenceFields": [
+        "RIN",
+        "agency",
+        "stage",
+        "priority",
+        "timetable",
+        "legal authority",
+        "CFR reference",
+        "related RIN",
+        "NAICS"
+      ],
+      "resourceRelationships": [
+        {
+          "resourceId": "unified-agenda-native-controls",
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier"
+          ]
+        },
+        {
+          "resourceId": "rin-authority",
+          "relationships": [
+            "nativeIdentifier"
+          ]
+        },
+        {
+          "resourceId": "naics",
+          "relationships": [
+            "nativeCodeOrClassification"
+          ]
+        }
+      ]
+    },
+    {
+      "profileId": "cfr-section-v1",
+      "evidenceFields": [
+        "CFR hierarchy",
+        "citation",
+        "edition",
+        "point-in-time status",
+        "USLM structure"
+      ],
+      "resourceRelationships": [
+        {
+          "resourceId": "cfr-list-of-subjects",
+          "relationships": [
+            "sourceAssignedVocabulary"
+          ]
+        },
+        {
+          "resourceId": "ecfr-govinfo-cfr-structure",
+          "relationships": [
+            "nativeIdentifier",
+            "nativeStructure"
+          ]
+        },
+        {
+          "resourceId": "uslm",
+          "relationships": [
+            "nativeStructure"
+          ]
+        }
+      ]
+    },
+    {
+      "profileId": "congress-bill-v1",
+      "evidenceFields": [
+        "bill type",
+        "action",
+        "version",
+        "committee",
+        "BioGuide identity",
+        "USLM structure"
+      ],
+      "resourceRelationships": [
+        {
+          "resourceId": "crs-legislative-subject-terms",
+          "relationships": [
+            "sourceAssignedVocabulary"
+          ]
+        },
+        {
+          "resourceId": "crs-policy-areas",
+          "relationships": [
+            "sourceAssignedVocabulary"
+          ]
+        },
+        {
+          "resourceId": "congress-billstatus-native-controls",
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier",
+            "nativeStructure"
+          ]
+        },
+        {
+          "resourceId": "federal-legislative-identifiers",
+          "relationships": [
+            "nativeIdentifier"
+          ]
+        },
+        {
+          "resourceId": "uslm",
+          "relationships": [
+            "nativeStructure"
+          ]
+        }
+      ]
+    },
+    {
+      "profileId": "sam-entity-v1",
+      "evidenceFields": [
+        "UEI",
+        "CAGE",
+        "NAICS",
+        "legal name",
+        "registration status",
+        "location",
+        "Federal Hierarchy"
+      ],
+      "resourceRelationships": [
+        {
+          "resourceId": "entity-identifier-authorities",
+          "relationships": [
+            "nativeIdentifier"
+          ]
+        },
+        {
+          "resourceId": "naics",
+          "relationships": [
+            "nativeCodeOrClassification"
+          ]
+        },
+        {
+          "resourceId": "federal-hierarchy",
+          "relationships": [
+            "nativeIdentifier",
+            "nativeCodeOrClassification"
+          ]
+        }
+      ]
+    },
+    {
+      "profileId": "lobbying-filing-v1",
+      "evidenceFields": [
+        "general issue code",
+        "filing type",
+        "period",
+        "status",
+        "client",
+        "registrant",
+        "government target",
+        "amendment"
+      ],
+      "resourceRelationships": [
+        {
+          "resourceId": "lda-native-controls",
+          "relationships": [
+            "sourceAssignedVocabulary",
+            "nativeCodeOrClassification",
+            "nativeIdentifier"
+          ]
+        }
+      ]
+    },
+    {
+      "profileId": "fec-committee-v1",
+      "evidenceFields": [
+        "committee ID",
+        "committee type",
+        "designation",
+        "organization type",
+        "party",
+        "sponsor",
+        "candidate",
+        "cycle",
+        "effective date"
+      ],
+      "resourceRelationships": [
+        {
+          "resourceId": "fec-native-controls",
+          "relationships": [
+            "nativeIdentifier",
+            "nativeCodeOrClassification"
+          ]
+        },
+        {
+          "resourceId": "federal-legislative-identifiers",
+          "relationships": [
+            "nativeIdentifier"
+          ]
+        }
+      ]
+    },
+    {
+      "profileId": "gao-report-v1",
+      "evidenceFields": [
+        "GAO report ID",
+        "topic",
+        "product type",
+        "date",
+        "agency",
+        "recommendation",
+        "evidence depth"
+      ],
+      "resourceRelationships": [
+        {
+          "resourceId": "gao-topics",
+          "relationships": [
+            "sourceAssignedVocabulary"
+          ]
+        },
+        {
+          "resourceId": "gao-native-controls",
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier"
+          ]
+        }
+      ]
+    },
+    {
+      "profileId": "crs-report-v1",
+      "evidenceFields": [
+        "legislative subject term",
+        "policy area",
+        "product topic",
+        "product type",
+        "edition",
+        "status",
+        "report number",
+        "bill",
+        "committee"
+      ],
+      "resourceRelationships": [
+        {
+          "resourceId": "crs-legislative-subject-terms",
+          "relationships": [
+            "sourceAssignedVocabulary"
+          ]
+        },
+        {
+          "resourceId": "crs-policy-areas",
+          "relationships": [
+            "sourceAssignedVocabulary"
+          ]
+        },
+        {
+          "resourceId": "crs-native-controls",
+          "relationships": [
+            "sourceAssignedVocabulary",
+            "nativeCodeOrClassification",
+            "nativeIdentifier"
+          ]
+        }
+      ]
+    },
+    {
+      "profileId": "court-opinion-v1",
+      "evidenceFields": [
+        "court identity",
+        "opinion type",
+        "version",
+        "citation",
+        "case identity",
+        "package identity"
+      ],
+      "resourceRelationships": [
+        {
+          "resourceId": "court-identifiers-and-controls",
+          "relationships": [
+            "nativeIdentifier",
+            "nativeCodeOrClassification"
+          ]
+        }
+      ]
+    },
+    {
+      "profileId": "court-docket-v1",
+      "evidenceFields": [
+        "court identity",
+        "Nature of Suit",
+        "case identity",
+        "party",
+        "CourtListener status",
+        "date",
+        "access"
+      ],
+      "resourceRelationships": [
+        {
+          "resourceId": "court-identifiers-and-controls",
+          "relationships": [
+            "nativeIdentifier",
+            "nativeCodeOrClassification"
+          ]
+        },
+        {
+          "resourceId": "nature-of-suit",
+          "relationships": [
+            "nativeCodeOrClassification"
+          ]
+        }
+      ]
+    },
+    {
+      "profileId": "usaspending-recipient-v1",
+      "evidenceFields": [
+        "recipient ID",
+        "UEI",
+        "CAGE",
+        "NAICS",
+        "PSC",
+        "Federal Hierarchy",
+        "status",
+        "vintage"
+      ],
+      "resourceRelationships": [
+        {
+          "resourceId": "entity-identifier-authorities",
+          "relationships": [
+            "nativeIdentifier"
+          ]
+        },
+        {
+          "resourceId": "naics",
+          "relationships": [
+            "nativeCodeOrClassification"
+          ]
+        },
+        {
+          "resourceId": "psc",
+          "relationships": [
+            "nativeCodeOrClassification"
+          ]
+        },
+        {
+          "resourceId": "federal-hierarchy",
+          "relationships": [
+            "nativeIdentifier",
+            "nativeCodeOrClassification"
+          ]
+        }
+      ]
+    },
+    {
+      "profileId": "fcc-proceeding-v1",
+      "evidenceFields": [
+        "ECFS proceeding number",
+        "rulemaking flag",
+        "bureau",
+        "status",
+        "date",
+        "47 CFR procedure class"
+      ],
+      "resourceRelationships": [
+        {
+          "resourceId": "fcc-ecfs-native-controls",
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier",
+            "nativeStructure"
+          ]
+        },
+        {
+          "resourceId": "frn-authority",
+          "relationships": [
+            "nativeIdentifier"
+          ]
+        },
+        {
+          "resourceId": "cfr47-procedure",
+          "relationships": [
+            "nativeCodeOrClassification"
+          ]
+        }
+      ]
+    },
+    {
+      "profileId": "fcc-filing-v1",
+      "evidenceFields": [
+        "ECFS filing description",
+        "filer",
+        "author",
+        "FRN",
+        "bureau",
+        "filing status",
+        "access status",
+        "attachment type",
+        "genre map version"
+      ],
+      "resourceRelationships": [
+        {
+          "resourceId": "federal-register-api-topics",
+          "relationships": [
+            "sourceAssignedVocabulary"
+          ]
+        },
+        {
+          "resourceId": "fcc-ecfs-native-controls",
+          "relationships": [
+            "nativeCodeOrClassification",
+            "nativeIdentifier",
+            "nativeStructure"
+          ]
+        },
+        {
+          "resourceId": "frn-authority",
+          "relationships": [
+            "nativeIdentifier"
+          ]
+        },
+        {
+          "resourceId": "cfr47-procedure",
+          "relationships": [
+            "nativeCodeOrClassification"
+          ]
+        }
+      ]
+    }
+  ]
+}
