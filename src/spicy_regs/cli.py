@@ -200,7 +200,7 @@ def cmd_agencies(args):
     print("No data downloaded yet. Run: spicy-regs download")
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="spicy-regs",
         description="Download and explore federal regulations data from Spicy Regs",
@@ -213,6 +213,10 @@ def main():
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    from spicy_regs.document_release_v3_cli import add_document_release_v3_parser
+
+    add_document_release_v3_parser(subparsers)
 
     # Download command
     download_parser = subparsers.add_parser("download", help="Download parquet files")
@@ -243,14 +247,14 @@ def main():
     agencies_parser = subparsers.add_parser("agencies", help="List all agencies")
     agencies_parser.set_defaults(func=cmd_agencies)
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if args.command is None:
         parser.print_help()
-        sys.exit(0)
+        return 0
 
-    args.func(args)
+    return int(args.func(args) or 0)
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
