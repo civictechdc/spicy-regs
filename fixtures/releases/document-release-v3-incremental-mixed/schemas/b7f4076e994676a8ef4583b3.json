@@ -1,0 +1,1 @@
+{"fields":[{"name":"document_id","nullable":false,"type":"string"},{"name":"old_document_version_id","nullable":true,"type":"string"},{"name":"new_document_version_id","nullable":true,"type":"string"},{"name":"change_kind","nullable":false,"type":"string"}],"format":"spicy-arrow-schema","formatVersion":"1.0","schemaId":"urn:spicyregs:schema:document-release-v3:changes:1.0"}
