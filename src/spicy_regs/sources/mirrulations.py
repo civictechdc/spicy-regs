@@ -15,6 +15,7 @@ import re
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
+from datetime import datetime
 from json import loads
 from threading import Lock
 from typing import Any
@@ -202,6 +203,60 @@ class PayloadParseError(Exception):
     """
 
 
+@dataclass(frozen=True, slots=True)
+class DownloadedObject:
+    """Exact bytes and source metadata returned by one anonymous S3 GET."""
+
+    content: bytes
+    etag: str | None
+    last_modified: datetime | None
+    content_length: int | None
+
+
+def download_object_bytes(
+    s3_resource: Any,
+    bucket_name: str,
+    key: str,
+    *,
+    if_match: str | None = None,
+    max_bytes: int | None = None,
+) -> DownloadedObject:
+    """Read one S3 object exactly, optionally pinned to its listed ETag.
+
+    ``IfMatch`` closes the gap between an immutable draw and a later fetch: if
+    the mirror replaces an object after listing, S3 refuses the GET instead of
+    handing the caller different bytes under the old key.  The response body
+    is closed on every path so concurrent batch readers return connections to
+    botocore's pool promptly.
+    """
+
+    if max_bytes is not None and max_bytes <= 0:
+        raise ValueError("max_bytes must be greater than zero")
+    obj = s3_resource.Object(bucket_name, key)
+    response = obj.get(**({"IfMatch": if_match} if if_match is not None else {}))
+    content_length = response.get("ContentLength")
+    if max_bytes is not None and content_length is not None and content_length > max_bytes:
+        raise ValueError(f"{key} exceeds the {max_bytes} byte cap")
+    body = response["Body"]
+    try:
+        content = body.read(max_bytes + 1) if max_bytes is not None else body.read()
+    finally:
+        body.close()
+    if max_bytes is not None and len(content) > max_bytes:
+        raise ValueError(f"{key} exceeds the {max_bytes} byte cap")
+    if content_length is not None and content_length != len(content):
+        raise ValueError(f"{key} returned {len(content)} bytes but declared {content_length}")
+    etag = response.get("ETag")
+    if if_match is not None and etag != if_match:
+        raise ValueError(f"{key} returned ETag {etag!r}, expected {if_match!r}")
+    return DownloadedObject(
+        content=content,
+        etag=etag,
+        last_modified=response.get("LastModified"),
+        content_length=content_length,
+    )
+
+
 @dataclass
 class DownloadFailures:
     """Per-key download failures, split by whether they're worth retrying.
@@ -237,12 +292,7 @@ def download_and_parse(
     waiting for a free connection.
     """
     try:
-        obj = s3_resource.Object(bucket_name, key)
-        body = obj.get()["Body"]
-        try:
-            content = body.read()
-        finally:
-            body.close()
+        content = download_object_bytes(s3_resource, bucket_name, key).content
     except Exception as exc:
         raise TransientDownloadError(key) from exc
     try:
