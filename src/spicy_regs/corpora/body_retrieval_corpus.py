@@ -282,10 +282,13 @@ class DrawRule:
     min_year: int
     document_types: tuple[str, ...]
     max_documents: int | None = None
+    excluded_document_numbers: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.max_documents is not None and self.max_documents <= 0:
             raise BodyCorpusError("max_documents must be greater than zero")
+        if any(not number for number in self.excluded_document_numbers):
+            raise BodyCorpusError("excluded document numbers must be non-empty")
 
     def as_record(self) -> dict[str, Any]:
         record = asdict(self)
@@ -295,6 +298,10 @@ class DrawRule:
             record.pop("max_documents")
         else:
             record["max_documents_order"] = "sha256-document-number-v1"
+        if self.excluded_document_numbers:
+            record["excluded_document_numbers"] = sorted(set(self.excluded_document_numbers))
+        else:
+            record.pop("excluded_document_numbers")
         return record
 
 
@@ -364,9 +371,12 @@ def select_rows(rows: Iterable[Mapping[str, Any]], rule: DrawRule) -> list[dict[
     """
 
     wanted_parts = set(rule.cfr_parts)
+    excluded_document_numbers = set(rule.excluded_document_numbers)
     needle = rule.topic_substring.casefold()
     selected: list[dict[str, Any]] = []
     for row in rows:
+        if _text(row.get("document_number")) in excluded_document_numbers:
+            continue
         if _text(row.get("document_type")) not in rule.document_types:
             continue
         if not any(title == rule.cfr_title and part in wanted_parts for title, part in _cfr_pairs(row)):
@@ -1309,6 +1319,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     draw.add_argument("--min-pages", type=int, default=12)
     draw.add_argument("--min-year", type=int, default=2005)
     draw.add_argument("--max-documents", type=int, default=None)
+    draw.add_argument(
+        "--exclude-document-number",
+        action="append",
+        default=[],
+        help="Known unavailable source record to exclude explicitly; repeat as needed",
+    )
 
     fetch = commands.add_parser("fetch", help="fetch the drawn bodies politely and resumably")
     fetch.add_argument("--draw", type=Path, required=True)
@@ -1361,6 +1377,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             min_year=args.min_year,
             document_types=("Rule", "Proposed Rule"),
             max_documents=args.max_documents,
+            excluded_document_numbers=tuple(args.exclude_document_number),
         )
         source = Path(args.federal_register)
         manifest = build_draw(

@@ -246,6 +246,16 @@ class TestDrawManifest:
         with pytest.raises(brc.BodyCorpusError, match="requested 2 documents"):
             brc.build_draw([_row("A")], rule=rule, source_digest="sha256:aa")
 
+    def test_explicit_source_exclusion_is_sealed_and_backfilled_deterministically(self) -> None:
+        rows = [_row("D"), _row("B"), _row("A"), _row("C")]
+        rule = replace(DEFAULT_RULE, max_documents=3, excluded_document_numbers=("B",))
+
+        manifest = brc.build_draw(rows, rule=rule, source_digest="sha256:aa")
+
+        assert {document["document_number"] for document in manifest["documents"]} == {"A", "C", "D"}
+        assert manifest["selection_rule"]["excluded_document_numbers"] == ["B"]
+        assert manifest["counts"]["eligible_before_limit"] == 3
+
 
 # --------------------------------------------------------------------------
 # fetching
