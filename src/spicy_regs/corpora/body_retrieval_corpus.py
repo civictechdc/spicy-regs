@@ -18,7 +18,7 @@ So the draw optimises for *competition*, not for size:
 * measured before it is fetched, because a draw that reproduces the 0.140
   problem is a failed draw and should be discarded at zero network cost.
 
-Three stages, each separately receipted:
+Four stages, each separately receipted:
 
 ``draw``
     Pure offline selection over ``federal_register.parquet``. Emits a
@@ -30,6 +30,10 @@ Three stages, each separately receipted:
     successes, and failures land in a typed quarantine rather than vanishing.
 ``validate``
     Re-verifies every cached body against the lock and fails closed.
+``v3-selection``
+    Converts a complete verified cache into deterministic split ledgers for the
+    bounded ``DocumentRelease`` v3 writer. The ledgers reference the exact
+    captured files; they do not make substitute text copies.
 
 **The fetch is not reproducible; the lock is.** That is the same boundary
 ``corpora/segmentation_evaluation.py`` draws, and it is deliberate: bytes on a
@@ -59,6 +63,7 @@ import json
 import random
 import re
 import statistics
+import tempfile
 import time
 from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -86,6 +91,7 @@ __all__ = [
     "sha256_bytes",
     "tokenize",
     "validate_body_cache",
+    "write_v3_selection",
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -275,11 +281,20 @@ class DrawRule:
     min_pages: int
     min_year: int
     document_types: tuple[str, ...]
+    max_documents: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.max_documents is not None and self.max_documents <= 0:
+            raise BodyCorpusError("max_documents must be greater than zero")
 
     def as_record(self) -> dict[str, Any]:
         record = asdict(self)
         record["cfr_parts"] = list(self.cfr_parts)
         record["document_types"] = list(self.document_types)
+        if self.max_documents is None:
+            record.pop("max_documents")
+        else:
+            record["max_documents_order"] = "sha256-document-number-v1"
         return record
 
 
@@ -385,8 +400,20 @@ def build_draw(
     """
 
     selected = select_rows(rows, rule)
-    with_url = [row for row in selected if _text(row.get("body_html_url")).startswith("http")]
-    excluded_no_url = len(selected) - len(with_url)
+    eligible_with_url = [row for row in selected if _text(row.get("body_html_url")).startswith("http")]
+    excluded_no_url = len(selected) - len(eligible_with_url)
+    if rule.max_documents is not None and len(eligible_with_url) < rule.max_documents:
+        raise BodyCorpusError(
+            f"draw requested {rule.max_documents} documents, but only {len(eligible_with_url)} have body URLs"
+        )
+    if rule.max_documents is None:
+        with_url = eligible_with_url
+    else:
+        with_url = sorted(
+            eligible_with_url,
+            key=lambda row: hashlib.sha256(_text(row.get("document_number")).encode()).digest(),
+        )[: rule.max_documents]
+        with_url.sort(key=lambda row: _text(row.get("document_number")))
 
     documents = [
         {
@@ -434,6 +461,8 @@ def build_draw(
             **summarize_distribution(jaccard_distribution(token_sets, cap=jaccard_cap, seed=jaccard_seed)),
         },
     }
+    if rule.max_documents is not None:
+        manifest["counts"]["eligible_before_limit"] = len(eligible_with_url)
     manifest["draw_id"] = (
         "urn:spicyregs:body-retrieval-draw:" + hashlib.sha256(canonical_json(manifest).encode("utf-8")).hexdigest()[:24]
     )
@@ -694,7 +723,7 @@ def fetch_bodies(
                 "cache_file": cache_file,
                 "source_url": url,
                 "resolved_url": result.resolved_url,
-                "media_type": result.media_type or "text/html",
+                "media_type": result.media_type or RENDITIONS[rendition]["media_type"],
                 "retrieved_on": stamp,
                 "source_bytes": len(result.content),
                 "source_sha256": sha256_bytes(result.content),
@@ -913,6 +942,150 @@ def validate_body_cache(cache_dir: Path) -> dict[str, Any]:
         "status": "pass" if not failures else "fail",
         "source_count": len(sources),
         "failures": failures,
+    }
+
+
+def write_v3_selection(
+    draw_manifest_path: Path,
+    cache_dir: Path,
+    output_path: Path,
+    *,
+    partition_id: str,
+    split_count: int = 1,
+    split_index: int = 0,
+) -> dict[str, Any]:
+    """Write one deterministic v3 ledger over exact verified capture files.
+
+    The complete draw must have sealed successfully before this bridge runs.
+    This keeps acquisition failures visible at the source boundary instead of
+    silently narrowing the v3 reconciliation universe. ``split_index`` uses
+    the stable draw order modulo ``split_count``, so the ledgers are disjoint
+    and their union is the complete cache.
+    """
+
+    if split_count <= 0:
+        raise BodyCorpusError("split_count must be greater than zero")
+    if split_index < 0 or split_index >= split_count:
+        raise BodyCorpusError("split_index must be between zero and split_count - 1")
+    if not partition_id:
+        raise BodyCorpusError("partition_id must be non-empty")
+
+    manifest = _read_json(Path(draw_manifest_path))
+    cache = Path(cache_dir)
+    lock = _read_json(cache / "source-lock.json")
+    quarantine = _read_json(cache / "quarantine.json")
+    documents = manifest.get("documents")
+    sources = lock.get("sources")
+    if not isinstance(documents, list) or not all(isinstance(item, Mapping) for item in documents):
+        raise BodyCorpusError("draw manifest documents must be an array of objects")
+    if not isinstance(sources, list) or not all(isinstance(item, Mapping) for item in sources):
+        raise BodyCorpusError("source lock sources must be an array of objects")
+    if lock.get("draw_id") != manifest.get("draw_id"):
+        raise BodyCorpusError("source lock draw identity differs from the requested draw")
+    if quarantine.get("total") != 0:
+        raise BodyCorpusError(f"source cache still has {quarantine.get('total')} quarantined document(s)")
+
+    document_by_number = {_text(item.get("document_number")): item for item in documents}
+    source_by_number = {_text(item.get("document_number")): item for item in sources}
+    if len(document_by_number) != len(documents):
+        raise BodyCorpusError("draw manifest document numbers must be unique")
+    if len(source_by_number) != len(sources):
+        raise BodyCorpusError("source lock document numbers must be unique")
+    if set(document_by_number) != set(source_by_number):
+        missing = sorted(set(document_by_number) - set(source_by_number))
+        raise BodyCorpusError(
+            f"source cache does not close against the draw; {len(missing)} document(s) remain uncaptured"
+        )
+
+    body_validation = validate_body_cache(cache)
+    if body_validation["status"] != "pass":
+        raise BodyCorpusError(f"body cache validation failed: {body_validation['failures']}")
+    require_capture_instants(cache)
+    rendition = _text(lock.get("rendition")) or "html"
+    if rendition not in RENDITIONS:
+        raise BodyCorpusError(f"source cache has unsupported rendition {rendition!r}")
+
+    ordered_numbers = [_text(item.get("document_number")) for item in documents]
+    specs = document_specs(manifest, ordered_numbers, rendition=rendition)
+    from spicy_regs.corpora.segmentation_evaluation import validate_source_cache
+
+    source_validation = validate_source_cache(cache, specs=specs)
+    if source_validation["status"] != "pass":
+        raise BodyCorpusError(f"source cache validation failed: {source_validation['failures']}")
+
+    chosen_numbers = ordered_numbers[split_index::split_count]
+    output = Path(output_path).resolve()
+    if output.exists() or output.is_symlink():
+        raise BodyCorpusError(f"refusing to replace existing v3 selection: {output}")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.sha256()
+    byte_size = 0
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            prefix=f".{output.name}.building-",
+            dir=output.parent,
+            delete=False,
+        ) as stream:
+            temporary_path = Path(stream.name)
+            for number in chosen_numbers:
+                document = document_by_number[number]
+                source = source_by_number[number]
+                cache_file = cache / _text(source.get("cache_file"))
+                source_digest = _text(source.get("source_sha256"))
+                source_url = _text(source.get("source_url"))
+                media_type = _text(source.get("media_type")) or RENDITIONS[rendition]["media_type"]
+                title = _text(document.get("title"))
+                document_type = _text(document.get("document_type"))
+                if not title or not document_type or not source_digest or not source_url:
+                    raise BodyCorpusError(f"captured document {number} lacks required v3 source facts")
+                record = {
+                    "documentId": f"https://www.federalregister.gov/d/{number}",
+                    "sourceInputId": source_url,
+                    "sourceId": "federal-register",
+                    "sourcePartition": partition_id,
+                    "disposition": "active",
+                    "previousActive": False,
+                    "sourceRecordId": number,
+                    "sourceVersion": f"sha256:{source_digest}",
+                    "renditionPath": str(cache_file.resolve()),
+                    "mediaType": media_type,
+                    "title": title,
+                    "documentType": document_type,
+                    "language": "en",
+                    "eligibilityState": "unverified",
+                    "eligibilityAuthorityId": "spicyregs.body-retrieval-corpus.v1",
+                    "eligibilityEvidenceKind": "sealed-qualification",
+                    "eligibilityBasis": (
+                        f"exact public source rendition verified under draw {manifest.get('draw_id')}; "
+                        "this producer pilot grants no search eligibility"
+                    ),
+                    "eligibilityReasonCode": "spicyregs.eligibility.unverified-scale-pilot",
+                }
+                scan_for_secrets(record, f"v3-selection.{number}")
+                line = (canonical_json(record) + "\n").encode("utf-8")
+                stream.write(line)
+                digest.update(line)
+                byte_size += len(line)
+        assert temporary_path is not None
+        temporary_path.replace(output)
+    except Exception:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+        raise
+
+    return {
+        "draw_id": manifest.get("draw_id"),
+        "partition_id": partition_id,
+        "split_count": split_count,
+        "split_index": split_index,
+        "selected_documents": len(chosen_numbers),
+        "complete_draw_documents": len(ordered_numbers),
+        "rendition": rendition,
+        "output": str(output),
+        "byte_size": byte_size,
+        "sha256": digest.hexdigest(),
     }
 
 
@@ -1135,6 +1308,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     draw.add_argument("--topic-substring", default="endangered")
     draw.add_argument("--min-pages", type=int, default=12)
     draw.add_argument("--min-year", type=int, default=2005)
+    draw.add_argument("--max-documents", type=int, default=None)
 
     fetch = commands.add_parser("fetch", help="fetch the drawn bodies politely and resumably")
     fetch.add_argument("--draw", type=Path, required=True)
@@ -1165,6 +1339,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="also publish the v2 distribution directory a consumer needs to admit it",
     )
 
+    v3_selection = commands.add_parser(
+        "v3-selection",
+        help="write a split v3 ledger that references a complete verified body cache",
+    )
+    v3_selection.add_argument("--draw", type=Path, required=True)
+    v3_selection.add_argument("--cache-dir", type=Path, required=True)
+    v3_selection.add_argument("--output", type=Path, required=True)
+    v3_selection.add_argument("--partition-id", required=True)
+    v3_selection.add_argument("--split-count", type=int, default=1)
+    v3_selection.add_argument("--split-index", type=int, default=0)
+
     args = parser.parse_args(argv)
 
     if args.command == "draw":
@@ -1175,6 +1360,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             min_pages=args.min_pages,
             min_year=args.min_year,
             document_types=("Rule", "Proposed Rule"),
+            max_documents=args.max_documents,
         )
         source = Path(args.federal_register)
         manifest = build_draw(
@@ -1265,6 +1451,21 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "release_digest": built["release_digest"],
                     "output": str(output),
                 }
+            )
+        )
+        return 0
+
+    if args.command == "v3-selection":
+        print(
+            canonical_json(
+                write_v3_selection(
+                    args.draw,
+                    args.cache_dir,
+                    args.output,
+                    partition_id=args.partition_id,
+                    split_count=args.split_count,
+                    split_index=args.split_index,
+                )
             )
         )
         return 0

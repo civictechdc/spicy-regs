@@ -18,7 +18,7 @@ import tempfile
 import uuid
 from collections import defaultdict
 from collections.abc import Iterable, Iterator, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
@@ -60,6 +60,21 @@ EligibilityState = Literal["eligible", "ineligible", "unverified"]
 
 _PARTITION_ID = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}\Z")
 _RFC3339_UTC = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z\Z")
+_UTF8_TEXTUAL_MEDIA_TYPES = frozenset(
+    {
+        "application/json",
+        "application/json; charset=utf-8",
+        "application/xhtml+xml",
+        "application/xml",
+        "application/xml; charset=utf-8",
+        "text/html",
+        "text/html; charset=utf-8",
+        "text/plain",
+        "text/plain; charset=utf-8",
+        "text/xml",
+        "text/xml; charset=utf-8",
+    }
+)
 _SOURCE_INPUT_KEYS = frozenset(
     {
         "documentId",
@@ -255,8 +270,10 @@ class SourceInput:
             assert self.rendition_path is not None
             if not self.rendition_path.is_file():
                 raise DocumentReleaseV3Error(f"rendition does not exist: {self.rendition_path}")
-            if self.media_type != "text/plain; charset=utf-8":
-                raise DocumentReleaseV3Error("the reference vertical slice accepts UTF-8 text renditions only")
+            if self.media_type not in _UTF8_TEXTUAL_MEDIA_TYPES:
+                raise DocumentReleaseV3Error(
+                    "the reference producer accepts exact UTF-8 plain text, HTML, XML, and JSON media types only"
+                )
             _parse_timestamp(self.published_at, "publishedAt")
             _parse_timestamp(self.updated_at, "updatedAt")
         elif self.disposition == "deleted":
@@ -382,7 +399,7 @@ class BuildConfig:
         if self.max_oversized_document_bytes < self.max_document_bytes:
             raise DocumentReleaseV3Error("max_oversized_document_bytes must be at least max_document_bytes")
 
-    def identity(self) -> str:
+    def identity(self, *, partition_ids: Sequence[str] | None = None) -> str:
         semantic = {
             "implementationId": self.implementation_id,
             "implementationVersion": self.implementation_version,
@@ -398,7 +415,6 @@ class BuildConfig:
             "selectorType": self.selector_type,
             "selectorDigest": self.selector_digest,
             "effectiveAt": self.effective_at,
-            "partitionId": self.partition_id,
             "rowBatchSize": self.row_batch_size,
             "rowBatchUtf8Bytes": self.row_batch_utf8_bytes,
             "maxPassageUtf8Bytes": self.max_passage_utf8_bytes,
@@ -407,6 +423,10 @@ class BuildConfig:
             "maxOversizedDocumentBytes": self.max_oversized_document_bytes,
             "compression": self.compression,
         }
+        if partition_ids is None:
+            semantic["partitionId"] = self.partition_id
+        else:
+            semantic["partitionIds"] = list(partition_ids)
         return "urn:spicyregs:document-release-v3-config:" + sha256_bytes(canonical_json_bytes(semantic))
 
 
@@ -495,7 +515,7 @@ class _PackOutput:
 class RenditionPackWriter:
     """Stream immutable rendition bytes into bounded packs and exact indexes."""
 
-    def __init__(self, root: Path, config: BuildConfig) -> None:
+    def __init__(self, root: Path, config: BuildConfig, *, shared_seen_path: Path | None = None) -> None:
         self.root = root
         self.config = config
         self.outputs: list[_PackOutput] = []
@@ -506,10 +526,12 @@ class RenditionPackWriter:
         self._index_path: Path | None = None
         self._size = 0
         self._count = 0
-        self._seen_path = self.root / "renditions" / ".rendition-seen.sqlite"
+        self._shared_seen = shared_seen_path is not None
+        self._seen_path = shared_seen_path or self.root / "renditions" / ".rendition-seen.sqlite"
         self._seen = sqlite3.connect(self._seen_path)
         self._seen.execute(
-            "CREATE TABLE seen_renditions (digest BLOB PRIMARY KEY, media_type TEXT NOT NULL) WITHOUT ROWID"
+            "CREATE TABLE IF NOT EXISTS seen_renditions "
+            "(digest BLOB PRIMARY KEY, media_type TEXT NOT NULL) WITHOUT ROWID"
         )
 
     def _open_pack(self) -> None:
@@ -586,7 +608,8 @@ class RenditionPackWriter:
         self._close_pack()
         self._seen.commit()
         self._seen.close()
-        self._seen_path.unlink(missing_ok=True)
+        if not self._shared_seen:
+            self._seen_path.unlink(missing_ok=True)
 
 
 @dataclass(slots=True)
@@ -614,6 +637,40 @@ class _BuildState:
     sources: set[str] = field(default_factory=set)
     eligibility: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     source_rollups: dict[str, dict[str, int]] = field(default_factory=lambda: defaultdict(lambda: defaultdict(int)))
+
+    def merge(self, other: _BuildState) -> None:
+        for name in (
+            "selected_document_count",
+            "previous_active_document_count",
+            "universe_count",
+            "active_document_count",
+            "deleted_document_count",
+            "excluded_document_count",
+            "accepted_failure_count",
+            "document_version_count",
+            "passage_count",
+            "rendition_count",
+            "eligibility_evidence_count",
+            "source_disposition_count",
+            "failure_count",
+            "normalized_text_bytes",
+            "passage_text_bytes",
+            "rendition_bytes",
+            "retry_count",
+        ):
+            setattr(self, name, getattr(self, name) + getattr(other, name))
+        for name in (
+            "max_document_bytes_observed",
+            "max_writer_buffer_rows",
+            "max_writer_buffer_utf8_bytes",
+        ):
+            setattr(self, name, max(getattr(self, name), getattr(other, name)))
+        self.sources.update(other.sources)
+        for eligibility, count in other.eligibility.items():
+            self.eligibility[eligibility] += count
+        for source_id, rollup in other.source_rollups.items():
+            for disposition, count in rollup.items():
+                self.source_rollups[source_id][disposition] += count
 
     def counts(self, *, member_count: int, member_bytes: int, partition_count: int) -> dict[str, int]:
         return {
@@ -718,7 +775,7 @@ def atomic_publish_directory(work_root: Path, output_dir: Path) -> None:
         lock_path.unlink(missing_ok=True)
 
 
-def _inventory_digest(dispositions_path: Path, *, temp_directory: Path, memory_limit: str) -> str:
+def _inventory_digest(dispositions_paths: Sequence[Path], *, temp_directory: Path, memory_limit: str) -> str:
     connection = duckdb.connect()
     try:
         connection.execute(f"SET memory_limit = '{memory_limit}'")
@@ -727,7 +784,7 @@ def _inventory_digest(dispositions_path: Path, *, temp_directory: Path, memory_l
         cursor = connection.execute(
             "SELECT document_id, source_input_id FROM read_parquet(?) "
             "WHERE selected_current ORDER BY document_id, source_input_id",
-            [str(dispositions_path)],
+            [[str(path) for path in dispositions_paths]],
         )
         # DuckDB's NOCASE order is not the required byte order.  The build's
         # UTF-8 identifiers are ASCII in the reference slice; reject anything
@@ -774,11 +831,13 @@ def _write_partition(
     config: BuildConfig,
     *,
     started_at: str,
+    shared_rendition_seen_path: Path | None = None,
+    write_coverage: bool = True,
 ) -> tuple[list[MemberDescriptor], _BuildState]:
     paths = _table_paths(root, config.partition_id)
     writers: dict[str, BoundedParquetWriter] = {}
     for role, path in paths.items():
-        if role == "partition-receipt":
+        if role == "partition-receipt" or (role == "coverage" and not write_coverage):
             continue
         schema_id = ROLE_SCHEMA_IDS[role]
         writers[role] = BoundedParquetWriter(
@@ -788,10 +847,11 @@ def _write_partition(
             max_utf8_bytes=config.row_batch_utf8_bytes,
             compression=config.compression,
         )
-    pack_writer = RenditionPackWriter(root, config)
+    pack_writer = RenditionPackWriter(root, config, shared_seen_path=shared_rendition_seen_path)
     state = _BuildState()
     try:
         for item in source_inputs:
+            item.validate()
             if item.source_partition not in {None, config.partition_id}:
                 raise DocumentReleaseV3Error(
                     f"source input partition {item.source_partition!r} does not match build partition {config.partition_id!r}"
@@ -1014,18 +1074,19 @@ def _write_partition(
                         "change_kind": change_kind,
                     }
                 )
-        for source_id in sorted(state.source_rollups):
-            rollup = state.source_rollups[source_id]
-            writers["coverage"].write(
-                {
-                    "source_id": source_id,
-                    "selected_document_count": rollup["selected"],
-                    "active_document_count": rollup["active"],
-                    "deleted_document_count": rollup["deleted"],
-                    "excluded_document_count": rollup["excluded"],
-                    "accepted_terminal_failure_count": rollup["accepted-failure"],
-                }
-            )
+        if write_coverage:
+            for source_id in sorted(state.source_rollups):
+                rollup = state.source_rollups[source_id]
+                writers["coverage"].write(
+                    {
+                        "source_id": source_id,
+                        "selected_document_count": rollup["selected"],
+                        "active_document_count": rollup["active"],
+                        "deleted_document_count": rollup["deleted"],
+                        "excluded_document_count": rollup["excluded"],
+                        "accepted_terminal_failure_count": rollup["accepted-failure"],
+                    }
+                )
     finally:
         for writer in writers.values():
             writer.close()
@@ -1119,17 +1180,58 @@ def _write_partition(
     return members, state
 
 
-def build_release(
-    source_inputs: Iterable[SourceInput],
+def _write_aggregate_coverage(root: Path, state: _BuildState, config: BuildConfig) -> MemberDescriptor:
+    path = root / "data" / "coverage-global.parquet"
+    writer = BoundedParquetWriter(
+        path,
+        TABLE_SCHEMAS[ROLE_SCHEMA_IDS["coverage"]],
+        max_rows=config.row_batch_size,
+        max_utf8_bytes=config.row_batch_utf8_bytes,
+        compression=config.compression,
+    )
+    for source_id in sorted(state.source_rollups):
+        rollup = state.source_rollups[source_id]
+        writer.write(
+            {
+                "source_id": source_id,
+                "selected_document_count": rollup["selected"],
+                "active_document_count": rollup["active"],
+                "deleted_document_count": rollup["deleted"],
+                "excluded_document_count": rollup["excluded"],
+                "accepted_terminal_failure_count": rollup["accepted-failure"],
+            }
+        )
+    writer.close()
+    return _member_descriptor(
+        root,
+        path,
+        role="coverage",
+        record_count=writer.record_count,
+        schema_id=ROLE_SCHEMA_IDS["coverage"],
+        partition_id=None,
+        media_type="application/vnd.apache.parquet",
+    )
+
+
+def build_release_from_partitions(
+    partition_inputs: Mapping[str, Iterable[SourceInput]],
     output_dir: Path,
     config: BuildConfig,
     *,
     verifier_memory_limit: str = "512MB",
 ) -> Path:
-    """Build, verify, and atomically publish one complete v3 release."""
+    """Build one release from named partitions, then verify and publish it atomically."""
 
     output_dir = Path(output_dir).resolve()
     require_memory_limit(verifier_memory_limit)
+    partition_ids = sorted(partition_inputs)
+    if not partition_ids:
+        raise DocumentReleaseV3Error("a release requires at least one partition input")
+    for partition_id in partition_ids:
+        if not isinstance(partition_id, str) or _PARTITION_ID.fullmatch(partition_id) is None:
+            raise DocumentReleaseV3Error(
+                f"partition input id {partition_id!r} must use portable lowercase filename characters"
+            )
     if output_dir.exists() or output_dir.is_symlink():
         raise DocumentReleaseV3Error(f"refusing to replace existing output: {output_dir}")
     output_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -1169,27 +1271,56 @@ def build_release(
             "schemas": schema_descriptors,
         }
 
-        partition_members, state = _write_partition(work_root, source_inputs, config, started_at=started_at)
-        partition_manifest = make_subordinate_manifest(
-            scope_kind="partition", scope_id=config.partition_id, members=partition_members
-        )
-        partition_manifest_path = work_root / "manifests" / f"partition-{config.partition_id}.json"
-        _write_canonical_json(partition_manifest_path, partition_manifest)
-        partition_manifest_digest, partition_manifest_size = sha256_file(partition_manifest_path)
-        partition_reference = ManifestReference(
-            manifest_id=f"partition:{config.partition_id}",
-            scope_kind="partition",
-            scope_id=config.partition_id,
-            object_key=partition_manifest_path.relative_to(work_root).as_posix(),
-            byte_size=partition_manifest_size,
-            sha256=partition_manifest_digest,
-        )
+        multiple_partitions = len(partition_ids) > 1
+        shared_seen_path = work_root / "renditions" / ".rendition-seen.sqlite" if multiple_partitions else None
+        state = _BuildState()
+        partition_references: list[ManifestReference] = []
+        all_partition_members: list[MemberDescriptor] = []
+        dispositions_paths: list[Path] = []
+        for partition_id in partition_ids:
+            partition_config = replace(config, partition_id=partition_id)
+            partition_members, partition_state = _write_partition(
+                work_root,
+                partition_inputs[partition_id],
+                partition_config,
+                started_at=started_at,
+                shared_rendition_seen_path=shared_seen_path,
+                write_coverage=not multiple_partitions,
+            )
+            state.merge(partition_state)
+            all_partition_members.extend(partition_members)
+            dispositions_paths.append(_table_paths(work_root, partition_id)["source-dispositions"])
+            partition_manifest = make_subordinate_manifest(
+                scope_kind="partition", scope_id=partition_id, members=partition_members
+            )
+            partition_manifest_path = work_root / "manifests" / f"partition-{partition_id}.json"
+            _write_canonical_json(partition_manifest_path, partition_manifest)
+            partition_manifest_digest, partition_manifest_size = sha256_file(partition_manifest_path)
+            partition_references.append(
+                ManifestReference(
+                    manifest_id=f"partition:{partition_id}",
+                    scope_kind="partition",
+                    scope_id=partition_id,
+                    object_key=partition_manifest_path.relative_to(work_root).as_posix(),
+                    byte_size=partition_manifest_size,
+                    sha256=partition_manifest_digest,
+                )
+            )
+        if shared_seen_path is not None:
+            shared_seen_path.unlink(missing_ok=True)
 
-        dispositions_path = _table_paths(work_root, config.partition_id)["source-dispositions"]
         inventory_digest = _inventory_digest(
-            dispositions_path,
+            dispositions_paths,
             temp_directory=work_root,
             memory_limit=verifier_memory_limit,
+        )
+
+        aggregate_members: list[MemberDescriptor] = []
+        if multiple_partitions:
+            aggregate_members.append(_write_aggregate_coverage(work_root, state, config))
+        receipt_count_members = [*schema_members, *aggregate_members, *all_partition_members]
+        configuration_identity = (
+            config.identity() if partition_ids == [config.partition_id] else config.identity(partition_ids=partition_ids)
         )
 
         receipt = {
@@ -1200,7 +1331,7 @@ def build_release(
                 "implementationVersion": config.implementation_version,
                 "runtimeProfileId": config.runtime_profile_id,
             },
-            "configurationIdentity": config.identity(),
+            "configurationIdentity": configuration_identity,
             "inputIdentities": [
                 {"selectionId": config.selection_id, "selectorDigest": config.selector_digest},
                 *(
@@ -1214,11 +1345,14 @@ def build_release(
                     ]
                 ),
             ],
-            "outputIdentities": [{"manifestId": partition_reference.manifest_id, "sha256": partition_reference.sha256}],
+            "outputIdentities": [
+                {"manifestId": reference.manifest_id, "sha256": reference.sha256}
+                for reference in partition_references
+            ],
             "counts": state.counts(
-                member_count=len(schema_members) + len(partition_members),
-                member_bytes=sum(member.byte_size for member in [*schema_members, *partition_members]),
-                partition_count=1,
+                member_count=len(receipt_count_members),
+                member_bytes=sum(member.byte_size for member in receipt_count_members),
+                partition_count=len(partition_references),
             ),
             "coverage": state.coverage(),
             "failureTotal": state.failure_count,
@@ -1241,7 +1375,7 @@ def build_release(
             media_type="application/json",
         )
 
-        global_members = [*schema_members, build_receipt_member]
+        global_members = [*schema_members, *aggregate_members, build_receipt_member]
         global_manifest = make_subordinate_manifest(scope_kind="global", scope_id="global", members=global_members)
         global_manifest_path = work_root / "manifests" / "global.json"
         _write_canonical_json(global_manifest_path, global_manifest)
@@ -1255,11 +1389,11 @@ def build_release(
             sha256=global_manifest_digest,
         )
 
-        all_members = [*global_members, *partition_members]
+        all_members = [*global_members, *all_partition_members]
         counts = state.counts(
             member_count=len(all_members),
             member_bytes=sum(member.byte_size for member in all_members),
-            partition_count=1,
+            partition_count=len(partition_references),
         )
         content = {
             "schemaSet": schema_set,
@@ -1297,7 +1431,7 @@ def build_release(
                 }
             ),
             "globalManifest": global_reference.as_dict(),
-            "partitionManifests": [partition_reference.as_dict()],
+            "partitionManifests": [reference.as_dict() for reference in partition_references],
             "counts": counts,
             "coverage": state.coverage(),
         }
@@ -1325,6 +1459,23 @@ def build_release(
         raise
 
 
+def build_release(
+    source_inputs: Iterable[SourceInput],
+    output_dir: Path,
+    config: BuildConfig,
+    *,
+    verifier_memory_limit: str = "512MB",
+) -> Path:
+    """Build one single-partition release using the original producer API."""
+
+    return build_release_from_partitions(
+        {config.partition_id: source_inputs},
+        output_dir,
+        config,
+        verifier_memory_limit=verifier_memory_limit,
+    )
+
+
 def build_release_from_jsonl(
     input_path: Path,
     output_dir: Path,
@@ -1336,6 +1487,23 @@ def build_release_from_jsonl(
 
     return build_release(
         iter_source_inputs(input_path),
+        output_dir,
+        config,
+        verifier_memory_limit=verifier_memory_limit,
+    )
+
+
+def build_release_from_partition_jsonl(
+    partition_inputs: Mapping[str, Path],
+    output_dir: Path,
+    config: BuildConfig,
+    *,
+    verifier_memory_limit: str = "512MB",
+) -> Path:
+    """Stream named JSON Lines selection ledgers into one sealed release."""
+
+    return build_release_from_partitions(
+        {partition_id: iter_source_inputs(path) for partition_id, path in partition_inputs.items()},
         output_dir,
         config,
         verifier_memory_limit=verifier_memory_limit,

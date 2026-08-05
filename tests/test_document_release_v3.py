@@ -26,7 +26,12 @@ from spicy_regs.document_release_v3 import (
 from spicy_regs.document_release_v3_compact import compact_release, compaction_metrics
 from spicy_regs.document_release_v3_diff import active_identity_map, iter_release_diff, release_member_paths
 from spicy_regs.document_release_v3_verify import verify_release, verify_release_or_raise
-from spicy_regs.document_release_v3_writer import BuildConfig, SourceInput, build_release
+from spicy_regs.document_release_v3_writer import (
+    BuildConfig,
+    SourceInput,
+    build_release,
+    build_release_from_partitions,
+)
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -81,6 +86,8 @@ def _active_input(
     old_document_version_id: str | None = None,
     old_eligibility_state: str | None = None,
     eligibility_state: str = "eligible",
+    source_partition: str = "test",
+    media_type: str = "text/plain; charset=utf-8",
 ) -> SourceInput:
     filename = hashlib.sha256(document_id.encode()).hexdigest()[:12] + ".txt"
     path = root / filename
@@ -89,7 +96,7 @@ def _active_input(
         document_id=document_id,
         source_input_id=source_input_id or f"input:{document_id}",
         source_id="pytest-source",
-        source_partition="test",
+        source_partition=source_partition,
         disposition="active",
         previous_active=previous_active,
         old_document_version_id=old_document_version_id,
@@ -97,7 +104,7 @@ def _active_input(
         source_record_id=document_id,
         source_version="1",
         rendition_path=path,
-        media_type="text/plain; charset=utf-8",
+        media_type=media_type,
         title=f"Title for {document_id}",
         document_type="test-document",
         language="en",
@@ -107,6 +114,39 @@ def _active_input(
         eligibility_basis="pytest evidence",
         eligibility_reason_code=f"spicyregs.eligibility.{eligibility_state}",
     )
+
+
+def _write_partition_ledger(root: Path, partition_id: str, document_id: str) -> Path:
+    rendition = root / f"{partition_id}.html"
+    rendition.write_text(f"<p>Exact body for {document_id}</p>", encoding="utf-8")
+    ledger = root / f"{partition_id}.jsonl"
+    ledger.write_text(
+        json.dumps(
+            {
+                "documentId": document_id,
+                "sourceInputId": f"input:{document_id}",
+                "sourceId": "pytest-cli-source",
+                "sourcePartition": partition_id,
+                "disposition": "active",
+                "sourceRecordId": document_id,
+                "sourceVersion": "1",
+                "renditionPath": str(rendition),
+                "mediaType": "text/html",
+                "title": f"Title for {document_id}",
+                "documentType": "test-document",
+                "language": "en",
+                "eligibilityState": "eligible",
+                "eligibilityAuthorityId": "pytest-authority",
+                "eligibilityEvidenceKind": "deterministic-policy",
+                "eligibilityBasis": "pytest evidence",
+                "eligibilityReasonCode": "spicyregs.eligibility.eligible",
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return ledger
 
 
 def _reseal_partition_manifest(release: Path, mutate: object) -> None:
@@ -334,6 +374,85 @@ def test_builder_deduplicates_identical_rendition_bytes_exactly(tmp_path: Path) 
     assert root["content"]["coverage"]["renditionByteCount"] == len("identical rendition".encode())
 
 
+def test_partitioned_builder_seals_sorted_splits_with_aggregate_rollups(tmp_path: Path) -> None:
+    first = _active_input(
+        tmp_path,
+        "doc:first-split",
+        "shared exact rendition",
+        source_partition="split-a",
+    )
+    second = _active_input(
+        tmp_path,
+        "doc:second-split",
+        "shared exact rendition",
+        source_partition="split-b",
+    )
+
+    output = build_release_from_partitions(
+        {"split-b": [second], "split-a": [first]},
+        tmp_path / "partitioned",
+        _config(selector="partitioned"),
+    )
+    result = verify_release_or_raise(output)
+    root = parse_canonical_json((output / "release.json").read_bytes(), label="release.json")
+    receipt = parse_canonical_json((output / "receipts" / "build.json").read_bytes(), label="build receipt")
+    coverage_rows = [
+        row for path in release_member_paths(output, "coverage") for row in pq.read_table(path).to_pylist()
+    ]
+
+    assert [reference["manifestId"] for reference in root["content"]["partitionManifests"]] == [
+        "partition:split-a",
+        "partition:split-b",
+    ]
+    assert result.counts["partitionManifestCount"] == 2
+    assert result.counts["activeDocumentCount"] == 2
+    assert result.counts["renditionCount"] == 1
+    assert root["content"]["coverage"]["sourceCount"] == 1
+    assert coverage_rows == [
+        {
+            "source_id": "pytest-source",
+            "selected_document_count": 2,
+            "active_document_count": 2,
+            "deleted_document_count": 0,
+            "excluded_document_count": 0,
+            "accepted_terminal_failure_count": 0,
+        }
+    ]
+    assert [identity["manifestId"] for identity in receipt["outputIdentities"]] == [
+        "partition:split-a",
+        "partition:split-b",
+    ]
+    assert receipt["counts"]["partitionManifestCount"] == 2
+    assert receipt["coverage"] == root["content"]["coverage"]
+
+
+@pytest.mark.parametrize(
+    "media_type",
+    [
+        "text/html",
+        "text/html; charset=utf-8",
+        "text/xml",
+        "application/xml",
+        "application/json",
+        "application/json; charset=utf-8",
+        "text/plain",
+    ],
+)
+def test_builder_accepts_exact_utf8_html_xml_and_json_media_types(tmp_path: Path, media_type: str) -> None:
+    item = _active_input(tmp_path, f"doc:{media_type}", "<root>exact UTF-8 text</root>", media_type=media_type)
+
+    output = build_release([item], tmp_path / hashlib.sha256(media_type.encode()).hexdigest(), _config(selector=media_type))
+
+    assert verify_release_or_raise(output).counts["activeDocumentCount"] == 1
+
+
+def test_builder_rejects_binary_media_types(tmp_path: Path) -> None:
+    item = _active_input(tmp_path, "doc:pdf", "%PDF-1.7", media_type="application/pdf")
+
+    with pytest.raises(DocumentReleaseV3Error, match="exact UTF-8"):
+        build_release([item], tmp_path / "pdf", _config(selector="pdf"))
+
+
 def test_release_with_only_accounted_exclusions_needs_no_rendition_pack(tmp_path: Path) -> None:
     excluded = SourceInput(
         document_id="doc:excluded-only",
@@ -411,6 +530,51 @@ def test_compaction_reseals_and_preserves_active_logical_identities(tmp_path: Pa
     assert after.inactive_document_versions == 0
     assert after.inactive_eligibility_rows == 0
     assert after.inactive_passages == 0
+
+
+def test_cli_builds_one_release_from_repeated_partition_inputs(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    first = _write_partition_ledger(tmp_path, "split-a", "doc:cli-a")
+    second = _write_partition_ledger(tmp_path, "split-b", "doc:cli-b")
+    output = tmp_path / "cli-partitioned"
+
+    exit_code = cli_main(
+        [
+            "document-release-v3",
+            "build",
+            "--partition-input",
+            f"split-b={second}",
+            "--partition-input",
+            f"split-a={first}",
+            "--output",
+            str(output),
+            "--selector-digest",
+            hashlib.sha256(b"partitioned-cli-selection").hexdigest(),
+            "--selection-id",
+            "pytest-partitioned-cli-selection",
+            "--selector-type",
+            "closed-jsonl-ledger",
+            "--effective-at",
+            "2026-08-04T00:00:00Z",
+            "--created-at",
+            "2026-08-04T00:00:00Z",
+            "--build-started-at",
+            "2026-08-04T00:00:00Z",
+            "--build-completed-at",
+            "2026-08-04T00:00:01Z",
+        ]
+    )
+
+    assert exit_code == 0
+    result = verify_release_or_raise(output)
+    root = parse_canonical_json((output / "release.json").read_bytes(), label="release.json")
+    assert result.counts["activeDocumentCount"] == 2
+    assert [reference["scopeId"] for reference in root["content"]["partitionManifests"]] == [
+        "split-a",
+        "split-b",
+    ]
+    assert json.loads(capsys.readouterr().out)["verdict"] == "pass"
 
 
 def test_cli_verifies_fixture_and_writes_sidecar_receipt(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

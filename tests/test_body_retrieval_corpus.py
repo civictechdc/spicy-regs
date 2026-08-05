@@ -22,7 +22,9 @@ hold this module to it.
 
 from __future__ import annotations
 
+import hashlib
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -221,6 +223,28 @@ class TestDrawManifest:
         manifest = brc.build_draw([row, _row("B")], rule=DEFAULT_RULE, source_digest="sha256:aa")
         assert [d["document_number"] for d in manifest["documents"]] == ["B"]
         assert manifest["counts"]["excluded_no_body_url"] == 1
+
+    def test_max_documents_bounds_the_stable_draw_after_url_filtering(self) -> None:
+        rows = [_row("D"), _row("B"), _row("A"), _row("C")]
+        missing = _row("00")
+        missing["body_html_url"] = None
+        rule = replace(DEFAULT_RULE, max_documents=3)
+
+        manifest = brc.build_draw([*rows, missing], rule=rule, source_digest="sha256:aa")
+
+        expected = sorted(
+            sorted(("A", "B", "C", "D"), key=lambda value: hashlib.sha256(value.encode()).digest())[:3]
+        )
+        assert [document["document_number"] for document in manifest["documents"]] == expected
+        assert manifest["counts"]["eligible_before_limit"] == 4
+        assert manifest["counts"]["excluded_no_body_url"] == 1
+        assert manifest["selection_rule"]["max_documents"] == 3
+        assert manifest["selection_rule"]["max_documents_order"] == "sha256-document-number-v1"
+
+    def test_max_documents_fails_when_the_source_cannot_fill_the_draw(self) -> None:
+        rule = replace(DEFAULT_RULE, max_documents=2)
+        with pytest.raises(brc.BodyCorpusError, match="requested 2 documents"):
+            brc.build_draw([_row("A")], rule=rule, source_digest="sha256:aa")
 
 
 # --------------------------------------------------------------------------
@@ -610,6 +634,86 @@ class TestReleaseAdmissibility:
             _manifest(tmp_path, count=1), cache, fetcher=_Recorder({}), sleep=lambda _: None
         )
         assert brc.require_capture_instants(cache) == 1
+
+
+class TestV3Selection:
+    def test_ledgers_partition_a_complete_verified_xml_cache_without_copying_bodies(self, tmp_path: Path) -> None:
+        manifest_path = _manifest(tmp_path, count=5)
+        cache = tmp_path / "cache"
+        brc.fetch_bodies(
+            manifest_path,
+            cache,
+            fetcher=_Recorder({}),
+            sleep=lambda _: None,
+            rendition="xml",
+            retrieved_on="2026-08-05T12:00:00Z",
+        )
+
+        ledgers = []
+        records = []
+        for index in range(3):
+            ledger = tmp_path / f"pilot-{index:02d}.jsonl"
+            summary = brc.write_v3_selection(
+                manifest_path,
+                cache,
+                ledger,
+                partition_id=f"pilot-{index:02d}",
+                split_count=3,
+                split_index=index,
+            )
+            ledgers.append(ledger)
+            split_records = [json.loads(line) for line in ledger.read_text().splitlines()]
+            assert summary["selected_documents"] == len(split_records)
+            assert {record["sourcePartition"] for record in split_records} == {f"pilot-{index:02d}"}
+            assert {record["mediaType"] for record in split_records} == {"text/xml"}
+            assert {record["eligibilityState"] for record in split_records} == {"unverified"}
+            records.extend(split_records)
+
+        assert [len(ledger.read_text().splitlines()) for ledger in ledgers] == [2, 2, 1]
+        assert len({record["documentId"] for record in records}) == 5
+        assert all(Path(record["renditionPath"]).is_relative_to(cache) for record in records)
+        assert sum(1 for _ in cache.glob("documents/*.xml")) == 5
+
+    def test_incomplete_cache_cannot_narrow_the_v3_reconciliation_universe(self, tmp_path: Path) -> None:
+        manifest_path = _manifest(tmp_path, count=3)
+        cache = tmp_path / "cache"
+        brc.fetch_bodies(
+            manifest_path,
+            cache,
+            fetcher=_Recorder({}),
+            sleep=lambda _: None,
+            max_requests=2,
+            stop_at_budget=True,
+        )
+
+        with pytest.raises(brc.BodyCorpusError, match="remain uncaptured"):
+            brc.write_v3_selection(
+                manifest_path,
+                cache,
+                tmp_path / "selection.jsonl",
+                partition_id="pilot-00",
+            )
+
+    def test_xml_capture_without_content_type_keeps_the_xml_fallback(self, tmp_path: Path) -> None:
+        manifest_path = _manifest(tmp_path, count=1)
+        cache = tmp_path / "cache"
+
+        def fetch_without_content_type(url: str) -> brc.FetchResult:
+            return brc.FetchResult(content=BODY, resolved_url=url, media_type="", status_code=200)
+
+        brc.fetch_bodies(
+            manifest_path,
+            cache,
+            fetcher=fetch_without_content_type,
+            sleep=lambda _: None,
+            rendition="xml",
+            retrieved_on="2026-08-05T12:00:00Z",
+        )
+
+        ledger = tmp_path / "selection.jsonl"
+        brc.write_v3_selection(manifest_path, cache, ledger, partition_id="pilot-00")
+
+        assert json.loads(ledger.read_text())["mediaType"] == "application/xml"
 
 
 class TestSecretScan:

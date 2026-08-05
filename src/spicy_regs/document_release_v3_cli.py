@@ -11,11 +11,31 @@ from spicy_regs.document_release_v3 import DocumentReleaseV3Error, canonical_jso
 from spicy_regs.document_release_v3_compact import compact_release, compaction_metrics
 from spicy_regs.document_release_v3_diff import write_release_diff
 from spicy_regs.document_release_v3_verify import verify_release, verify_release_or_raise
-from spicy_regs.document_release_v3_writer import BuildConfig, build_release_from_jsonl
+from spicy_regs.document_release_v3_writer import (
+    BuildConfig,
+    build_release_from_jsonl,
+    build_release_from_partition_jsonl,
+)
 
 
 def _print_json(value: object) -> None:
     print(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2))
+
+
+def _partition_input(value: str) -> tuple[str, Path]:
+    partition_id, separator, path = value.partition("=")
+    if not separator or not partition_id or not path:
+        raise argparse.ArgumentTypeError("partition input must use ID=PATH")
+    return partition_id, Path(path)
+
+
+def _partition_input_paths(values: list[tuple[str, Path]]) -> dict[str, Path]:
+    result: dict[str, Path] = {}
+    for partition_id, path in values:
+        if partition_id in result:
+            raise DocumentReleaseV3Error(f"duplicate --partition-input id: {partition_id}")
+        result[partition_id] = path
+    return result
 
 
 def _selector_digest(args: argparse.Namespace) -> str:
@@ -66,12 +86,20 @@ def _cmd_build(args: argparse.Namespace) -> int:
         build_started_at=args.build_started_at,
         build_completed_at=args.build_completed_at,
     )
-    output = build_release_from_jsonl(
-        args.input,
-        args.output,
-        config,
-        verifier_memory_limit=args.memory_limit,
-    )
+    if args.partition_input is None:
+        output = build_release_from_jsonl(
+            args.input,
+            args.output,
+            config,
+            verifier_memory_limit=args.memory_limit,
+        )
+    else:
+        output = build_release_from_partition_jsonl(
+            _partition_input_paths(args.partition_input),
+            args.output,
+            config,
+            verifier_memory_limit=args.memory_limit,
+        )
     result = verify_release_or_raise(output, memory_limit=args.memory_limit)
     _print_json({"output": str(output), **result.as_dict()})
     return 0
@@ -140,8 +168,16 @@ def add_document_release_v3_parser(subparsers: argparse._SubParsersAction) -> No
     )
     commands = parser.add_subparsers(dest="document_release_v3_command", required=True)
 
-    build = commands.add_parser("build", help="Build and atomically seal a release from a JSON Lines selection")
-    build.add_argument("--input", type=Path, required=True, help="Closed JSON Lines source-selection ledger")
+    build = commands.add_parser("build", help="Build and atomically seal a release from JSON Lines selections")
+    inputs = build.add_mutually_exclusive_group(required=True)
+    inputs.add_argument("--input", type=Path, help="Single closed JSON Lines source-selection ledger")
+    inputs.add_argument(
+        "--partition-input",
+        action="append",
+        type=_partition_input,
+        metavar="ID=PATH",
+        help="Named JSON Lines ledger; repeat to assemble one partitioned release",
+    )
     build.add_argument("--output", type=Path, required=True, help="New release directory")
     build.add_argument("--selection-policy", type=Path, help="Immutable selection-policy bytes to hash")
     build.add_argument("--selector-digest", help="Precomputed lowercase SHA-256 selection-policy digest")
@@ -149,7 +185,7 @@ def add_document_release_v3_parser(subparsers: argparse._SubParsersAction) -> No
     build.add_argument("--selector-type", required=True)
     build.add_argument("--effective-at", required=True, help="Selection instant in RFC 3339 UTC form")
     build.add_argument("--previous-release", type=Path, help="Verified v3 predecessor used for change detection")
-    build.add_argument("--partition-id", default="default")
+    build.add_argument("--partition-id", default="default", help="Partition id used with --input")
     build.add_argument("--implementation-id", default="spicyregs.document-release-v3.reference")
     build.add_argument("--implementation-version", default="1.0")
     build.add_argument("--runtime-profile-id", default="local-python-3.12")
