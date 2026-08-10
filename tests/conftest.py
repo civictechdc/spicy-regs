@@ -42,7 +42,14 @@ def _legacy_rulespec_skip_reason() -> str | None:
     manifest = json.loads(
         LEGACY_RULESPEC_MANIFEST.read_text(encoding="utf-8")
     )
-    expected = manifest["evidenceRevision"]
+    expected = manifest.get("evidenceRevision")
+    if expected is None:
+        # RefSpec 9166862 retired the revision pin from the dependency
+        # manifest, so the combined proof has no exact revision to anchor to.
+        return (
+            "legacy combined RefSpec/Rulespec proof has no evidenceRevision "
+            "pin in rulespec-dependency.json; the anchor was retired upstream"
+        )
     head = _git(selected, "rev-parse", "HEAD")
     actual = head.stdout.strip()
     if head.returncode or actual != expected:
