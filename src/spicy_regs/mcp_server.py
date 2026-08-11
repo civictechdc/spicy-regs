@@ -1,18 +1,3 @@
-"""Spicy Regs MCP server (stdio + ASGI).
-
-Canonical FastMCP server implementation. Exposed two ways:
-
-- Stdio, via the ``spicy-regs-mcp`` console script declared in pyproject.toml.
-  Install with ``uvx --from "spicy-regs @ git+https://github.com/civictechdc/spicy-regs" spicy-regs-mcp``
-  or, once published, ``uvx spicy-regs-mcp``.
-- Streamable HTTP, via :func:`build_app` for ASGI deployment.
-
-The Vercel function at ``mcp-server/api/index.py`` keeps a parallel copy so it
-can deploy without pulling in the parent package's ETL dependencies. Keep the
-tool surface (names, parameters, behavior) in sync between the two files;
-``tests/test_mcp_server.py::test_vercel_copy_in_sync`` enforces this.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -35,9 +20,6 @@ from mcp.types import Icon
 from spicy_regs._icon import ICON_DATA_URI
 
 DEFAULT_R2_BASE_URL = "https://data.spicy-regs.dev"
-# The full published R2 surface. Must match the data dictionary's table list
-# (src/spicy_regs/data_dictionary.py::TABLES) — a test enforces it so the two
-# can't drift. Keep in sync with the Vercel copy in mcp-server/api/index.py.
 TABLES = (
     "dockets",
     "documents",
@@ -60,34 +42,15 @@ TABLES = (
     "fcc_proceedings",
     "fcc_filings",
 )
-# Matches the Vercel copy's default (kept just under that deploy's 800s
-# ``maxDuration``). stdio has no platform duration limit, so here this is purely
-# a runaway-query guard; it stays in lockstep with the Vercel copy so the two
-# behave identically. Override with ``SPICY_REGS_STATEMENT_TIMEOUT``.
 STATEMENT_TIMEOUT = os.environ.get("SPICY_REGS_STATEMENT_TIMEOUT", "790s")
 
 logger = logging.getLogger(__name__)
 
-# DuckDB alias the R2 Data Catalog is attached under (mirrors
-# ``spicy_regs.sources.iceberg._CATALOG_ALIAS``). When the catalog is
-# configured, the ``comments`` view is served from it instead of the monolithic
-# ``comments.parquet`` — the comments table is too large to keep republishing as
-# a single file, so the catalog is its read surface. All other tables stay on
-# the public Parquet snapshots.
 CATALOG_ALIAS = "reg_catalog"
 DEFAULT_CATALOG_NAMESPACE = "default"
 
 
 def _parse_timeout_seconds(raw: str) -> float | None:
-    """Parse ``SPICY_REGS_STATEMENT_TIMEOUT`` into seconds (``None`` disables it).
-
-    DuckDB has no ``statement_timeout`` configuration parameter — ``SET
-    statement_timeout=...`` raises ``Catalog Error: unrecognized configuration
-    parameter``. The cap is instead enforced with a watchdog that interrupts the
-    connection (see :func:`_statement_timeout`). Accepts a bare number of
-    seconds or a value suffixed with ``ms``/``s``/``m``; non-positive values
-    disable the timeout.
-    """
     text = raw.strip().lower()
     if not text:
         return None
@@ -116,9 +79,6 @@ INSTRUCTIONS = (
     "IDs, comment IDs, agency codes, and dates from the rows you return."
 )
 
-# Server icon, advertised on the Implementation metadata sent during
-# ``initialize``. A base64 data: URI (not an https:// URL) so it works for both
-# the stdio and HTTP transports — see scripts/gen_icon.py.
 ICONS = [Icon(src=ICON_DATA_URI, mimeType="image/png", sizes=["512x512"])]
 
 
@@ -136,15 +96,6 @@ R2_BASE_URL = _resolve_r2_base_url()
 
 
 def _resolve_home_directory() -> str:
-    """Pick a writable directory for DuckDB's extension/home cache.
-
-    DuckDB resolves its extension cache under ``$HOME/.duckdb``. Serverless
-    hosts (Vercel/AWS Lambda) frequently have no writable home directory, or
-    none defined at all, so ``INSTALL httpfs`` fails with
-    ``Can't find the home directory at ''``. Defaulting to the platform temp
-    directory keeps the extension fetch working there while staying valid on
-    local stdio installs; ``SPICY_REGS_HOME_DIR`` overrides it.
-    """
     raw = os.environ.get("SPICY_REGS_HOME_DIR", tempfile.gettempdir())
     if any(c in raw for c in ("\x00", "\n", "\r")):
         raise RuntimeError(f"SPICY_REGS_HOME_DIR contains illegal characters: {raw!r}")
@@ -155,18 +106,6 @@ HOME_DIRECTORY = _resolve_home_directory()
 
 
 def _resolve_catalog_config() -> dict[str, str] | None:
-    """Return R2 Data Catalog connection settings, or ``None`` when unconfigured.
-
-    The catalog is optional: when ``R2_CATALOG_URI`` / ``R2_CATALOG_WAREHOUSE`` /
-    ``R2_CATALOG_TOKEN`` are all present the ``comments`` view is served from the
-    Iceberg catalog; otherwise the server falls back to the monolithic
-    ``comments.parquet`` (the dual model). The token used here should be a
-    read-scoped R2 API token — this is a public, read-only server.
-
-    Values are inlined into ``CREATE SECRET`` / ``ATTACH`` (which take no bind
-    parameters), so any value containing a quote, backslash, or control
-    character is rejected outright rather than escaped.
-    """
     uri = os.environ.get("R2_CATALOG_URI")
     warehouse = os.environ.get("R2_CATALOG_WAREHOUSE")
     token = os.environ.get("R2_CATALOG_TOKEN")
@@ -176,8 +115,6 @@ def _resolve_catalog_config() -> dict[str, str] | None:
         "uri": uri,
         "warehouse": warehouse,
         "token": token,
-        # `or DEFAULT` (not get's default arg) so an env var set to an empty
-        # string falls back to the default namespace rather than "".
         "namespace": os.environ.get("R2_CATALOG_NAMESPACE") or DEFAULT_CATALOG_NAMESPACE,
     }
     for key, value in config.items():
@@ -187,7 +124,6 @@ def _resolve_catalog_config() -> dict[str, str] | None:
 
 
 def _jsonify(value: Any) -> Any:
-    """Coerce DuckDB row values into JSON-serializable forms."""
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     if isinstance(value, (datetime, date, time)):
@@ -208,54 +144,16 @@ def _jsonify(value: Any) -> Any:
 
 
 def _apply_security_settings(con: duckdb.DuckDBPyConnection) -> None:
-    """Lock a fresh connection down to read-only remote access.
-
-    Separated from :func:`_connect` (which also installs httpfs and creates the
-    R2 views) so the sandbox can be exercised in tests without network access.
-    Run after httpfs is loaded and before any user SQL.
-    """
     con.execute("SET preserve_insertion_order=false")
     con.execute("SET autoinstall_known_extensions=false")
     con.execute("SET autoload_known_extensions=false")
     con.execute("SET allow_unsigned_extensions=false")
-    # NB: do NOT disable LocalFileSystem here. It is tempting as a guard against
-    # user SQL reading local files, but httpfs reads the system CA bundle off
-    # the local filesystem for every TLS handshake, so disabling it breaks the
-    # only thing this server does — reading the R2 parquet over HTTPS fails with
-    # "File system LocalFileSystem has been disabled by configuration" the
-    # moment a view binds. See the query_sql docstring for the access model.
-    #
-    # Disable on-disk spilling instead: temp_directory defaults to a local
-    # ".tmp" that is read-only on serverless hosts, so a spilling query (a big
-    # GROUP BY/ORDER BY) would fail there anyway. Empty disables spilling —
-    # queries run in memory or fail with a clear out-of-memory error.
     con.execute("SET temp_directory=''")
-    # DuckDB has no statement_timeout parameter; the per-query cap is enforced
-    # by the _statement_timeout watchdog wrapping each tool's execution.
     con.execute("SET lock_configuration=true")
 
 
 def _attach_catalog(con: duckdb.DuckDBPyConnection, config: dict[str, str]) -> bool:
-    """Attach the R2 Data Catalog so the ``comments`` view can read from it.
-
-    Best-effort: if the iceberg extension or the attach fails (bad token,
-    network, catalog down) the server stays up by falling back to the monolithic
-    ``comments.parquet``. Must run before :func:`_apply_security_settings` locks
-    the configuration. Returns ``True`` only when the catalog is attached.
-    """
     try:
-        # DuckDB 1.5's iceberg extension reads Avro manifests via a separate
-        # `avro` extension. iceberg tries to auto-install it lazily during LOAD,
-        # but that nested install doesn't inherit the session's home_directory in
-        # serverless sandboxes (Vercel) and dies with "Can't find the home
-        # directory at ''" — so the whole attach fails and comments silently fall
-        # back to the frozen monolith. Installing avro explicitly first runs on
-        # the same top-level path that already installs httpfs/iceberg fine, so it
-        # sees the configured home_directory and the nested auto-install is skipped.
-        #
-        # Best-effort: on older DuckDB (<1.5) avro isn't a separate extension and
-        # `INSTALL avro` errors — swallow it and let iceberg use its bundled Avro
-        # path, so this never regresses environments where the attach already works.
         try:
             con.execute("INSTALL avro")
             con.execute("LOAD avro")
@@ -273,15 +171,10 @@ def _attach_catalog(con: duckdb.DuckDBPyConnection, config: dict[str, str]) -> b
 
 def _connect() -> duckdb.DuckDBPyConnection:
     con = duckdb.connect()
-    # Must precede INSTALL/LOAD: that step writes the extension under
-    # <home_directory>/.duckdb, and the default home is read-only or undefined
-    # on serverless hosts.
     con.execute(f"SET home_directory='{HOME_DIRECTORY.replace(chr(39), chr(39) * 2)}'")
     con.execute("INSTALL httpfs")
     con.execute("LOAD httpfs")
 
-    # Optionally attach the Iceberg catalog (before the config lock) so the
-    # comments view can be served from it.
     catalog = _resolve_catalog_config()
     catalog_attached = catalog is not None and _attach_catalog(con, catalog)
 
@@ -290,52 +183,25 @@ def _connect() -> duckdb.DuckDBPyConnection:
         if name == "comments" and catalog_attached:
             namespace = catalog["namespace"]  # type: ignore[index]
             try:
-                # Dedup on read: keep one row per comment_id (latest modify_date).
-                # The catalog table can physically carry duplicate comment_id rows
-                # because DuckDB's Iceberg engine has no MERGE INTO, so the ETL
-                # upsert (iceberg._merge) removes superseded rows with a plain
-                # DELETE — and DELETE does not reliably remove prior rows on the R2
-                # Data Catalog (the same limitation dedupe_table works around by
-                # never deleting). Any comment_id that is re-merged (a comment whose
-                # modify_date advanced, or a key re-staged by the redundant sweep)
-                # can therefore leave its old row behind next to the new one. This
-                # QUALIFY makes the read surface single-valued regardless, so counts
-                # aren't inflated and comments aren't repeated; physical compaction
-                # (scripts/dedupe_comments_catalog.py) reclaims the space out-of-band.
-                # A filter on agency_code/docket_id pushes down ahead of the window,
-                # so the common point-lookup queries only dedup the rows they touch.
                 con.execute(
-                    f'CREATE VIEW comments AS '
+                    f"CREATE VIEW comments AS "
                     f'SELECT * FROM {CATALOG_ALIAS}."{namespace}"."comments" '
-                    f'QUALIFY ROW_NUMBER() OVER '
-                    f'(PARTITION BY comment_id ORDER BY modify_date DESC NULLS LAST) = 1'
+                    f"QUALIFY ROW_NUMBER() OVER "
+                    f"(PARTITION BY comment_id ORDER BY modify_date DESC NULLS LAST) = 1"
                 )
                 continue
             except duckdb.Error as exc:
-                # Catalog reachable but the table isn't there yet — fall back to
-                # the monolith rather than breaking every query on the server.
                 logger.warning("comments not available in catalog; falling back to monolith: %s", exc)
         url = f"{R2_BASE_URL}/{name}.parquet"
         try:
             con.execute(f"CREATE VIEW {name} AS SELECT * FROM read_parquet('{url}')")
         except duckdb.Error as exc:
-            # A table registered in TABLES whose parquet isn't published yet
-            # (e.g. a new source whose first upload hasn't run) shouldn't break
-            # every query on the server — skip its view and keep the rest, the
-            # same way the comments-catalog branch degrades above.
             logger.warning("table %s not available at %s; skipping view: %s", name, url, exc)
     return con
 
 
 @contextmanager
 def _statement_timeout(con: duckdb.DuckDBPyConnection) -> Iterator[None]:
-    """Cap the wrapped query's runtime, replacing the missing DuckDB setting.
-
-    Starts a watchdog timer that calls ``con.interrupt()`` once the configured
-    budget elapses; a tripped timer turns DuckDB's ``InterruptException`` into a
-    ``TimeoutError`` so the cause is unambiguous. A no-op when the timeout is
-    disabled.
-    """
     if STATEMENT_TIMEOUT_SECONDS is None:
         yield
         return
@@ -425,25 +291,18 @@ def _register_tools(mcp: FastMCP) -> None:
 
 
 def build_server() -> FastMCP:
-    """Construct a FastMCP server with the Spicy Regs tools registered."""
     mcp = FastMCP("spicy-regs", instructions=INSTRUCTIONS, icons=ICONS)
     _register_tools(mcp)
     return mcp
 
 
 def build_app():
-    """ASGI app for Streamable HTTP transport (used by the Vercel function)."""
     mcp = FastMCP(
         "spicy-regs",
         instructions=INSTRUCTIONS,
         icons=ICONS,
         stateless_http=True,
         streamable_http_path="/mcp",
-        # The hosted deployment is reached via mcp.spicy-regs.dev and
-        # per-deploy *.vercel.app hosts; FastMCP's default localhost-only
-        # DNS-rebinding allowlist would reject all of them with 421. The
-        # server is public, stateless, and read-only, so rebinding
-        # protection buys nothing here.
         transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
     )
     _register_tools(mcp)
@@ -451,7 +310,6 @@ def build_app():
 
 
 def main() -> None:
-    """Stdio entry point used by the ``spicy-regs-mcp`` console script."""
     build_server().run()
 
 
