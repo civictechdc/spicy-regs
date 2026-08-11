@@ -60,10 +60,12 @@ TABLES = (
     "fcc_proceedings",
     "fcc_filings",
 )
-# Kept just under the Vercel ``maxDuration`` (300s) so a runaway query trips
-# this watchdog and returns a clean ``TimeoutError`` before the platform hard
-# kills the function. Override with ``SPICY_REGS_STATEMENT_TIMEOUT``.
-STATEMENT_TIMEOUT = os.environ.get("SPICY_REGS_STATEMENT_TIMEOUT", "290s")
+# Kept just under the Vercel ``maxDuration`` (800s, the generally-available Pro
+# ceiling) so a runaway query trips this watchdog and returns a clean
+# ``TimeoutError`` before the platform hard kills the function -- a platform kill
+# gives the caller an opaque 500 instead. Raise both together or not at all.
+# Override with ``SPICY_REGS_STATEMENT_TIMEOUT``.
+STATEMENT_TIMEOUT = os.environ.get("SPICY_REGS_STATEMENT_TIMEOUT", "790s")
 
 logger = logging.getLogger(__name__)
 

@@ -60,9 +60,11 @@ TABLES = (
     "fcc_proceedings",
     "fcc_filings",
 )
-# Matches the Vercel copy's default (kept just under that deploy's 300s
-# ``maxDuration``). Override with ``SPICY_REGS_STATEMENT_TIMEOUT``.
-STATEMENT_TIMEOUT = os.environ.get("SPICY_REGS_STATEMENT_TIMEOUT", "290s")
+# Matches the Vercel copy's default (kept just under that deploy's 800s
+# ``maxDuration``). stdio has no platform duration limit, so here this is purely
+# a runaway-query guard; it stays in lockstep with the Vercel copy so the two
+# behave identically. Override with ``SPICY_REGS_STATEMENT_TIMEOUT``.
+STATEMENT_TIMEOUT = os.environ.get("SPICY_REGS_STATEMENT_TIMEOUT", "790s")
 
 logger = logging.getLogger(__name__)
 
