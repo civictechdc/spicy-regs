@@ -142,12 +142,24 @@ Then point a client at `http://localhost:8000/mcp`.
 
 ## Limitations
 
-- Vercel functions here cap at 300s (`maxDuration` in `vercel.json`, the Pro
-  plan ceiling). A DuckDB statement-timeout watchdog trips at `290s` (override
-  with `SPICY_REGS_STATEMENT_TIMEOUT`) so runaway queries return a clean
-  `TimeoutError` just before the platform kill. The first query in a cold
-  container pays a few seconds to install the DuckDB `httpfs` extension and
-  fetch parquet metadata; subsequent queries within the same container are fast.
+- Vercel functions here cap at 800s (`maxDuration` in `vercel.json`) — the
+  generally-available ceiling on Pro, not the 300s that is merely the default on
+  every plan. Pro/Enterprise can go to 1800s via the extended-max-duration beta,
+  which we deliberately don't use: a blocking DuckDB query streams nothing while
+  it runs, and Vercel warns that idle HTTP/1.1 connections may be closed by
+  intermediaries regardless of the server-side budget. A DuckDB
+  statement-timeout watchdog trips at `790s` (override with
+  `SPICY_REGS_STATEMENT_TIMEOUT`) so runaway queries return a clean
+  `TimeoutError` just before the platform kill — a platform kill surfaces as an
+  opaque 500 instead. Raise the two together or not at all.
+- **In practice your MCP client, not the function, is the binding limit.** Most
+  clients abandon a tool call in 60–120s, well under 800s, so the extra headroom
+  only helps callers that raise their own timeout too. Note also that Fluid
+  Compute bills active CPU: a query that genuinely runs for minutes of DuckDB
+  compute now costs minutes of CPU rather than being cut off at five.
+- The first query in a cold container pays a few seconds to install the DuckDB
+  `httpfs` extension and fetch parquet metadata; subsequent queries within the
+  same container are fast.
 - The `find_duplicate_regulations.py` helper isn't exposed over MCP — its
   pairwise scan can exceed the function timeout. For that workload, use the
   local script via `uv run --script` (see the skill's SKILL.md).
