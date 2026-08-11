@@ -142,6 +142,11 @@ Then point a client at `http://localhost:8000/mcp`.
 
 ## Limitations
 
+> Working on the server itself? [`INTERNALS.md`](INTERNALS.md) has the
+> engineering rationale — why the connection is set up in that order, why
+> `LocalFileSystem` must stay enabled, why the comments view carries a `QUALIFY`,
+> and what must not be deleted from either copy.
+
 - Vercel functions here cap at 800s (`maxDuration` in `vercel.json`) — the
   generally-available ceiling on Pro, not the 300s that is merely the default on
   every plan. Pro/Enterprise can go to 1800s via the extended-max-duration beta,
