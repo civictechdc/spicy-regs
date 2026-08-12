@@ -39,8 +39,6 @@ from loguru import logger
 from spicy_regs.schemas import COMMENT
 from spicy_regs.sources import iceberg, r2
 
-load_dotenv()
-
 _REQUIRED_S3_ENV = ("R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_ENDPOINT")
 
 
@@ -101,6 +99,7 @@ def _expected_counts(con, bucket: str) -> dict[str, int]:
 
 
 def main() -> int:
+    load_dotenv()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--agency", help="Load only this agency_code (default: all)")
     parser.add_argument("--output-dir", type=Path, default=Path("output"))

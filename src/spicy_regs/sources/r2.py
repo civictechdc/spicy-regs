@@ -20,10 +20,7 @@ from pathlib import Path
 
 import boto3
 import httpx
-from dotenv import load_dotenv
 from loguru import logger
-
-load_dotenv()
 
 
 # --- download (public URL) -------------------------------------------------

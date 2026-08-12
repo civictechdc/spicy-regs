@@ -48,8 +48,6 @@ from spicy_regs.transforms import (
     write_staging,
 )
 
-load_dotenv()
-
 
 class RegulationsPipeline(Pipeline):
     """Mirrulations S3 → Parquet ETL, composed from Readers, Writers, and transforms."""
@@ -412,6 +410,7 @@ def main(
     verbose: Annotated[bool, Parameter(name=["--verbose", "-v"], help="Verbose logging")] = False,
 ) -> None:
     """Run the regulations.gov ETL pipeline."""
+    load_dotenv()
     RegulationsPipeline(
         agency=agency,
         output_dir=output_dir,

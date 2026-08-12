@@ -188,7 +188,6 @@ def test_chunked_comments_commit_per_chunk(tmp_output: Path, monkeypatch: pytest
     """With chunk_size set, comments ingest in bounded key-chunks and the catalog
     MERGE runs once per chunk (so a huge agency commits in pieces, never buffering
     everything in memory)."""
-    monkeypatch.delenv("R2_PUBLIC_URL", raising=False)
     # 5 comment files, chunk_size 2 -> chunks [2,2,1] -> 3 merges.
     store = {
         _comment_key(f"c{i}", "EPA-2026-0001"): dumps(
@@ -237,7 +236,6 @@ def _run(tmp_output: Path, **overrides: Any) -> None:
 
 
 def test_second_run_skips_keys_already_in_manifest(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("R2_PUBLIC_URL", raising=False)
     store = {
         _docket_key("EPA-2024-0001"): dumps(_docket_payload("EPA-2024-0001", "2024-01-01")).encode(),
         _docket_key("EPA-2025-0002"): dumps(_docket_payload("EPA-2025-0002", "2025-01-01")).encode(),
@@ -259,7 +257,6 @@ def test_second_run_skips_keys_already_in_manifest(tmp_output: Path, monkeypatch
 
 
 def test_full_refresh_reprocesses_despite_manifest(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("R2_PUBLIC_URL", raising=False)
     store = {_docket_key("EPA-2024-0001"): dumps(_docket_payload("EPA-2024-0001", "2024-01-01")).encode()}
     monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
 
@@ -284,7 +281,6 @@ def test_failed_download_is_not_committed_to_manifest_and_retries_next_run(
 ) -> None:
     """A transient download failure must not be marked processed, so the next
     incremental run re-lists and re-downloads it."""
-    monkeypatch.delenv("R2_PUBLIC_URL", raising=False)
     good = _docket_key("EPA-2024-0001")
     flaky = _docket_key("EPA-2025-0002")
     store = {
@@ -312,7 +308,6 @@ def test_failed_download_is_not_committed_to_manifest_and_retries_next_run(
 def test_parse_failure_is_committed_to_manifest(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A deterministically corrupt file is marked processed (so it doesn't retry
     forever) and recorded in failed_keys.parquet with kind=parse."""
-    monkeypatch.delenv("R2_PUBLIC_URL", raising=False)
     good = _docket_key("EPA-2024-0001")
     corrupt = _docket_key("EPA-2025-0002")
     store = {
@@ -335,7 +330,6 @@ def test_parse_failure_is_committed_to_manifest(tmp_output: Path, monkeypatch: p
 
 def test_chunked_comments_exclude_failed_keys_from_manifest(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """The chunked ingest path excludes transient failures from the manifest too."""
-    monkeypatch.delenv("R2_PUBLIC_URL", raising=False)
     keys = {f"c{i}": _comment_key(f"c{i}", "EPA-2026-0001") for i in range(3)}
     store = {
         keys[f"c{i}"]: dumps(_comment_payload(f"c{i}", "EPA-2026-0001", "2026-01-01T00:00:00Z")).encode()
@@ -373,7 +367,6 @@ def test_chunked_comments_exclude_failed_keys_from_manifest(tmp_output: Path, mo
 
 
 def test_processes_multiple_agencies_in_parallel(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("R2_PUBLIC_URL", raising=False)
     monkeypatch.setenv("AGENCIES", "EPA,FDA")
     store = {
         _docket_key("EPA-2024-0001", agency="EPA"): dumps(
@@ -402,7 +395,6 @@ def test_processes_multiple_agencies_in_parallel(tmp_output: Path, monkeypatch: 
 def test_run_uploads_changed_comment_partitions(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A run that stages comments must publish the changed partitions + index,
     not just the monolithic dataset."""
-    monkeypatch.delenv("R2_PUBLIC_URL", raising=False)  # keep merge's R2 fetch offline
     store = {
         _comment_key("c1", "EPA-2024-0001"): dumps(
             _comment_payload("c1", "EPA-2024-0001", "2024-01-01T00:00:00Z")
@@ -440,7 +432,6 @@ def test_run_uploads_changed_comment_partitions(tmp_output: Path, monkeypatch: p
 
 def test_run_skips_partition_upload_when_no_comments(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A dockets-only run must not call the comment-partition upload."""
-    monkeypatch.delenv("R2_PUBLIC_URL", raising=False)
     store = {
         _docket_key("EPA-2024-0001"): dumps(_docket_payload("EPA-2024-0001", "2024-01-01")).encode(),
     }
@@ -475,7 +466,6 @@ def test_run_primes_comments_index_from_r2_before_merge(tmp_output: Path, monkey
     regression by asserting the index is requested during the prime step and
     that pre-existing rows survive the rebuild.
     """
-    monkeypatch.delenv("R2_PUBLIC_URL", raising=False)  # keep merge's partition fetch offline
     store = {
         _comment_key("c1", "EPA-2024-0001"): dumps(
             _comment_payload("c1", "EPA-2024-0001", "2024-01-01T00:00:00Z")

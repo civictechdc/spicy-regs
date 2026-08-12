@@ -42,6 +42,7 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
+from dotenv import load_dotenv
 from loguru import logger
 
 from spicy_regs.schemas import RecordType
@@ -410,6 +411,7 @@ def backfill_comments_catalog(
 
 
 def main() -> None:
+    load_dotenv()
     parser = argparse.ArgumentParser(
         description="Backfill comment text_content from Mirrulations derived-data extracted text."
     )

@@ -92,12 +92,16 @@ the maintainers publish.
 - Follow existing code style and conventions (ruff handles most of this).
 - Add or update tests for any behavior change.
 - Run `uv run pytest` and `uv run ruff check .` before pushing.
+- Never call `load_dotenv()` at module scope. Importing the package must not
+  mutate `os.environ` — that leaks a developer's `.env` into unit tests and
+  points them at production R2. Call it in the CLI entry point instead (the
+  `@app.default` command, or `main()`). `tests/test_env_loading.py` enforces
+  this.
 - The default suite is hermetic. An autouse `isolate_env` fixture in
-  `tests/conftest.py` strips `R2_*`, `SPICY_REGS_*`, `CLOUDFLARE_*`, `AWS_*`,
-  `AGENCIES`, and the API keys, so a local `.env` can't leak into a unit test and
-  send it at production R2. If a test genuinely needs real credentials or the
-  network, mark it `@pytest.mark.integration` — the fixture exempts those, and
-  they're deselected by default.
+  `tests/conftest.py` also strips `R2_*`, `SPICY_REGS_*`, `CLOUDFLARE_*`,
+  `AWS_*`, `AGENCIES`, and the API keys as defence in depth. If a test genuinely
+  needs real credentials or the network, mark it `@pytest.mark.integration` — the
+  fixture exempts those, and they're deselected by default.
 
 ## Glossary
 

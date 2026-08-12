@@ -30,6 +30,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import polars as pl
+from dotenv import load_dotenv
 from loguru import logger
 
 from spicy_regs.schemas import RecordType
@@ -507,6 +508,7 @@ def enrich_comments_catalog(
 
 
 def main() -> None:
+    load_dotenv()
     parser = argparse.ArgumentParser(description="Backfill documents/comments text_content from PDF attachments.")
     parser.add_argument("--output-dir", type=Path, default=Path("output"))
     parser.add_argument(
