@@ -27,7 +27,7 @@ FORMAT_VERSION = "3.0"
 CANONICAL_JSON_PROFILE = "spicy-canonical-json-v1"
 MEMBER_MANIFEST_FORMAT = "spicy-artifact-member-manifest"
 MEMBER_MANIFEST_VERSION = "1.0"
-RELEASE_ID_PREFIX = "urn:spicyregs:document-release:v3:"
+RELEASE_ID_PREFIX = "urn:spicy-regs:document-release:v3:"
 SCHEMA_SET_ID_PREFIX = "urn:spicy:schema-set:v1:"
 MAX_JSON_SAFE_INTEGER = (1 << 53) - 1
 
@@ -416,19 +416,19 @@ def make_subordinate_manifest(*, scope_kind: str, scope_id: str, members: Sequen
     }
 
 
-CURRENT_DOCUMENTS_SCHEMA_ID = "urn:spicyregs:schema:document-release-v3:current-documents:1.0"
-DOCUMENTS_SCHEMA_ID = "urn:spicyregs:schema:document-release-v3:documents:1.0"
-ELIGIBILITY_EVIDENCE_SCHEMA_ID = "urn:spicyregs:schema:document-release-v3:eligibility-evidence:1.0"
-ELIGIBILITY_DATA_SCHEMA_ID = "urn:spicyregs:schema:document-release-v3:eligibility-data:1.0"
-RENDITION_UTF8_COORDINATE_SCHEMA_ID = "urn:spicyregs:coordinate:rendition-utf8-byte-slice:1.0"
-PASSAGES_SCHEMA_ID = "urn:spicyregs:schema:document-release-v3:passages:1.0"
-SOURCE_DISPOSITIONS_SCHEMA_ID = "urn:spicyregs:schema:document-release-v3:source-dispositions:1.0"
-CHANGES_SCHEMA_ID = "urn:spicyregs:schema:document-release-v3:changes:1.0"
-FAILURES_SCHEMA_ID = "urn:spicyregs:schema:document-release-v3:failures:1.0"
-COVERAGE_SCHEMA_ID = "urn:spicyregs:schema:document-release-v3:coverage:1.0"
-RENDITION_PACK_INDEX_SCHEMA_ID = "urn:spicyregs:schema:document-release-v3:rendition-pack-index:1.0"
-PARTITION_RECEIPT_SCHEMA_ID = "urn:spicyregs:schema:document-release-v3:partition-receipt:1.0"
-BUILD_RECEIPT_SCHEMA_ID = "urn:spicyregs:schema:document-release-v3:build-receipt:1.0"
+CURRENT_DOCUMENTS_SCHEMA_ID = "urn:spicy-regs:schema:document-release-v3:current-documents:1.0"
+DOCUMENTS_SCHEMA_ID = "urn:spicy-regs:schema:document-release-v3:documents:1.0"
+ELIGIBILITY_EVIDENCE_SCHEMA_ID = "urn:spicy-regs:schema:document-release-v3:eligibility-evidence:1.0"
+ELIGIBILITY_DATA_SCHEMA_ID = "urn:spicy-regs:schema:document-release-v3:eligibility-data:1.0"
+RENDITION_UTF8_COORDINATE_SCHEMA_ID = "urn:spicy-regs:coordinate:rendition-utf8-byte-slice:1.0"
+PASSAGES_SCHEMA_ID = "urn:spicy-regs:schema:document-release-v3:passages:1.0"
+SOURCE_DISPOSITIONS_SCHEMA_ID = "urn:spicy-regs:schema:document-release-v3:source-dispositions:1.0"
+CHANGES_SCHEMA_ID = "urn:spicy-regs:schema:document-release-v3:changes:1.0"
+FAILURES_SCHEMA_ID = "urn:spicy-regs:schema:document-release-v3:failures:1.0"
+COVERAGE_SCHEMA_ID = "urn:spicy-regs:schema:document-release-v3:coverage:1.0"
+RENDITION_PACK_INDEX_SCHEMA_ID = "urn:spicy-regs:schema:document-release-v3:rendition-pack-index:1.0"
+PARTITION_RECEIPT_SCHEMA_ID = "urn:spicy-regs:schema:document-release-v3:partition-receipt:1.0"
+BUILD_RECEIPT_SCHEMA_ID = "urn:spicy-regs:schema:document-release-v3:build-receipt:1.0"
 
 UTC_TIMESTAMP = pa.timestamp("us", tz="UTC")
 TABLE_SCHEMAS: dict[str, pa.Schema] = {

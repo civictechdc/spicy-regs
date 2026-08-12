@@ -404,7 +404,7 @@ def test_the_adapter_refuses_a_passage_that_names_an_unknown_representation(
     release: dict[str, Any],
 ) -> None:
     def mutate(body: dict[str, Any]) -> None:
-        body["structural_passages"][0]["text_representation_ref"] = "urn:spicyregs:text-representation:" + "2" * 64
+        body["structural_passages"][0]["text_representation_ref"] = "urn:spicy-regs:text-representation:" + "2" * 64
 
     with pytest.raises(PassageBindingError):
         adapt_document_release(_reseal(release, mutate))
@@ -415,7 +415,7 @@ def test_the_adapter_refuses_a_fragment_projection_that_names_another_artifact(
 ) -> None:
     def mutate(body: dict[str, Any]) -> None:
         projection = body["structural_passages"][0]["source_fragment_projection"]
-        projection["source_artifact_ref"] = "urn:spicyregs:artifact:" + "3" * 64
+        projection["source_artifact_ref"] = "urn:spicy-regs:artifact:" + "3" * 64
 
     with pytest.raises(PassageBindingError):
         adapt_document_release(_reseal(release, mutate))
@@ -587,7 +587,7 @@ def test_a_sealed_but_invalid_release_is_refused_by_the_release_validator(
     def dangling_coverage_passage_ref(body: dict[str, Any]) -> None:
         for region in body["passage_coverage"][0]["regions"]:
             if region["state"] == "processed":
-                region["passage_ref"] = "urn:spicyregs:structural-passage:" + "4" * 64
+                region["passage_ref"] = "urn:spicy-regs:structural-passage:" + "4" * 64
                 return
 
     for mutate in (
@@ -610,17 +610,17 @@ def test_the_checked_in_release_passes_the_validator_unchanged(release: dict[str
 
 
 def test_a_representation_id_that_would_escape_the_output_directory_is_hashed() -> None:
-    hostile = "urn:spicyregs:text-representation:../../escaped"
+    hostile = "urn:spicy-regs:text-representation:../../escaped"
 
     stem = model_input_file_stem(hostile)
 
     assert "/" not in stem and ".." not in stem
     assert stem == hashlib.sha256(hostile.encode("utf-8")).hexdigest()
-    assert model_input_file_stem("urn:spicyregs:text-representation:" + "a" * 64) == "a" * 64
+    assert model_input_file_stem("urn:spicy-regs:text-representation:" + "a" * 64) == "a" * 64
 
 
 def test_a_hostile_representation_id_writes_inside_the_output_directory(tmp_path: Path) -> None:
-    hostile = "urn:spicyregs:text-representation:../../escaped"
+    hostile = "urn:spicy-regs:text-representation:../../escaped"
     stem = model_input_file_stem(hostile)
 
     target = adapter_module._contained_output_path(tmp_path / "out", f"segments/{stem}.json")

@@ -1,1 +1,0 @@
-{"$id":"urn:spicyregs:schema:document-release-v3:eligibility-data:1.0","$schema":"https://json-schema.org/draft/2020-12/schema","additionalProperties":false,"properties":{"basis":{"minLength":1,"type":"string"},"sourceInputId":{"minLength":1,"type":"string"}},"required":["basis","sourceInputId"],"type":"object"}

@@ -1,11 +1,11 @@
 {
   "applicabilityDigest": "sha256:0671caded698822217485275b9b2ddcfacc1286a177769b0b3b7a85026acf427",
-  "applicabilityId": "urn:spicyregs:applicability:0671caded698822217485275b9b2ddcfacc1286a177769b0b3b7a85026acf427",
+  "applicabilityId": "urn:spicy-regs:applicability:0671caded698822217485275b9b2ddcfacc1286a177769b0b3b7a85026acf427",
   "experimental": true,
   "format": "spicyregs-profile-resource-applicability/experimental-v0",
   "profileCatalog": {
     "digest": "sha256:f0ffc8a5f3bbb871c6824d3f7ea1f3f64f51652281ce6819d1404ff2c2f3cec1",
-    "id": "urn:spicyregs:profile-catalog:f0ffc8a5f3bbb871c6824d3f7ea1f3f64f51652281ce6819d1404ff2c2f3cec1"
+    "id": "urn:spicy-regs:profile-catalog:f0ffc8a5f3bbb871c6824d3f7ea1f3f64f51652281ce6819d1404ff2c2f3cec1"
   },
   "profiles": [
     {

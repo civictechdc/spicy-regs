@@ -99,7 +99,7 @@ def test_m1_release_is_deterministic_self_contained_and_pins_rulespec_core() -> 
     second = build_document_release()
 
     assert canonical_json(first) == canonical_json(second)
-    assert first["release_id"] == ("urn:spicyregs:document-release:" + first["release_digest"].removeprefix("sha256:"))
+    assert first["release_id"] == ("urn:spicy-regs:document-release:" + first["release_digest"].removeprefix("sha256:"))
     assert first["rulespec_core_release"] == {
         "release_digest": "sha256:5ac6ba59929eca874ec603cab0e90f7b15ab1a008b394cec5aefebdafe22564b",
         "release_id": "urn:rulespec:core:5ac6ba59929eca874ec603cab0e90f7b15ab1a008b394cec5aefebdafe22564b",
@@ -537,7 +537,7 @@ def test_document_only_classification_fails_closed_and_excludes_dockets_and_comm
         ),
         (
             lambda release: release["source_rendition_captures"][0].__setitem__(
-                "source_rendition_ref", "urn:spicyregs:source-rendition:missing"
+                "source_rendition_ref", "urn:spicy-regs:source-rendition:missing"
             ),
             "missing rendition",
         ),
@@ -561,7 +561,7 @@ def test_release_digest_omits_only_root_identity_fields() -> None:
     changed_release = seal_document_release(changed)
     assert changed_release["release_id"] != release["release_id"]
 
-    release["release_id"] = "urn:spicyregs:document-release:" + "0" * 64
+    release["release_id"] = "urn:spicy-regs:document-release:" + "0" * 64
     with pytest.raises(DocumentReleaseError, match="canonical identity differs"):
         validate_document_release(release)
 

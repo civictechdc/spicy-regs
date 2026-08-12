@@ -190,7 +190,7 @@ def test_checked_in_fixture_is_a_complete_valid_distribution() -> None:
 
     assert result.code is VerificationCode.VALID
     assert result.release_id == (
-        "urn:spicyregs:document-release:v3:6782ade513917b0285c59e861c6b0e94446a5618dc8a1ae769af7344821ad2bb"
+        "urn:spicy-regs:document-release:v3:23d975ee516a24fcf8a4ce5056cfc307ee06461099b577f97a8bb533dddcd34a"
     )
     assert result.counts["activeDocumentCount"] == 4
     assert result.counts["passageCount"] == 4

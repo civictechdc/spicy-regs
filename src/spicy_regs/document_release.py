@@ -10,7 +10,7 @@ The release identity recipe is intentionally small and public:
   non-finite numbers.
 * ``release_digest`` hashes the complete root object after removing only the
   root ``release_id`` and ``release_digest`` fields.
-* ``release_id`` is ``urn:spicyregs:document-release:<digest hex>``.
+* ``release_id`` is ``urn:spicy-regs:document-release:<digest hex>``.
 * Every other record identifier hashes the fields that define that fact.
 
 The bundled M1 fixture is synthetic but source-shaped.  It seals the exact
@@ -101,7 +101,7 @@ def stable_record_id(record_type: str, identity: Mapping[str, Any]) -> str:
     if not record_type or not re.fullmatch(r"[a-z0-9-]+", record_type):
         raise DocumentReleaseError("record type must use lowercase letters, digits, and hyphens")
     digest = canonical_digest(dict(identity)).removeprefix("sha256:")
-    return f"urn:spicyregs:{record_type}:{digest}"
+    return f"urn:spicy-regs:{record_type}:{digest}"
 
 
 def _require_digest(value: object, label: str) -> str:
@@ -1099,7 +1099,7 @@ def seal_document_release(body: Mapping[str, Any]) -> JsonObject:
     sealed = _canonical_clone(dict(body))
     digest = canonical_digest(sealed)
     sealed["release_digest"] = digest
-    sealed["release_id"] = "urn:spicyregs:document-release:" + digest.removeprefix("sha256:")
+    sealed["release_id"] = "urn:spicy-regs:document-release:" + digest.removeprefix("sha256:")
     return _canonical_clone(sealed)
 
 
@@ -1749,7 +1749,7 @@ def validate_document_release(
         if acquisition_kind is None:
             raise DocumentReleaseError("DocumentRelease source input type has no acquisition binding")
         expected_acquisition_release_ref = (
-            f"urn:spicyregs:acquisition-release:{acquisition_kind}:"
+            f"urn:spicy-regs:acquisition-release:{acquisition_kind}:"
             + source_input_digest.removeprefix("sha256:")
         )
         expected_status = _actual_file_release_status(
@@ -2290,7 +2290,7 @@ def validate_document_release(
 
     body = {key: value for key, value in release.items() if key not in {"release_id", "release_digest"}}
     expected_digest = canonical_digest(body)
-    expected_id = "urn:spicyregs:document-release:" + expected_digest.removeprefix("sha256:")
+    expected_id = "urn:spicy-regs:document-release:" + expected_digest.removeprefix("sha256:")
     if release["release_digest"] != expected_digest or release["release_id"] != expected_id:
         raise DocumentReleaseError("DocumentRelease canonical identity differs")
 

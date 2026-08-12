@@ -853,7 +853,7 @@ def _prepare_file_release(
 
     fixture: dict[str, Any] = {
         "acquisition_release_ref": (
-            "urn:spicyregs:acquisition-release:file-manifest:" + manifest_digest.removeprefix("sha256:")
+            "urn:spicy-regs:acquisition-release:file-manifest:" + manifest_digest.removeprefix("sha256:")
         ),
         "coverage_gaps": manifest["coverage_gaps"],
         "fixture_id": (
@@ -1125,7 +1125,7 @@ def _prepare_source_cache_release(
     _require_string(lock.get("retrieved_on"), "source cache retrieved_on")
     fixture: dict[str, Any] = {
         "acquisition_release_ref": (
-            "urn:spicyregs:acquisition-release:source-lock:" + lock_digest.removeprefix("sha256:")
+            "urn:spicy-regs:acquisition-release:source-lock:" + lock_digest.removeprefix("sha256:")
         ),
         "coverage_gaps": [],
         "fixture_id": "source-lock:" + lock_digest.removeprefix("sha256:"),

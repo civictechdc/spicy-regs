@@ -63,8 +63,8 @@ from spicy_regs.document_release import (  # noqa: E402
 
 EXAM_SCHEMA_VERSION = "search-holdout-exam-release-v1"
 EXAM_DATASET_ID = "search-holdout-matters-2026-08-01-v1"
-EXAM_FIXTURE_ID = "urn:spicyregs:source-fixture:search-holdout-exam-2026-08-01"
-EXAM_ACQUISITION_RELEASE_REF = "urn:spicyregs:acquisition-release:search-holdout-exam-2026-08-01"
+EXAM_FIXTURE_ID = "urn:spicy-regs:source-fixture:search-holdout-exam-2026-08-01"
+EXAM_ACQUISITION_RELEASE_REF = "urn:spicy-regs:acquisition-release:search-holdout-exam-2026-08-01"
 EXAM_OBSERVED_AT = "2026-08-01T22:00:00Z"
 EXAM_RELEASED_AT = "2026-08-01T22:00:00Z"
 
@@ -267,7 +267,7 @@ def _exam_record(number: str, row: Mapping[str, Any]) -> dict[str, Any]:
         "captures": [
             {
                 "observed_at": EXAM_OBSERVED_AT,
-                "retrieval_receipt_ref": f"urn:spicyregs:retrieval-receipt:search-holdout-exam-2026-08-01:{number}",
+                "retrieval_receipt_ref": f"urn:spicy-regs:retrieval-receipt:search-holdout-exam-2026-08-01:{number}",
             }
         ],
         "representations": [

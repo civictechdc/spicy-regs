@@ -250,7 +250,7 @@ def test_three_split_ledgers_are_disjoint_complete_and_reference_cached_html(tmp
     assert all(record["eligibilityState"] == "unverified" for record in all_records)
     assert all(Path(record["renditionPath"]).is_file() for record in all_records)
     assert all("comment" not in record and "firstName" not in record for record in all_records)
-    assert all(record["sourceInputId"].startswith("urn:spicyregs:mirrulations-pair:sha256:") for record in all_records)
+    assert all(record["sourceInputId"].startswith("urn:spicy-regs:mirrulations-pair:sha256:") for record in all_records)
 
     from spicy_regs.document_release_v3_verify import verify_release_or_raise
     from spicy_regs.document_release_v3_writer import BuildConfig, build_release_from_partition_jsonl

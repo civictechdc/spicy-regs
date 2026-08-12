@@ -16,9 +16,9 @@ _REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 _BASE_RELEASE = _REPOSITORY_ROOT / "fixtures" / "releases" / "document-release-v3"
 _MIXED_RELEASE = _REPOSITORY_ROOT / "fixtures" / "releases" / "document-release-v3-incremental-mixed"
 _SOURCE_FIXTURE = Path(__file__).with_name("fixtures") / "document-release-v3-incremental-mixed-source"
-_BASE_DIGEST = "6782ade513917b0285c59e861c6b0e94446a5618dc8a1ae769af7344821ad2bb"
-_MIXED_DIGEST = "487efddedd7c45311b7dcf8d5283c9d8851f2f13ff9b4edc237ce3e1cde114e8"
-_ROOT_SHA256 = "b38a6482aa05f32f2d8e71a4cc315da990091ced07ad937d82ef0f1cb4728707"
+_BASE_DIGEST = "23d975ee516a24fcf8a4ce5056cfc307ee06461099b577f97a8bb533dddcd34a"
+_MIXED_DIGEST = "cd65b3e7340b769d0bcf6190624774fa96336f583fba13b3db3010f095971294"
+_ROOT_SHA256 = "280ccdf53699312ce3daf822506492c187d5f1e253c8ff396da62a872394a0cc"
 
 
 def _distribution_files(root: Path) -> dict[Path, bytes]:
@@ -48,7 +48,7 @@ def test_mixed_incremental_fixture_pins_its_base_and_exact_change_set() -> None:
         "renditionCount": 4,
         "selectedDocumentCount": 4,
         "sourceDispositionCount": 5,
-        "totalMemberByteSize": 53737,
+        "totalMemberByteSize": 53839,
     }
 
     sealed_changes = [

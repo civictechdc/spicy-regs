@@ -322,7 +322,7 @@ class _Quarantine:
         fact = canonical_json(row)
         self._seen[fact] += 1
         row["occurrence"] = str(self._seen[fact])
-        row["quarantine_id"] = stable_id("urn:spicyregs:agency-crosswalk-quarantine", row)
+        row["quarantine_id"] = stable_id("urn:spicy-regs:agency-crosswalk-quarantine", row)
         self.rows.append(row)
         for reason in ordered_reasons:
             self.reasons[source][reason] += 1
@@ -712,7 +712,7 @@ def _build_code_tables(
                 "is_primary": _flag(rank == 1),
                 "tier": tier,
             }
-            row["crosswalk_id"] = stable_id("urn:spicyregs:agency-crosswalk", row)
+            row["crosswalk_id"] = stable_id("urn:spicy-regs:agency-crosswalk", row)
             crosswalk_rows.append(row)
 
         # Membership in the dockets table does not mean the evidence came
@@ -733,7 +733,7 @@ def _build_code_tables(
             "candidate_count": str(len(ordered)),
             "candidate_slugs_json": canonical_json(ordered),
         }
-        code_row["agency_code_id"] = stable_id("urn:spicyregs:agency-code", code_row)
+        code_row["agency_code_id"] = stable_id("urn:spicy-regs:agency-code", code_row)
         code_rows.append(code_row)
 
     crosswalk_rows.sort(key=lambda row: (row["agency_code"], int(row["rank"]), row["agency_slug"]))
@@ -787,7 +787,7 @@ def _build_cfr_table(
                 "rank": str(rank),
                 "is_most_citing": _flag(rank == 1),
             }
-            row["cfr_agency_id"] = stable_id("urn:spicyregs:cfr-part-agency", row)
+            row["cfr_agency_id"] = stable_id("urn:spicy-regs:cfr-part-agency", row)
             rows.append(row)
     return rows
 
@@ -921,7 +921,7 @@ def build_artifact(
             "cfr_primary_note": CFR_PRIMARY_LABEL,
         },
     }
-    receipt["artifact_id"] = stable_id("urn:spicyregs:agency-crosswalk-artifact", receipt)
+    receipt["artifact_id"] = stable_id("urn:spicy-regs:agency-crosswalk-artifact", receipt)
     (output_dir / "receipt.json").write_text(canonical_json(receipt) + "\n", encoding="utf-8")
     return receipt
 

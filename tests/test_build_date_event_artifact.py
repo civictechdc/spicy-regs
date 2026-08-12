@@ -176,7 +176,7 @@ def test_comment_period_interval_emits_open_and_close_events(tmp_path):
         tmp_path,
         comment_periods=[
             comment_period_row(
-                proceedings=("urn:spicyregs:proceeding:p1",),
+                proceedings=("urn:spicy-regs:proceeding:p1",),
                 rins=("2050-AA00",),
             )
         ],
@@ -192,7 +192,7 @@ def test_comment_period_interval_emits_open_and_close_events(tmp_path):
     for event in (open_event, close_event):
         assert event["source"] == "comment_periods"
         assert json.loads(event["docket_refs_json"]) == ["EPA-HQ-2026-0001"]
-        assert json.loads(event["proceeding_refs_json"]) == ["urn:spicyregs:proceeding:p1"]
+        assert json.loads(event["proceeding_refs_json"]) == ["urn:spicy-regs:proceeding:p1"]
         assert json.loads(event["rin_refs_json"]) == ["2050-AA00"]
         assert json.loads(event["evidence_refs_json"]) == ["2026-00001"]
         assert event["document_ref"] is None
@@ -405,7 +405,7 @@ def test_event_ids_are_stable_and_unique(tmp_path):
     events = read_rows(output_dir / "date-events.parquet")
     identifiers = [event["event_id"] for event in events]
     assert len(identifiers) == len(set(identifiers))
-    assert all(identifier.startswith("urn:spicyregs:date-event:") for identifier in identifiers)
+    assert all(identifier.startswith("urn:spicy-regs:date-event:") for identifier in identifiers)
 
 
 def test_fixture_slice_is_a_subset_with_its_own_receipt(tmp_path):

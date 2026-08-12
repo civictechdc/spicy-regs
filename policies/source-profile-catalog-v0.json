@@ -2,7 +2,7 @@
   "experimental": true,
   "format": "spicyregs-source-profile-catalog/experimental-v0",
   "profileCatalogDigest": "sha256:f0ffc8a5f3bbb871c6824d3f7ea1f3f64f51652281ce6819d1404ff2c2f3cec1",
-  "profileCatalogId": "urn:spicyregs:profile-catalog:f0ffc8a5f3bbb871c6824d3f7ea1f3f64f51652281ce6819d1404ff2c2f3cec1",
+  "profileCatalogId": "urn:spicy-regs:profile-catalog:f0ffc8a5f3bbb871c6824d3f7ea1f3f64f51652281ce6819d1404ff2c2f3cec1",
   "profiles": [
     {
       "access": {

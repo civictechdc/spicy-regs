@@ -948,7 +948,7 @@ def test_receipt_pins_inputs_artifacts_thresholds_and_counts(tmp_path):
 
     assert receipt["schema_version"] == mod.ARTIFACT_SCHEMA_VERSION
     assert receipt["tier_policy"] == mod.TIER_POLICY
-    assert receipt["artifact_id"].startswith("urn:spicyregs:agency-crosswalk-artifact:")
+    assert receipt["artifact_id"].startswith("urn:spicy-regs:agency-crosswalk-artifact:")
 
     saved = json.loads((output_dir / "receipt.json").read_text())
     assert saved == receipt
@@ -968,10 +968,10 @@ def test_two_builds_are_byte_identical(tmp_path):
 def test_row_identifiers_are_stable_and_unique(tmp_path):
     output_dir, _ = _full_build(tmp_path)
     for name, column, prefix in (
-        ("agency-crosswalk.parquet", "crosswalk_id", "urn:spicyregs:agency-crosswalk:"),
-        ("agency-codes.parquet", "agency_code_id", "urn:spicyregs:agency-code:"),
-        ("cfr-part-agencies.parquet", "cfr_agency_id", "urn:spicyregs:cfr-part-agency:"),
-        ("quarantine.parquet", "quarantine_id", "urn:spicyregs:agency-crosswalk-quarantine:"),
+        ("agency-crosswalk.parquet", "crosswalk_id", "urn:spicy-regs:agency-crosswalk:"),
+        ("agency-codes.parquet", "agency_code_id", "urn:spicy-regs:agency-code:"),
+        ("cfr-part-agencies.parquet", "cfr_agency_id", "urn:spicy-regs:cfr-part-agency:"),
+        ("quarantine.parquet", "quarantine_id", "urn:spicy-regs:agency-crosswalk-quarantine:"),
     ):
         identifiers = [row[column] for row in read_rows(output_dir / name)]
         assert identifiers, name

@@ -110,7 +110,7 @@ def _seal(payload: Mapping[str, Any], *, kind: str) -> dict[str, Any]:
     return {
         **payload,
         f"{kind}Digest": digest,
-        f"{kind}Id": f"urn:spicyregs:{kind.replace('Catalog', '-catalog').replace('applicability', 'applicability')}:"
+        f"{kind}Id": f"urn:spicy-regs:{kind.replace('Catalog', '-catalog').replace('applicability', 'applicability')}:"
         + digest.removeprefix("sha256:"),
     }
 
@@ -123,7 +123,7 @@ def _verify_seal(value: Mapping[str, Any], *, kind: str) -> None:
     if digest != canonical_sha256(payload):
         raise SourceProfileArtifactError(f"{kind} digest does not match its canonical payload")
     expected_id = (
-        f"urn:spicyregs:{kind.replace('Catalog', '-catalog').replace('applicability', 'applicability')}:"
+        f"urn:spicy-regs:{kind.replace('Catalog', '-catalog').replace('applicability', 'applicability')}:"
         + digest.removeprefix("sha256:")
     )
     if value.get(id_field) != expected_id:

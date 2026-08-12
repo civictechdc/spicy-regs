@@ -236,7 +236,7 @@ class _Collector:
             "evidence_field": evidence_field,
             "evidence_refs_json": canonical_json(evidence_refs or []),
         }
-        row["event_id"] = stable_id("urn:spicyregs:date-event", row)
+        row["event_id"] = stable_id("urn:spicy-regs:date-event", row)
         self.events.append(row)
 
     def add_quarantine(
@@ -266,7 +266,7 @@ class _Collector:
             "event_date": event_date,
             "reasons_json": canonical_json(ordered_reasons),
         }
-        row["quarantine_id"] = stable_id("urn:spicyregs:date-event-quarantine", row)
+        row["quarantine_id"] = stable_id("urn:spicy-regs:date-event-quarantine", row)
         self.quarantine.append(row)
         for reason in ordered_reasons:
             self.quarantine_reasons[source][reason] += 1
@@ -559,7 +559,7 @@ def build_artifact(
             "sanity_bounds_note": SANITY_BOUNDS_LABEL,
         },
     }
-    receipt["artifact_id"] = stable_id("urn:spicyregs:date-event-artifact", receipt)
+    receipt["artifact_id"] = stable_id("urn:spicy-regs:date-event-artifact", receipt)
     (output_dir / "receipt.json").write_text(canonical_json(receipt) + "\n", encoding="utf-8")
     return receipt
 
@@ -627,7 +627,7 @@ def build_fixture_slice(
             "quarantined_rows_total": len(sliced_quarantine),
         },
     }
-    receipt["artifact_id"] = stable_id("urn:spicyregs:date-event-artifact-slice", receipt)
+    receipt["artifact_id"] = stable_id("urn:spicy-regs:date-event-artifact-slice", receipt)
     (output_dir / "receipt.json").write_text(canonical_json(receipt) + "\n", encoding="utf-8")
     return receipt
 

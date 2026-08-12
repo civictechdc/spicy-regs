@@ -207,7 +207,7 @@ def build_draw(
         },
         "documents": documents,
     }
-    manifest["draw_id"] = "urn:spicyregs:mirrulations-document-draw:" + _draw_digest(manifest)[:24]
+    manifest["draw_id"] = "urn:spicy-regs:mirrulations-document-draw:" + _draw_digest(manifest)[:24]
     scan_for_secrets(manifest, "mirrulations-document-draw")
     return manifest
 
@@ -280,7 +280,7 @@ def _read_json(path: Path) -> dict[str, Any]:
 def _draw_documents(manifest: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     if manifest.get("schema_version") != DRAW_SCHEMA_VERSION:
         raise MirrulationsCorpusError("draw schema version differs")
-    expected_id = "urn:spicyregs:mirrulations-document-draw:" + _draw_digest(manifest)[:24]
+    expected_id = "urn:spicy-regs:mirrulations-document-draw:" + _draw_digest(manifest)[:24]
     if manifest.get("draw_id") != expected_id:
         raise MirrulationsCorpusError("draw identity does not match its content")
     documents = manifest.get("documents")
@@ -435,7 +435,7 @@ def _download_pair(
             "observed_last_modified": _timestamp(rendition.last_modified),
         },
         "pair_sha256": pair_sha,
-        "source_input_id": f"urn:spicyregs:mirrulations-pair:sha256:{pair_sha}",
+        "source_input_id": f"urn:spicy-regs:mirrulations-pair:sha256:{pair_sha}",
         "document": extracted,
     }
     _write_new(cache_dir / "receipts" / f"{document_id}.json", _json_bytes(receipt))
@@ -513,7 +513,7 @@ def _validate_receipt(
         ).encode("utf-8")
     ).hexdigest()
     if receipt.get("pair_sha256") != pair_sha or receipt.get("source_input_id") != (
-        f"urn:spicyregs:mirrulations-pair:sha256:{pair_sha}"
+        f"urn:spicy-regs:mirrulations-pair:sha256:{pair_sha}"
     ):
         raise MirrulationsCorpusError(f"{document_id}: pair identity differs")
 

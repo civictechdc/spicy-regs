@@ -132,7 +132,7 @@ def _parse_timestamp(value: str | None, label: str) -> datetime | None:
 
 
 def _stable_urn(kind: str, value: Mapping[str, Any]) -> str:
-    return f"urn:spicyregs:{kind}:v3:{sha256_bytes(canonical_json_bytes(dict(value)))}"
+    return f"urn:spicy-regs:{kind}:v3:{sha256_bytes(canonical_json_bytes(dict(value)))}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -427,7 +427,7 @@ class BuildConfig:
             semantic["partitionId"] = self.partition_id
         else:
             semantic["partitionIds"] = list(partition_ids)
-        return "urn:spicyregs:document-release-v3-config:" + sha256_bytes(canonical_json_bytes(semantic))
+        return "urn:spicy-regs:document-release-v3-config:" + sha256_bytes(canonical_json_bytes(semantic))
 
 
 class BoundedParquetWriter:
@@ -1134,7 +1134,7 @@ def _write_partition(
         )
 
     completed_at = config.build_completed_at or _utc_now()
-    task_key = "urn:spicyregs:document-release-v3-task:" + sha256_bytes(
+    task_key = "urn:spicy-regs:document-release-v3-task:" + sha256_bytes(
         canonical_json_bytes(
             {
                 "configurationIdentity": config.identity(),

@@ -261,7 +261,7 @@ def _refresh_partition_receipt(
     )
     writer.write(
         {
-            "task_key": f"urn:spicyregs:document-release-v3-task:{task_key}",
+            "task_key": f"urn:spicy-regs:document-release-v3-task:{task_key}",
             "attempt_id": f"compaction-{uuid.uuid4()}",
             "partition_id": manifest["scope"]["id"],
             "state": "committed",
@@ -394,7 +394,7 @@ def compact_release(
         prior_receipt["coverage"] = coverage
         prior_receipt["completedAt"] = completed_at
         prior_receipt["configurationIdentity"] = (
-            "urn:spicyregs:document-release-v3-compaction:"
+            "urn:spicy-regs:document-release-v3-compaction:"
             + hashlib.sha256(str(source_root["releaseId"]).encode()).hexdigest()
         )
         _write_json(receipt_path, prior_receipt)

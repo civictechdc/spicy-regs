@@ -1,5 +1,5 @@
 {
-  "acquisition_release_ref": "urn:spicyregs:acquisition-release:m1-2026-07-31",
+  "acquisition_release_ref": "urn:spicy-regs:acquisition-release:m1-2026-07-31",
   "coverage_gaps": [
     {
       "collection": "documents",
@@ -16,7 +16,7 @@
       "state": "unprocessed"
     }
   ],
-  "fixture_digest": "sha256:cdf76ffacd5552245d5fa191fd7d4b64e14dab6e249e89d47503d8171138b699",
+  "fixture_digest": "sha256:6fa62fa8af16754675cb77981191cdf94b98665e8f5c42609caf7256384e5ca7",
   "fixture_id": "spicyregs-m1-source-fixture-v1",
   "format_version": "spicyregs-m1-source-fixture/v1",
   "links": [
@@ -40,11 +40,11 @@
       "captures": [
         {
           "observed_at": "2026-07-31T12:00:00Z",
-          "retrieval_receipt_ref": "urn:spicyregs:retrieval-receipt:fr-2026-03227:first"
+          "retrieval_receipt_ref": "urn:spicy-regs:retrieval-receipt:fr-2026-03227:first"
         },
         {
           "observed_at": "2026-07-31T12:05:00Z",
-          "retrieval_receipt_ref": "urn:spicyregs:retrieval-receipt:fr-2026-03227:repeat"
+          "retrieval_receipt_ref": "urn:spicy-regs:retrieval-receipt:fr-2026-03227:repeat"
         }
       ],
       "collection": "documents",
@@ -123,7 +123,7 @@
       "captures": [
         {
           "observed_at": "2026-07-31T12:01:00Z",
-          "retrieval_receipt_ref": "urn:spicyregs:retrieval-receipt:FSIS-2025-0012-0003"
+          "retrieval_receipt_ref": "urn:spicy-regs:retrieval-receipt:FSIS-2025-0012-0003"
         }
       ],
       "collection": "documents",
@@ -167,7 +167,7 @@
       "captures": [
         {
           "observed_at": "2026-07-31T12:02:00Z",
-          "retrieval_receipt_ref": "urn:spicyregs:retrieval-receipt:fr-2026-03228"
+          "retrieval_receipt_ref": "urn:spicy-regs:retrieval-receipt:fr-2026-03228"
         }
       ],
       "collection": "documents",
@@ -221,7 +221,7 @@
       "captures": [
         {
           "observed_at": "2026-07-31T12:03:00Z",
-          "retrieval_receipt_ref": "urn:spicyregs:retrieval-receipt:mismatch-control"
+          "retrieval_receipt_ref": "urn:spicy-regs:retrieval-receipt:mismatch-control"
         }
       ],
       "collection": "documents",

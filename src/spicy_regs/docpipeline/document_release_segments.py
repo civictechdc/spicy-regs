@@ -390,7 +390,7 @@ def _check_seal(release: Mapping[str, Any]) -> None:
         raise ReleaseSealError("release body is not canonical JSON") from error
     if release.get("release_digest") != digest:
         raise ReleaseSealError("release digest does not cover the release body")
-    if release.get("release_id") != "urn:spicyregs:document-release:" + digest.removeprefix("sha256:"):
+    if release.get("release_id") != "urn:spicy-regs:document-release:" + digest.removeprefix("sha256:"):
         raise ReleaseSealError("release id does not name the release digest")
 
 

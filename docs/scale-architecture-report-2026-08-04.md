@@ -178,7 +178,7 @@ JSON plus a content-addressed sidecar tree. It is not sharded or streamable.**
   A run builds in a sibling `.{name}.work` dir and only
   `work_dir.replace(output_dir)` on pass (`runtime.py:933-936`, `:1418-1419`).
   Release identity is `release_digest = sha256(canonical_json(body))` with
-  `release_id = urn:spicyregs:document-release:<hex>`
+  `release_id = urn:spicy-regs:document-release:<hex>`
   (`document_release.py:11-13`, `:2291-2295`).
 - **Contrast: the ETL half rebuilds `output/` in place**
   (`merge_staging_files.py:116-119`) — no versioned release, no immutability.

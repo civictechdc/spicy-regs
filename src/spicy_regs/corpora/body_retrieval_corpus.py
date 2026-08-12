@@ -474,7 +474,7 @@ def build_draw(
     if rule.max_documents is not None:
         manifest["counts"]["eligible_before_limit"] = len(eligible_with_url)
     manifest["draw_id"] = (
-        "urn:spicyregs:body-retrieval-draw:" + hashlib.sha256(canonical_json(manifest).encode("utf-8")).hexdigest()[:24]
+        "urn:spicy-regs:body-retrieval-draw:" + hashlib.sha256(canonical_json(manifest).encode("utf-8")).hexdigest()[:24]
     )
     return manifest
 
