@@ -214,6 +214,40 @@ def test_a_real_cfr_citation_beside_a_compilation_locator_survives():
     assert parse_eo_compilation_citation(raw) == [ExecutiveOrderCompilation("1964", "1965", "339")]
 
 
+# The two boundary defects PLAN.md section 3 names, one test each, both exact.
+# Neither asserts "at least these citations": the whole point of a boundary
+# defect is the extra or missing item at the edge, so an assertion that admits
+# extras cannot see either one.
+
+
+def test_two_unspaced_citations_do_not_mint_a_third():
+    """Regression: ``'1CFR9,10CFR1'`` published a phantom 1 CFR 1.
+
+    The list expansion after a citation guards against swallowing the next
+    citation with a negative lookahead for "CFR", and a bare ``\\d+`` walked
+    out from under it: the engine gave back the "0" of "10" and matched the
+    leading "1", inventing a part under the *first* citation's title. Both
+    real citations were already found by the primary expression; the third
+    was arithmetic on a backtrack.
+    """
+    assert parse_cfr_citation("1CFR9,10CFR1") == [CfrCitation("1", "9"), CfrCitation("10", "1")]
+
+
+def test_a_sentence_final_period_is_punctuation_and_not_part_of_the_section():
+    """Regression: ``'49 CFR 900.42.'`` returned nothing at all.
+
+    The greedy section capture read "900.42." including the period; that is
+    not a section, and a citation whose written section cannot be read is
+    dropped whole rather than truncated. So every question typed as a
+    sentence lost its citation, silently. The same string without the period
+    always worked, which is how the defect stayed invisible.
+    """
+    assert parse_cfr_citation("49 CFR 900.42.") == [CfrCitation("49", "900", "42")]
+    assert parse_cfr_citation("49 CFR 900.42") == [CfrCitation("49", "900", "42")]
+    # An interior dot or hyphen is still the section's own name.
+    assert parse_cfr_citation("40 CFR 60.5-1.") == [CfrCitation("40", "60", "5-1")]
+
+
 # Every string below is verbatim from output/citation-bakeoff-2026-08-02
 # (detection.json, cell `neither`) — the largest well-defined slice of the
 # shared-miss cell no evaluated package addresses. 31 of the 32 strings that

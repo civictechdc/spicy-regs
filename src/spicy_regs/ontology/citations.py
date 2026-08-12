@@ -26,12 +26,34 @@ _CFR_COMPACT = re.compile(
 #: available in the shape is whether the title is one the CFR has.
 _CFR_TITLE_COUNT = 50
 
+#: A section's inner dots and hyphens are part of its name ("60.5-1"); a
+#: trailing one is the sentence's punctuation, not the section's.
+#:
+#: The greedy ``[A-Za-z0-9][A-Za-z0-9.-]*`` this replaces read "49 CFR 900.42."
+#: as section "900.42.", which :func:`_cfr_section` then refused — and
+#: :func:`_cfr_from_match` drops the *whole* citation when a section was
+#: written and could not be read, so a question typed as a sentence lost its
+#: citation entirely rather than losing the period. Requiring the last
+#: character to be alphanumeric hands the trailing punctuation back to the
+#: sentence.
+#:
+#: Ported from SpicySearch ``identifiers.py:149``. That module's ``_LEFT`` and
+#: ``_RIGHT`` boundary guards are deliberately not part of this port: they fix
+#: a different defect, and this file's 25 compiled patterns carry no boundary
+#: lookbehind at all, so importing the guards for one of them would state a
+#: discipline the other 24 do not keep.
+_CFR_SECTION_CAPTURE = r"[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?"
+
 _CFR_STANDARD = re.compile(
     r"(?P<title>[1-9]\d*)\s*C\.?\s*F\.?\s*R\.?"
     r"\s*(?:parts?|pt\.?|§{1,2}|sections?|secs?\.?)?\s*"
-    r"(?P<part>\d+)(?:\.(?P<section>[A-Za-z0-9][A-Za-z0-9.-]*))?",
+    rf"(?P<part>\d+)(?:\.(?P<section>{_CFR_SECTION_CAPTURE}))?",
     re.IGNORECASE,
 )
+#: The other 24 compiled patterns in this module, including this one and
+#: :data:`_CFR_COMPACT`, keep their own section spelling. The port is scoped to
+#: the one expression the two regression cases reach; widening it is a separate
+#: decision about a grammar nobody has measured.
 _CFR_TITLE_PART = re.compile(
     r"(?:title\s+)?(?P<title>[1-9]\d*)\s*[,;:-]?\s*"
     r"(?:C\.?\s*F\.?\s*R\.?\s*)?(?:parts?|pt\.?)\s+(?P<part>\d+)"
@@ -646,6 +668,16 @@ def parse_cfr_citation(value: object) -> list[CfrCitation]:
 
     # Common UA form: "40 CFR Parts 60 and 63". The primary expression finds
     # the first part; expand simple trailing part numbers under the same title.
+    #
+    # ``(?!\d)`` is the boundary this expansion was missing. The negative
+    # lookahead for "CFR" was meant to stop the expansion from swallowing the
+    # opening of the *next* citation, but a bare ``\d+`` backtracks out from
+    # under it: in "1CFR9,10CFR1" the engine tried "10", failed the CFR
+    # lookahead, gave back the "0", and matched "1" — publishing a phantom
+    # 1 CFR 1 beside the two real citations the primary expression had already
+    # found. Refusing to stop in the middle of a number leaves the lookahead
+    # nothing to backtrack into, and a part number never abuts a digit it does
+    # not own.
     if found:
         first = found[0]
         tail_start = next(
@@ -654,7 +686,7 @@ def parse_cfr_citation(value: object) -> list[CfrCitation]:
         )
         if tail_start:
             tail = text[tail_start.end() :]
-            for match in re.finditer(r"(?:,|\band\b|\bor\b)\s*(\d+)(?!\s*C\.?F\.?R\.?)", tail, re.IGNORECASE):
+            for match in re.finditer(r"(?:,|\band\b|\bor\b)\s*(\d+)(?!\d)(?!\s*C\.?F\.?R\.?)", tail, re.IGNORECASE):
                 if locates_a_compilation(tail_start.end() + match.start()):
                     continue
                 candidate = CfrCitation(first.title, str(int(match.group(1))), None)
