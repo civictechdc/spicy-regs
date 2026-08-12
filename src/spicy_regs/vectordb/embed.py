@@ -23,6 +23,7 @@ import argparse
 from pathlib import Path
 
 import polars as pl
+from dotenv import load_dotenv
 from tqdm import tqdm
 
 try:
@@ -163,6 +164,7 @@ def embed_parquet(
 
 
 def main():
+    load_dotenv()
     # Build preset help text
     preset_help = "Model presets:\n"
     for key, val in MODEL_PRESETS.items():

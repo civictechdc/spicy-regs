@@ -15,6 +15,8 @@ from pathlib import Path
 from urllib.request import urlretrieve
 from urllib.error import URLError
 
+from dotenv import load_dotenv
+
 # Public URL for the R2 bucket
 PUBLIC_URL = "https://data.spicy-regs.dev"
 DATA_TYPES = ["dockets", "documents", "comments", "manifest"]
@@ -201,6 +203,7 @@ def cmd_agencies(args):
 
 
 def main():
+    load_dotenv()
     parser = argparse.ArgumentParser(
         prog="spicy-regs",
         description="Download and explore federal regulations data from Spicy Regs",

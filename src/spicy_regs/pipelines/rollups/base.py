@@ -31,8 +31,6 @@ from loguru import logger
 from spicy_regs.pipelines.base import Pipeline
 from spicy_regs.sources import r2
 
-load_dotenv()
-
 
 class RollupPipeline(Pipeline):
     """A single materialized rollup, run standalone from the base tables on R2."""
@@ -111,6 +109,7 @@ def make_rollup_app(pipeline_cls: type[RollupPipeline]) -> App:
         output_dir: Annotated[Path | None, Parameter(help="Output directory")] = None,
         skip_upload: Annotated[bool, Parameter(help="Skip R2 upload (recommended while vetting)")] = True,
     ) -> None:
+        load_dotenv()
         pipeline_cls(output_dir=output_dir, skip_upload=skip_upload).run()
 
     return app

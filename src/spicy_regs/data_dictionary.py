@@ -29,6 +29,7 @@ import tempfile
 from pathlib import Path
 
 import polars as pl
+from dotenv import load_dotenv
 
 from spicy_regs.schemas.regulations import RECORD_TYPES
 
@@ -668,6 +669,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> None:
+    load_dotenv()
     parser = build_parser()
     args = parser.parse_args(argv)
     sys.exit(args.func(args))
