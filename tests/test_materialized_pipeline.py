@@ -549,3 +549,114 @@ def test_publishing_refuses_implicit_state_reset(tmp_path, monkeypatch) -> None:
             output_dir=tmp_path,
             skip_upload=False,
         )._prime_previous_generation(tmp_path)
+
+
+# The snapshot schema version bump. Version 2 makes ``visibility`` required on
+# every artifact record; version 1 predates the field and stays readable, so a
+# dataset whose last generation was sealed at version 1 can still restore.
+
+
+def test_the_build_writes_the_current_snapshot_version_and_declares_visibility(tmp_path) -> None:
+    class VisibleDataset(MaterializedDatasetPipeline):
+        name = "visible-dataset"
+        dataset_name = "visible"
+        published_outputs = ("public.parquet",)
+        internal_outputs = ("private.parquet",)
+
+        def stages(self):
+            return (
+                DatasetStage(
+                    name="emit",
+                    depends_on=(),
+                    outputs=("public.parquet", "private.parquet"),
+                    build=lambda output_dir, _context: [
+                        pq.write_table(pa.table({"a": [1]}), output_dir / "public.parquet"),
+                        pq.write_table(pa.table({"a": [2]}), output_dir / "private.parquet"),
+                    ],
+                ),
+            )
+
+    VisibleDataset(output_dir=tmp_path).run()
+
+    manifest = json.loads((tmp_path / "visible-dataset-manifest.json").read_text())
+    pointer = json.loads((tmp_path / "visible-dataset-latest.json").read_text())
+
+    assert manifest["format_version"] == 2
+    assert pointer["format_version"] == 2
+    assert manifest["artifacts"]["public.parquet"]["visibility"] == "public"
+    assert manifest["artifacts"]["private.parquet"]["visibility"] == "internal"
+    prefix = f"materialized/visible/snapshots/{manifest['snapshot_id']}/"
+    assert manifest["artifacts"]["public.parquet"]["remote_key"] == f"{prefix}public.parquet"
+
+
+def _stateful_generation(tmp_path, *, format_version: int, artifact: dict) -> tuple[type, Path]:
+    class StatefulDataset(MaterializedDatasetPipeline):
+        name = "stateful-dataset"
+        dataset_name = "stateful"
+        prior_outputs = (("state.parquet", "_state_prior.parquet"),)
+
+        def stages(self):
+            return ()
+
+    snapshot_id = "snapshot_versioned"
+    prefix = f"materialized/stateful/snapshots/{snapshot_id}"
+    (tmp_path / "_stateful_latest.json").write_text(
+        json.dumps(
+            {
+                "format_version": format_version,
+                "dataset": "stateful",
+                "snapshot_id": snapshot_id,
+                "manifest_key": f"{prefix}/manifest.json",
+            }
+        )
+    )
+    prior = tmp_path / "_state_prior.parquet"
+    prior.write_bytes(b"prior-state")
+    (tmp_path / "_stateful_previous_manifest.json").write_text(
+        json.dumps(
+            {
+                "format_version": format_version,
+                "dataset": "stateful",
+                "snapshot_id": snapshot_id,
+                "artifacts": {"state.parquet": {"remote_key": f"{prefix}/state.parquet", **artifact}},
+            }
+        )
+    )
+    return StatefulDataset, prior
+
+
+def test_a_version_2_generation_missing_visibility_is_refused(tmp_path) -> None:
+    dataset, _ = _stateful_generation(
+        tmp_path,
+        format_version=2,
+        artifact={"sha256": hashlib.sha256(b"prior-state").hexdigest()},
+    )
+
+    with pytest.raises(RuntimeError, match=r"format version 2 is missing \['visibility'\]"):
+        dataset(output_dir=tmp_path)._prime_previous_generation(tmp_path)
+
+
+def test_a_version_1_generation_restores_without_the_field(tmp_path) -> None:
+    """Restoring state from a generation sealed before the field existed."""
+    dataset, prior = _stateful_generation(
+        tmp_path,
+        format_version=1,
+        artifact={"sha256": hashlib.sha256(b"prior-state").hexdigest()},
+    )
+
+    manifest = dataset(output_dir=tmp_path)._prime_previous_generation(tmp_path)
+
+    assert manifest is not None
+    assert manifest["format_version"] == 1
+    assert prior.read_bytes() == b"prior-state"
+
+
+def test_a_generation_at_an_unknown_version_is_refused(tmp_path) -> None:
+    dataset, _ = _stateful_generation(
+        tmp_path,
+        format_version=99,
+        artifact={"sha256": hashlib.sha256(b"prior-state").hexdigest(), "visibility": "internal"},
+    )
+
+    with pytest.raises(RuntimeError, match="Unsupported stateful pointer snapshot format version 99"):
+        dataset(output_dir=tmp_path)._prime_previous_generation(tmp_path)

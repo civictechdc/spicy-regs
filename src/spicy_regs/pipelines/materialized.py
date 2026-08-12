@@ -39,7 +39,28 @@ from spicy_regs.sources import r2
 
 _SAFE_NAME = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _SAFE_SNAPSHOT_ID = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
-_FORMAT_VERSION = 1
+
+#: The snapshot format this build writes.
+#:
+#: Version 2 makes ``visibility`` a required field on every artifact record.
+#: Version 1 manifests carry it in practice — this pipeline has written it
+#: since the field existed — but nothing in the format required it, so a
+#: reader could not tell "internal" from "the producer forgot", and both read
+#: as absent. A public resolver that cannot distinguish those two answers is
+#: one missing key away from handing out an internal object's URL.
+_FORMAT_VERSION = 2
+
+#: Versions this build can *read*. A published snapshot outlives the code that
+#: wrote it, and the prior generation a run restores from was written before
+#: this bump, so refusing version 1 outright would strand every existing
+#: dataset's state at its next build.
+SUPPORTED_FORMAT_VERSIONS = (1, 2)
+
+#: The version at which each added field becomes required. Below it the field
+#: is unconstrained, because a snapshot cannot be held to a rule that did not
+#: exist when it was sealed.
+_ARTIFACT_FIELD_SINCE = {"visibility": 2}
+
 _ROOT_PREFIX = "materialized"
 
 
@@ -76,6 +97,25 @@ def _read_json(path: Path) -> dict:
     if not isinstance(value, dict):
         raise RuntimeError(f"Materialized-dataset JSON at {path} must be an object")
     return value
+
+
+def _manifest_format_version(value: object, *, label: str) -> int:
+    """Return a readable snapshot format version, or refuse the document."""
+    if value not in SUPPORTED_FORMAT_VERSIONS:
+        raise RuntimeError(
+            f"Unsupported {label} snapshot format version {value!r}; "
+            f"this build reads {list(SUPPORTED_FORMAT_VERSIONS)}"
+        )
+    return int(value)  # type: ignore[arg-type]  # membership above narrows it
+
+
+def _check_artifact_fields(record: dict, *, format_version: int, label: str) -> None:
+    """Enforce the fields the snapshot's own version made required."""
+    missing = sorted(
+        field for field, since in _ARTIFACT_FIELD_SINCE.items() if format_version >= since and field not in record
+    )
+    if missing:
+        raise RuntimeError(f"{label} artifact record at format version {format_version} is missing {missing}")
 
 
 def _safe_remote_key(value: object, *, prefix: str) -> str:
@@ -287,7 +327,8 @@ class MaterializedDatasetPipeline(Pipeline):
             return None
 
         pointer = _read_json(pointer_path)
-        if pointer.get("format_version") != _FORMAT_VERSION or pointer.get("dataset") != self.dataset_name:
+        pointer_version = _manifest_format_version(pointer.get("format_version"), label=f"{self.dataset_name} pointer")
+        if pointer.get("dataset") != self.dataset_name:
             raise RuntimeError(f"Invalid {self.dataset_name} latest pointer")
         snapshot_id = str(pointer.get("snapshot_id") or "")
         if not _SAFE_SNAPSHOT_ID.fullmatch(snapshot_id):
@@ -304,8 +345,11 @@ class MaterializedDatasetPipeline(Pipeline):
         if not use_cached_manifest and not r2.download(manifest_key, manifest_path):
             raise RuntimeError(f"{self.dataset_name} latest pointer references missing {manifest_key}")
         manifest = _read_json(manifest_path)
+        manifest_version = _manifest_format_version(
+            manifest.get("format_version"), label=f"{self.dataset_name} manifest"
+        )
         if (
-            manifest.get("format_version") != _FORMAT_VERSION
+            manifest_version != pointer_version
             or manifest.get("dataset") != self.dataset_name
             or manifest.get("snapshot_id") != pointer.get("snapshot_id")
         ):
@@ -342,6 +386,11 @@ class MaterializedDatasetPipeline(Pipeline):
                     )
                     continue
                 raise RuntimeError(f"{self.dataset_name} manifest is missing stateful artifact {artifact_name}")
+            _check_artifact_fields(
+                record,
+                format_version=manifest_version,
+                label=f"{self.dataset_name} {artifact_name}",
+            )
             remote_key = _safe_remote_key(record.get("remote_key"), prefix=expected_prefix)
             if remote_key != f"{expected_prefix}{artifact_name}":
                 raise RuntimeError(f"{self.dataset_name} manifest has an invalid key for {artifact_name}")

@@ -22,6 +22,21 @@ MATERIALIZED_TABLES = frozenset(
 )
 _SAFE_SNAPSHOT_ID = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 
+#: Snapshot format versions this resolver reads. Mirrors
+#: :data:`spicy_regs.pipelines.materialized.SUPPORTED_FORMAT_VERSIONS`; a
+#: published snapshot outlives the code that wrote it, so version 1 stays
+#: readable.
+SUPPORTED_FORMAT_VERSIONS = (1, 2)
+
+#: The version at which ``visibility`` became a required artifact field.
+#:
+#: Below it, absence means "this snapshot predates the field", and refusing a
+#: table for it would break every resolver against every already-published
+#: dataset. At or above it, absence means the producer wrote an invalid
+#: manifest, and a value other than "public" means the object is internal and
+#: was never meant to be handed to a caller of this function.
+_VISIBILITY_REQUIRED_SINCE = 2
+
 
 def _fetch_json(url: str) -> dict:
     try:
@@ -54,7 +69,7 @@ def resolve_materialized_table_urls(
 ) -> dict[str, str]:
     base = base_url.rstrip("/")
     pointer = _fetch_json(f"{base}/materialized/{dataset}/latest.json")
-    if pointer.get("format_version") != 1 or pointer.get("dataset") != dataset:
+    if pointer.get("format_version") not in SUPPORTED_FORMAT_VERSIONS or pointer.get("dataset") != dataset:
         raise RuntimeError(f"Invalid {dataset} materialized dataset pointer")
     snapshot_id = str(pointer.get("snapshot_id") or "")
     if not _SAFE_SNAPSHOT_ID.fullmatch(snapshot_id):
@@ -64,8 +79,10 @@ def resolve_materialized_table_urls(
     if manifest_key != f"{prefix}manifest.json":
         raise RuntimeError(f"Invalid {dataset} materialized dataset manifest key")
     manifest = _fetch_json(f"{base}/{manifest_key}")
+    format_version = manifest.get("format_version")
     if (
-        manifest.get("format_version") != 1
+        format_version not in SUPPORTED_FORMAT_VERSIONS
+        or format_version != pointer.get("format_version")
         or manifest.get("dataset") != dataset
         or manifest.get("snapshot_id") != pointer.get("snapshot_id")
     ):
@@ -79,6 +96,12 @@ def resolve_materialized_table_urls(
         record = artifacts.get(f"{table}.parquet")
         if not isinstance(record, dict):
             raise RuntimeError(f"{dataset} manifest is missing {table}.parquet")
+        if format_version >= _VISIBILITY_REQUIRED_SINCE:
+            visibility = record.get("visibility")
+            if visibility is None:
+                raise RuntimeError(f"{dataset} manifest declares no visibility for {table}.parquet")
+            if visibility != "public":
+                raise RuntimeError(f"{dataset} manifest marks {table}.parquet {visibility}, not public")
         remote_key = _safe_key(record.get("remote_key"), prefix=prefix)
         if remote_key != f"{prefix}{table}.parquet":
             raise RuntimeError(f"{dataset} manifest has an invalid key for {table}.parquet")
