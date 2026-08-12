@@ -79,10 +79,16 @@ Two things deliberately keep the old spelling:
   actually minted; rewriting them would make a dated record lie. The one
   `docs/` occurrence that stated the *format* rather than a past result
   (`scale-architecture-report-2026-08-04.md:181`) is respelled.
-- Gitignored regenerable outputs are not regenerated here. On-disk v3
-  artifacts under `output/` predate the respell and carry `urn:spicyregs:`;
-  they regenerate with the new spelling on the next build, and no checked-in
-  digest pins them.
+- Gitignored regenerable outputs are not regenerated here. Nineteen files
+  under `output/` — in `agency-crosswalk-2026-08-02`,
+  `body-retrieval-corpus-2026-08-02`, `date-event-artifact-2026-08-01`,
+  `scale-dr-10k-2026-08-05` and `search-holdout-exam-2026-08-01` — predate the
+  respell and still carry `urn:spicyregs:`. They regenerate with the new
+  spelling on the next build, and no checked-in digest pins them.
+
+The counts above are `git grep` over tracked files. A gitignore-aware search
+of the whole worktree agrees on the tracked set, which is how the `output/`
+residue was found separately rather than folded into the inventory.
 
 ### 1b. Byte versus codepoint offsets — audited, nothing to convert
 
@@ -272,7 +278,7 @@ What survives the decision:
 
 `tests/test_rkaf_projection_boundary.py` carries the freeze, written
 2026-08-11 against `src/spicy_regs/docpipeline/rkaf_projection.py` at
-`6dbe181ccec7`, before the train in section 4 ships `ontology/`. It runs in
+`6dbe181ccec7`, before the landing in section 4 moves `ontology/`. It runs in
 the default suite: `testpaths = ["tests"]`, no marker, three tests, 0.1s.
 
 The frozen surface, AST-derived from the file: 17 outbound import statements,
@@ -301,8 +307,11 @@ a sibling source-tree consumption REF-024 forbids. The exact pin at
 `pyproject.toml:12` (`refspec==0.1.0.dev0`) is already correct. Delete the
 `[tool.uv.sources]` override once the RefSpec package is consumable from an
 installed wheel; RefSpec's `PLAN.md` schedules the input resolver that makes
-it so. The payload test in section 4 does not cover this crossing — it gates
-what ships upstream, and this line never ships.
+it so. The REF-024 payload rule in section 4 does not cover this crossing —
+it governs what ships upstream, and this line never ships. It is also where
+`rkaf_projection.py:2334`'s `from refspec import (...)` is answered: an
+import of an installed wheel is not a sibling source-tree crossing, so
+deleting the override retires both at once.
 
 ## 7. Canonical-JSON profiles precede any dedup
 
