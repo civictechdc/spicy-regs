@@ -840,3 +840,20 @@ class TestValidate:
         lock = json.loads((cache / "source-lock.json").read_text())
         (cache / lock["sources"][0]["cache_file"]).unlink()
         assert brc.validate_body_cache(cache)["status"] == "fail"
+
+    def test_a_body_the_lock_does_not_name_fails_closed(self, tmp_path: Path) -> None:
+        """The other direction: on disk, named nowhere.
+
+        The lock is the closed statement of the corpus. A file beside the
+        named ones — a partial re-draw, an interrupted capture, a hand copy —
+        is corpus to any reader that globs the directory, and the lock-first
+        walk cannot see it at all.
+        """
+        cache = tmp_path / "cache"
+        brc.fetch_bodies(_manifest(tmp_path), cache, fetcher=_Recorder({}), sleep=lambda _: None)
+        assert brc.validate_body_cache(cache)["status"] == "pass"
+
+        (cache / "documents" / "unnamed-leftover.html").write_bytes(BODY)
+        report = brc.validate_body_cache(cache)
+        assert report["status"] == "fail"
+        assert report["failures"] == ["documents/unnamed-leftover.html: cached body is not named by the lock"]

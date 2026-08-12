@@ -914,7 +914,17 @@ def _seal_lock(cache_dir: Path, manifest: Mapping[str, Any], *, rendition: str =
 
 
 def validate_body_cache(cache_dir: Path) -> dict[str, Any]:
-    """Re-verify every cached body against the lock. Fails closed."""
+    """Re-verify the cache and the lock against each other. Fails closed.
+
+    Both directions, because one of them is not a check. Walking the lock and
+    asking whether each record's file is on disk with the right bytes proves
+    every *named* body is intact; it says nothing about a body that is on disk
+    and named nowhere. An unnamed file is not inert: a partial re-draw, an
+    interrupted capture, or a hand-copied document all leave one, and the next
+    reader that globs ``documents/`` — rather than reading the lock — takes it
+    for corpus. The lock is the closed statement of what the corpus is, so a
+    file it does not name is a failure of the cache, not a spare.
+    """
 
     cache_dir = Path(cache_dir)
     lock = _read_json(cache_dir / "source-lock.json")
@@ -924,6 +934,14 @@ def validate_body_cache(cache_dir: Path) -> dict[str, Any]:
     sources = lock.get("sources")
     if not isinstance(sources, list):
         return {"status": "fail", "source_count": 0, "failures": ["lock sources must be an array"]}
+
+    documents_dir = cache_dir / "documents"
+    on_disk = {
+        path.relative_to(cache_dir).as_posix() for path in sorted(documents_dir.rglob("*")) if path.is_file()
+    }
+    named = {_text(record.get("cache_file")) for record in sources if isinstance(record, dict)}
+    for orphan in sorted(on_disk - named):
+        failures.append(f"{orphan}: cached body is not named by the lock")
 
     for record in sources:
         number = _text(record.get("document_number"))
