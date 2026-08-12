@@ -21,6 +21,8 @@ from spicy_regs.ontology.ledger import (
     write_segment_ledger,
 )
 from spicy_regs.ontology.llm import TagProposal
+from spicy_regs.ontology import receipt as receipt_module
+from spicy_regs.ontology.receipt import main as receipt_main
 from spicy_regs.ontology.receipt import validate_generation
 from spicy_regs.ontology.subjects import iter_artifacts, segment_artifact
 from spicy_regs.pipelines.ontology_dataset import OntologyDatasetPipeline
@@ -572,3 +574,38 @@ def test_generation_receipt_records_unreadable_parquet(tmp_path):
 
     assert result["status"] == "fail"
     assert result["failures"]["by_check"]["manifest.parquet"] == 1
+
+
+# REF-024: no product-internal path names a sibling product's checkout. The
+# receipt CLI used to default ``--rulespec-repo`` to ``../rulespec`` — a guess
+# about the caller's directory layout that read silently when it was wrong.
+
+
+def test_the_receipt_cli_requires_the_rulespec_location(capsys) -> None:
+    with pytest.raises(SystemExit) as exit_info:
+        receipt_main(["manifest.json", "--output", "receipt.json"])
+
+    assert exit_info.value.code == 2
+    assert "--rulespec-repo" in capsys.readouterr().err
+
+
+def test_the_receipt_cli_carries_no_sibling_default() -> None:
+    """The location has no default at all, not merely a different one.
+
+    A default that happens to be right in this checkout is still a default:
+    the next caller in a different layout gets a wrong answer instead of an
+    error, and the receipt states a provenance nobody chose.
+    """
+    defaults = {action.dest: action for action in receipt_module.build_parser()._actions}
+
+    assert defaults["rulespec_repo"].default is None
+    assert defaults["rulespec_repo"].required is True
+    # The repository this code runs inside is not a sibling escape.
+    assert defaults["spicy_repo"].default == Path.cwd()
+
+    siblings = [
+        action.dest
+        for action in defaults.values()
+        if isinstance(action.default, Path) and action.default.resolve() == Path.cwd().parent.resolve()
+    ]
+    assert siblings == []

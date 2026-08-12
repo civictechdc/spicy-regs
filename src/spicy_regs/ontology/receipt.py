@@ -2192,7 +2192,8 @@ def build_receipt(
     return receipt
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
+    """The receipt CLI's argument parser, separable so its defaults are testable."""
     parser = argparse.ArgumentParser(
         description="Validate an ontology manifest and emit a paired Rulespec receipt",
     )
@@ -2204,15 +2205,28 @@ def main(argv: list[str] | None = None) -> int:
         help="Clean worktree used to produce the baseline manifest",
     )
     parser.add_argument("--spicy-repo", type=Path, default=Path.cwd())
+    # Required, with no default. The default this replaces was
+    # ``Path.cwd().parent / "rulespec"`` — a guess that the Rulespec checkout
+    # sits beside this one. REF-024 forbids a product-internal path into a
+    # sibling product regardless of where the code ends up, and a default is
+    # the worst form of it: the caller who never passed the flag believes
+    # nothing about the layout, so the wrong directory is read silently and
+    # the receipt states a provenance nobody chose. Say where it is.
     parser.add_argument(
         "--rulespec-repo",
         type=Path,
-        default=Path.cwd().parent / "rulespec",
+        required=True,
+        help="Rulespec checkout the receipt is paired against; no default, name it explicitly",
     )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--run-materialization", action="store_true")
     parser.add_argument("--run-gates", action="store_true")
     parser.add_argument("--require-clean", action="store_true")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
     args = parser.parse_args(argv)
     if args.run_materialization and (
         args.baseline_manifest is None or args.baseline_repo is None
