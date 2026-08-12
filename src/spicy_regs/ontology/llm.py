@@ -74,13 +74,41 @@ class OpenAIProviderExhaustedError(RuntimeError):
     """All application-owned provider attempts failed."""
 
 
+#: What :class:`EvidenceOffsetResolution`'s numbers count, said out loud.
+#:
+#: Two coordinate units exist in this repository and they never meet. The v3
+#: release counts UTF-8 **bytes** over rendition bytes
+#: (``document_release_v3.RENDITION_UTF8_COORDINATE_SCHEMA_ID``); every
+#: evidence span — this function, ``docpipeline/source.py``,
+#: ``docpipeline/rkaf_projection.py``, ``ontology/subjects.py``,
+#: ``ontology/concepts.py``, ``ontology/relation_findings.py`` — counts
+#: Unicode **code points** over a ``str``, half-open, and proves itself by
+#: re-slicing that ``str``. Both are internally exact; a number carried from
+#: one into the other would be neither. Everything else in that family names
+#: its unit in a constant. This function did not, and it is the one the rest
+#: of the family calls, so it names it here. See PLAN.md section 1b.
+EVIDENCE_OFFSET_UNIT = "unicode-codepoints"
+
+#: Half-open ``[start, end)``, matching every other span in the family.
+EVIDENCE_OFFSET_INTERVAL = "half-open"
+
+
 @dataclass(frozen=True)
 class EvidenceOffsetResolution:
-    """An exact, deterministic alignment of quoted evidence to one field."""
+    """An exact, deterministic alignment of quoted evidence to one field.
+
+    ``start`` and ``end`` index ``field_text`` in :data:`EVIDENCE_OFFSET_UNIT`
+    over the :data:`EVIDENCE_OFFSET_INTERVAL` interval — the same units the
+    ``str`` they came from uses, so ``field_text[start:end]`` is the evidence
+    by construction. They are not UTF-8 byte offsets and must not be written
+    into a field that holds those.
+    """
 
     start: int
     end: int
     method: str
+    unit: str = EVIDENCE_OFFSET_UNIT
+    interval: str = EVIDENCE_OFFSET_INTERVAL
 
 
 def resolve_exact_evidence_offsets(
@@ -89,7 +117,10 @@ def resolve_exact_evidence_offsets(
     start: int | None,
     end: int | None,
 ) -> EvidenceOffsetResolution | None:
-    """Verify provider offsets or repair one unambiguous verbatim match."""
+    """Verify provider offsets or repair one unambiguous verbatim match.
+
+    Offsets in and out are :data:`EVIDENCE_OFFSET_UNIT` into ``field_text``.
+    """
     if not evidence_text:
         return None
     if (
