@@ -1,9 +1,22 @@
 """Shared fixtures for pipeline tests."""
 
+import os
 from pathlib import Path
 
 import polars as pl
 import pytest
+
+_ISOLATED_PREFIXES = ("R2_", "SPICY_REGS_", "CLOUDFLARE_", "AWS_")
+_ISOLATED_NAMES = frozenset({"AGENCIES", "DATA_GOV_API_KEY", "SAM_API_KEY", "LDA_API_KEY", "COURTLISTENER_API_TOKEN"})
+
+
+@pytest.fixture(autouse=True)
+def isolate_env(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    if "integration" in request.keywords:
+        return
+    for name in list(os.environ):
+        if name.startswith(_ISOLATED_PREFIXES) or name in _ISOLATED_NAMES:
+            monkeypatch.delenv(name, raising=False)
 
 
 @pytest.fixture

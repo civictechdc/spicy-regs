@@ -92,6 +92,12 @@ the maintainers publish.
 - Follow existing code style and conventions (ruff handles most of this).
 - Add or update tests for any behavior change.
 - Run `uv run pytest` and `uv run ruff check .` before pushing.
+- The default suite is hermetic. An autouse `isolate_env` fixture in
+  `tests/conftest.py` strips `R2_*`, `SPICY_REGS_*`, `CLOUDFLARE_*`, `AWS_*`,
+  `AGENCIES`, and the API keys, so a local `.env` can't leak into a unit test and
+  send it at production R2. If a test genuinely needs real credentials or the
+  network, mark it `@pytest.mark.integration` — the fixture exempts those, and
+  they're deselected by default.
 
 ## Glossary
 
