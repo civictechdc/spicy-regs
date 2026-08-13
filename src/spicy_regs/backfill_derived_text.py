@@ -4,9 +4,18 @@ The ETL fills ``text_content`` inline for *new* comments
 (:class:`~spicy_regs.transforms.enrich_derived_text.EnrichCommentText`), but
 every comment published before that wiring still has ``text_content`` NULL. This
 is the one-time / re-runnable backfill: it fills ``text_content`` from the
-bucket's ``derived-data`` prefix (no PDF download, no JSON re-ingest). Rows are
-skipped unless they have an attachment and no ``text_extraction_status`` yet, so
-repeated runs only do new work.
+bucket's ``derived-data`` prefix (no PDF download, no JSON re-ingest). By
+default, rows are candidates only if they already carry an ``attachments_json``
+and have no ``text_extraction_status`` yet, so repeated runs only do new work.
+
+That default has a blind spot: comments ingested before the pipeline started
+recording ``attachments_json`` never get a chance, even though Mirrulations may
+already have extracted text for their attachments. Pass
+``discover_from_derived=True`` (CLI: ``--discover-from-derived``) to select
+candidates by ``text_extraction_status`` alone and let the derived-data listing
+itself decide whether extracted text exists — this is strictly more expensive
+(every docket in scope gets listed, not just ones already known to have
+attachments) so scope it with ``--agency``/``--limit``.
 
 There are two write targets, because comments now live in two places:
 
@@ -66,6 +75,7 @@ def _derived_text_updates(
     limit: int | None,
     max_workers: int,
     overwrite: bool,
+    discover_from_derived: bool = False,
 ) -> tuple[pl.DataFrame, dict[str, int]]:
     """Fetch derived-data text for a frame's candidate comments.
 
@@ -75,12 +85,19 @@ def _derived_text_updates(
     the published-Parquet path (:func:`enrich_comments_with_derived_text`) joins
     it back onto the whole frame; the catalog path upserts exactly these rows.
 
-    Only attachment-bearing comments are candidates; unless ``overwrite`` is set,
-    rows that already have a ``text_extraction_status`` are skipped so repeated
-    runs are incremental. ``agency`` overrides the per-row ``agency_code`` (the
-    Hive partitions don't carry that column); when ``None`` it is read from the
-    frame. Work is grouped by docket and fanned out across ``max_workers`` so
-    each docket's extraction prefix is listed once.
+    By default only attachment-bearing comments (``attachments_json`` truthy)
+    are candidates. When ``discover_from_derived`` is set, that gate is
+    dropped — every comment without a ``text_extraction_status`` is a
+    candidate, and the per-docket derived-data listing (via
+    :meth:`~spicy_regs.sources.derived_text.DerivedCommentText.text_for`)
+    is what actually decides whether extracted text exists. This is how rows
+    ingested before ``attachments_json`` was recorded get found at all. Unless
+    ``overwrite`` is set, rows that already have a ``text_extraction_status``
+    are skipped either way so repeated runs are incremental. ``agency``
+    overrides the per-row ``agency_code`` (the Hive partitions don't carry
+    that column); when ``None`` it is read from the frame. Work is grouped by
+    docket and fanned out across ``max_workers`` so each docket's extraction
+    prefix is listed once.
     """
     select_cols = ["comment_id", "docket_id", "attachments_json", "text_extraction_status"]
     if agency is None:
@@ -95,7 +112,9 @@ def _derived_text_updates(
         if limit is not None and selected >= limit:
             break
         comment_id = row["comment_id"]
-        if comment_id is None or not row["attachments_json"]:
+        if comment_id is None:
+            continue
+        if not discover_from_derived and not row["attachments_json"]:
             continue
         if not overwrite and row["text_extraction_status"] is not None:
             continue
@@ -160,12 +179,14 @@ def enrich_comments_with_derived_text(
     limit: int | None = None,
     max_workers: int = 8,
     overwrite: bool = False,
+    discover_from_derived: bool = False,
 ) -> tuple[pl.DataFrame, dict[str, int]]:
     """Fill ``text_content`` / ``text_extraction_status`` on a comments frame.
 
     The published-Parquet path: fetch derived text for the frame's candidates
     (:func:`_derived_text_updates`) and join it back onto the whole frame,
-    returning the enriched frame and stats.
+    returning the enriched frame and stats. See ``discover_from_derived`` there
+    for the opt-in mode that finds legacy rows with no ``attachments_json``.
     """
     for col in ("text_content", "text_extraction_status"):
         if col not in df.columns:
@@ -178,6 +199,7 @@ def enrich_comments_with_derived_text(
         limit=limit,
         max_workers=max_workers,
         overwrite=overwrite,
+        discover_from_derived=discover_from_derived,
     )
     if updates.is_empty():
         return df, stats
@@ -201,6 +223,7 @@ def _backfill_file(
     limit: int | None,
     max_workers: int,
     overwrite: bool,
+    discover_from_derived: bool = False,
 ) -> dict[str, int]:
     df = pl.read_parquet(path)
     enriched, stats = enrich_comments_with_derived_text(
@@ -210,6 +233,7 @@ def _backfill_file(
         limit=limit,
         max_workers=max_workers,
         overwrite=overwrite,
+        discover_from_derived=discover_from_derived,
     )
     if stats["ok"]:
         enriched.write_parquet(path, compression="zstd")
@@ -224,6 +248,7 @@ def backfill_comments_parquet(
     limit: int | None = None,
     max_workers: int = 8,
     overwrite: bool = False,
+    discover_from_derived: bool = False,
 ) -> dict[str, int]:
     """Backfill the monolithic ``comments.parquet`` (carries ``agency_code``)."""
     if not comments_path.exists():
@@ -235,6 +260,7 @@ def backfill_comments_parquet(
         limit=limit,
         max_workers=max_workers,
         overwrite=overwrite,
+        discover_from_derived=discover_from_derived,
     )
 
 
@@ -245,6 +271,7 @@ def backfill_comment_partitions(
     limit: int | None = None,
     max_workers: int = 8,
     overwrite: bool = False,
+    discover_from_derived: bool = False,
 ) -> tuple[dict[str, int], list[Path]]:
     """Backfill every ``agency_code=*/*.parquet`` partition; agency comes from the path.
 
@@ -274,6 +301,7 @@ def backfill_comment_partitions(
             limit=remaining,
             max_workers=max_workers,
             overwrite=overwrite,
+            discover_from_derived=discover_from_derived,
         )
         for key, value in stats.items():
             totals[key] += value
@@ -295,30 +323,37 @@ def _backfill_agency_in_catalog(
     limit: int | None = None,
     max_workers: int = 8,
     overwrite: bool = False,
+    discover_from_derived: bool = False,
 ) -> dict[str, int]:
-    """Fill + upsert one agency's attachment comments in the attached catalog.
+    """Fill + upsert one agency's candidate comments in the attached catalog.
 
-    Selects the agency's candidate rows (attachment-bearing, no
-    ``text_extraction_status`` unless ``overwrite``) from the catalog table,
-    fetches derived text, and upserts the filled rows back with the same
-    per-agency DELETE+INSERT idiom as :func:`spicy_regs.sources.iceberg._merge`
-    (Iceberg has no ``MERGE INTO`` in DuckDB). Scoping every statement to one
-    agency keeps it off the whole tens-of-millions-row table. ``con`` is the
-    catalog connection (injected so this is testable against a local DuckDB
-    attached under the ``reg_catalog`` alias). Returns fill stats.
+    Selects the agency's candidate rows from the catalog table (by default,
+    attachment-bearing with no ``text_extraction_status`` unless ``overwrite``;
+    with ``discover_from_derived`` the ``attachments_json`` requirement is
+    dropped so legacy rows ingested before that column existed are candidates
+    too — see :func:`_derived_text_updates`), fetches derived text, and upserts
+    the filled rows back with the same per-agency DELETE+INSERT idiom as
+    :func:`spicy_regs.sources.iceberg._merge` (Iceberg has no ``MERGE INTO`` in
+    DuckDB). Scoping every statement to one agency keeps it off the whole
+    tens-of-millions-row table. ``con`` is the catalog connection (injected so
+    this is testable against a local DuckDB attached under the ``reg_catalog``
+    alias). Returns fill stats.
     """
     from spicy_regs.sources import iceberg
 
     tbl = iceberg._qualified(record_type)
     ag = iceberg._sql_str(agency)
     status_filter = "" if overwrite else "AND (text_extraction_status IS NULL OR text_extraction_status = '')"
+    attachment_filter = (
+        "" if discover_from_derived else "AND attachments_json IS NOT NULL AND TRIM(attachments_json) NOT IN ('', '[]')"
+    )
     limit_sql = f" LIMIT {int(limit)}" if limit is not None else ""
     candidates = con.execute(
         f"""
         SELECT comment_id, docket_id, agency_code, attachments_json, text_extraction_status
         FROM {tbl}
         WHERE agency_code = '{ag}'
-          AND attachments_json IS NOT NULL AND TRIM(attachments_json) NOT IN ('', '[]')
+          {attachment_filter}
           {status_filter}
         {limit_sql}
         """
@@ -333,6 +368,7 @@ def _backfill_agency_in_catalog(
         limit=limit,
         max_workers=max_workers,
         overwrite=overwrite,
+        discover_from_derived=discover_from_derived,
     )
     if updates.is_empty():
         return stats
@@ -357,6 +393,7 @@ def backfill_comments_catalog(
     limit: int | None = None,
     max_workers: int = 8,
     overwrite: bool = False,
+    discover_from_derived: bool = False,
 ) -> dict[str, int]:
     """Backfill ``text_content`` directly in the R2 Data Catalog (durable path).
 
@@ -397,6 +434,7 @@ def backfill_comments_catalog(
                 limit=remaining,
                 max_workers=max_workers,
                 overwrite=overwrite,
+                discover_from_derived=discover_from_derived,
             )
             for key, value in stats.items():
                 totals[key] += value
@@ -435,6 +473,14 @@ def main() -> None:
         action="store_true",
         help="Published-Parquet path only: upload changed partitions + index to R2 (needs credentials)",
     )
+    parser.add_argument(
+        "--discover-from-derived",
+        action="store_true",
+        help="Find candidates by text_extraction_status alone, dropping the attachments_json "
+        "requirement — catches comments ingested before that column was populated. The "
+        "derived-data listing itself decides whether extracted text exists. More expensive "
+        "(every docket in scope gets listed); scope with --agency/--limit.",
+    )
     args = parser.parse_args()
 
     # Durable path: write the catalog (the system of record the mirror is
@@ -450,6 +496,7 @@ def main() -> None:
             limit=args.limit,
             max_workers=args.max_workers,
             overwrite=args.overwrite,
+            discover_from_derived=args.discover_from_derived,
         )
         return
 
@@ -461,6 +508,7 @@ def main() -> None:
             limit=args.limit,
             max_workers=args.max_workers,
             overwrite=args.overwrite,
+            discover_from_derived=args.discover_from_derived,
         )
         if args.upload and changed:
             from spicy_regs.sources.r2 import upload_comment_partitions
@@ -472,6 +520,7 @@ def main() -> None:
             limit=args.limit,
             max_workers=args.max_workers,
             overwrite=args.overwrite,
+            discover_from_derived=args.discover_from_derived,
         )
         if args.upload:
             from spicy_regs.sources.r2 import upload_file

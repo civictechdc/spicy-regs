@@ -4,11 +4,13 @@ Jupyter notebooks for exploring and analyzing federal regulations data from [reg
 
 ## Data Source
 
-All notebooks query Parquet files hosted on Cloudflare R2:
+All notebooks query Parquet files hosted on Cloudflare R2 at `https://data.spicy-regs.dev`:
 
-- **dockets.parquet** - 346K+ regulatory dockets
+- **dockets.parquet** - 276K+ regulatory dockets
 - **documents.parquet** - 2M+ documents
-- **comments.parquet** - 24M+ public comments
+- **comments.parquet** - 25M+ public comments
+
+That's the original three-table core. The published corpus has since grown to **20 tables** — rollups (`feed_summary`, `agency_stats`, ...) plus external federal sources (`federal_register`, `unified_agenda`, `sam_entities`, `usaspending_recipients`, ...) joinable on `rin`, `uei`, CFR citations, and `agency_code`. [`getting_started.ipynb`](getting_started.ipynb) covers the full picture; the rest of this page is mostly the original three-table view.
 
 Data is sourced from the [Mirrulations](https://github.com/MoravianUniversity/mirrulations) project.
 
@@ -25,7 +27,8 @@ jupyter notebook
 
 | Notebook | Description |
 |----------|-------------|
-| [query_data.ipynb](query_data.ipynb) | Getting started with querying the data |
+| [getting_started.ipynb](getting_started.ipynb) | Start here: the four access doors (DuckDB, MCP, CLI, docs site), rollups-first segment/filter, a cross-source join, and building/saving a dataset |
+| [query_data.ipynb](query_data.ipynb) | Short intro to querying the three core tables directly |
 | [data_explorer.ipynb](data_explorer.ipynb) | Schema docs, search utilities, export tools |
 | [search_capabilities.ipynb](search_capabilities.ipynb) | Three no-server layers of search: prebuilt docket index, DuckDB metadata, partition-aware comment full-text |
 
@@ -40,6 +43,15 @@ jupyter notebook
 | **Docket Analysis** | [docket_analysis.ipynb](docket_analysis.ipynb) | Summarize insights from thousands of comments |
 | **Cross-Docket Analysis** | [cross_docket_analysis.ipynb](cross_docket_analysis.ipynb) | Map related dockets across agencies and cycles |
 | **Document Navigation** | [document_navigation.ipynb](document_navigation.ipynb) | Find relevant sections in lengthy regulatory docs |
+
+### Advanced / Maintainer-Only
+
+These need credentials the public notebooks above don't (R2 / R2 Data Catalog API keys), so they're for people operating the pipeline rather than exploring the public data.
+
+| Notebook | Description |
+|----------|-------------|
+| [iceberg_explorer.ipynb](iceberg_explorer.ipynb) | Query the R2 Data Catalog (Apache Iceberg) directly, and compare it against the public Parquet mirror |
+| [vector_search.ipynb](vector_search.ipynb) | Vector + hybrid (BM25) search over comments via LanceDB |
 
 ## Quick Start
 

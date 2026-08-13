@@ -97,6 +97,46 @@ def test_enrich_respects_limit() -> None:
     assert stats["ok"] == 1
 
 
+def test_discover_from_derived_finds_rows_with_no_attachments_json() -> None:
+    # Legacy row: no attachments_json recorded at all (ingested before that
+    # column existed), yet the fake derived-data store has extracted text for
+    # it. Default mode must skip it; discover_from_derived must find it.
+    df = _frame(
+        [{"comment_id": "ACF-2025-0038-0004", "docket_id": "ACF-2025-0038", "agency_code": "ACF", "attachments_json": None}]
+    )
+
+    default_out, default_stats = enrich_comments_with_derived_text(df, resource_factory=_factory())
+    assert default_stats == {"selected": 0, "ok": 0, "missing": 0}
+    assert default_out.row(0, named=True)["text_content"] is None
+
+    discover_out, discover_stats = enrich_comments_with_derived_text(
+        df, resource_factory=_factory(), discover_from_derived=True
+    )
+    assert discover_stats == {"selected": 1, "ok": 1, "missing": 0}
+    assert discover_out.row(0, named=True)["text_content"] == "Wisconsin DCF comment body"
+    assert discover_out.row(0, named=True)["text_extraction_status"] == "ok"
+
+
+def test_discover_from_derived_is_incremental() -> None:
+    # A second run over the already-filled frame must not reselect the row.
+    df = _frame(
+        [{"comment_id": "ACF-2025-0038-0004", "docket_id": "ACF-2025-0038", "agency_code": "ACF", "attachments_json": None}]
+    )
+    filled, _ = enrich_comments_with_derived_text(df, resource_factory=_factory(), discover_from_derived=True)
+
+    _, stats = enrich_comments_with_derived_text(filled, resource_factory=_factory(), discover_from_derived=True)
+    assert stats == {"selected": 0, "ok": 0, "missing": 0}
+
+
+def test_discover_from_derived_still_counts_true_misses() -> None:
+    # No attachments_json AND no derived-data text available at all.
+    df = _frame(
+        [{"comment_id": "ACF-2025-0038-9999", "docket_id": "ACF-2025-0038", "agency_code": "ACF", "attachments_json": None}]
+    )
+    _, stats = enrich_comments_with_derived_text(df, resource_factory=_factory(), discover_from_derived=True)
+    assert stats == {"selected": 1, "ok": 0, "missing": 1}
+
+
 def test_backfill_partitions_reads_agency_from_path(tmp_path) -> None:
     part_dir = tmp_path / "comments" / "agency" / "agency_code=ACF"
     part_dir.mkdir(parents=True)
@@ -173,6 +213,51 @@ def test_catalog_backfill_upserts_filled_rows_in_place() -> None:
 
         # Idempotent: a second run finds nothing new (the filled row now has a status).
         again = _backfill_agency_in_catalog(con, COMMENT, "ACF", resource_factory=_factory())
+        assert again == {"selected": 1, "ok": 0, "missing": 1}
+    finally:
+        con.close()
+
+
+def test_catalog_backfill_discover_from_derived_finds_legacy_rows_without_attachments_json() -> None:
+    # This is the exact trap the docstring warns about: rows ingested before
+    # attachments_json was recorded have it NULL, so the default (attachment-
+    # gated) catalog query never selects them even though Mirrulations has
+    # extracted text ready and waiting. discover_from_derived must find them.
+    con = duckdb.connect()
+    con.execute(f"ATTACH ':memory:' AS {iceberg._CATALOG_ALIAS};")
+    try:
+        _seed_catalog(
+            con,
+            [
+                # legacy row: attachments_json was never populated
+                {"comment_id": "ACF-2025-0038-0004", "docket_id": "ACF-2025-0038", "agency_code": "ACF",
+                 "attachments_json": None, "modify_date": "2025-01-01"},
+                # legacy row with no derived-data text available either
+                {"comment_id": "ACF-2025-0038-9999", "docket_id": "ACF-2025-0038", "agency_code": "ACF",
+                 "attachments_json": None, "modify_date": "2025-01-01"},
+            ],
+        )
+
+        default_stats = _backfill_agency_in_catalog(con, COMMENT, "ACF", resource_factory=_factory())
+        assert default_stats == {"selected": 0, "ok": 0, "missing": 0}, "default mode must not touch legacy rows"
+
+        discover_stats = _backfill_agency_in_catalog(
+            con, COMMENT, "ACF", resource_factory=_factory(), discover_from_derived=True
+        )
+        assert discover_stats == {"selected": 2, "ok": 1, "missing": 1}
+
+        out = dict(
+            con.execute(
+                f"SELECT comment_id, text_content FROM {iceberg._qualified(COMMENT)} ORDER BY comment_id"
+            ).fetchall()
+        )
+        assert out["ACF-2025-0038-0004"] == "Wisconsin DCF comment body"
+        assert out["ACF-2025-0038-9999"] is None
+
+        # Idempotent: a second discover run finds nothing new for the filled row.
+        again = _backfill_agency_in_catalog(
+            con, COMMENT, "ACF", resource_factory=_factory(), discover_from_derived=True
+        )
         assert again == {"selected": 1, "ok": 0, "missing": 1}
     finally:
         con.close()

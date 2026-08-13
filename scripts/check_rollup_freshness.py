@@ -20,7 +20,7 @@ from pathlib import Path
 
 import duckdb
 
-DEFAULT_BASE_URL = "https://r2.spicy-regs.dev"
+DEFAULT_BASE_URL = "https://data.spicy-regs.dev"
 FreshnessRow = tuple[str, str, str | None, int]
 FreshnessState = dict[str, dict[str, int | str]]
 
