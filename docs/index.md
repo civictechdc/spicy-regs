@@ -109,11 +109,12 @@ of `dockets`; they join to the corpus (and to each other) on a few shared keys:
   exists.
 - **`agency_code` / agency name** appears across nearly every table.
 
-> Coverage notes: `sam_entities` is a partial sample (~5K of ~765K — the SAM API
-> caps pagination; full coverage needs chunked ingestion), `lobbying_filings`
-> covers 2024-onward, `usaspending_recipients` is the top ~100K recipients by
-> award amount, and `gao_reports` tracks GAO's recent-items RSS window (it grows
-> as the daily job runs). Each table page notes its own scope.
+> Coverage notes: `sam_entities` covers the active public registry (~885K rows;
+> chunked ingestion walks SAM's bulk extract by `registrationDate` year window
+> across runs), `lobbying_filings` covers 2024-onward, `usaspending_recipients`
+> is the top ~100K recipients by award amount, and `gao_reports` tracks GAO's
+> recent-items RSS window (it grows as the daily job runs). Each table page
+> notes its own scope.
 
 ## How to query it
 

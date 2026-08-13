@@ -129,9 +129,11 @@ con.execute(f"""
 
 ## Comments (the large one)
 
-`comments` is tens of millions of rows and is published Hive-partitioned. For
-**counts**, read the tiny `comments_index` rollup instead of scanning the full
-table:
+`comments` is tens of millions of rows. Reading the whole thing isn't the way
+in — there are two better options depending on what you need.
+
+For **counts by agency**, read the tiny `comments_index` rollup instead of
+scanning the full table:
 
 ```python
 con.execute(f"""
@@ -139,21 +141,49 @@ con.execute(f"""
     FROM {table('comments_index')}
     GROUP BY agency_code
     ORDER BY comments DESC
-    LIMIT 10
+    LIMIT 5
 """).fetchall()
+# -> [('FWS', 2629148), ('FDA', 1801740), ('CMS', 1420828), ('EPA', 1133975), ('HHS', 1108090)]
 ```
 
-To read comment *rows*, scope tightly by the Hive partition keys
-(`agency_code`, `docket_id`, `year`, `month`) so DuckDB prunes to just the files
-you need:
+For **rows**, `comments` is also published Hive-partitioned by agency, one
+Parquet file per agency, rebuilt daily — `comments/agency/agency_code={X}/part-0.parquet`.
+Point `read_parquet` at the single file for the agency you want and filter the
+rest with a normal `WHERE`:
 
 ```python
 con.execute(f"""
     SELECT comment_id, posted_date, title
-    FROM read_parquet('{BASE}/comments/agency_code=EPA/docket_id=EPA-HQ-OAR-2021-0317/**/*.parquet')
+    FROM read_parquet('{BASE}/comments/agency/agency_code=EPA/part-0.parquet')
+    WHERE docket_id = 'EPA-HQ-OAR-2021-0317'
+    ORDER BY posted_date
     LIMIT 20
 """).fetchall()
 ```
+
+!!! warning "Wildcards don't work over this endpoint"
+    R2's public HTTP endpoint doesn't support object listing, so DuckDB has no
+    way to expand a glob like `.../agency_code=EPA/**/*.parquet` — it 404s.
+    Globs only work over `s3://` with R2 credentials (a maintainer-only path,
+    since listing needs the R2 API, not plain HTTPS). Over `https://`, always
+    give `read_parquet` one concrete file — here, that's the one file per
+    agency — and filter with `WHERE` instead of relying on path expansion.
+
+!!! note "An older, abandoned partition tree also exists"
+    R2 still has a second, older comments tree at
+    `comments/agency_code={A}/docket_id={D}/year={Y}/month={M}/part-0.parquet`.
+    It stopped being written when comments moved onto the Iceberg catalog
+    (its newest known file dates to May 2026) and it only ever carried 12
+    columns — missing `first_name`, `last_name`, `organization`, `category`,
+    `text_content`, and `text_extraction_status`. Don't build new queries
+    against it.
+
+    **`comments_index.parquet` cannot be used to enumerate it.** The index is
+    rebuilt daily from the Iceberg catalog, not from this partition tree, so
+    it now lists many `(agency_code, docket_id, year, month)` combinations
+    that describe catalog contents with no corresponding file underneath —
+    reading one of those paths 404s. `comments_index` is still the right way
+    to get **counts** (as above); it's just not a file listing for this tree.
 
 ## Other ways in
 

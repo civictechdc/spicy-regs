@@ -11,16 +11,27 @@ Usage:
 
 import argparse
 import sys
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from urllib.request import urlretrieve
-from urllib.error import URLError
 
+import httpx
 from dotenv import load_dotenv
 
 # Public URL for the R2 bucket
 PUBLIC_URL = "https://data.spicy-regs.dev"
 DATA_TYPES = ["dockets", "documents", "comments", "manifest"]
 DEFAULT_OUTPUT_DIR = Path("./spicy-regs-data")
+
+try:
+    _PACKAGE_VERSION = version("spicy-regs")
+except PackageNotFoundError:
+    _PACKAGE_VERSION = "0.0.0"
+
+# Cloudflare rejects the default `Python-urllib/*` / blank User-Agent with a 403
+# on this bucket; send an honest identifier instead (this is our own data, so
+# there's no need to spoof a browser UA the way sources/pdf.py does for
+# downloads.regulations.gov).
+DEFAULT_HEADERS = {"User-Agent": f"spicy-regs/{_PACKAGE_VERSION}"}
 
 
 def get_output_dir(args) -> Path:
@@ -41,12 +52,23 @@ def download_file(name: str, output_dir: Path, force: bool = False) -> Path | No
         return local_path
 
     print(f"  ⬇ Downloading {name}.parquet...")
+    # Stream to a sibling temp file and rename only on success. A partial write
+    # left at local_path would be indistinguishable from a complete one on the
+    # next run (the exists() check above short-circuits), silently handing back
+    # a truncated parquet — a real risk on comments.parquet at ~2.4 GB.
+    tmp_path = local_path.with_suffix(".parquet.partial")
     try:
-        urlretrieve(url, local_path)
+        with httpx.stream("GET", url, headers=DEFAULT_HEADERS, follow_redirects=True, timeout=60.0) as resp:
+            resp.raise_for_status()
+            with open(tmp_path, "wb") as f:
+                for chunk in resp.iter_bytes():
+                    f.write(chunk)
+        tmp_path.replace(local_path)
         size_mb = local_path.stat().st_size / (1024 * 1024)
         print(f"  ✓ {name}.parquet ({size_mb:.1f} MB)")
         return local_path
-    except URLError as e:
+    except (httpx.HTTPError, OSError) as e:
+        tmp_path.unlink(missing_ok=True)
         print(f"  ✗ Failed to download {name}.parquet: {e}")
         return None
 
