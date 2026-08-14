@@ -344,3 +344,125 @@ exactly this tear and converts to a pass when it closes.
 Regenerate the applicability policy against RefSpec's catalog after the
 validation-cost reset (`RefSpec/plans/validation-cost-reset-plan.md`) stops
 moving that repository; regenerating against a moving catalog re-tears it.
+
+## 9. Three document populations come home from RefSpec
+
+Landed 2026-08-14 on `integrate/payload-prereqs`. RefSpec is removing three
+Atlas units because they enumerate world-generated document populations, which
+this repository's README already claims: SpicyRegs owns source acquisition and
+source-addressable document structure. The shedding decision is REF-031 in
+`RefSpec/docs/decisions.md`; this section cites it by identifier and does not
+restate it. What follows is the SpicyRegs half — what arrived, what was built
+for it, and what it is not.
+
+### 9a. The captures, as exact publisher bytes
+
+Five files under `sample-data/document-populations/`, byte-identical to the
+captures RefSpec pinned and carrying the same digests and byte lengths:
+
+- `cbo-119congress-cost-estimates-2026-08-04.xml`, 375,365 bytes,
+  `sha256:edc957a1115320f1c0da4b02c33d1af146a3c508592ee20b4909e0a8db44d968`,
+  from `https://www.cbo.gov/rss/119congress-cost-estimates.xml` at
+  `2026-08-04T00:50:00Z`. 1,058 publications.
+- `cbo-datadome-challenge-real-capture.html`, 770 bytes,
+  `sha256:07d681cd0aa832c1132ba2b8d323693990cf27c818e8b064b0f92ebddda58e66`:
+  the DataDome edge challenge `https://www.cbo.gov/cost-estimates/xml` returns
+  in place of the feed that carries CBO's topic labels and fiscal facets.
+- `fcc-ecfs-filings-2026-08-03.json`, 51,284 bytes,
+  `sha256:4393e9c73ab5e12e25c79a707ca85856ba1d9cc1c3eccdfdfa235223f17773da`,
+  from `https://publicapi.fcc.gov/ecfs/filings?limit=25&sort=date_disseminated,DESC`
+  at `2026-08-03T19:20:00Z`. 25 filings, 40 proceeding embeddings, 15 distinct
+  proceedings.
+- `govinfo-package-summary-cfr-2023-title1-vol1-2026-08-03.json`, 1,532 bytes,
+  `sha256:705a28865a4fba746e8deb4aff05a21bbd63534201e74c5320f56d505ca3d79e`,
+  and `govinfo-premis-cfr-2023-title1-vol1-mini-2026-08-03.xml`, 4,268 bytes,
+  `sha256:afeba6d9e48f502c911ef0ec1400accdbaa5cad5d7d056672dce6a54d1326417`,
+  both at `2026-08-03T19:15:00Z`. One CFR package, and the two
+  publisher-declared SHA-256 digests its PREMIS record carries.
+
+`document-population-capture-manifest-v1.json` binds each file to its digest,
+byte length, publisher URL, and observation timestamp, the way
+`sample-data/mirrulations/document-release-file-manifest-v1.json` binds the
+checked-in Regulations.gov pair. The captures sit beside `document-files/`
+rather than inside it because they are a different kind: `document-files/`
+holds one document's renditions, these hold the listings that say which
+documents exist. That is where acquisition coverage is decided — a run cannot
+state what it missed without a publisher-issued enumeration to miss it
+against — so they land under `sample-data/` and their parsers under
+`src/spicy_regs/sources/`, not in a corpus or an evaluation tree.
+`.gitattributes` marks them `-text -whitespace`, extending the rule already
+written there for `document-files/`: a digest a test re-derives cannot survive
+git normalizing the bytes under it.
+
+The `-mini-` in the PREMIS filename is RefSpec's and RefSpec explains it
+nowhere. The file carries two file objects while the package summary lists six
+rendition roles, and GovInfo is documented as computing fixity for only some
+of a package's objects, so whether these are the whole PREMIS response or an
+excerpt is not established here. The digest pins the bytes either way; nothing
+treats the two digests as covering the package.
+
+### 9b. What was built, and what checks it
+
+`src/spicy_regs/sources/document_populations.py` verifies a capture against the
+manifest on every read and parses the CBO feed, the GovInfo package summary,
+and the GovInfo PREMIS fixity record. `proceedings_from_filings` went into
+`src/spicy_regs/sources/fcc_ecfs.py` instead, next to the ECFS knowledge it
+belongs to; the proceedings it returns feed the existing
+`build_fcc_ecfs._shape_proceeding` unchanged, so the FCC capture reaches the
+published `fcc_proceedings` column shape with no new shaping code at all.
+
+The parsing is ported from RefSpec's readers and rewritten; nothing imports
+`refspec`. The strictness is ported deliberately with it. A publisher that
+changes its field set raises rather than yielding fewer records, because an
+empty population and a refused request are indistinguishable to a lenient
+parser, and that is the failure that loses a whole population silently. The
+DataDome capture is kept as the fixture that proves the refusal: 16 tests in
+`tests/test_document_populations.py` pin the counts (1,058 / 15 / 1 package /
+2 fixity digests), the exact first CBO record, the 52 items CBO issues with an
+empty `Bill_Number`, one shaped proceeding in full, GovInfo's own
+`814758`-byte XML and `572151`-byte HTML digests, and the refusals — a
+challenge body, a DOCTYPE, a drifted item shape, a repeated publication URL, a
+conflicting proceeding identity, fixity for another package, a non-CFR
+collection. Mutating one byte of the FCC capture fails three of them.
+
+### 9c. No `cbo-publication-v1` profile, and why that is not an omission
+
+`policies/source-profile-catalog-v0.json` is generated from
+`src/spicy_regs/source_profiles.py`, and every one of its 17 profiles names a
+`sourceTable` this repository actually publishes and documents. CBO has no
+reader, no transform, no rollup pipeline, no schema, and no entry in
+`data_dictionary.TABLES`, so a `cbo-publication-v1` profile would name a table
+nothing produces.
+
+The generator refuses it outright, which is the useful part: adding the profile
+and running `tools/generate_source_profile_artifacts.py --write` fails with
+`applicability profile coverage differs; missing=['cbo-publication-v1']`. The
+entry cannot be written without also authoring a row in
+`policies/profile-resource-applicability-input-v0.json` — a claim about which
+RefSpec catalog resources CBO publications are source-natively related to, for
+which these captures are no evidence. Measured, not assumed: the profile was
+added, the generator run, and the change reverted; `policies/` and
+`source_profiles.py` are byte-identical to `HEAD`.
+
+`fcc-proceeding-v1` and `gao-report-v1` already exist and are untouched. The
+FCC capture is a real-bytes regression for a profile and a table that were
+already wired, which is why it needed no policy change to be worth landing.
+
+### 9d. What did not arrive
+
+- **The populations.** These are seed captures, not acquisitions. One CBO feed
+  file covers one Congress; one ECFS filing page names the 15 proceedings its
+  25 filings happened to touch, not ECFS's ~20,000; one GovInfo package is one
+  volume of one title of one year. `FccEcfsProceedingsReader` can already walk
+  the whole ECFS proceeding population, and `CfrSectionsReader` walks GovInfo
+  CFR granules; neither was run here. CBO has no reader at all — only the feed
+  URL, the parse, and the knowledge that `cost-estimates/xml` is walled while
+  the per-Congress files are not.
+- **Package fixity as a published fact.** The PREMIS parse yields GovInfo's own
+  digest for a rendition SpicyRegs could download, which is the check that
+  would let a CFR volume be verified against its publisher rather than against
+  ourselves. Nothing consumes it yet; `sources/cfr_sections.py` deliberately
+  reads granule metadata and not package bodies.
+- **A `cbo_publications` table.** Per 9c, that is the whole chain — reader,
+  transform, rollup, schema, dictionary entry, applicability row — and it is
+  not started.

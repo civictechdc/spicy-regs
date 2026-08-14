@@ -241,6 +241,49 @@ class _EcfsReader(Reader):
         return None
 
 
+def proceedings_from_filings(payload: dict) -> list[dict]:
+    """Derive the distinct proceedings named by one ``/filings`` response.
+
+    A filing embeds the proceedings it was filed into, so a filing page names a
+    proceeding population without a second query. Identity is the proceeding
+    ``name`` (``17-108``); the same proceeding appears on many filings, and a
+    second copy carrying a different id, description, or bureau is drift rather
+    than a second proceeding, so it raises instead of silently winning.
+
+    Records come back in the raw ECFS shape
+    :func:`~spicy_regs.transforms.build_fcc_ecfs._shape_proceeding` accepts —
+    embedded proceedings carry flat ``bureau_code`` / ``bureau_name`` where the
+    ``/proceedings`` endpoint nests them.
+    """
+    raw_filings = payload.get("filing")
+    if not isinstance(raw_filings, list):
+        raise ValueError("ECFS filings payload has no 'filing' array")
+    filings: list = raw_filings
+    proceedings: dict[str, dict] = {}
+    for ordinal, filing in enumerate(filings):
+        embedded = filing.get("proceedings") if isinstance(filing, dict) else None
+        if not isinstance(embedded, list) or not embedded:
+            raise ValueError(f"ECFS filing[{ordinal}] names no proceedings")
+        for proceeding in embedded:
+            if not isinstance(proceeding, dict):
+                raise ValueError(f"ECFS filing[{ordinal}] embeds a non-object proceeding")
+            name = str(proceeding.get("name") or "").strip()
+            if not name:
+                raise ValueError(f"ECFS filing[{ordinal}] embeds a proceeding with no name")
+            seen = proceedings.get(name)
+            if seen is None:
+                proceedings[name] = proceeding
+                continue
+            if any(seen.get(field) != proceeding.get(field) for field in _PROCEEDING_IDENTITY_FIELDS):
+                raise ValueError(f"ECFS proceeding {name!r} was embedded with conflicting identity")
+    return [proceedings[name] for name in sorted(proceedings)]
+
+
+# The fields that make an embedded proceeding the same proceeding. A filing
+# repeats the whole record, so a disagreement here is publisher drift.
+_PROCEEDING_IDENTITY_FIELDS = ("id_proceeding", "description", "bureau_code", "bureau_name")
+
+
 class FccEcfsProceedingsReader(_EcfsReader):
     """Yields raw ECFS proceeding dicts created in ``[since, until]`` (inclusive).
 

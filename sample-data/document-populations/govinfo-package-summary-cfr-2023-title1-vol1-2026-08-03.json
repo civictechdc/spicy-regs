@@ -1,0 +1,34 @@
+{
+    "dateIssued": "2023-01-01",
+    "documentType": "CFR",
+    "partRange": {
+        "from": "1",
+        "to": "603"
+    },
+    "packageId": "CFR-2023-title1-vol1",
+    "collectionCode": "CFR",
+    "detailsLink": "https://www.govinfo.gov/app/details/CFR-2023-title1-vol1",
+    "title": "General Provisions",
+    "branch": "executive",
+    "collectionName": "Code of Federal Regulations (annual edition)",
+    "download": {
+        "premisLink": "https://api.govinfo.gov/packages/CFR-2023-title1-vol1/premis",
+        "xmlLink": "https://api.govinfo.gov/packages/CFR-2023-title1-vol1/xml",
+        "txtLink": "https://api.govinfo.gov/packages/CFR-2023-title1-vol1/htm",
+        "zipLink": "https://api.govinfo.gov/packages/CFR-2023-title1-vol1/zip",
+        "modsLink": "https://api.govinfo.gov/packages/CFR-2023-title1-vol1/mods",
+        "pdfLink": "https://api.govinfo.gov/packages/CFR-2023-title1-vol1/pdf"
+    },
+    "pages": "175",
+    "governmentAuthor2": "Office of the Federal Register",
+    "titleNumber": "1",
+    "governmentAuthor1": "National Archives and Records Administration",
+    "publisher": "Office of the Federal Register, National Archives and Records Administration",
+    "volumeCount": "1",
+    "suDocClassNumber": "AE 2.106/3:1/",
+    "docClass": "CFR",
+    "lastModified": "2025-05-21T06:24:19Z",
+    "category": "Regulatory Information",
+    "otherIdentifier": {"migrated-doc-id": "1CFR"},
+    "granulesLink": "https://api.govinfo.gov/packages/CFR-2023-title1-vol1/granules?offsetMark=*&pageSize=100"
+}

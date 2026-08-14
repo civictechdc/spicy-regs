@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<premis xmlns="info:lc/xmlns/premis-v2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="info:lc/xmlns/premis-v2 http://www.loc.gov/standards/premis/v2/premis-v2-0.xsd" version="2.0">
+        <object xsi:type="file">
+        <objectIdentifier>
+            <objectIdentifierType>FDsys ACP</objectIdentifierType>
+            <objectIdentifierValue>D09002ee1c7456565</objectIdentifierValue>
+        </objectIdentifier>
+        <objectCharacteristics>
+            <compositionLevel>0</compositionLevel>
+            <fixity>
+                <messageDigestAlgorithm>SHA-256</messageDigestAlgorithm>
+                <messageDigest>7321767f07828dc822e81e9806a33280cb2860d4281ac91f1bc79439b1cfcb33</messageDigest>
+                <messageDigestOriginator>FDsys</messageDigestOriginator>
+            </fixity>
+            <size>572151</size>
+            <format>
+                <formatDesignation>
+                    <formatName>text/html</formatName>
+                </formatDesignation>
+                <formatRegistry>
+                    <formatRegistryName>PRONOM</formatRegistryName>
+                    <formatRegistryKey>fmt/96</formatRegistryKey>
+                </formatRegistry>
+                <formatNote>Hypertext Markup Language</formatNote>
+            </format>
+        </objectCharacteristics>
+        <originalName>CFR-2023-title1-vol1.htm</originalName>
+        <storage>
+            <contentLocation>
+                <contentLocationType>URI</contentLocationType>
+                <contentLocationValue>Public Access Rendition https://www.govinfo.gov/content/pkg/CFR-2023-title1-vol1/html/CFR-2023-title1-vol1.htm</contentLocationValue>
+            </contentLocation>
+            <storageMedium>hard disk</storageMedium>
+        </storage>
+        <relationship>
+            <relationshipType>structural</relationshipType>
+            <relationshipSubType>is part of</relationshipSubType><relatedObjectIdentification>
+                <relatedObjectIdentifierType>FDsys ACP</relatedObjectIdentifierType>
+                <relatedObjectIdentifierValue>R0b002ee1c745977c</relatedObjectIdentifierValue>
+            </relatedObjectIdentification>
+        </relationship>
+    </object>
+    <object xsi:type="file">
+        <objectIdentifier>
+            <objectIdentifierType>FDsys ACP</objectIdentifierType>
+            <objectIdentifierValue>D09002ee1c7456569</objectIdentifierValue>
+        </objectIdentifier>
+        <objectCharacteristics>
+            <compositionLevel>0</compositionLevel>
+            <fixity>
+                <messageDigestAlgorithm>SHA-256</messageDigestAlgorithm>
+                <messageDigest>933d9cf35c4342d4d55cd4dc771a73b46a0c8f88423b935da470ad5862d13e0d</messageDigest>
+                <messageDigestOriginator>FDsys</messageDigestOriginator>
+            </fixity>
+            <size>814758</size>
+            <format>
+                <formatDesignation>
+                    <formatName>text/xml</formatName>
+                </formatDesignation>
+                <formatRegistry>
+                    <formatRegistryName>PRONOM</formatRegistryName>
+                    <formatRegistryKey>fmt/101</formatRegistryKey>
+                </formatRegistry>
+                <formatNote>Extensible Markup Language</formatNote>
+            </format>
+        </objectCharacteristics>
+        <originalName>CFR-2023-title1-vol1.xml</originalName>
+        <storage>
+            <contentLocation>
+                <contentLocationType>URI</contentLocationType>
+                <contentLocationValue>Public Access Rendition https://www.govinfo.gov/content/pkg/CFR-2023-title1-vol1/xml/CFR-2023-title1-vol1.xml</contentLocationValue>
+            </contentLocation>
+            <storageMedium>hard disk</storageMedium>
+        </storage>
+        <relationship>
+            <relationshipType>structural</relationshipType>
+            <relationshipSubType>is part of</relationshipSubType><relatedObjectIdentification>
+                <relatedObjectIdentifierType>FDsys ACP</relatedObjectIdentifierType>
+                <relatedObjectIdentifierValue>R0b002ee1c745977f</relatedObjectIdentifierValue>
+            </relatedObjectIdentification>
+        </relationship>
+    </object>
+</premis>

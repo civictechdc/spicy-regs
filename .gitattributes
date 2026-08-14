@@ -1,3 +1,9 @@
 # Captured source fixtures are byte-pinned; do not rewrite publisher whitespace.
 sample-data/document-files/*.html -whitespace
 sample-data/document-files/*.xml -whitespace
+
+# Document-population captures are pinned to publisher digests a test re-derives,
+# so git must not normalize their line endings either.
+sample-data/document-populations/*.html -text -whitespace
+sample-data/document-populations/*.json -text -whitespace
+sample-data/document-populations/*.xml -text -whitespace

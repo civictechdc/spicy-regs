@@ -1,0 +1,76 @@
+{
+  "captures": [
+    {
+      "byte_length": 375365,
+      "bytes_digest": "sha256:edc957a1115320f1c0da4b02c33d1af146a3c508592ee20b4909e0a8db44d968",
+      "key": "cbo-119th-congress-publications",
+      "media_type": "application/xml",
+      "observation_basis": "publisher-capture",
+      "observed_at": "2026-08-04T00:50:00Z",
+      "path": "cbo-119congress-cost-estimates-2026-08-04.xml",
+      "population": "CBO publications issued for the 119th Congress",
+      "publisher": "cbo",
+      "record_count": 1058,
+      "role": "population-listing",
+      "source_url": "https://www.cbo.gov/rss/119congress-cost-estimates.xml"
+    },
+    {
+      "byte_length": 770,
+      "bytes_digest": "sha256:07d681cd0aa832c1132ba2b8d323693990cf27c818e8b064b0f92ebddda58e66",
+      "key": "cbo-cost-estimates-datadome-challenge",
+      "media_type": "text/html",
+      "observation_basis": "repository-import",
+      "observed_at": "2026-08-03",
+      "path": "cbo-datadome-challenge-real-capture.html",
+      "population": "CBO cost estimates, refused at the edge",
+      "publisher": "cbo",
+      "role": "publisher-refusal",
+      "source_url": "https://www.cbo.gov/cost-estimates/xml"
+    },
+    {
+      "byte_length": 51284,
+      "bytes_digest": "sha256:4393e9c73ab5e12e25c79a707ca85856ba1d9cc1c3eccdfdfa235223f17773da",
+      "key": "fcc-ecfs-proceedings",
+      "media_type": "application/json",
+      "observation_basis": "publisher-capture",
+      "observed_at": "2026-08-03T19:20:00Z",
+      "path": "fcc-ecfs-filings-2026-08-03.json",
+      "population": "FCC ECFS proceedings named by one filing-search page",
+      "publisher": "fcc-ecfs",
+      "record_count": 15,
+      "role": "population-listing",
+      "source_url": "https://publicapi.fcc.gov/ecfs/filings?limit=25&sort=date_disseminated,DESC"
+    },
+    {
+      "byte_length": 1532,
+      "bytes_digest": "sha256:705a28865a4fba746e8deb4aff05a21bbd63534201e74c5320f56d505ca3d79e",
+      "key": "govinfo-cfr-package-summary",
+      "media_type": "application/json",
+      "observation_basis": "publisher-capture",
+      "observed_at": "2026-08-03T19:15:00Z",
+      "path": "govinfo-package-summary-cfr-2023-title1-vol1-2026-08-03.json",
+      "population": "GovInfo CFR package CFR-2023-title1-vol1",
+      "publisher": "govinfo",
+      "record_count": 1,
+      "role": "population-listing",
+      "source_url": "https://api.govinfo.gov/packages/CFR-2023-title1-vol1/summary"
+    },
+    {
+      "byte_length": 4268,
+      "bytes_digest": "sha256:afeba6d9e48f502c911ef0ec1400accdbaa5cad5d7d056672dce6a54d1326417",
+      "key": "govinfo-cfr-package-fixity",
+      "media_type": "application/xml",
+      "observation_basis": "publisher-capture",
+      "observed_at": "2026-08-03T19:15:00Z",
+      "path": "govinfo-premis-cfr-2023-title1-vol1-mini-2026-08-03.xml",
+      "population": "PREMIS file fixity for GovInfo CFR package CFR-2023-title1-vol1",
+      "publisher": "govinfo",
+      "record_count": 2,
+      "role": "package-fixity",
+      "source_url": "https://api.govinfo.gov/packages/CFR-2023-title1-vol1/premis"
+    }
+  ],
+  "format_version": "spicyregs-document-populations/v1",
+  "manifest_id": "refspec-atlas-population-handoff-v1",
+  "released_at": "2026-08-14T00:00:00Z"
+}
