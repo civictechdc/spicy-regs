@@ -307,3 +307,98 @@ def test_connect_queries_r2_end_to_end():
         )
     )
     assert result is not None
+
+
+# --- connection caching ------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _clear_connection_cache():
+    """Keep the module-level connection cache from leaking across tests."""
+    mcp_server._reset_connection_cache()
+    yield
+    mcp_server._reset_connection_cache()
+
+
+def _make_local_connection(monkeypatch, module) -> duckdb.DuckDBPyConnection:
+    """Force ``_build_connection`` to hand back a bare in-memory DuckDB.
+
+    Keeps these tests hermetic: no httpfs, no R2, no catalog — just enough of a
+    connection to prove the caching, cursor-isolation, and TTL logic wrapping it.
+    """
+    build_count = {"n": 0}
+
+    def _fake_build() -> duckdb.DuckDBPyConnection:
+        build_count["n"] += 1
+        con = duckdb.connect()
+        con.execute("CREATE TABLE agency_stats AS SELECT 1 AS docket_count")
+        return con
+
+    monkeypatch.setattr(module, "_build_connection", _fake_build)
+    return build_count
+
+
+@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
+def test_get_connection_reuses_within_ttl(module_name, monkeypatch):
+    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+    module._reset_connection_cache()
+    build_count = _make_local_connection(monkeypatch, module)
+
+    first = module._get_connection()
+    second = module._get_connection()
+
+    assert first is second
+    assert build_count["n"] == 1
+    module._reset_connection_cache()
+
+
+@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
+def test_get_connection_rebuilds_past_ttl(module_name, monkeypatch):
+    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+    module._reset_connection_cache()
+    build_count = _make_local_connection(monkeypatch, module)
+    # A zero TTL forces every call to treat the cache as expired.
+    monkeypatch.setattr(module, "_CONNECTION_TTL_SECONDS", 0.0)
+
+    module._get_connection()
+    module._get_connection()
+
+    assert build_count["n"] == 2
+    module._reset_connection_cache()
+
+
+def test_cursor_from_cached_connection_survives_rebuild(monkeypatch):
+    """A cursor taken before a TTL rebuild must keep serving its query.
+
+    This is the safety property the rebuild relies on: swapping the cached
+    connection only drops the module's reference, so an in-flight request's
+    cursor (which still references the old connection) is never closed.
+    """
+    module = mcp_server
+    module._reset_connection_cache()
+    _make_local_connection(monkeypatch, module)
+    monkeypatch.setattr(module, "_CONNECTION_TTL_SECONDS", 0.0)
+
+    old_cursor = module._get_connection().cursor()
+    module._get_connection()  # TTL expired -> builds and caches a new connection
+
+    # The old cursor's parent is no longer referenced by the module, but the
+    # cursor holds it alive and still answers.
+    assert old_cursor.execute("SELECT docket_count FROM agency_stats").fetchone() == (1,)
+    module._reset_connection_cache()
+
+
+def test_query_sql_reuses_one_connection_across_calls(monkeypatch):
+    """Two ``query_sql`` calls should build the backing connection once."""
+    module = mcp_server
+    module._reset_connection_cache()
+    build_count = _make_local_connection(monkeypatch, module)
+    server = module.build_server()
+
+    for _ in range(2):
+        asyncio.run(
+            server.call_tool("query_sql", {"sql": "SELECT docket_count FROM agency_stats", "max_rows": 1})
+        )
+
+    assert build_count["n"] == 1
+    module._reset_connection_cache()
