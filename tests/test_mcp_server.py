@@ -163,7 +163,7 @@ def test_resolve_catalog_config_rejects_injection(module_name, monkeypatch):
 # both shipped runtime crashes lived (the bogus ``statement_timeout`` SET and
 # the spill-to-disabled-LocalFileSystem error). They are hermetic: the sandbox
 # is applied to a plain in-memory connection, so no httpfs install or network
-# is needed. The live ``_connect`` + R2 path is covered by the integration test
+# is needed. The live ``_build_connection`` + R2 path is covered by the integration test
 # below.
 
 
@@ -247,7 +247,7 @@ def test_comments_catalog_view_dedups_on_read():
     The R2 Data Catalog can physically carry duplicate comment_id rows: the ETL
     upsert removes superseded rows with a plain ``DELETE``, which does not reliably
     take on the catalog, so a re-merged comment_id can leave its old row behind.
-    ``_connect`` wraps the catalog table in a per-comment_id QUALIFY so the read
+    ``_build_connection`` wraps the catalog table in a per-comment_id QUALIFY so the read
     surface stays single-valued regardless. This locks in that dedup expression:
     the newest ``modify_date`` wins, exactly one row survives per id, and
     non-duplicated ids are untouched — which is also the ``count(*) ==
@@ -265,7 +265,7 @@ def test_comments_catalog_view_dedups_on_read():
             ('c3', '2024-05-01', 'unique');
         """
     )
-    # The exact dedup wrapper used by the catalog `comments` view in `_connect`.
+    # The exact dedup wrapper used by the catalog `comments` view in `_build_connection`.
     con.execute(
         "CREATE VIEW comments AS SELECT * FROM raw "
         "QUALIFY ROW_NUMBER() OVER "
@@ -283,7 +283,7 @@ def test_comments_catalog_view_dedups_on_read():
 
 @pytest.mark.integration
 def test_connect_queries_r2_end_to_end():
-    """Live: the real ``_connect`` (httpfs + R2 views) serves the MCP tools.
+    """Live: the real ``_build_connection`` (httpfs + R2 views) serves the MCP tools.
 
     Covers the full path the hermetic tests cannot — httpfs install, the R2
     parquet views, and a spilling aggregation over real data — asserting none
@@ -320,11 +320,13 @@ def _clear_connection_cache():
     mcp_server._reset_connection_cache()
 
 
-def _make_local_connection(monkeypatch, module) -> duckdb.DuckDBPyConnection:
+def _make_local_connection(monkeypatch, module) -> dict[str, int]:
     """Force ``_build_connection`` to hand back a bare in-memory DuckDB.
 
     Keeps these tests hermetic: no httpfs, no R2, no catalog — just enough of a
     connection to prove the caching, cursor-isolation, and TTL logic wrapping it.
+    Returns a ``{"n": build_count}`` dict so callers can assert how many times
+    the (patched) builder actually ran.
     """
     build_count = {"n": 0}
 
