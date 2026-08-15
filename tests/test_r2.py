@@ -50,3 +50,52 @@ def test_upload_comment_partitions_uploads_changed_and_index(
 
     assert (changed, str(changed.relative_to(tmp_path))) in uploaded
     assert (tmp_path / "comments_index.parquet", "comments_index.parquet") in uploaded
+
+
+def _upload_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Minimal R2 env so upload_file runs its body (isolate_env strips these)."""
+    monkeypatch.setenv("R2_ACCESS_KEY_ID", "k")
+    monkeypatch.setenv("R2_SECRET_ACCESS_KEY", "s")
+    monkeypatch.setenv("R2_BUCKET_NAME", "spicy-regs")
+    monkeypatch.setenv("R2_PUBLIC_URL", "https://data.spicy-regs.dev")
+
+
+def test_upload_file_purges_exact_object_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """After a successful upload, the edge cache is purged for that one URL."""
+    _upload_env(monkeypatch)
+    (tmp_path / "agency_stats.parquet").write_bytes(b"x" * 100)
+
+    monkeypatch.setattr(r2, "get_r2_client", lambda: __import__("unittest.mock", fromlist=["MagicMock"]).MagicMock())
+    monkeypatch.setattr(r2, "_get_remote_size", lambda *a, **k: None)
+    purged: list[list[str]] = []
+    monkeypatch.setattr(r2, "purge_urls", lambda urls: purged.append(urls))
+
+    r2.upload_file(tmp_path / "agency_stats.parquet")
+
+    assert purged == [["https://data.spicy-regs.dev/agency_stats.parquet"]]
+
+
+def test_upload_file_survives_unreachable_edge(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """End-to-end: a dead Cloudflare edge must not fail a successful publish.
+
+    Uses the real ``purge_urls`` (creds set) with ``httpx.post`` raising, so this
+    exercises the actual composition rather than a mock — the property that
+    matters is that the ETL never dies because the cache couldn't be purged.
+    """
+    _upload_env(monkeypatch)
+    monkeypatch.setenv("CLOUDFLARE_API_TOKEN", "tok")
+    monkeypatch.setenv("CLOUDFLARE_ZONE_ID", "zone")
+    (tmp_path / "agency_stats.parquet").write_bytes(b"x" * 100)
+
+    monkeypatch.setattr(r2, "get_r2_client", lambda: __import__("unittest.mock", fromlist=["MagicMock"]).MagicMock())
+    monkeypatch.setattr(r2, "_get_remote_size", lambda *a, **k: None)
+
+    import httpx
+
+    def _raise(*a, **k):
+        raise httpx.ConnectError("edge down")
+
+    monkeypatch.setattr(httpx, "post", _raise)
+
+    # Must complete normally despite the purge failing underneath.
+    r2.upload_file(tmp_path / "agency_stats.parquet")

@@ -53,7 +53,9 @@ class TestUploadShrinkGuard:
         upload_to_r2(local)
         assert len(uploads) == 1
 
-    def test_parquet_upload_requires_cache_revalidation(self, tmp_path, monkeypatch):
+    def test_parquet_upload_is_cacheable(self, tmp_path, monkeypatch):
+        """Parquet is now cacheable — freshness comes from purge-on-publish, with
+        the max-age as a self-healing backstop (see sources/cloudflare.py)."""
         self._setup_env(monkeypatch)
         _, uploads = self._mock_r2_client(monkeypatch, remote_size=None)
         local = tmp_path / "rollup.parquet"
@@ -61,7 +63,7 @@ class TestUploadShrinkGuard:
 
         upload_to_r2(local)
 
-        assert uploads[0][2]["CacheControl"] == "public, no-cache, must-revalidate"
+        assert uploads[0][2]["CacheControl"] == "public, max-age=3600"
 
     def test_cache_control_env_override_wins(self, tmp_path, monkeypatch):
         self._setup_env(monkeypatch)

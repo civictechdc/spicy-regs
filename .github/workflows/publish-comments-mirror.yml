@@ -62,6 +62,9 @@ jobs:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          # Cloudflare edge-cache purge after publish (best-effort; no-op if unset).
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
           # Bypass r2's byte-size shrink guard: re-exporting from the catalog
           # re-sorts + re-compresses the data, so a partition can be several times
           # smaller on disk while holding *more* rows (verified: ACF 19.7 MB -> 6.0 MB

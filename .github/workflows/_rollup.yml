@@ -71,6 +71,9 @@ jobs:
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          # Cloudflare edge-cache purge after publish (best-effort; no-op if unset).
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
           DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
           # SAM.gov Entity API key. Unlike the generic DATA_GOV_API_KEY, SAM
           # requires a key provisioned by a SAM.gov account (api.data.gov-backed);
