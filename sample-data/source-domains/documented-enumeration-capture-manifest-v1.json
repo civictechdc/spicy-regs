@@ -1,0 +1,29 @@
+{
+  "captures": [
+    {
+      "byte_length": 60826,
+      "bytes_digest": "sha256:be43c866f5ca424a456bde36ea03cb9326c454ef4e1894a13df80b6dc6e22488",
+      "key": "regulations-gov-openapi-v4",
+      "media_type": "application/yaml",
+      "observed_at": "2026-08-03T19:13:12Z",
+      "path": "regulations-gov-openapi-v4-2026-08-03.yaml",
+      "publisher": "regulations-gov",
+      "publisher_revision": "2026-07-02T21:13:41Z",
+      "source_url": "https://open.gsa.gov/api/regulationsgov/v4/openapi.yaml",
+      "states": "the regulations.gov API v4 schema enums for documentType, docketType and submitterType"
+    },
+    {
+      "byte_length": 22730,
+      "bytes_digest": "sha256:94fdcf4b382830cc44b9956c00439dc20a9643de402c298cee71293a14153b24",
+      "key": "reginfo-rin-data-xsd",
+      "media_type": "application/xml",
+      "observed_at": "2026-08-03T19:15:15Z",
+      "path": "reginfo-rin-data-ver10262011.xsd",
+      "publisher": "reginfo-gov",
+      "publisher_revision": "Ver10262011",
+      "source_url": "https://www.reginfo.gov/public/xml/REGINFO_XML_Ver10262011.xsd",
+      "states": "the Unified Agenda RIN-data element list, whose controlled domains live in xs:documentation prose rather than xs:enumeration"
+    }
+  ],
+  "format_version": "spicyregs-source-domains/capture-v1"
+}

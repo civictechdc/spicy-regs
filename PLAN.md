@@ -466,3 +466,265 @@ already wired, which is why it needed no policy change to be worth landing.
 - **A `cbo_publications` table.** Per 9c, that is the whole chain — reader,
   transform, rollup, schema, dictionary entry, applicability row — and it is
   not started.
+
+## 10. Documented enumerations become a gate here
+
+Landed 2026-08-14 on `integrate/payload-prereqs`. RefSpec is removing ~29
+"observed inventory" Atlas units, the largest being the 14-unit
+`regulatory-native-*` family, which was distinct-value scans over four of this
+repository's published Parquet tables. The shedding decision is REF-032 in
+`RefSpec/docs/decisions.md`; this section cites it by identifier and does not
+restate it.
+
+Unlike section 9, almost nothing needed porting: the scanned data is already
+ours, and `agency_stats` already publishes the agency-code inventories two of
+those units enumerated. One thing was not already ours, and it is the only thing
+those inventories ever produced that was worth keeping — the *comparison*. A
+distinct-value scan is trivia until it is set beside what the publisher said the
+values would be; then it is the difference between an enumeration and a claim.
+Nothing in either repository ran that comparison. It runs here now.
+
+### 10a. The check
+
+`tools/check_source_domain_drift.py` diffs the value list a publisher documents
+for a column against the values that column actually carries, in both
+directions, for six columns of three published tables. It is a gate: exit 1 when
+either direction produces something unrecorded.
+
+**The documented half is parsed, not transcribed.** Two publisher documents are
+checked in under `sample-data/source-domains/`, byte-identical to the captures
+RefSpec pinned and carrying the same digests and byte lengths, bound to their
+publisher URL and observation time by
+`documented-enumeration-capture-manifest-v1.json` the way section 9a's captures
+are bound:
+
+- `regulations-gov-openapi-v4-2026-08-03.yaml`, 60,826 bytes,
+  `sha256:be43c866f5ca424a456bde36ea03cb9326c454ef4e1894a13df80b6dc6e22488`,
+  from `https://open.gsa.gov/api/regulationsgov/v4/openapi.yaml` at
+  `2026-08-03T19:13:12Z`. Its `components.schemas.DocumentType.enum` (lines
+  893-898) and `.DocketType.enum` (lines 902-904) are the only closed lists in
+  it that govern a column we publish.
+- `reginfo-rin-data-ver10262011.xsd`, 22,730 bytes,
+  `sha256:94fdcf4b382830cc44b9956c00439dc20a9643de402c298cee71293a14153b24`,
+  from `https://www.reginfo.gov/public/xml/REGINFO_XML_Ver10262011.xsd` at
+  `2026-08-03T19:15:15Z`. Four `xs:documentation` sentences —
+  `PRIORITY_CATEGORY` (line 50), `RIN_STATUS` (line 58), `RULE_STAGE` (line 66),
+  `MAJOR` (line 74).
+
+`src/spicy_regs/sources/source_domains.py` re-verifies both digests on every
+read and parses the values out of the bytes each run, with the value count and
+the raw option count pinned per domain. A hand-typed list rots silently; a parse
+against a pinned digest cannot, and re-pinning a fresher capture makes the
+publisher's own change show up as a test failure rather than as nothing.
+
+Worth stating plainly, because it is what makes the reginfo half prose rather
+than schema: **the XSD contains no `xs:enumeration` anywhere.** Every one of
+those fields is declared `<xs:restriction base="xs:string"/>` with no facets.
+The controlled list exists only in a sentence, which the parser reads and
+refuses if it does not recognise. The publisher's prose also repeats itself —
+`PRIORITY_CATEGORY` lists `Not Major` twice — so a literal duplicate is folded
+into one value and the raw count is kept beside the distinct one.
+
+**The observed half is a derived summary with its own provenance.**
+`observed-domain-snapshot-2026-08-03.json` is 3,733 bytes and holds, per column,
+the distinct values with row support, the null count, and the table's row count.
+It names its inputs by digest: `dockets.parquet`
+(`sha256:b14cd488…`, 276,326 rows), `documents.parquet` (`sha256:bb42f79e…`,
+1,990,136 rows) and `unified_agenda.parquet` (`sha256:e6862d5d…`, 3,954 rows),
+all from `https://r2.spicy-regs.dev/` at producer revision `f1fcb8c9c883` —
+this repository's own `origin/main` per section 2. Those three tables are 70 MB
+and are not checked in; that is the whole reason a 3.7 KB summary of their
+2,270,416 rows exists. The tool regenerates it from any directory of published
+Parquet with `--observe --write-snapshot`, so the code that writes the fixture
+is the code that checks it, and `--write-snapshot` refuses to run without an
+observation timestamp and a producer revision.
+
+**Two directions, because they mean different things.** An *undocumented* value
+says the publisher's documentation is incomplete, and a consumer that switches
+on it mishandles those rows. An *unobserved* value says either the snapshot is
+bounded — one semiannual agenda edition need not exercise every documented stage
+— or the publisher retired a value without saying so. Neither is automatically
+an error and neither is automatically fine, so both are carried in
+`ACCEPTED_DOMAIN_FINDINGS`, closed in both directions in the shape
+`tests/test_docpipeline_retrieval_migration.py:_assert_ledger_exact` already
+uses: an unrecorded finding fails, and a recorded finding the data stopped
+producing fails just as hard, because an exception nothing exercises is a claim
+nobody checked.
+
+`tests/test_source_domain_drift.py` runs it in the default suite — 29 tests,
+1.0s, no network and no Parquet. Eighteen assert the check and the publisher
+facts it rests on; eleven break an input and require it to fire. Adding one
+undocumented value to the committed
+snapshot fails seven of them and takes the tool to exit 1 with
+`regulations-gov-docket-type undocumented-value 'Rulemaking - Legacy' is not in
+ACCEPTED_DOMAIN_FINDINGS`. Changing one byte of the OpenAPI capture fails
+earlier still, at the digest.
+
+**What is deliberately out of scope, so the six are a decision and not an
+accident.** `submitterType` (OpenAPI lines 905-911) governs `comments.category`,
+and the snapshot the observed half is drawn from carries no comments table; a
+documented domain with nothing to observe is not a check. `TTBL_ACTION` (XSD
+line 443) documents 34 timetable actions, but the same snapshot's
+`timetable_json` carries 1,139 distinct actions over 10,533 entries — the
+publisher's own data treats that field as free text, and a gate against its list
+would report a thousand findings and gate nothing.
+`federal_register.document_type` is absent for a third reason: no pinned
+publisher document states its list, and a domain nobody published is not a
+documented domain.
+
+### 10b. The findings
+
+Seven findings over six columns; two columns agree completely, which matters,
+because a check that only ever finds drift is not a check.
+
+**`Public Submission` — undocumented, 373 rows.** regulations.gov returns this
+`documentType` on 373 of 1,990,136 document rows and labels it in its own web
+UI, but the pinned v4 OpenAPI `DocumentType` enum lists five values and does not
+include it: `Notice`, `Rule`, `Proposed Rule`, `Supporting & Related Material`,
+`Other`. "Public Submission" appears nowhere in the 60 KB document. The
+documentation is incomplete; the data is not wrong. This is the finding
+RefSpec's inventory produced and the reason the comparison was worth keeping.
+
+**`No Stage` and `Not Major` — documented, unobserved.** Agenda edition 202510
+is the only edition in the snapshot, and it carries five of the six documented
+`RULE_STAGE` values and five of the six documented `PRIORITY_CATEGORY` values.
+The absences are edition-boundedness, not retired values: an edition states the
+stages its 3,954 RINs are in, and `unified_agenda` is keyed `(rin,
+agenda_edition)` and accumulates editions, so this is a fact about the snapshot
+rather than about the publisher. Recorded rather than ignored so that a *second*
+edition landing without them would be visible.
+
+**`rin_status` case drift — undocumented, 3,954 rows, and new here.** Not one of
+RefSpec's findings; the check found it on its first run. The XSD documents
+`"First time published in the Unified Agenda"` and `"Previously published in the
+Unified Agenda"`. Every row carries the title-cased forms — `First Time
+Published in The Unified Agenda` (1,119 rows) and `Previously Published in The
+Unified Agenda` (2,835). Same values, different bytes, on the whole column: a
+consumer built by copying the schema documentation matches no row at all. It is
+recorded
+in all four directions — two undocumented, two unobserved — because that is what
+the data says.
+
+**Two column descriptions are wrong, and this is how we know.**
+`data_dictionary/descriptions.yaml:236` says `rin_status` is
+"e.g. `Active`, `Completed`, `Long-Term`". None of those three strings occurs in
+the column, in the XSD, or anywhere in the reginfo export. Line 240 says `major`
+is "e.g. `Yes`/`No`. Often null" — the column is `Undetermined` on 865 of 3,954
+rows (22%) and null on none. Recorded, not fixed: the dictionary's prose is not
+what this gate is for, and correcting it pulls in a regeneration of
+`docs/tables/*.md` that belongs to its own change. It is here because it is the
+clearest evidence that the comparison earns its keep — nothing else in the tree
+would have caught it.
+
+**715 unresolved agency names in `federal_register.agencies_json` — a defect.**
+This is what RefSpec's deleted "unresolved-agency-name" unit was looking at, and
+it is a real data-quality defect rather than a vocabulary.
+
+The evidence, from `federal_register.parquet` at `sha256:702018767f73b914…`
+(800,619 rows): the column holds 1,289,014 agency entries, of which 22,181 carry
+no `slug`, spanning 715 distinct `raw_name` values. Every unresolved entry
+carries **only** `raw_name` — no `name`, no `id`, no `url`, no `parent_id` — so
+federalregister.gov itself did not resolve the printed agency heading to an
+agency record and returned the heading text alone. What lands in the column is
+therefore what was printed at the top of the document, and a large minority of
+it is not an agency name at all:
+
+- 44 distinct values carry a stray `]`, the tail of a bracketed docket line:
+  `Docket No. FR-4675-N-01]`, `EPA-HQ-OAR-2016-0546; FRL-9969-55-OAR]`,
+  `Investigation No. 337-TA-1096]`, `OMB 3060-0760]`.
+- 3 are CFR citations: `44 CFR Part 64` (document `2011-15520`),
+  `Coast Guard CFR 33 CFR 165` (`03-14022`),
+  `National Oceanic and Atmospheric Administration 50 CFR Parts 223 and 224`.
+- 41 are longer than 80 characters and are plainly document titles: *"Vermont
+  Yankee Nuclear Power Corporation; Notice of Consideration of Issuance of
+  Amendment to Facility Operating License…"* at 212 characters.
+- 1 is the bare word `Rule`, on three documents (`00-3`, `00-7`, `00-53`).
+- Some are simply the publisher's typos: `DEPARTMENT OF HOUSING AND URBAN
+  DEVELPMENT`.
+
+Where it enters, on our side: `transforms/build_federal_register.py:92` stores
+the API's `agencies` array verbatim (`json.dumps(agencies)`) and `:82` builds
+`agency_slugs` as `",".join(a["slug"] for a in agencies if … a.get("slug"))` —
+which drops every unresolved entry without a word. So the residue is upstream
+(FR's own parse of the printed heading) but the *defect here* is that we
+propagate it unvalidated and then discard it silently: 95 documents have a
+non-empty `agencies_json` and a NULL `agency_slugs`, and are invisible to every
+agency-faceted consumer with nothing recording that they were dropped.
+
+Fixing the ingestion is out of scope for this landing. It is named here as a
+defect with its evidence: a `raw_name` that resolves to nothing is a parse
+residue, not an agency, and the transform should say so — quarantine it the way
+`tools/build_agency_crosswalk_artifact.py` already quarantines malformed
+crosswalk rows — rather than let it vanish into a dropped join.
+
+**The agency-code inventories were already ours.** RefSpec's
+`regulatory-native-regulations-gov-document-agency-code`,
+`…-docket-agency-code` and `…-unified-agenda-agency-code` units enumerated
+distinct `agency_code` values from tables this repository publishes.
+`agency_stats` is that inventory with support attached: one row per agency code,
+built as the `UNION` of distinct `agency_code` across `dockets`, `documents` and
+`comments_index` (`transforms/build_agency_stats.py:46-97`), carrying
+`docket_count`, `document_count` and `comment_count`. It is a published table,
+MCP-queryable, documented at `docs/tables/agency_stats.md`, and refreshed by its
+own rollup workflow. Nothing was lost and nothing needed porting.
+
+### 10c. GAO: nothing lands now
+
+RefSpec is also removing its GAO product-topic observation and the report
+witness. The decision here is (ii) — record that `gao-report-v1` covers the
+document class, and let the topic observation arrive when the pipeline actually
+ingests GAO products. Nothing is ported.
+
+The reasoning is the "structure must earn its keep" test, and GAO fails it three
+ways at once:
+
+- **Nothing here would consume it.** `gao_reports.parquet` already carries a
+  `topics_json` column, and it is `[]` on every row *by design*: the RSS feed at
+  `https://www.gao.gov/rss/reports.xml` is the only anonymously machine-readable
+  GAO surface and it carries no topic tags
+  (`transforms/build_gao_reports.py:18-21`). A parser for a product page's
+  Topics field would populate nothing, because no product page ever reaches it.
+- **There is no acquisition path to feed it.** RefSpec's
+  `registry/gao_topics.py` parses one already-captured product page and states
+  that unattended live acquisition still needs an injected Zyte-backed proxy
+  fetcher, because gao.gov's Akamai edge returns "Access Denied" to a plain
+  client. This repository has no Zyte transport — `grep -ri zyte src/ tools/
+  tests/ pyproject.toml` returns nothing — and `sources/gao_reports.py` already
+  documents GAO's sitemap, product JSON and search endpoints as bot-blocked. A
+  ported parser would be a parser with one 2026-08-04 capture and no way to get
+  a second.
+- **The observation is capture-local by RefSpec's own account.** Every GAO topic
+  observation carries an empty `identifiers` list, because gao.gov links an
+  assigned topic only to a navigational `/topics/<slug>` page and publishes no
+  stable topic code or IRI, and the 1998 GAO Thesaurus that once assigned codes
+  is retired. There is no publisher identifier to port.
+
+So the honest statement is the small one: `gao-report-v1` in
+`source_profiles.py` covers the GAO product as a document class and is
+untouched; `topics_json` stays reserved and empty; and the topic observation is
+worth building on the day a GAO acquisition path exists to make it a population
+rather than a single page. Building it today would add a parser, a capture, and
+a test suite that no code path reaches — the unconsumed structure section 9c
+already refused once for CBO.
+
+### 10d. What this is not
+
+- **Not a schema.** The gate reports; it does not constrain. No transform
+  validates a value against a documented domain, and none should until there is
+  a stated policy for what to do with a row that fails — dropping publisher data
+  because the publisher's own documentation is incomplete would be worse than
+  the drift.
+- **Not a claim about the whole corpus.** The observed half is one dated
+  snapshot of three tables at one producer revision. It can prove a value
+  *occurs*; it can only prove a value is *absent from that snapshot*, which is
+  precisely why the two agenda findings are recorded as edition-boundedness
+  rather than as retirements.
+- **Not a second home for RefSpec's units.** Six columns are checked because six
+  columns have both a pinned publisher document and an observation. The other
+  ~23 removed units enumerated things with neither, or things `agency_stats`
+  already publishes. Re-creating them here would rebuild the inventory REF-032
+  is removing, one repository to the left.
+- **Not wired into CI.** The gate runs in the default pytest suite, which is
+  where the `source_profile_artifacts` gate also lives; no CI job invokes the
+  tool directly. A `.github/workflows/ci.yml` job beside `data-dictionary` is
+  the obvious next step and is not taken here.

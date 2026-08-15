@@ -7,3 +7,9 @@ sample-data/document-files/*.xml -whitespace
 sample-data/document-populations/*.html -text -whitespace
 sample-data/document-populations/*.json -text -whitespace
 sample-data/document-populations/*.xml -text -whitespace
+
+# Documented-enumeration captures are parsed for the value lists they state, and
+# the OpenAPI capture states one of them with a trailing space (`- Nonrulemaking `).
+# Normalizing that would change what the publisher documented.
+sample-data/source-domains/*.xsd -text -whitespace
+sample-data/source-domains/*.yaml -text -whitespace
