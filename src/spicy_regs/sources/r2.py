@@ -22,6 +22,8 @@ import boto3
 import httpx
 from loguru import logger
 
+from spicy_regs.sources.cloudflare import purge_urls
+
 
 # --- download (public URL) -------------------------------------------------
 
@@ -172,17 +174,16 @@ def upload_file(local_path: Path, remote_key: str | None = None) -> None:
     remote_size = _get_remote_size(client, bucket, remote_key)
     _assert_upload_safe(local_size_bytes, remote_size, remote_key)
 
-    # Parquet readers issue many byte-range requests. Serving stale ranges across
-    # an object replacement can mix two versions and corrupt the read, so Parquet
-    # may be stored by caches but must be revalidated before reuse. Small immutable-
-    # enough auxiliary artifacts retain the prior edge-cache policy. Operators can
-    # override either policy globally when testing a Cloudflare rule.
+    # Cache-Control policy. Parquet readers issue many byte-range requests, and
+    # serving stale ranges across an object replacement can mix two versions and
+    # corrupt a read — so historically Parquet was marked `no-cache`. That is now
+    # handled by purge-on-publish below (we invalidate the exact URL we just
+    # wrote), which lets Parquet be cached like everything else. The `max-age` is
+    # a self-healing backstop: if a purge is ever missed, stale data still ages
+    # out within the hour rather than persisting to the next daily republish.
+    # `R2_CACHE_CONTROL` still overrides everything for ad-hoc testing.
     configured_cache_control = getenv("R2_CACHE_CONTROL")
-    cache_control = configured_cache_control or (
-        "public, no-cache, must-revalidate"
-        if remote_key.endswith(".parquet")
-        else "public, max-age=3600, stale-while-revalidate=86400"
-    )
+    cache_control = configured_cache_control or "public, max-age=3600"
     client.upload_file(
         str(local_path),
         bucket,
@@ -192,6 +193,12 @@ def upload_file(local_path: Path, remote_key: str | None = None) -> None:
 
     public_url = getenv("R2_PUBLIC_URL", "")
     logger.info("Uploaded: {}/{}", public_url, remote_key)
+
+    # Invalidate the edge cache for exactly this object so the fresh version is
+    # visible immediately. Best-effort and a no-op without Cloudflare creds; it
+    # must never fail a publish that already wrote the data (see cloudflare.py).
+    if public_url:
+        purge_urls([f"{public_url.rstrip('/')}/{remote_key}"])
 
 
 def upload_directory_to_r2(local_dir: Path, remote_prefix: str | None = None) -> None:
