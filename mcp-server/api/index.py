@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from pathlib import Path
+from time import monotonic as _monotonic
 from typing import Any
 from urllib.parse import urlparse
 from uuid import UUID
@@ -172,7 +173,7 @@ def _attach_catalog(con: duckdb.DuckDBPyConnection, config: dict[str, str]) -> b
         return False
 
 
-def _connect() -> duckdb.DuckDBPyConnection:
+def _build_connection() -> duckdb.DuckDBPyConnection:
     con = duckdb.connect()
     con.execute(f"SET home_directory='{HOME_DIRECTORY.replace(chr(39), chr(39) * 2)}'")
     con.execute("INSTALL httpfs")
@@ -203,8 +204,59 @@ def _connect() -> duckdb.DuckDBPyConnection:
     return con
 
 
+# Building a connection is the expensive part of a tool call — install httpfs +
+# iceberg, attach the R2 catalog over REST, and CREATE VIEW over all 20 tables
+# (each reads a parquet footer over HTTPS), ~35s on a cold serverless instance.
+# The query that follows is milliseconds. So we build once and reuse: Fluid
+# Compute keeps a warmed instance's module state across invocations, and the
+# stdio server is a single long-lived process, so a module-level connection
+# amortizes that cost across every request the instance serves.
+#
+# Concurrency: the cached connection is shared, but each request runs on its own
+# `con.cursor()` — DuckDB's supported way to run overlapping queries on one
+# connection — so the statement-timeout interrupt (below) hits only that cursor,
+# never a sibling request.
+#
+# Staleness: the views hold parquet footers and the catalog attach pins an
+# Iceberg snapshot, both taken at build time. The ETL republishes daily, so a
+# connection older than the TTL is rebuilt to pick up new data. On rebuild we
+# only drop the module reference to the old connection — never close it — so any
+# cursor still mid-query keeps working (a cursor outlives its parent losing its
+# last Python reference); the old connection is reclaimed once its cursors drain.
+_CONNECTION_TTL_SECONDS = float(os.environ.get("SPICY_REGS_CONNECTION_TTL", "300"))
+_connection_lock = threading.Lock()
+_cached_connection: duckdb.DuckDBPyConnection | None = None
+_cached_connection_at = 0.0
+
+
+def _get_connection() -> duckdb.DuckDBPyConnection:
+    """Return a shared, cached DuckDB connection, rebuilding past the TTL.
+
+    Callers must run their query on ``.cursor()`` of the returned connection,
+    not on the connection itself, so concurrent requests don't serialize and a
+    per-request timeout interrupt stays scoped to that request.
+    """
+    global _cached_connection, _cached_connection_at
+    with _connection_lock:
+        age = _monotonic() - _cached_connection_at
+        if _cached_connection is None or age >= _CONNECTION_TTL_SECONDS:
+            # Drop (don't close) the previous connection: an in-flight cursor on
+            # another thread still references it and must survive this swap.
+            _cached_connection = _build_connection()
+            _cached_connection_at = _monotonic()
+        return _cached_connection
+
+
+def _reset_connection_cache() -> None:
+    """Forget the cached connection so the next call rebuilds. For tests."""
+    global _cached_connection, _cached_connection_at
+    with _connection_lock:
+        _cached_connection = None
+        _cached_connection_at = 0.0
+
+
 @contextmanager
-def _statement_timeout(con: duckdb.DuckDBPyConnection) -> Iterator[None]:
+def _statement_timeout(cursor: duckdb.DuckDBPyConnection) -> Iterator[None]:
     if STATEMENT_TIMEOUT_SECONDS is None:
         yield
         return
@@ -212,7 +264,9 @@ def _statement_timeout(con: duckdb.DuckDBPyConnection) -> Iterator[None]:
 
     def _interrupt() -> None:
         tripped.set()
-        con.interrupt()
+        # Interrupt only this request's cursor, not the shared connection —
+        # sibling requests run on their own cursors and must not be cancelled.
+        cursor.interrupt()
 
     timer = threading.Timer(STATEMENT_TIMEOUT_SECONDS, _interrupt)
     timer.start()
@@ -258,9 +312,9 @@ def describe_table(table: str) -> dict[str, Any]:
             "error": f"Unknown table '{table}'",
             "available_tables": list(TABLES),
         }
-    con = _connect()
-    with _statement_timeout(con):
-        rows = con.execute(f"DESCRIBE {table}").fetchall()
+    cursor = _get_connection().cursor()
+    with _statement_timeout(cursor):
+        rows = cursor.execute(f"DESCRIBE {table}").fetchall()
     return {
         "table": table,
         "columns": [
@@ -288,9 +342,9 @@ def query_sql(sql: str, max_rows: int = 25) -> dict[str, Any]:
     if max_rows <= 0 or max_rows > 500:
         return {"error": "max_rows must be between 1 and 500"}
 
-    con = _connect()
-    with _statement_timeout(con):
-        cursor = con.execute(sql)
+    cursor = _get_connection().cursor()
+    with _statement_timeout(cursor):
+        cursor.execute(sql)
         columns = [desc[0] for desc in cursor.description] if cursor.description else []
         rows = cursor.fetchmany(max_rows)
     result_rows = [{col: _jsonify(val) for col, val in zip(columns, row)} for row in rows]

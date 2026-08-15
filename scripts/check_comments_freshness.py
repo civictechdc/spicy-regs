@@ -156,7 +156,9 @@ def main() -> int:
         idx_where = ""
         rows_where = ""
 
-    con = mcp_server._connect()
+    # A one-off script that owns and closes its own connection — use the builder
+    # directly, not the shared cached connection the MCP tools reuse.
+    con = mcp_server._build_connection()
     try:
         stale = _check_freshness(con, idx_where, rows_where, args.limit)
         duplicated = _check_duplicates(con, rows_where, args.limit)

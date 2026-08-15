@@ -163,7 +163,7 @@ def test_resolve_catalog_config_rejects_injection(module_name, monkeypatch):
 # both shipped runtime crashes lived (the bogus ``statement_timeout`` SET and
 # the spill-to-disabled-LocalFileSystem error). They are hermetic: the sandbox
 # is applied to a plain in-memory connection, so no httpfs install or network
-# is needed. The live ``_connect`` + R2 path is covered by the integration test
+# is needed. The live ``_build_connection`` + R2 path is covered by the integration test
 # below.
 
 
@@ -247,7 +247,7 @@ def test_comments_catalog_view_dedups_on_read():
     The R2 Data Catalog can physically carry duplicate comment_id rows: the ETL
     upsert removes superseded rows with a plain ``DELETE``, which does not reliably
     take on the catalog, so a re-merged comment_id can leave its old row behind.
-    ``_connect`` wraps the catalog table in a per-comment_id QUALIFY so the read
+    ``_build_connection`` wraps the catalog table in a per-comment_id QUALIFY so the read
     surface stays single-valued regardless. This locks in that dedup expression:
     the newest ``modify_date`` wins, exactly one row survives per id, and
     non-duplicated ids are untouched — which is also the ``count(*) ==
@@ -265,7 +265,7 @@ def test_comments_catalog_view_dedups_on_read():
             ('c3', '2024-05-01', 'unique');
         """
     )
-    # The exact dedup wrapper used by the catalog `comments` view in `_connect`.
+    # The exact dedup wrapper used by the catalog `comments` view in `_build_connection`.
     con.execute(
         "CREATE VIEW comments AS SELECT * FROM raw "
         "QUALIFY ROW_NUMBER() OVER "
@@ -283,7 +283,7 @@ def test_comments_catalog_view_dedups_on_read():
 
 @pytest.mark.integration
 def test_connect_queries_r2_end_to_end():
-    """Live: the real ``_connect`` (httpfs + R2 views) serves the MCP tools.
+    """Live: the real ``_build_connection`` (httpfs + R2 views) serves the MCP tools.
 
     Covers the full path the hermetic tests cannot — httpfs install, the R2
     parquet views, and a spilling aggregation over real data — asserting none
@@ -307,3 +307,100 @@ def test_connect_queries_r2_end_to_end():
         )
     )
     assert result is not None
+
+
+# --- connection caching ------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _clear_connection_cache():
+    """Keep the module-level connection cache from leaking across tests."""
+    mcp_server._reset_connection_cache()
+    yield
+    mcp_server._reset_connection_cache()
+
+
+def _make_local_connection(monkeypatch, module) -> dict[str, int]:
+    """Force ``_build_connection`` to hand back a bare in-memory DuckDB.
+
+    Keeps these tests hermetic: no httpfs, no R2, no catalog — just enough of a
+    connection to prove the caching, cursor-isolation, and TTL logic wrapping it.
+    Returns a ``{"n": build_count}`` dict so callers can assert how many times
+    the (patched) builder actually ran.
+    """
+    build_count = {"n": 0}
+
+    def _fake_build() -> duckdb.DuckDBPyConnection:
+        build_count["n"] += 1
+        con = duckdb.connect()
+        con.execute("CREATE TABLE agency_stats AS SELECT 1 AS docket_count")
+        return con
+
+    monkeypatch.setattr(module, "_build_connection", _fake_build)
+    return build_count
+
+
+@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
+def test_get_connection_reuses_within_ttl(module_name, monkeypatch):
+    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+    module._reset_connection_cache()
+    build_count = _make_local_connection(monkeypatch, module)
+
+    first = module._get_connection()
+    second = module._get_connection()
+
+    assert first is second
+    assert build_count["n"] == 1
+    module._reset_connection_cache()
+
+
+@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
+def test_get_connection_rebuilds_past_ttl(module_name, monkeypatch):
+    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+    module._reset_connection_cache()
+    build_count = _make_local_connection(monkeypatch, module)
+    # A zero TTL forces every call to treat the cache as expired.
+    monkeypatch.setattr(module, "_CONNECTION_TTL_SECONDS", 0.0)
+
+    module._get_connection()
+    module._get_connection()
+
+    assert build_count["n"] == 2
+    module._reset_connection_cache()
+
+
+def test_cursor_from_cached_connection_survives_rebuild(monkeypatch):
+    """A cursor taken before a TTL rebuild must keep serving its query.
+
+    This is the safety property the rebuild relies on: swapping the cached
+    connection only drops the module's reference, so an in-flight request's
+    cursor (which still references the old connection) is never closed.
+    """
+    module = mcp_server
+    module._reset_connection_cache()
+    _make_local_connection(monkeypatch, module)
+    monkeypatch.setattr(module, "_CONNECTION_TTL_SECONDS", 0.0)
+
+    old_cursor = module._get_connection().cursor()
+    module._get_connection()  # TTL expired -> builds and caches a new connection
+
+    # The old cursor's parent is no longer referenced by the module, but the
+    # cursor holds it alive and still answers.
+    assert old_cursor.execute("SELECT docket_count FROM agency_stats").fetchone() == (1,)
+    module._reset_connection_cache()
+
+
+def test_query_sql_reuses_one_connection_across_calls(monkeypatch):
+    """Two ``query_sql`` calls should build the backing connection once."""
+    module = mcp_server
+    module._reset_connection_cache()
+    build_count = _make_local_connection(monkeypatch, module)
+    server = module.build_server()
+
+    for _ in range(2):
+        asyncio.run(
+            server.call_tool("query_sql", {"sql": "SELECT docket_count FROM agency_stats", "max_rows": 1})
+        )
+
+    assert build_count["n"] == 1
+    module._reset_connection_cache()
