@@ -1,6 +1,6 @@
 {
-  "applicabilityDigest": "sha256:0671caded698822217485275b9b2ddcfacc1286a177769b0b3b7a85026acf427",
-  "applicabilityId": "urn:spicy-regs:applicability:0671caded698822217485275b9b2ddcfacc1286a177769b0b3b7a85026acf427",
+  "applicabilityDigest": "sha256:08e7d6116d008c8fe190c55620f24440f54b751483119aae5087e3014a57cb63",
+  "applicabilityId": "urn:spicy-regs:applicability:08e7d6116d008c8fe190c55620f24440f54b751483119aae5087e3014a57cb63",
   "experimental": true,
   "format": "spicyregs-profile-resource-applicability/experimental-v0",
   "profileCatalog": {
@@ -556,8 +556,8 @@
   ],
   "recordedAt": "2026-08-03T12:00:00Z",
   "refspecResourceCatalog": {
-    "digest": "sha256:c0bcce7318ac6fedce2e0c51e77186ef32cf5c9d1039aa2170d7b28422de7dbe",
-    "id": "urn:ref:resource-catalog:c0bcce7318ac6fedce2e0c51e77186ef32cf5c9d1039aa2170d7b28422de7dbe"
+    "digest": "sha256:21e883b51626f45b4cc64c92bfeb18d5864260662a759a8a313a2d94b41f0d64",
+    "id": "urn:ref:resource-catalog:21e883b51626f45b4cc64c92bfeb18d5864260662a759a8a313a2d94b41f0d64"
   },
   "summary": {
     "profileCount": 17,
