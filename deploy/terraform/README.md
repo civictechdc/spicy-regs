@@ -54,3 +54,42 @@ to re-create/overwrite live config.
 - Validated with `terraform validate` against the Cloudflare v5 provider. `plan`
   and `apply` need a token and are intentionally left to a human — this repo has
   never had credentials, by design.
+
+## Managing tokens (opt-in, off by default)
+
+`tokens.tf` can create the **CI cache-purge token** (the one the ETL's
+purge-on-publish uses, stored as the GitHub Actions secret
+`CLOUDFLARE_API_TOKEN`). It is **disabled by default** — `manage_ci_purge_token`
+defaults to `false`, so nothing is created unless you opt in. Read these
+tradeoffs first; token creation is not like the other resources:
+
+- **Bootstrap.** Terraform cannot create the token it authenticates with, so
+  this only manages *other* service tokens — never the R2/Cache-Rules token you
+  run `plan`/`apply` with (that stays hand-made).
+- **Privilege escalation.** To create tokens, the token Terraform runs with must
+  gain **Account · Account API Tokens · Edit** — the power to mint arbitrary
+  tokens. Add that permission deliberately; it's a big step up from the scoped
+  R2 + Cache Rules token.
+- **Secret in state.** The new token's value is a sensitive computed attribute
+  written to `terraform.tfstate`. With **local state that's a live credential in
+  a plaintext file on disk** — treat state as a secret, or move to an encrypted
+  remote backend before enabling this.
+- **No import / rotation = new secret.** Cloudflare reveals a token's secret only
+  at creation, so an existing token can't be imported with a usable value.
+  Enabling this creates a *fresh* token; you then migrate CI to it and revoke the
+  old one. Rotating later (`terraform taint` + `apply`) likewise mints a new secret.
+
+Given all that — especially on **local state** — this is genuinely optional and
+arguably not worth it until there's an encrypted remote backend. It's here so the
+option is codified and reviewed, not because you must use it.
+
+### If you do enable it
+
+```bash
+# 1. Grant the terraform token Account > Account API Tokens > Edit.
+# 2. Opt in and apply:
+terraform apply -var manage_ci_purge_token=true
+# 3. Read the secret and set it as the GitHub Actions secret:
+terraform output -raw ci_purge_token_value | gh secret set CLOUDFLARE_API_TOKEN
+# 4. Revoke the old hand-made purge token in the dashboard.
+```
