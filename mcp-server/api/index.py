@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import sys
 import tempfile
 import threading
@@ -109,6 +110,42 @@ def _resolve_home_directory() -> str:
 HOME_DIRECTORY = _resolve_home_directory()
 
 
+def _resolve_memory_limit() -> str | None:
+    """DuckDB memory ceiling from SPICY_REGS_MEMORY_LIMIT (e.g. '12GB', '75%').
+
+    Unset => None => DuckDB's own default (~80% of detected RAM). Set it on hosts
+    where DuckDB can't see the real allocation (containers detect host RAM, not
+    the cgroup limit) so it spills/errors before the platform OOM-kills the process.
+    Interpolated into a SET, so the value is format-validated.
+    """
+    raw = os.environ.get("SPICY_REGS_MEMORY_LIMIT", "").strip()
+    if not raw:
+        return None
+    if not re.fullmatch(r"\d+(\.\d+)?\s*(%|[KMGT]?i?B)?", raw, re.IGNORECASE):
+        raise RuntimeError(f"SPICY_REGS_MEMORY_LIMIT is not a valid size/percent: {raw!r}")
+    return raw
+
+
+def _resolve_temp_dir() -> str:
+    """DuckDB spill directory from SPICY_REGS_TEMP_DIR.
+
+    Default '' disables spilling — the safe serverless behavior, since DuckDB's
+    default temp dir is a relative '.tmp' that is read-only on serverless hosts,
+    so a spilling query would fail there anyway. Supply a writable path (a
+    container with real disk, or a mounted volume) to let big GROUP BY/ORDER BY
+    spill instead of erroring. Interpolated into a SET, so injection chars are
+    rejected.
+    """
+    raw = os.environ.get("SPICY_REGS_TEMP_DIR", "")
+    if any(c in raw for c in ("'", "\\", "\x00", "\n", "\r")):
+        raise RuntimeError(f"SPICY_REGS_TEMP_DIR contains illegal characters: {raw!r}")
+    return raw
+
+
+MEMORY_LIMIT = _resolve_memory_limit()
+TEMP_DIR = _resolve_temp_dir()
+
+
 def _resolve_catalog_config() -> dict[str, str] | None:
     uri = os.environ.get("R2_CATALOG_URI")
     warehouse = os.environ.get("R2_CATALOG_WAREHOUSE")
@@ -152,7 +189,9 @@ def _apply_security_settings(con: duckdb.DuckDBPyConnection) -> None:
     con.execute("SET autoinstall_known_extensions=false")
     con.execute("SET autoload_known_extensions=false")
     con.execute("SET allow_unsigned_extensions=false")
-    con.execute("SET temp_directory=''")
+    if MEMORY_LIMIT is not None:
+        con.execute(f"SET memory_limit='{MEMORY_LIMIT}'")
+    con.execute(f"SET temp_directory='{TEMP_DIR}'")
     con.execute("SET lock_configuration=true")
 
 

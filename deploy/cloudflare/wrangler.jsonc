@@ -1,0 +1,24 @@
+{
+  // Cloudflare Containers deploy for the MCP server. BETA (Containers is in beta
+  // as of 2026) — verify field names against the installed wrangler on first
+  // deploy. standard-4 = 4 vCPU / 12 GiB RAM / 20 GB real disk: the disk is why
+  // this is a better heavy-analytics fit than Cloud Run's RAM-backed /tmp, since
+  // DuckDB can spill big aggregations to it (SPICY_REGS_TEMP_DIR=/tmp).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "spicy-regs-mcp",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "containers": [
+    {
+      "class_name": "McpContainer",
+      "image": "./Dockerfile",
+      "instance_type": "standard-4",
+      "max_instances": 10
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "MCP_CONTAINER", "class_name": "McpContainer" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["McpContainer"] }]
+}

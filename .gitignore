@@ -25,3 +25,14 @@ recovery
 .env*.local
 __pycache__
 notebooks/.cache
+# Terraform (deploy/terraform)
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+
+# Node (deploy/cloudflare Worker)
+deploy/cloudflare/node_modules/

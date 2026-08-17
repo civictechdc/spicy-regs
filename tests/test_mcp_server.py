@@ -404,3 +404,76 @@ def test_query_sql_reuses_one_connection_across_calls(monkeypatch):
 
     assert build_count["n"] == 1
     module._reset_connection_cache()
+
+
+# --- memory-limit / spill env gating (Cloud Run) -----------------------------
+
+
+@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
+def test_resolve_memory_limit_unset_is_none(module_name, monkeypatch):
+    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+    monkeypatch.delenv("SPICY_REGS_MEMORY_LIMIT", raising=False)
+    assert module._resolve_memory_limit() is None
+
+
+@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
+@pytest.mark.parametrize("value", ["12GB", "2048MB", "75%", "16GiB"])
+def test_resolve_memory_limit_valid(module_name, value, monkeypatch):
+    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+    monkeypatch.setenv("SPICY_REGS_MEMORY_LIMIT", value)
+    assert module._resolve_memory_limit() == value
+
+
+@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
+@pytest.mark.parametrize("value", ["12GB'; SET x=1", "lots", "'"])
+def test_resolve_memory_limit_rejects_junk(module_name, value, monkeypatch):
+    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+    monkeypatch.setenv("SPICY_REGS_MEMORY_LIMIT", value)
+    with pytest.raises(RuntimeError, match="valid size/percent"):
+        module._resolve_memory_limit()
+
+
+@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
+def test_resolve_temp_dir_default_empty(module_name, monkeypatch):
+    """Unset => '' => spilling disabled (the safe serverless default)."""
+    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+    monkeypatch.delenv("SPICY_REGS_TEMP_DIR", raising=False)
+    assert module._resolve_temp_dir() == ""
+
+
+@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
+def test_resolve_temp_dir_rejects_injection(module_name, monkeypatch):
+    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+    monkeypatch.setenv("SPICY_REGS_TEMP_DIR", "/tmp'; SET memory_limit='1kB")
+    with pytest.raises(RuntimeError, match="illegal characters"):
+        module._resolve_temp_dir()
+
+
+def _setting(con: duckdb.DuckDBPyConnection, name: str) -> str:
+    row = con.execute(f"SELECT current_setting('{name}')").fetchone()
+    assert row is not None
+    return row[0]
+
+
+def test_security_settings_default_disables_spill(monkeypatch):
+    """With no env set, temp_directory stays '' — byte-identical to Vercel today."""
+    monkeypatch.setattr(mcp_server, "MEMORY_LIMIT", None)
+    monkeypatch.setattr(mcp_server, "TEMP_DIR", "")
+    con = duckdb.connect()
+    mcp_server._apply_security_settings(con)
+    assert _setting(con, "temp_directory") == ""
+
+
+def test_security_settings_honor_memory_and_temp(tmp_path, monkeypatch):
+    """When the env-derived module constants are set, the pragmas reflect them.
+
+    This is the contract of the change — the actual spill/OOM behavior at a given
+    limit is DuckDB's, and is exercised manually against the built container
+    rather than pinned to a version-specific memory threshold here.
+    """
+    monkeypatch.setattr(mcp_server, "MEMORY_LIMIT", "1GB")
+    monkeypatch.setattr(mcp_server, "TEMP_DIR", str(tmp_path))
+    con = duckdb.connect()
+    mcp_server._apply_security_settings(con)
+    assert _setting(con, "temp_directory") == str(tmp_path)
+    assert _setting(con, "memory_limit") not in ("", None)
