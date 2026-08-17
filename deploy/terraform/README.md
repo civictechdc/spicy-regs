@@ -22,22 +22,30 @@ terraform plan     # should show "will import" + NO resource changes
 terraform apply    # adopts them into state; no-op on the actual infra
 ```
 
-A clean plan after import (imports only, zero changes) is the proof the code
-matches production. Once imported, delete or leave the `imports.tf` blocks — they
-are no-ops thereafter.
+A clean plan after import ("3 to import, 0 to add/change/destroy") is the proof
+the code matches production. Once imported, delete or leave the `imports.tf`
+blocks — they are no-ops thereafter.
 
-Finding the import ids: `<ACCOUNT_ID>` and `<ZONE_ID>` are in `terraform.tfvars`;
-the cache `<RULESET_ID>` is the id of the existing `http_request_cache_settings`
-ruleset (`GET /zones/{zone}/rulesets/phases/http_request_cache_settings/entrypoint`).
+`imports.tf` already carries the concrete ids (they interpolate `account_id` /
+`zone_id` from your tfvars; the cache ruleset id is hard-coded from the existing
+entrypoint). The bucket id needs a third `/default` jurisdiction component — a
+Cloudflare quirk.
 
-## What it manages
+## What it manages (importable)
 
 - `cloudflare_r2_bucket.corpus` — the `spicy-regs` bucket.
-- `cloudflare_r2_custom_domain.data` — public read at `data.spicy-regs.dev`.
-- `cloudflare_r2_bucket_cors.corpus` — GET/HEAD from the app origins (DuckDB-WASM).
 - `cloudflare_r2_data_catalog.corpus` — the Iceberg catalog (comments system of record).
 - `cloudflare_ruleset.r2_cache` — the edge cache rule (respect-origin; the ETL's
   purge-on-publish handles invalidation). Keep in sync with `sources/r2.py` headers.
+
+## Not importable (provider limitation)
+
+`cloudflare_r2_custom_domain` (data.spicy-regs.dev) and `cloudflare_r2_bucket_cors`
+have **no `terraform import` support** in the provider. They exist in production and
+stay dashboard/API-managed here; adopting them into state isn't possible. For a
+**fresh** environment, rename `fresh-environment.tf.example` → `.tf` to have
+Terraform create them. Don't apply it against the existing bucket — it would try
+to re-create/overwrite live config.
 
 ## Guardrails
 

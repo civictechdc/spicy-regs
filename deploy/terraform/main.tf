@@ -21,33 +21,12 @@ resource "cloudflare_r2_bucket" "corpus" {
   location   = var.bucket_location
 }
 
-# Public read over the Cloudflare-fronted custom domain (data.spicy-regs.dev).
-# Being behind a custom domain is also what makes the bucket eligible for the
-# Cache Rule below and for edge caching at all.
-resource "cloudflare_r2_custom_domain" "data" {
-  account_id  = var.cloudflare_account_id
-  bucket_name = cloudflare_r2_bucket.corpus.name
-  domain      = var.custom_domain
-  zone_id     = var.cloudflare_zone_id
-  enabled     = true
-}
-
-# CORS so the browser explorer (DuckDB-WASM in spicy-regs-ui) can range-read the
-# parquet cross-origin. Read-only methods; no credentials.
-resource "cloudflare_r2_bucket_cors" "corpus" {
-  account_id  = var.cloudflare_account_id
-  bucket_name = cloudflare_r2_bucket.corpus.name
-
-  rules = [{
-    allowed = {
-      origins = var.cors_allowed_origins
-      methods = ["GET", "HEAD"]
-      headers = ["range", "if-match", "content-type"]
-    }
-    expose_headers  = ["etag", "content-length", "content-range"]
-    max_age_seconds = 3600
-  }]
-}
+# NOTE — the public custom domain (data.spicy-regs.dev) and the bucket CORS config
+# also exist in production, but the Cloudflare provider does NOT support
+# `terraform import` for `cloudflare_r2_custom_domain` or `cloudflare_r2_bucket_cors`
+# (confirmed against the provider docs). Adopting the existing ones into state is
+# therefore impossible, so they stay dashboard/API-managed here. For a FRESH
+# environment, `fresh-environment.tf.example` has Terraform create them.
 
 # R2 Data Catalog (Apache Iceberg) on the bucket — the system of record for the
 # comments table (R2_CATALOG_*). Enabling it is idempotent; the REST endpoint and

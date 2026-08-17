@@ -1,35 +1,27 @@
-# Import-first: these resources ALREADY EXIST in production. Uncomment the block
-# for each and run `terraform plan` — Terraform adopts the live resource into
-# state instead of trying to create (and colliding with) it. A clean plan after
-# import (no changes) is the proof this config matches reality. Remove/keep these
-# blocks after the first successful apply; they are no-ops once in state.
-#
-# Import IDs follow the Cloudflare provider's documented format for each resource
-# (see registry.terraform.io/providers/cloudflare/cloudflare/latest/docs). Fill in
-# <ACCOUNT_ID> / <ZONE_ID> from terraform.tfvars, and the ruleset id from
-# `deploy/terraform` outputs of the existing rule (already created 2026-08-15).
+# Import-first: adopt the EXISTING production resources into state. Only these
+# three support `terraform import` (the custom domain + CORS do not — see the note
+# in main.tf). Fill the ids from terraform.tfvars, then `terraform plan` (expect
+# "3 to import, 0 to change") and `terraform apply`. Delete or keep these blocks
+# afterward — they are no-ops once the resources are in state.
 
-# import {
-#   to = cloudflare_r2_bucket.corpus
-#   id = "<ACCOUNT_ID>/spicy-regs"
-# }
+# R2 bucket. NB the id has THREE parts: <account_id>/<bucket>/<jurisdiction>.
+# "default" is the standard (non-jurisdiction-restricted) location.
+import {
+  to = cloudflare_r2_bucket.corpus
+  id = "${var.cloudflare_account_id}/${var.bucket_name}/default"
+}
 
-# import {
-#   to = cloudflare_r2_custom_domain.data
-#   id = "<ACCOUNT_ID>/spicy-regs/data.spicy-regs.dev"
-# }
+# Iceberg data catalog: <account_id>/<bucket_name>.
+import {
+  to = cloudflare_r2_data_catalog.corpus
+  id = "${var.cloudflare_account_id}/${var.bucket_name}"
+}
 
-# import {
-#   to = cloudflare_r2_bucket_cors.corpus
-#   id = "<ACCOUNT_ID>/spicy-regs"
-# }
-
-# import {
-#   to = cloudflare_r2_data_catalog.corpus
-#   id = "<ACCOUNT_ID>/spicy-regs"
-# }
-
-# import {
-#   to = cloudflare_ruleset.r2_cache
-#   id = "zones/<ZONE_ID>/<RULESET_ID>"
-# }
+# Cache-settings ruleset: zones/<zone_id>/<ruleset_id>. The ruleset id is the
+# existing http_request_cache_settings entrypoint (created 2026-08-15):
+# 63af84667b3e4f3da0ecafc1094d51a2 — confirm with
+#   GET /zones/{zone}/rulesets/phases/http_request_cache_settings/entrypoint
+import {
+  to = cloudflare_ruleset.r2_cache
+  id = "zones/${var.cloudflare_zone_id}/63af84667b3e4f3da0ecafc1094d51a2"
+}
