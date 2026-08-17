@@ -54,3 +54,40 @@ to re-create/overwrite live config.
 - Validated with `terraform validate` against the Cloudflare v5 provider. `plan`
   and `apply` need a token and are intentionally left to a human — this repo has
   never had credentials, by design.
+
+## Remote state in R2
+
+State is stored in Cloudflare R2 via the Terraform `s3` backend (`backend.tf`) —
+in a **separate, private** bucket (`spicy-regs-tfstate`), never the public data
+bucket. R2 credentials come from the environment, never the committed config.
+
+### One-time setup / migrating from local state
+
+```bash
+# 1. Create the PRIVATE state bucket (do NOT give it a public domain).
+npx wrangler r2 bucket create spicy-regs-tfstate
+
+# 2. Point the s3 backend at R2 using your R2 S3 API credentials
+#    (the same access-key/secret the ETL uses; from .env).
+export AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
+export AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
+
+# 3. Re-init; Terraform detects the new backend and offers to copy local state up.
+cd deploy/terraform
+terraform init -migrate-state    # answer "yes" to copy terraform.tfstate to R2
+
+# 4. Confirm, then the local state files are no longer authoritative.
+terraform plan                   # "No changes" — now reading state from R2
+rm -f terraform.tfstate terraform.tfstate.backup
+```
+
+Thereafter every `plan`/`apply` reads and locks state in R2 (the `AWS_*` env vars
+must be set). `use_lockfile` puts a lock object in the bucket for the duration of
+a run, so two people can't apply at once.
+
+Notes:
+- The state bucket **must stay private**. State can contain sensitive attributes;
+  a public state bucket would leak them.
+- The `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` names are just how the s3 backend
+  reads credentials — the values are your **R2** access key + secret, not AWS.
+- `*.tfstate*` is gitignored regardless, so state never lands in git even locally.
