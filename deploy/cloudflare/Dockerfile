@@ -1,4 +1,5 @@
-# Cloud Run container for the Spicy Regs MCP server.
+# Container image for the Spicy Regs MCP server (deployed to Cloudflare
+# Containers; also runs anywhere that serves an $PORT HTTP container).
 #
 # Runs the CANONICAL server (src/spicy_regs/mcp_server.py:build_app) directly —
 # not the Vercel copy. Importing mcp_server pulls only duckdb + mcp (verified),
@@ -8,8 +9,8 @@
 # Vercel is retired.
 FROM python:3.12-slim
 
-# duckdb needs no system libs; keep the image minimal. Unbuffered stdout so
-# Cloud Run captures logs live.
+# duckdb needs no system libs; keep the image minimal. Unbuffered stdout so the
+# platform captures logs live.
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
@@ -27,7 +28,7 @@ COPY pyproject.toml README.md ./
 COPY src ./src
 RUN pip install --no-deps .
 
-# Cloud Run sends traffic to $PORT (default 8080). build_app() mounts the MCP
+# The platform sends traffic to $PORT (default 8080). build_app() mounts the MCP
 # endpoint at /mcp; --factory because build_app is a callable returning the app.
 ENV PORT=8080
 EXPOSE 8080

@@ -1,0 +1,9 @@
+# Copy to terraform.tfvars (gitignored) and fill in. account_id + zone_id are on
+# the Cloudflare dashboard: account id under R2 or the account home; zone id on
+# the spicy-regs.dev zone Overview page.
+cloudflare_account_id = "your_account_id"
+cloudflare_zone_id    = "your_zone_id"
+
+# Defaults match production; override only for a different environment.
+# bucket_name   = "spicy-regs"
+# custom_domain = "data.spicy-regs.dev"
