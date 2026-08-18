@@ -80,3 +80,30 @@ npm run deploy
 to zero), and `SPICY_REGS_MEMORY_LIMIT` (keep under the instance RAM so heavy
 queries spill to disk rather than being killed) are the knobs. Re-measure after
 changes.
+
+## Scaling & load-test findings (2026-08-18)
+
+Measured against a freshly-upgraded Workers Paid account. Takeaways:
+
+- **Single instance (`getContainer`) is stable and the current default.** 0% errors
+  through ~c=25 on one `standard-4`; latency scales ~linearly with concurrency
+  (p50 ≈ 3.6s @ c=10, ≈ 9.7s @ c=25) and it starts shedding 500s around c=50.
+  One instance's DuckDB connection (cached, per-request cursors) handles the load
+  fine — the ceiling is one instance's CPU.
+- **Horizontal scaling (`getRandom` across N instances) is NOT viable on this
+  account yet.** Under any real concurrency it returns `Failed to start container:
+  Maximum number of running container instances exceeded` and corrupts in-flight
+  responses (utf-8 decode errors) as instances are evicted at the cap. This is an
+  **account container-instance limit**, not a code bug — the config validates and
+  single-instance is rock-solid. Rapidly changing `max_instances` also churns the
+  platform into a temporarily bad state where even single-instance 500s until it
+  drains. **Before using `getRandom`, request a container-instance / vCPU limit
+  increase from Cloudflare, then set `INSTANCE_COUNT` + `max_instances` to fit.**
+- **Cold start ≈ 80s** (provision + build the DuckDB connection). This beta has no
+  min-instances/pre-warm config; keep an instance warm during an event with a
+  scheduled ping, and note `sleepAfter` sets idle survival between requests.
+
+For 100 concurrent hackathon users, single-instance is likely fine if usage is
+bursty (MCP calls are not sustained-100-parallel), but a limit increase + a small
+`getRandom` fan-out is the headroom play. Re-run `scratchpad/loadtest.py --suite
+mcp` after any change.
