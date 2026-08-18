@@ -36,3 +36,6 @@ crash.*.log
 
 # Node (deploy/cloudflare Worker)
 deploy/cloudflare/node_modules/
+
+# Cloudflare Workers generated types
+deploy/cloudflare/worker-configuration.d.ts

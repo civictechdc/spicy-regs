@@ -3,13 +3,16 @@
   "private": true,
   "description": "Cloudflare Containers deploy for the Spicy Regs MCP server",
   "scripts": {
+    "types": "wrangler types",
+    "check": "wrangler types && tsc --noEmit && wrangler deploy --dry-run",
     "deploy": "wrangler deploy",
     "dev": "wrangler dev"
   },
   "dependencies": {
-    "@cloudflare/containers": "^0.0.40"
+    "@cloudflare/containers": "^0.3.7"
   },
   "devDependencies": {
-    "wrangler": "^4.0.0"
+    "typescript": "^7.0.2",
+    "wrangler": "^4.123.0"
   }
 }
