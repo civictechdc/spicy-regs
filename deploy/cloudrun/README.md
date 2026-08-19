@@ -46,10 +46,33 @@ gcloud run services update spicy-regs-mcp --region us-east1 --min-instances 5   
 gcloud run services update spicy-regs-mcp --region us-east1 --min-instances 0   # back to scale-to-zero
 ```
 
-## Still to do before it's the canonical endpoint
+## Custom domain (done — mcp.spicy-regs.dev)
 
-- **Custom domain:** map `mcp.spicy-regs.dev` to the service (`gcloud run domain-mappings create`) and repoint DNS from Vercel.
-- **Iceberg catalog:** add `R2_CATALOG_TOKEN` (a secret — use Secret Manager +
-  `--set-secrets`) and the `R2_CATALOG_*` vars so `comments` reads the deduped
-  system-of-record instead of the public parquet mirror.
-- Retire the Vercel deploy + `mcp-server/api/index.py` copy once cut over.
+Cloud Run domain mapping, DNS in Cloudflare:
+
+```bash
+gcloud domains verify spicy-regs.dev            # one-time, Search Console TXT in Cloudflare
+gcloud beta run domain-mappings create --service spicy-regs-mcp \
+  --domain mcp.spicy-regs.dev --region us-east1
+# then add the CNAME it prints (mcp -> ghs.googlehosted.com) in Cloudflare,
+# DNS-only (grey cloud) so Cloud Run can provision the managed cert (~15-60 min).
+```
+
+## Iceberg catalog (done — comments reads the deduped system-of-record)
+
+```bash
+grep '^R2_CATALOG_TOKEN=' .env | cut -d= -f2- | tr -d '\n' | \
+  gcloud secrets create R2_CATALOG_TOKEN --data-file=- --project spicy-regs-mcp
+gcloud secrets add-iam-policy-binding R2_CATALOG_TOKEN \
+  --member="serviceAccount:PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
+gcloud run services update spicy-regs-mcp --region us-east1 \
+  --set-secrets "R2_CATALOG_TOKEN=R2_CATALOG_TOKEN:latest" \
+  --update-env-vars "R2_CATALOG_URI=...,R2_CATALOG_WAREHOUSE=...,R2_CATALOG_NAMESPACE=default"
+```
+
+Verify it attached (not the silent parquet fallback): `SELECT count(*), count(DISTINCT comment_id) FROM comments` should be **equal** (the catalog view dedups via QUALIFY).
+
+## Remaining
+
+- Retire the Vercel MCP deploy + the `mcp-server/api/index.py` copy now that `mcp.spicy-regs.dev` points at Cloud Run.
