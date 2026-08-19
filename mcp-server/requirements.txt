@@ -1,7 +1,0 @@
-# Upper bounds are load-bearing, not caution. This file has no lockfile — pip
-# resolves it fresh on every Vercel rebuild — so an unbounded spec turns any
-# deploy into an unreviewed dependency upgrade. mcp 2.0 (2026-07-28) deleted
-# mcp.server.fastmcp outright and took down mcp.spicy-regs.dev that way.
-# Porting to the 2.x mcp.server.mcpserver API is what lifts the <2 bound.
-mcp>=1.27.1,<2
-duckdb>=1.2.0,<2

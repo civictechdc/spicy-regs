@@ -1,28 +1,20 @@
 # MCP server internals
 
 > Engineering notes for contributors. Not user-facing — for how to *use* the
-> server see [`README.md`](README.md), and for table schemas see
-> <https://docs.spicy-regs.dev>.
+> server see <https://docs.spicy-regs.dev>; for deploying it see
+> [`../deploy/cloudrun/`](../deploy/cloudrun/).
 
-This is the rationale behind the MCP server implementation. Both source files are
-comment-free by project policy (documentation lives in markdown), so this
-document is the explanation for what the code does and why.
+This is the rationale behind the MCP server implementation
+(`src/spicy_regs/mcp_server.py`). The source is comment-free by project policy
+(documentation lives in markdown), so this document explains what the code does
+and why.
 
-It covers **both copies**, which are hand-mirrored and must stay in sync:
-
-| File | Role |
-|---|---|
-| `src/spicy_regs/mcp_server.py` | Canonical. Stdio via the `spicy-regs-mcp` console script, plus `build_app()` for ASGI. |
-| `mcp-server/api/index.py` | Vercel function. A parallel copy so the deploy avoids the parent package's ETL dependencies (boto3, polars). |
-
-`tests/test_mcp_server.py::test_vercel_copy_in_sync` enforces that the tool
-surface, `TABLES`, `INSTRUCTIONS`, `DEFAULT_R2_BASE_URL`, `CATALOG_ALIAS`, and
-`DEFAULT_CATALOG_NAMESPACE` match. It does **not** check dependency drift — the
-Vercel copy has no lockfile, which is how an unpinned `mcp>=1.10.0` resolving to
-2.0 took production down in July 2026. Pins in `mcp-server/requirements.txt`
-carry upper bounds for that reason.
-
-Everything below applies to both copies unless stated.
+> **History:** there used to be a second, hand-mirrored copy at
+> `mcp-server/api/index.py` — a dependency-light parallel of the canonical server
+> for a Vercel deployment, kept in sync by `test_vercel_copy_in_sync`. The server
+> now runs on Cloud Run (see `deploy/cloudrun/`) from the **canonical** module
+> directly (importing it pulls only duckdb + mcp, no ETL deps), so the copy and
+> its sync test were removed. Everything below is the single canonical server.
 
 ## What must never be deleted
 
@@ -34,11 +26,10 @@ Strip them and the server still runs, but every client goes blind. Verify with
 `asyncio.run(build_server().list_tools())`.
 
 **Inline `# type: ignore` / `# noqa` are directives, not comments.** `ty` and
-`ruff` gate merges and both read them. `_connect` needs `# type: ignore[index]`
-on `catalog["namespace"]`; the Vercel copy needs `# noqa: E402` on its `_icon`
-import, which must follow the `sys.path` insert.
+`ruff` gate merges and both read them. `_build_connection` needs `# type: ignore[index]`
+on `catalog["namespace"]`.
 
-## Connection setup (`_connect`, `_apply_security_settings`)
+## Connection setup (`_build_connection`, `_get_connection`, `_apply_security_settings`)
 
 - `SET home_directory` **must precede** `INSTALL`/`LOAD`. DuckDB writes
   extensions under `<home_directory>/.duckdb`, and the default home is read-only
@@ -53,7 +44,7 @@ import, which must follow the `sys.path` insert.
   defaults to a local `.tmp` that is read-only on serverless hosts, so a spilling
   query (big GROUP BY/ORDER BY) fails there regardless. Empty disables spilling —
   queries run in memory or fail with a clear OOM.
-- `_apply_security_settings` is deliberately separate from `_connect` so the
+- `_apply_security_settings` is deliberately separate from `_build_connection` so the
   sandbox is testable without network. Run it after httpfs loads and before any
   user SQL; `SET lock_configuration=true` is last because it freezes everything.
 
@@ -62,18 +53,15 @@ import, which must follow the `sys.path` insert.
 **DuckDB has no `statement_timeout` parameter.** `SET statement_timeout=...`
 raises `Catalog Error: unrecognized configuration parameter` — this was a shipped
 runtime crash once, and `tests/test_mcp_server.py` guards the regression. The cap
-is a watchdog (`_statement_timeout`) that calls `con.interrupt()` and converts
+is a watchdog (`_statement_timeout`) that calls `cursor.interrupt()` and converts
 DuckDB's `InterruptException` into a `TimeoutError` so the cause is unambiguous.
 
-`SPICY_REGS_STATEMENT_TIMEOUT` defaults to `790s`, kept just under the Vercel
-`maxDuration` of **800s** so a runaway query returns a clean `TimeoutError`
-instead of an opaque platform-killed 500. **Raise the two together or not at
-all.** 800s is the generally-available Pro ceiling; 300s is only the all-plans
-default. The 1800s extended tier is beta and a poor fit — a blocking DuckDB query
-streams nothing, so Vercel's warning about intermediaries closing idle HTTP/1.1
-connections applies squarely. In practice the binding limit is usually the *MCP
-client*, which typically gives up at 60–120s. The canonical stdio copy has no
-platform limit at all; its default matches purely to keep the mirrors identical.
+`SPICY_REGS_STATEMENT_TIMEOUT` defaults to `790s` in code; the Cloud Run
+deployment sets it to `600s` via env (matching the service `--timeout`), so a
+runaway query returns a clean `TimeoutError` rather than a platform-killed 5xx.
+Keep the app timeout at or below the platform request timeout. In practice the
+binding limit is usually the *MCP client*, which typically gives up at 60–120s.
+The stdio entrypoint has no platform limit at all.
 
 ## Iceberg catalog attach (`_attach_catalog`)
 
@@ -109,8 +97,8 @@ same degradation strategy as the catalog fallback.
 
 ## DNS rebinding protection is off in `build_app`
 
-Deliberate. The deployment is reached via `mcp.spicy-regs.dev` and per-deploy
-`*.vercel.app` hosts; FastMCP's default localhost-only allowlist would reject all
+Deliberate. The deployment is reached via `mcp.spicy-regs.dev` and per-deploy Cloud Run
+`*.run.app` hosts; FastMCP's default localhost-only allowlist would reject all
 of them with **421**. The server is public, stateless, and read-only, so
 rebinding protection buys nothing.
 
@@ -124,6 +112,3 @@ rebinding protection buys nothing.
   no bind parameters.
 - `R2_CATALOG_NAMESPACE` uses `or DEFAULT` rather than `get`'s default argument so
   an env var set to the empty string falls back to `default` instead of `""`.
-- The Vercel `app()` wrapper normalizes the ASGI path: `vercel.json` rewrites
-  `/mcp` onto `/api/index`, and depending on how the rewrite is forwarded the path
-  arrives as either one, so both are mapped onto the transport's `/mcp` mount.
