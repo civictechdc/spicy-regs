@@ -35,8 +35,10 @@ Cloudflare quirk.
 
 - `cloudflare_r2_bucket.corpus` — the `spicy-regs` bucket.
 - `cloudflare_r2_data_catalog.corpus` — the Iceberg catalog (comments system of record).
-- `cloudflare_ruleset.r2_cache` — the edge cache rule (respect-origin; the ETL's
-  purge-on-publish handles invalidation). Keep in sync with `sources/r2.py` headers.
+- `cloudflare_ruleset.r2_cache` — the edge cache rule, **kept `enabled = false`**.
+  Edge-caching parquet corrupts DuckDB's concurrent byte-range reads (see
+  `sources/r2.py`, which serves parquet `no-cache`); the resource stays so
+  Terraform owns the disabled state and an `apply` can't re-enable the corruption.
 
 ## Not importable (provider limitation)
 

@@ -36,10 +36,12 @@ resource "cloudflare_r2_data_catalog" "corpus" {
   bucket_name = cloudflare_r2_bucket.corpus.name
 }
 
-# Edge cache rule for the corpus. Codifies what is currently a hand-created rule:
-# scoped to the data host only (so docs./mcp./app. subdomains are untouched),
-# eligible for cache, respecting the origin Cache-Control (purge-on-publish in the
-# ETL handles invalidation). Keep this in sync with sources/r2.py's headers.
+# Edge cache rule for the corpus — DISABLED. Edge-caching parquet corrupts
+# DuckDB's concurrent byte-range reads (utf-8/ETag failures at scale; see
+# sources/r2.py, which serves parquet no-cache). Kept as a resource (rather than
+# deleted) so Terraform owns the disabled state and a future apply can't silently
+# re-enable it. To cache only the UI's non-parquet MiniSearch json.gz, narrow the
+# expression to that suffix and flip enabled back on — never match .parquet.
 resource "cloudflare_ruleset" "r2_cache" {
   zone_id = var.cloudflare_zone_id
   name    = "default"
@@ -51,7 +53,7 @@ resource "cloudflare_ruleset" "r2_cache" {
     description = "Cache public data corpus at edge; respect origin Cache-Control (purge-on-publish invalidates)"
     expression  = "(http.host eq \"${var.custom_domain}\")"
     action      = "set_cache_settings"
-    enabled     = true
+    enabled     = false
     action_parameters = {
       cache = true
       edge_ttl = {
