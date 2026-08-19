@@ -33,3 +33,12 @@ both rely on the platform-agnostic env knobs added alongside this
 1. `terraform/` — stand up (or import) the bucket, domain, CORS, catalog, cache rule.
 2. Populate the corpus (the ETL / rollups on GitHub Actions).
 3. `cloudflare/` — build + deploy the MCP container.
+
+## Update 2026-08-18: Cloud Run is the primary MCP host
+
+After load-testing, the MCP server runs on **Google Cloud Run** (`cloudrun/`) —
+it autoscales to 100 concurrent at ~2s p50 with ~0% errors and supports a warm
+floor (`--min-instances`) for events. The `cloudflare/` container target is kept
+as a documented, working single-instance fallback (it thrashes multi-instance on
+the current beta account limit). Terraform (`terraform/`) still manages the R2
+bucket + cache rule regardless of where the MCP server runs.
