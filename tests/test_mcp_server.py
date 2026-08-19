@@ -1,37 +1,20 @@
 """Tests for the Spicy Regs MCP server.
 
-Covers the canonical implementation in ``spicy_regs.mcp_server`` and asserts
-that the Vercel parallel copy at ``mcp-server/api/index.py`` keeps the same
-tool surface so the two don't drift.
+Covers the canonical MCP server implementation in ``spicy_regs.mcp_server``
+(the single source of truth since the Vercel copy was retired).
 """
 
 from __future__ import annotations
 
 import asyncio
-import importlib.util
 from datetime import date, datetime
 from decimal import Decimal
-from pathlib import Path
 from uuid import UUID
 
 import duckdb
 import pytest
 
 from spicy_regs import mcp_server
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-VERCEL_COPY_PATH = REPO_ROOT / "mcp-server" / "api" / "index.py"
-
-
-def _load_vercel_copy():
-    spec = importlib.util.spec_from_file_location(
-        "spicy_regs_mcp_vercel_copy", VERCEL_COPY_PATH
-    )
-    assert spec and spec.loader, f"could not load {VERCEL_COPY_PATH}"
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
 
 def test_jsonify_primitives_pass_through():
     assert mcp_server._jsonify(None) is None
@@ -81,45 +64,29 @@ def test_build_server_registers_expected_tools():
     assert _tool_names(server) == {"list_sources", "describe_table", "query_sql"}
 
 
-def test_vercel_copy_in_sync():
-    """The Vercel copy must expose the same tools, table list, and instructions."""
-    vercel = _load_vercel_copy()
-
-    assert _tool_names(vercel.mcp) == _tool_names(mcp_server.build_server())
-    assert vercel.TABLES == mcp_server.TABLES
-    assert vercel.INSTRUCTIONS == mcp_server.INSTRUCTIONS
-    assert vercel.DEFAULT_R2_BASE_URL == mcp_server.DEFAULT_R2_BASE_URL
-    # The catalog-backed comments path must stay identical across the two copies.
-    assert vercel.CATALOG_ALIAS == mcp_server.CATALOG_ALIAS
-    assert vercel.DEFAULT_CATALOG_NAMESPACE == mcp_server.DEFAULT_CATALOG_NAMESPACE
-
-
 # --- catalog config resolution ----------------------------------------------
 
 _CATALOG_ENV = ("R2_CATALOG_URI", "R2_CATALOG_WAREHOUSE", "R2_CATALOG_TOKEN")
 
 
-@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
-def test_resolve_catalog_config_none_when_unset(module_name, monkeypatch):
-    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+def test_resolve_catalog_config_none_when_unset(monkeypatch):
+    module = mcp_server
     for var in (*_CATALOG_ENV, "R2_CATALOG_NAMESPACE"):
         monkeypatch.delenv(var, raising=False)
     assert module._resolve_catalog_config() is None
 
 
-@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
-def test_resolve_catalog_config_partial_is_none(module_name, monkeypatch):
+def test_resolve_catalog_config_partial_is_none(monkeypatch):
     """Missing any one of the three required vars => disabled (fall back)."""
-    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+    module = mcp_server
     monkeypatch.setenv("R2_CATALOG_URI", "https://catalog.example/x")
     monkeypatch.setenv("R2_CATALOG_WAREHOUSE", "wh")
     monkeypatch.delenv("R2_CATALOG_TOKEN", raising=False)
     assert module._resolve_catalog_config() is None
 
 
-@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
-def test_resolve_catalog_config_full(module_name, monkeypatch):
-    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+def test_resolve_catalog_config_full(monkeypatch):
+    module = mcp_server
     monkeypatch.setenv("R2_CATALOG_URI", "https://catalog.example/x")
     monkeypatch.setenv("R2_CATALOG_WAREHOUSE", "wh")
     monkeypatch.setenv("R2_CATALOG_TOKEN", "secret-token")
@@ -133,10 +100,9 @@ def test_resolve_catalog_config_full(module_name, monkeypatch):
     }
 
 
-@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
-def test_resolve_catalog_config_empty_namespace_defaults(module_name, monkeypatch):
+def test_resolve_catalog_config_empty_namespace_defaults(monkeypatch):
     """An empty R2_CATALOG_NAMESPACE (e.g. an unset GH secret -> "") -> default."""
-    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+    module = mcp_server
     monkeypatch.setenv("R2_CATALOG_URI", "https://catalog.example/x")
     monkeypatch.setenv("R2_CATALOG_WAREHOUSE", "wh")
     monkeypatch.setenv("R2_CATALOG_TOKEN", "t")
@@ -146,10 +112,9 @@ def test_resolve_catalog_config_empty_namespace_defaults(module_name, monkeypatc
     assert config["namespace"] == module.DEFAULT_CATALOG_NAMESPACE
 
 
-@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
-def test_resolve_catalog_config_rejects_injection(module_name, monkeypatch):
+def test_resolve_catalog_config_rejects_injection(monkeypatch):
     """Values are inlined into CREATE SECRET / ATTACH, so quotes are rejected."""
-    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+    module = mcp_server
     monkeypatch.setenv("R2_CATALOG_URI", "https://catalog.example/x")
     monkeypatch.setenv("R2_CATALOG_WAREHOUSE", "wh'); DROP")
     monkeypatch.setenv("R2_CATALOG_TOKEN", "t")
@@ -180,14 +145,13 @@ def _sandboxed_connection(memory_limit: str | None = None):
     return con
 
 
-@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
-def test_security_settings_apply_cleanly(module_name):
+def test_security_settings_apply_cleanly():
     """Every pragma must be accepted by the installed DuckDB (no Catalog Error).
 
     The original ``SET statement_timeout`` regression failed exactly here, on a
     parameter DuckDB does not recognize.
     """
-    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+    module = mcp_server
     con = duckdb.connect()
     module._apply_security_settings(con)  # must not raise
 
@@ -340,9 +304,8 @@ def _make_local_connection(monkeypatch, module) -> dict[str, int]:
     return build_count
 
 
-@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
-def test_get_connection_reuses_within_ttl(module_name, monkeypatch):
-    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+def test_get_connection_reuses_within_ttl(monkeypatch):
+    module = mcp_server
     module._reset_connection_cache()
     build_count = _make_local_connection(monkeypatch, module)
 
@@ -354,9 +317,8 @@ def test_get_connection_reuses_within_ttl(module_name, monkeypatch):
     module._reset_connection_cache()
 
 
-@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
-def test_get_connection_rebuilds_past_ttl(module_name, monkeypatch):
-    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+def test_get_connection_rebuilds_past_ttl(monkeypatch):
+    module = mcp_server
     module._reset_connection_cache()
     build_count = _make_local_connection(monkeypatch, module)
     # A zero TTL forces every call to treat the cache as expired.
@@ -409,41 +371,36 @@ def test_query_sql_reuses_one_connection_across_calls(monkeypatch):
 # --- memory-limit / spill env gating (Cloud Run) -----------------------------
 
 
-@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
-def test_resolve_memory_limit_unset_is_none(module_name, monkeypatch):
-    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+def test_resolve_memory_limit_unset_is_none(monkeypatch):
+    module = mcp_server
     monkeypatch.delenv("SPICY_REGS_MEMORY_LIMIT", raising=False)
     assert module._resolve_memory_limit() is None
 
 
-@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
 @pytest.mark.parametrize("value", ["12GB", "2048MB", "75%", "16GiB"])
-def test_resolve_memory_limit_valid(module_name, value, monkeypatch):
-    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+def test_resolve_memory_limit_valid(value, monkeypatch):
+    module = mcp_server
     monkeypatch.setenv("SPICY_REGS_MEMORY_LIMIT", value)
     assert module._resolve_memory_limit() == value
 
 
-@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
 @pytest.mark.parametrize("value", ["12GB'; SET x=1", "lots", "'"])
-def test_resolve_memory_limit_rejects_junk(module_name, value, monkeypatch):
-    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+def test_resolve_memory_limit_rejects_junk(value, monkeypatch):
+    module = mcp_server
     monkeypatch.setenv("SPICY_REGS_MEMORY_LIMIT", value)
     with pytest.raises(RuntimeError, match="valid size/percent"):
         module._resolve_memory_limit()
 
 
-@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
-def test_resolve_temp_dir_default_empty(module_name, monkeypatch):
+def test_resolve_temp_dir_default_empty(monkeypatch):
     """Unset => '' => spilling disabled (the safe serverless default)."""
-    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+    module = mcp_server
     monkeypatch.delenv("SPICY_REGS_TEMP_DIR", raising=False)
     assert module._resolve_temp_dir() == ""
 
 
-@pytest.mark.parametrize("module_name", ["canonical", "vercel"])
-def test_resolve_temp_dir_rejects_injection(module_name, monkeypatch):
-    module = mcp_server if module_name == "canonical" else _load_vercel_copy()
+def test_resolve_temp_dir_rejects_injection(monkeypatch):
+    module = mcp_server
     monkeypatch.setenv("SPICY_REGS_TEMP_DIR", "/tmp'; SET memory_limit='1kB")
     with pytest.raises(RuntimeError, match="illegal characters"):
         module._resolve_temp_dir()
@@ -456,7 +413,7 @@ def _setting(con: duckdb.DuckDBPyConnection, name: str) -> str:
 
 
 def test_security_settings_default_disables_spill(monkeypatch):
-    """With no env set, temp_directory stays '' — byte-identical to Vercel today."""
+    """With no env set, temp_directory stays '' — byte-identical to the prior default."""
     monkeypatch.setattr(mcp_server, "MEMORY_LIMIT", None)
     monkeypatch.setattr(mcp_server, "TEMP_DIR", "")
     con = duckdb.connect()
