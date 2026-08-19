@@ -174,16 +174,20 @@ def upload_file(local_path: Path, remote_key: str | None = None) -> None:
     remote_size = _get_remote_size(client, bucket, remote_key)
     _assert_upload_safe(local_size_bytes, remote_size, remote_key)
 
-    # Cache-Control policy. Parquet readers issue many byte-range requests, and
-    # serving stale ranges across an object replacement can mix two versions and
-    # corrupt a read — so historically Parquet was marked `no-cache`. That is now
-    # handled by purge-on-publish below (we invalidate the exact URL we just
-    # wrote), which lets Parquet be cached like everything else. The `max-age` is
-    # a self-healing backstop: if a purge is ever missed, stale data still ages
-    # out within the hour rather than persisting to the next daily republish.
-    # `R2_CACHE_CONTROL` still overrides everything for ad-hoc testing.
+    # Cache-Control policy. Parquet MUST NOT be edge-cached: DuckDB (both the MCP
+    # server and the browser DuckDB-WASM UI) reads each file via many byte-range
+    # requests, and an edge cache serving inconsistent bytes across those ranges
+    # under concurrent load corrupts the read — observed as `utf-8 codec can't
+    # decode` / ETag-mismatch failures at ~c=10+. (This is why parquet was
+    # `no-cache` originally; a caching experiment reintroduced the corruption and
+    # was reverted.) Non-parquet artifacts (e.g. the UI MiniSearch json.gz, which
+    # is not read by DuckDB) may still be edge-cached. `R2_CACHE_CONTROL` overrides.
     configured_cache_control = getenv("R2_CACHE_CONTROL")
-    cache_control = configured_cache_control or "public, max-age=3600"
+    cache_control = configured_cache_control or (
+        "public, no-cache, must-revalidate"
+        if remote_key.endswith(".parquet")
+        else "public, max-age=3600, stale-while-revalidate=86400"
+    )
     client.upload_file(
         str(local_path),
         bucket,
