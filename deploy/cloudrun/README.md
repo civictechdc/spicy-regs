@@ -46,10 +46,16 @@ gcloud run services update spicy-regs-mcp --region us-east1 --min-instances 5   
 gcloud run services update spicy-regs-mcp --region us-east1 --min-instances 0   # back to scale-to-zero
 ```
 
-## Still to do before it's the canonical endpoint
+## Status — this IS the canonical endpoint
 
-- **Custom domain:** map `mcp.spicy-regs.dev` to the service (`gcloud run domain-mappings create`) and repoint DNS from Vercel.
-- **Iceberg catalog:** add `R2_CATALOG_TOKEN` (a secret — use Secret Manager +
-  `--set-secrets`) and the `R2_CATALOG_*` vars so `comments` reads the deduped
-  system-of-record instead of the public parquet mirror.
-- Retire the Vercel deploy + `mcp-server/api/index.py` copy once cut over.
+- **Custom domain** — `mcp.spicy-regs.dev` maps to the service (Cloud Run domain
+  mapping; DNS in Cloudflare, managed cert). Done.
+- **Iceberg catalog** — `R2_CATALOG_TOKEN` in Secret Manager + the `R2_CATALOG_*`
+  vars, so `comments` reads the deduped system-of-record (verified: `count(*)` ==
+  `count(DISTINCT comment_id)`). Done.
+- **Vercel** — retired: the deploy workflow and the `mcp-server/api/index.py`
+  copy are gone; `spicy_regs.mcp_server` is the single source.
+
+> Parquet is served `no-cache` (edge caching corrupts DuckDB range reads — see the
+> r2.py policy). The Cloudflare cache rule for the corpus is disabled; only
+> non-parquet artifacts are cache-eligible.
