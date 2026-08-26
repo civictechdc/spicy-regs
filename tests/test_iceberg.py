@@ -409,13 +409,21 @@ def test_export_public_comments_rebuilds_mirror(tmp_path, local_catalog, monkeyp
     iceberg._ensure_table(con, COMMENT)
 
     staging = tmp_path / "staging"
-    _write_comment_staging(staging, "EPA", [
-        _comment("c1", "EPA-1", "EPA", "2025-01-15T00:00:00Z"),
-        _comment("c2", "EPA-2", "EPA", "2025-02-03T00:00:00Z"),
-    ])
-    _write_comment_staging(staging, "OMB", [
-        _comment("c3", "OMB-1", "OMB", "2026-06-29T00:00:00Z"),
-    ])
+    _write_comment_staging(
+        staging,
+        "EPA",
+        [
+            _comment("c1", "EPA-1", "EPA", "2025-01-15T00:00:00Z"),
+            _comment("c2", "EPA-2", "EPA", "2025-02-03T00:00:00Z"),
+        ],
+    )
+    _write_comment_staging(
+        staging,
+        "OMB",
+        [
+            _comment("c3", "OMB-1", "OMB", "2026-06-29T00:00:00Z"),
+        ],
+    )
     iceberg._merge(con, iceberg._staging_files(staging, COMMENT), COMMENT)
 
     # export_public_comments opens its own catalog connection; point it at the
@@ -477,9 +485,7 @@ def test_audit_and_dedupe_table(tmp_path, local_catalog) -> None:
 
     # Clean afterward, and c1 kept its latest modify_date.
     assert iceberg.audit_duplicates(con, COMMENT) == []
-    kept = con.execute(
-        f"SELECT modify_date FROM {iceberg._qualified(COMMENT)} WHERE comment_id = 'c1'"
-    ).fetchone()[0]
+    kept = con.execute(f"SELECT modify_date FROM {iceberg._qualified(COMMENT)} WHERE comment_id = 'c1'").fetchone()[0]
     assert kept == "2025-03-09T00:00:00Z"
 
 
@@ -514,9 +520,7 @@ def test_dedupe_table_sub_batches_large_agency(tmp_path, local_catalog, monkeypa
     assert after == 20  # one row per distinct comment_id
 
     assert iceberg.audit_duplicates(con, COMMENT) == []
-    kept = con.execute(
-        f"SELECT modify_date FROM {iceberg._qualified(COMMENT)} WHERE comment_id = 'c0'"
-    ).fetchone()[0]
+    kept = con.execute(f"SELECT modify_date FROM {iceberg._qualified(COMMENT)} WHERE comment_id = 'c0'").fetchone()[0]
     assert kept == "2025-06-01T00:00:00Z"  # newest version survived the bucketed dedup
 
 
@@ -623,3 +627,108 @@ def test_dedupe_table_resumes_interrupted_swap(tmp_path, local_catalog) -> None:
     assert con.execute(f"SELECT count(*) FROM {tbl}").fetchone()[0] == 3
     with pytest.raises(duckdb.Error):
         con.execute(f"SELECT 1 FROM {dedup_tbl} LIMIT 1")
+
+
+def _write_snapshot(path: Path, rows: list[dict]) -> None:
+    """A published monolithic {name}.parquet snapshot."""
+    pl.DataFrame(rows, schema={c: pl.Utf8 for c in DOCKET.schema}).write_parquet(path)
+
+
+def test_backfill_inserts_only_missing_keys(tmp_path, local_catalog) -> None:
+    """The cutover repair: historical rows land, post-cutover rows are untouched."""
+    con = local_catalog
+    iceberg._ensure_table(con, DOCKET)
+
+    # The catalog holds only post-cutover rows - the production failure shape.
+    _write_staging(tmp_path / "staging", "EPA", [_docket("EPA-NEW", "EPA", "post-cutover", "2026-08-01T00:00:00Z")])
+    iceberg._merge(con, iceberg._staging_files(tmp_path / "staging", DOCKET), DOCKET)
+
+    snapshot = tmp_path / "dockets.parquet"
+    _write_snapshot(
+        snapshot,
+        [
+            _docket("EPA-OLD", "EPA", "historical", "2015-01-01T00:00:00Z"),
+            _docket("EPA-NEW", "EPA", "STALE SNAPSHOT COPY", "2026-07-02T00:00:00Z"),
+        ],
+    )
+
+    inserted, total = iceberg.backfill_missing_from_parquet(con, str(snapshot), DOCKET)
+    assert (inserted, total) == (1, 2)
+
+    rows = dict(con.execute(f"SELECT docket_id, title FROM {iceberg._qualified(DOCKET)} ORDER BY docket_id").fetchall())
+    assert rows["EPA-OLD"] == "historical"
+    # The newer catalog row must win - backfilling must never roll it back.
+    assert rows["EPA-NEW"] == "post-cutover"
+
+
+def test_backfill_is_idempotent(tmp_path, local_catalog) -> None:
+    """A re-run inserts nothing: the backfill does a plain INSERT with no dedup."""
+    con = local_catalog
+    iceberg._ensure_table(con, DOCKET)
+
+    snapshot = tmp_path / "dockets.parquet"
+    _write_snapshot(snapshot, [_docket("EPA-1", "EPA", "one", "2025-01-01T00:00:00Z")])
+
+    assert iceberg.backfill_missing_from_parquet(con, str(snapshot), DOCKET) == (1, 1)
+    assert iceberg.backfill_missing_from_parquet(con, str(snapshot), DOCKET) == (0, 1)
+
+
+def test_backfill_dedups_a_repeated_source_key(tmp_path, local_catalog) -> None:
+    """A snapshot with repeats cannot fan out into duplicate catalog rows."""
+    con = local_catalog
+    iceberg._ensure_table(con, DOCKET)
+
+    snapshot = tmp_path / "dockets.parquet"
+    _write_snapshot(
+        snapshot,
+        [
+            _docket("EPA-1", "EPA", "older", "2025-01-01T00:00:00Z"),
+            _docket("EPA-1", "EPA", "newer", "2025-06-01T00:00:00Z"),
+        ],
+    )
+
+    inserted, total = iceberg.backfill_missing_from_parquet(con, str(snapshot), DOCKET)
+    assert (inserted, total) == (1, 1)
+    title = con.execute(f"SELECT title FROM {iceberg._qualified(DOCKET)}").fetchone()[0]
+    assert title == "newer"
+
+
+def test_backfill_survives_a_null_key_in_the_catalog(tmp_path, local_catalog) -> None:
+    """NOT IN would return NULL for every row here and insert nothing; the anti-join must not."""
+    con = local_catalog
+    iceberg._ensure_table(con, DOCKET)
+    con.execute(f"INSERT INTO {iceberg._qualified(DOCKET)} (docket_id) VALUES (NULL);")
+
+    snapshot = tmp_path / "dockets.parquet"
+    _write_snapshot(snapshot, [_docket("EPA-1", "EPA", "one", "2025-01-01T00:00:00Z")])
+
+    inserted, _total = iceberg.backfill_missing_from_parquet(con, str(snapshot), DOCKET)
+    assert inserted == 1
+
+
+def test_backfill_skips_null_keys_in_the_source(tmp_path, local_catalog) -> None:
+    con = local_catalog
+    iceberg._ensure_table(con, DOCKET)
+
+    snapshot = tmp_path / "dockets.parquet"
+    _write_snapshot(
+        snapshot,
+        [
+            _docket("EPA-1", "EPA", "one", "2025-01-01T00:00:00Z"),
+            {col: None for col in DOCKET.schema},
+        ],
+    )
+
+    inserted, total = iceberg.backfill_missing_from_parquet(con, str(snapshot), DOCKET)
+    assert (inserted, total) == (1, 1)
+
+
+def test_backfill_rejects_a_source_without_the_key_column(tmp_path, local_catalog) -> None:
+    con = local_catalog
+    iceberg._ensure_table(con, DOCKET)
+
+    snapshot = tmp_path / "wrong.parquet"
+    pl.DataFrame({"agency_code": ["EPA"], "modify_date": ["2025-01-01T00:00:00Z"]}).write_parquet(snapshot)
+
+    with pytest.raises(RuntimeError, match="docket_id"):
+        iceberg.backfill_missing_from_parquet(con, str(snapshot), DOCKET)
