@@ -14,7 +14,7 @@ where a transient download error produced an empty local file that overwrote the
 3.3 GB historical ``comments.parquet`` on R2.
 """
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from os import getenv
 from pathlib import Path
 
@@ -230,6 +230,20 @@ def upload_dataset(output_dir: Path, data_types: list[str]) -> None:
 
     Rollups (feed_summary, agency_stats, ...) are no longer published here — each
     is built and uploaded by its own decoupled ``run-rollup-*`` pipeline.
+
+    Every upload is awaited and its outcome inspected. This used to be a bare
+    ``executor.map(upload_file, files_to_upload)`` whose return value was
+    discarded — and ``map`` yields a *lazy* iterator, so an exception raised in a
+    worker is only re-raised when the results are consumed. Nothing consumed
+    them, so every publish failure was swallowed and the ETL still exited 0.
+    That masked an 8-week ``dockets`` outage: the shrink guard was correctly
+    refusing a truncated ``dockets.parquet`` on every single run (the Iceberg
+    dockets table was never seeded, so the exported snapshot held ~5k rows
+    instead of ~276k) while the workflow stayed green and the published table sat
+    frozen at 2026-07-02.
+
+    Failures are collected rather than raised on the first one, so a broken table
+    can never hide a second broken table behind it.
     """
     files_to_upload = []
     for data_type in data_types:
@@ -241,8 +255,26 @@ def upload_dataset(output_dir: Path, data_types: list[str]) -> None:
     if manifest_file.exists():
         files_to_upload.append(manifest_file)
 
+    # ThreadPoolExecutor rejects max_workers=0, so an empty publish set would
+    # otherwise raise ValueError rather than being the no-op it should be.
+    if not files_to_upload:
+        logger.warning("upload_dataset: no files to publish in {}", output_dir)
+        return
+
+    failures: list[tuple[Path, BaseException]] = []
     with ThreadPoolExecutor(max_workers=len(files_to_upload)) as executor:
-        executor.map(upload_file, files_to_upload)
+        futures = {executor.submit(upload_file, pf): pf for pf in files_to_upload}
+        for future in as_completed(futures):
+            if (error := future.exception()) is not None:
+                failures.append((futures[future], error))
+
+    if failures:
+        for path, error in failures:
+            logger.error("Failed to publish {}: {}", path.name, error)
+        names = ", ".join(sorted(path.name for path, _ in failures))
+        raise RuntimeError(
+            f"Failed to publish {len(failures)} of {len(files_to_upload)} file(s) to R2: {names}"
+        ) from failures[0][1]
 
 
 def upload_comment_partitions(output_dir: Path, changed_files: list[Path]) -> None:

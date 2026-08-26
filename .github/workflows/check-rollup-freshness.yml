@@ -1,4 +1,10 @@
-name: Check external rollup freshness
+name: Check published table freshness
+
+# Watches the base tables the daily ETL publishes (dockets, documents) alongside
+# the external-source rollups. The base tables were added after a swallowed R2
+# upload failure froze `dockets` at 2026-07-02 for ~8 weeks with the ETL still
+# reporting success — comments had check-comments-freshness.yml, the rollups had
+# this check, and the two largest base tables had nothing watching them at all.
 
 on:
   schedule:
@@ -27,7 +33,7 @@ jobs:
           key: rollup-freshness-${{ github.run_id }}
           restore-keys: rollup-freshness-
 
-      - name: Check published rollups
+      - name: Check published tables
         run: uv run python scripts/check_rollup_freshness.py
 
       - name: Save row-count history

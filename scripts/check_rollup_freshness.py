@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Check public external-source rollups for stale watermarks and stalled growth.
+"""Check published tables for stale watermarks and stalled growth.
 
-Date-backed sources are checked against source-appropriate age budgets. Sources
-without a meaningful update date are either tracked by row-count change
-(``usaspending_recipients``) or explicitly skipped with a reason. The state file
-lets the daily workflow remember when a row count last changed.
+Covers both the base tables the daily ETL publishes (``dockets``, ``documents``)
+and the external-source rollups. Date-backed sources are checked against
+source-appropriate age budgets. Sources without a meaningful update date are
+either tracked by row-count change (``usaspending_recipients``) or explicitly
+skipped with a reason. The state file lets the daily workflow remember when a row
+count last changed.
 """
 
 from __future__ import annotations
@@ -33,7 +35,25 @@ class DateCheck:
     label: str | None = None
 
 
-DATE_CHECKS = (
+# Base tables published by the daily ETL (etl-new-pipeline.yml). They are not
+# external rollups, but they share this machinery — a max watermark over the
+# published Parquet on R2 — and nothing else was watching them. A silently
+# swallowed upload failure froze `dockets` at 2026-07-02 for ~8 weeks without a
+# single alert, while `comments` (covered by check-comments-freshness.yml) and
+# every external rollup stayed green.
+#
+# `modify_date` is the watermark for both, NOT `posted_date`: documents carry
+# future effective dates (months ahead of today), so max(posted_date) reads as
+# fresh forever and can never detect a stall.
+#
+# 4-day budget: enough slack to ride out a three-day federal holiday weekend
+# without paging, tight enough that a real break surfaces the same week.
+BASE_TABLE_CHECKS = (
+    DateCheck("dockets", "modify_date", 4),
+    DateCheck("documents", "modify_date", 4),
+)
+
+EXTERNAL_DATE_CHECKS = (
     DateCheck("federal_register", "publication_date", 3),
     DateCheck("lobbying_filings", "dt_posted", 3),
     # Both metrics matter: update_date alone can stay green while recent
@@ -46,6 +66,8 @@ DATE_CHECKS = (
     DateCheck("gao_reports", "published_date", 14),
     DateCheck("crs_reports", "published_date", 14),
 )
+
+DATE_CHECKS = BASE_TABLE_CHECKS + EXTERNAL_DATE_CHECKS
 
 ROW_CHANGE_BUDGETS = {"usaspending_recipients": 14}
 SKIPPED = {
@@ -168,7 +190,7 @@ def main() -> int:
         for failure in failures:
             print(f"- {failure}")
         return 1
-    print("\nAll monitored external-source rollups are within budget.")
+    print("\nAll monitored base tables and external-source rollups are within budget.")
     return 0
 
 
