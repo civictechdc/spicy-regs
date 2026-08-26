@@ -131,6 +131,66 @@ tables:
       document_type: "Document category counted in this bucket (e.g. `Rule`, `Notice`)."
       document_count: "Number of documents the agency posted of that type in that month."
 
+  rulemaking_lifecycles:
+    summary: >-
+      Proposed→final rulemaking arcs, one row per docket, discriminated by
+      `kind`: `pair` rows are completed rulemakings (earliest Proposed Rule
+      matched to the earliest subsequent Rule in the same docket, with elapsed
+      `days`); `stuck` rows are Proposed Rules with no matching Rule, where
+      `final_date` and `days` are NULL. Bounded to `proposed_date >= 2010-01-01`.
+      Built by `build_rulemaking_lifecycles` from `documents`. Note that pairing
+      is per docket, so a docket carrying several RINs across successive
+      rulemakings collapses to a single arc.
+    columns:
+      kind: "`pair` (completed: proposed and final both present) or `stuck` (proposed with no final rule in the docket)."
+      docket_id: "Docket the arc belongs to."
+      agency_code: "Agency short code, from the Proposed Rule."
+      title: "Title of the Proposed Rule that opens the arc."
+      proposed_date: "`posted_date` of the earliest Proposed Rule in the docket."
+      final_date: "`posted_date` of the earliest Rule at or after `proposed_date`. NULL when `kind` is `stuck`."
+      days: "Calendar days from `proposed_date` to `final_date`. NULL when `kind` is `stuck`."
+
+  fr_docket_links:
+    summary: >-
+      The Federal Register ↔ docket bridge: each `federal_register` row's
+      `docket_ids_json` array exploded to one row per (docket_id, FR document),
+      carrying the FR display columns. Use this instead of an `ILIKE` scan over
+      `federal_register.docket_ids_json` — it is sorted by `docket_id`, so
+      `WHERE docket_id = ?` prunes row groups. This is the practical join from
+      regulations.gov to the Federal Register, since `documents.fr_doc_num` is
+      populated on only ~1% of rules. Built by `build_fr_docket_links`.
+    columns:
+      docket_id: "One docket ID extracted from the FR document's `docket_ids_json` array."
+      document_number: "Federal Register document number (joins `federal_register.document_number`)."
+      title: "FR document title."
+      abstract: "FR document abstract."
+      document_type: "FR type: `Rule`, `Proposed Rule`, `Notice`, or `Presidential Document`."
+      subtype: "FR subtype where the Federal Register supplies one, e.g. `Final Rule`, `Interim Final Rule`."
+      publication_date: "Date the document published in the Federal Register."
+      effective_on: "Date the rule takes effect, when the document carries one."
+      comments_close_on: "Comment period close date, when the document carries one."
+      signing_date: "Signing date, for presidential documents."
+      agency_slugs: "Federal Register agency slugs for the issuing agencies."
+      docket_ids_json: "The full original docket-ID array, retained so consumers can see the other IDs this FR document links to."
+      regulation_id_numbers_json: "RINs (JSON array) claimed by the FR document — the RIN-side join key for a rulemaking."
+      html_url: "federalregister.gov HTML permalink."
+      pdf_url: "Federal Register PDF URL."
+      executive_order_number: "Executive order number, for presidential documents."
+
+  discovery_signals:
+    summary: >-
+      Per-agency document-output spike signal that powers the feed's discovery
+      panel — agencies whose document count in the trailing 30 days is at least
+      2× their prior-year monthly mean, requiring ≥24 documents in the prior year
+      to suppress tiny-denominator noise. Recomputed relative to the run date, so
+      rows turn over on every rebuild; it is a current-state signal, not a time
+      series. Built by `build_discovery_signals` from `documents`.
+    columns:
+      agency_code: "Agency short code."
+      recent_30d: "Documents the agency posted in the trailing 30 days."
+      baseline: "Prior-year monthly mean document count (months 2–13 back)."
+      ratio: "`recent_30d` divided by `baseline` — the spike multiple."
+
   cfr_sections:
     summary: >-
       One row per Code of Federal Regulations *section* (a GovInfo CFR granule),
