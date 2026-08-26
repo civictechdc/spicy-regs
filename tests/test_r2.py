@@ -34,9 +34,7 @@ def test_upload_dataset_uploads_existing_files(tmp_path: Path, monkeypatch: pyte
     }
 
 
-def test_upload_comment_partitions_uploads_changed_and_index(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_upload_comment_partitions_uploads_changed_and_index(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """upload_comment_partitions publishes each changed partition and the index."""
     changed = tmp_path / "comments" / "agency_code=EPA" / "part-0.parquet"
     changed.parent.mkdir(parents=True)
@@ -99,3 +97,49 @@ def test_upload_file_survives_unreachable_edge(tmp_path: Path, monkeypatch: pyte
 
     # Must complete normally despite the purge failing underneath.
     r2.upload_file(tmp_path / "agency_stats.parquet")
+
+
+def test_upload_dataset_raises_when_an_upload_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A failing publish must surface, not be swallowed by the executor.
+
+    Regression: `executor.map`'s lazy iterator was discarded, so the shrink
+    guard's refusal to overwrite dockets.parquet never propagated and the ETL
+    reported success while the table sat frozen for 8 weeks.
+    """
+    (tmp_path / "dockets.parquet").write_bytes(b"d")
+    (tmp_path / "documents.parquet").write_bytes(b"x")
+
+    def fake_upload(path: Path, remote_key: str | None = None) -> None:
+        if path.name == "dockets.parquet":
+            raise RuntimeError("Refusing to upload dockets.parquet: would shrink remote")
+
+    monkeypatch.setattr(r2, "upload_file", fake_upload)
+
+    with pytest.raises(RuntimeError, match="dockets.parquet"):
+        r2.upload_dataset(tmp_path, ["dockets", "documents"])
+
+
+def test_upload_dataset_reports_every_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """One broken table must not hide another behind it."""
+    (tmp_path / "dockets.parquet").write_bytes(b"d")
+    (tmp_path / "documents.parquet").write_bytes(b"x")
+
+    def fake_upload(path: Path, remote_key: str | None = None) -> None:
+        raise RuntimeError(f"boom: {path.name}")
+
+    monkeypatch.setattr(r2, "upload_file", fake_upload)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        r2.upload_dataset(tmp_path, ["dockets", "documents"])
+
+    message = str(excinfo.value)
+    assert "dockets.parquet" in message
+    assert "documents.parquet" in message
+    assert "2 of 2" in message
+
+
+def test_upload_dataset_is_a_noop_with_nothing_to_publish(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """An empty publish set must not blow up on max_workers=0."""
+    monkeypatch.setattr(r2, "upload_file", lambda p, remote_key=None: None)
+
+    r2.upload_dataset(tmp_path, ["dockets"])

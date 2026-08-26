@@ -25,3 +25,32 @@ def test_row_count_change_resets_the_clock():
     rows = [("usaspending_recipients", "row count", None, 100_000)]
     assert evaluate_row_changes(rows, state, date(2026, 7, 20)) == []
     assert state["usaspending_recipients"] == {"count": 100_000, "last_changed": "2026-07-20"}
+
+
+def test_base_tables_are_monitored():
+    """dockets/documents must stay covered — nothing watched them for 8 weeks."""
+    from scripts.check_rollup_freshness import DATE_CHECKS
+
+    monitored = {(c.table, c.column) for c in DATE_CHECKS}
+    assert ("dockets", "modify_date") in monitored
+    assert ("documents", "modify_date") in monitored
+
+
+def test_base_table_checks_avoid_future_dated_posted_date():
+    """documents.posted_date carries future effective dates and can't detect a stall."""
+    from scripts.check_rollup_freshness import DATE_CHECKS
+
+    assert ("documents", "posted_date") not in {(c.table, c.column) for c in DATE_CHECKS}
+
+
+def test_frozen_dockets_watermark_fails():
+    """The exact production regression: dockets stuck at 2026-07-02."""
+    rows = [("dockets", "modify_date", "2026-07-02T20:46:17Z", 276_326)]
+    failures = evaluate_date_rows(rows, date(2026, 8, 26))
+    assert len(failures) == 1
+    assert "dockets" in failures[0]
+
+
+def test_current_dockets_watermark_passes():
+    rows = [("dockets", "modify_date", "2026-08-25T12:00:00Z", 278_000)]
+    assert evaluate_date_rows(rows, date(2026, 8, 26)) == []
