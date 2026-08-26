@@ -6,6 +6,69 @@ per-release copy lives in [`CHANGELOG.md`](https://github.com/civictechdc/spicy-
 at the repository root and on the
 [GitHub Releases](https://github.com/civictechdc/spicy-regs/releases) page.
 
+## 2026-08-26
+
+This cycle was mostly about how the data is served rather than what's in it: the
+MCP server moved off Vercel onto **Cloud Run**, load-tested to **100 concurrent
+users at ~0% errors**, with the deployment codified as infrastructure-as-code.
+The corpus itself gained the **FCC**, and several documented access paths that
+didn't actually work were fixed.
+
+!!! note "New tables"
+    Both tables are published as `https://data.spicy-regs.dev/<name>.parquet`
+    and documented under **Tables** in the nav.
+
+### New data sources
+
+| Table | Source | PR |
+| --- | --- | --- |
+| `fcc_proceedings` | FCC ECFS — the FCC's docket equivalent, keyed by `name` (e.g. `17-108`) | [#149](https://github.com/civictechdc/spicy-regs/pull/149) |
+| `fcc_filings` | FCC ECFS — the comment equivalent, keyed by `id_submission` | [#149](https://github.com/civictechdc/spicy-regs/pull/149) |
+
+The FCC does not participate in regulations.gov, so its rulemaking record lives
+only here. `fcc_filings.proceeding_names_json` joins to `fcc_proceedings.name`,
+and `text_data` carries the full comment text for express comments.
+
+### Serving and performance
+
+- **The MCP server now runs on Cloud Run** at `mcp.spicy-regs.dev` — load-tested
+  to c=100 (p50 2.0s, 0.3% errors), with `count(DISTINCT comment_id)` over 25.7M
+  rows in ~7s ([#164](https://github.com/civictechdc/spicy-regs/pull/164)). The Vercel deploy is retired ([#166](https://github.com/civictechdc/spicy-regs/pull/166)).
+- **DuckDB connections are cached across tool calls** instead of rebuilt per
+  request: **34.5s → 0.21s** warm ([#157](https://github.com/civictechdc/spicy-regs/pull/157)).
+- **Parquet is served `no-cache`, deliberately.** Edge-caching it corrupts
+  DuckDB's concurrent byte-range reads — including in the browser DuckDB-WASM UI
+  ([#165](https://github.com/civictechdc/spicy-regs/pull/165), [#167](https://github.com/civictechdc/spicy-regs/pull/167)). Non-Parquet artifacts like the search
+  `json.gz` stay cacheable, and purge-on-publish ([#158](https://github.com/civictechdc/spicy-regs/pull/158)) keeps them
+  fresh.
+
+### Fixed
+
+- **The `spicy-regs` CLI now works.** Cloudflare 403s the default urllib
+  User-Agent, so `download`, `stats`, `sample`, `search`, and `agencies` all
+  failed ([#156](https://github.com/civictechdc/spicy-regs/pull/156)).
+- **Query docs corrected.** The recommended comments glob pointed at a tree that
+  is no longer written, and R2's public HTTPS endpoint can't expand a glob at
+  all. Use `comments/agency/agency_code={X}/part-0.parquet`, and
+  `comments_index.parquet` for counts ([#156](https://github.com/civictechdc/spicy-regs/pull/156)).
+- **Notebooks refreshed** against live production, plus a new
+  `getting_started.ipynb` covering the rollups, the non-core tables, and
+  cross-source joins ([#156](https://github.com/civictechdc/spicy-regs/pull/156)).
+- Comment-text backfill gained `--discover-from-derived`, so it can see rows
+  ingested before `attachments_json` was recorded ([#156](https://github.com/civictechdc/spicy-regs/pull/156)).
+- Unit tests no longer download the production corpus ([#154](https://github.com/civictechdc/spicy-regs/pull/154),
+  [#155](https://github.com/civictechdc/spicy-regs/pull/155)).
+
+### Infrastructure
+
+- A new `deploy/` folder with **Terraform** owning the R2 bucket, its
+  `data.spicy-regs.dev` domain, CORS, the Iceberg catalog, and the (now
+  disabled) cache rule ([#159](https://github.com/civictechdc/spicy-regs/pull/159)), with state in a private R2 bucket
+  ([#161](https://github.com/civictechdc/spicy-regs/pull/161)). Cloudflare Containers is kept as a documented fallback
+  ([#162](https://github.com/civictechdc/spicy-regs/pull/162)).
+- Docs: the README is now a project front page ([#150](https://github.com/civictechdc/spicy-regs/pull/150)) and MCP server
+  rationale lives in `mcp-server/INTERNALS.md` ([#153](https://github.com/civictechdc/spicy-regs/pull/153)).
+
 ## 2026-07-22
 
 This cycle expanded the dataset from a regulations.gov + Federal Register mirror
