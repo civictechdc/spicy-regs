@@ -46,6 +46,9 @@ nav:
       - feed_summary: tables/feed_summary.md
       - agency_stats: tables/agency_stats.md
       - agency_monthly_volume: tables/agency_monthly_volume.md
+      - rulemaking_lifecycles: tables/rulemaking_lifecycles.md
+      - fr_docket_links: tables/fr_docket_links.md
+      - discovery_signals: tables/discovery_signals.md
       - cfr_sections: tables/cfr_sections.md
       - congress_bills: tables/congress_bills.md
       - unified_agenda: tables/unified_agenda.md

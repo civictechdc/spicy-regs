@@ -50,6 +50,9 @@ TABLES: tuple[str, ...] = (
     "feed_summary",
     "agency_stats",
     "agency_monthly_volume",
+    "rulemaking_lifecycles",
+    "fr_docket_links",
+    "discovery_signals",
     "cfr_sections",
     "congress_bills",
     "unified_agenda",
@@ -77,6 +80,9 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
         "feed_summary",
         "agency_stats",
         "agency_monthly_volume",
+        "rulemaking_lifecycles",
+        "fr_docket_links",
+        "discovery_signals",
         "cfr_sections",
         "congress_bills",
         "unified_agenda",
@@ -157,6 +163,45 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("latest_action_text", "VARCHAR"),
         ("update_date", "VARCHAR"),
         ("url", "VARCHAR"),
+    ],
+    # Built by build_rulemaking_lifecycles from documents.parquet. Two row shapes
+    # discriminated by `kind`; bounded to proposed_date >= 2010-01-01.
+    "rulemaking_lifecycles": [
+        ("kind", "VARCHAR"),
+        ("docket_id", "VARCHAR"),
+        ("agency_code", "VARCHAR"),
+        ("title", "VARCHAR"),
+        ("proposed_date", "DATE"),
+        ("final_date", "DATE"),
+        ("days", "BIGINT"),
+    ],
+    # Built by build_fr_docket_links: federal_register.docket_ids_json exploded to
+    # one row per (docket_id, FR document), carrying FR display columns.
+    "fr_docket_links": [
+        ("docket_id", "VARCHAR"),
+        ("document_number", "VARCHAR"),
+        ("title", "VARCHAR"),
+        ("abstract", "VARCHAR"),
+        ("document_type", "VARCHAR"),
+        ("subtype", "VARCHAR"),
+        ("publication_date", "VARCHAR"),
+        ("effective_on", "VARCHAR"),
+        ("comments_close_on", "VARCHAR"),
+        ("signing_date", "VARCHAR"),
+        ("agency_slugs", "VARCHAR"),
+        ("docket_ids_json", "VARCHAR"),
+        ("regulation_id_numbers_json", "VARCHAR"),
+        ("html_url", "VARCHAR"),
+        ("pdf_url", "VARCHAR"),
+        ("executive_order_number", "VARCHAR"),
+    ],
+    # Built by build_discovery_signals from documents.parquet; CURRENT_DATE-relative,
+    # so rows change on every rebuild. One row per spiking agency.
+    "discovery_signals": [
+        ("agency_code", "VARCHAR"),
+        ("recent_30d", "BIGINT"),
+        ("baseline", "DOUBLE"),
+        ("ratio", "DOUBLE"),
     ],
     # Ingested from reginfo.gov (build_unified_agenda); all columns are stored as
     # VARCHAR, array fields serialized as JSON strings. Keyed by (rin, agenda_edition).

@@ -30,6 +30,9 @@ TABLES = (
     "feed_summary",
     "agency_stats",
     "agency_monthly_volume",
+    "rulemaking_lifecycles",
+    "fr_docket_links",
+    "discovery_signals",
     "cfr_sections",
     "congress_bills",
     "unified_agenda",
@@ -241,7 +244,7 @@ def _build_connection() -> duckdb.DuckDBPyConnection:
 
 
 # Building a connection is the expensive part of a tool call — install httpfs +
-# iceberg, attach the R2 catalog over REST, and CREATE VIEW over all 20 tables
+# iceberg, attach the R2 catalog over REST, and CREATE VIEW over all 23 tables
 # (each reads a parquet footer over HTTPS), ~35s on a cold serverless instance.
 # The query that follows is milliseconds. So we build once and reuse: Fluid
 # Compute keeps a warmed instance's module state across invocations, and the
@@ -330,8 +333,8 @@ def _register_tools(mcp: FastMCP) -> None:
     def describe_table(table: str) -> dict[str, Any]:
         """Return the column schema for one Spicy Regs table.
 
-        Valid tables: dockets, documents, comments, comments_index, feed_summary,
-        agency_stats, agency_monthly_volume.
+        Call list_sources for the set of valid table names; an unknown name
+        returns them in the error payload.
         """
         if table not in TABLES:
             return {
@@ -359,10 +362,9 @@ def _register_tools(mcp: FastMCP) -> None:
     def query_sql(sql: str, max_rows: int = 25) -> dict[str, Any]:
         """Run a SQL query against the Spicy Regs R2 tables and return up to max_rows rows.
 
-        The connection is in-memory and read-only against R2. Available views:
-        dockets, documents, comments, comments_index, feed_summary, agency_stats,
-        agency_monthly_volume. Always include a LIMIT in exploratory queries;
-        results past max_rows are dropped.
+        The connection is in-memory and read-only against R2. One view exists per
+        table listed by list_sources. Always include a LIMIT in exploratory
+        queries; results past max_rows are dropped.
         """
         if max_rows <= 0 or max_rows > 500:
             return {"error": "max_rows must be between 1 and 500"}
