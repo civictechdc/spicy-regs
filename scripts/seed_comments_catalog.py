@@ -31,43 +31,12 @@ import argparse
 import sys
 from os import getenv
 from pathlib import Path
-from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 from loguru import logger
 
 from spicy_regs.schemas import COMMENT
 from spicy_regs.sources import iceberg, r2
-
-_REQUIRED_S3_ENV = ("R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_ENDPOINT")
-
-
-def _create_s3_secret(con) -> None:
-    """Register R2's S3 API as a DuckDB secret so the partition tree can be globbed.
-
-    Reads over the public HTTPS URL can't list directories (the whole reason the
-    catalog cutover exists), so the source partitions are read via the S3 API,
-    which does support listing/globbing.
-    """
-    missing = [v for v in _REQUIRED_S3_ENV if not getenv(v)]
-    if missing:
-        raise RuntimeError("Missing R2 S3 env var(s): " + ", ".join(missing))
-    # R2_ENDPOINT is a full URL for boto3; DuckDB wants the bare host + USE_SSL.
-    endpoint = getenv("R2_ENDPOINT", "")
-    host = urlparse(endpoint).netloc or endpoint.replace("https://", "").replace("http://", "")
-    con.execute(
-        f"""
-        CREATE OR REPLACE SECRET r2_s3_secret (
-            TYPE S3,
-            KEY_ID '{iceberg._sql_str(getenv("R2_ACCESS_KEY_ID", ""))}',
-            SECRET '{iceberg._sql_str(getenv("R2_SECRET_ACCESS_KEY", ""))}',
-            ENDPOINT '{iceberg._sql_str(host)}',
-            URL_STYLE 'path',
-            USE_SSL true,
-            REGION 'auto'
-        );
-        """
-    )
 
 
 def _agencies(con, bucket: str, only: str | None) -> list[str]:
@@ -104,13 +73,15 @@ def main() -> int:
     parser.add_argument("--agency", help="Load only this agency_code (default: all)")
     parser.add_argument("--output-dir", type=Path, default=Path("output"))
     parser.add_argument(
-        "--append", action="store_true",
+        "--append",
+        action="store_true",
         help="Allow loading into a non-empty catalog table (default: refuse). "
-             "The load is idempotent per agency (each agency's rows are replaced), "
-             "so this is safe for resuming an interrupted run.",
+        "The load is idempotent per agency (each agency's rows are replaced), "
+        "so this is safe for resuming an interrupted run.",
     )
     parser.add_argument(
-        "--upload-index", action="store_true",
+        "--upload-index",
+        action="store_true",
         help="Publish the rebuilt comments_index.parquet to R2 after loading",
     )
     args = parser.parse_args()
@@ -119,17 +90,16 @@ def main() -> int:
 
     con = iceberg._connect()  # iceberg + httpfs loaded, catalog attached
     try:
-        _create_s3_secret(con)
+        iceberg.create_s3_secret(con)
         iceberg._ensure_table(con, COMMENT)
 
-        existing = con.execute(
-            f"SELECT count(*) FROM {iceberg._qualified(COMMENT)}"
-        ).fetchone()[0]
+        existing = con.execute(f"SELECT count(*) FROM {iceberg._qualified(COMMENT)}").fetchone()[0]
         if existing and not args.append:
             logger.error(
                 "Catalog comments table already has {:,} rows. Re-run with --append "
                 "to load anyway — the load is idempotent per agency (each agency's "
-                "rows are replaced), so this is safe.", existing,
+                "rows are replaced), so this is safe.",
+                existing,
             )
             return 1
 
@@ -146,25 +116,16 @@ def main() -> int:
             # agency loads via a single atomic INSERT, so a nonzero count that
             # matches means it completed — no partial-agency state to worry about.
             want = expected.get(agency)
-            have = con.execute(
-                f"SELECT count(*) FROM {qualified} WHERE agency_code = '{safe}'"
-            ).fetchone()[0]
+            have = con.execute(f"SELECT count(*) FROM {qualified} WHERE agency_code = '{safe}'").fetchone()[0]
             if want is not None and have == want and have > 0:
-                logger.info(
-                    "  [{}/{}] {}: already loaded ({:,} rows) — skipping", i, len(agencies), agency, have
-                )
+                logger.info("  [{}/{}] {}: already loaded ({:,} rows) — skipping", i, len(agencies), agency, have)
                 skipped += 1
                 continue
-            glob = (
-                f"s3://{bucket}/comments/agency_code={safe}/"
-                "docket_id=*/year=*/month=*/part-0.parquet"
-            )
+            glob = f"s3://{bucket}/comments/agency_code={safe}/docket_id=*/year=*/month=*/part-0.parquet"
             try:
                 # replace_agency makes each agency load idempotent: a re-run
                 # replaces that agency's rows rather than duplicating them.
-                total = iceberg.seed_comments_from_parquet(
-                    con, glob, COMMENT, replace_agency=agency
-                )
+                total = iceberg.seed_comments_from_parquet(con, glob, COMMENT, replace_agency=agency)
                 loaded += 1
             except Exception as exc:  # noqa: BLE001 — keep going, report at the end
                 logger.warning("  [{}/{}] {}: skipped ({})", i, len(agencies), agency, exc)
@@ -173,9 +134,10 @@ def main() -> int:
 
         total = con.execute(f"SELECT count(*) FROM {qualified}").fetchone()[0]
         logger.info(
-            "Load complete: {:,} rows in the catalog comments table "
-            "({} agencies loaded, {} already-current skipped)",
-            total, loaded, skipped,
+            "Load complete: {:,} rows in the catalog comments table ({} agencies loaded, {} already-current skipped)",
+            total,
+            loaded,
+            skipped,
         )
 
         index_file = iceberg._build_comments_index(con, COMMENT, args.output_dir)
@@ -187,9 +149,7 @@ def main() -> int:
         logger.info("Uploading rebuilt comments index to R2...")
         r2.upload_file(index_file, remote_key="comments_index.parquet")
 
-    logger.info(
-        "Done. Verify with: uv run python scripts/check_comments_freshness.py"
-    )
+    logger.info("Done. Verify with: uv run python scripts/check_comments_freshness.py")
     return 0
 
 

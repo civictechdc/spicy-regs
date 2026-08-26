@@ -36,6 +36,7 @@ Credentials are read from the environment, alongside the existing ``R2_*`` vars:
 
 from os import getenv
 from pathlib import Path
+from urllib.parse import urlparse
 
 from loguru import logger
 
@@ -317,6 +318,98 @@ def seed_comments_from_parquet(
     return con.execute(f"SELECT count(*) FROM {_qualified(record_type)}").fetchone()[0]
 
 
+_REQUIRED_S3_ENV = ("R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_ENDPOINT")
+
+
+def create_s3_secret(con) -> None:
+    """Register R2's S3 API as a DuckDB secret so bucket objects can be read/globbed.
+
+    Reads over the public HTTPS URL can't list directories (the whole reason the
+    catalog cutover exists), so source Parquet is read via the S3 API, which does
+    support listing/globbing. Shared by the catalog seeding scripts.
+    """
+    missing = [v for v in _REQUIRED_S3_ENV if not getenv(v)]
+    if missing:
+        raise RuntimeError("Missing R2 S3 env var(s): " + ", ".join(missing))
+    # R2_ENDPOINT is a full URL for boto3; DuckDB wants the bare host + USE_SSL.
+    endpoint = getenv("R2_ENDPOINT", "")
+    host = urlparse(endpoint).netloc or endpoint.replace("https://", "").replace("http://", "")
+    con.execute(
+        f"""
+        CREATE OR REPLACE SECRET r2_s3_secret (
+            TYPE S3,
+            KEY_ID '{_sql_str(getenv("R2_ACCESS_KEY_ID", ""))}',
+            SECRET '{_sql_str(getenv("R2_SECRET_ACCESS_KEY", ""))}',
+            ENDPOINT '{_sql_str(host)}',
+            URL_STYLE 'path',
+            USE_SSL true,
+            REGION 'auto'
+        );
+        """
+    )
+
+
+def backfill_missing_from_parquet(con, source_uri: str, record_type: RecordType) -> tuple[int, int]:
+    """Insert published-Parquet rows the catalog table is missing; return ``(inserted, total)``.
+
+    The cutover counterpart to :func:`seed_comments_from_parquet`, for a table
+    that was routed through the catalog without ever being seeded from the
+    Parquet that preceded it. ``dockets`` was exactly that: the Iceberg path
+    landed while ``comments`` got a real seed and ``dockets`` got none, so the
+    catalog table only ever accumulated rows staged *after* the cutover (~5.4k of
+    ~276k). Every run then exported that sliver as the "full" public snapshot and
+    the shrink guard refused it, freezing the published table for eight weeks.
+
+    Rows are matched on ``record_type.dedup_key`` and only source keys **absent**
+    from the table are inserted. That ordering matters: the catalog's rows are
+    *newer* than the frozen snapshot (they are the post-cutover updates), so
+    overwriting them from Parquet would silently roll back eight weeks of
+    ingested changes. Backfilling only what is missing keeps the newer row
+    authoritative in every case, and makes a re-run a no-op rather than a
+    duplicate load — this does a plain ``INSERT``, with no dedup of its own.
+
+    Expressed as an anti-join rather than ``NOT IN`` because a single NULL key on
+    either side makes ``NOT IN`` return NULL for every row and quietly insert
+    nothing. The source is de-duplicated on its own key (latest ``modify_date``
+    wins) so a snapshot with repeats can't fan out into duplicate rows.
+    """
+    key = record_type.dedup_key
+    columns = list(record_type.schema)
+    esc = _sql_str(source_uri)
+    qualified = _qualified(record_type)
+
+    present = {
+        row[0]
+        for row in con.execute(
+            f"DESCRIBE SELECT * FROM read_parquet('{esc}', union_by_name=true, hive_partitioning=false)"
+        ).fetchall()
+    }
+    if key not in present:
+        raise RuntimeError(f"Source {source_uri} has no '{key}' column; refusing to backfill {record_type.name}")
+
+    projection = ", ".join(
+        f'CAST("{c}" AS VARCHAR) AS "{c}"' if c in present else f'CAST(NULL AS VARCHAR) AS "{c}"' for c in columns
+    )
+    col_list = ", ".join(f'"{c}"' for c in columns)
+
+    before = con.execute(f"SELECT count(*) FROM {qualified}").fetchone()[0]
+    con.execute(
+        f"""
+        INSERT INTO {qualified} ({col_list})
+        WITH src AS (
+            SELECT {projection}
+            FROM read_parquet('{esc}', union_by_name=true, hive_partitioning=false)
+            QUALIFY row_number() OVER (PARTITION BY "{key}" ORDER BY "modify_date" DESC NULLS LAST) = 1
+        )
+        SELECT {col_list} FROM src
+        WHERE src."{key}" IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM {qualified} t WHERE t."{key}" = src."{key}");
+        """
+    )
+    total = con.execute(f"SELECT count(*) FROM {qualified}").fetchone()[0]
+    return total - before, total
+
+
 def upsert_comment_text(con, record_type: RecordType, agency: str, updates) -> None:
     """Upsert filled ``text_content`` / ``text_extraction_status`` for one agency.
 
@@ -370,7 +463,9 @@ def upsert_comment_text(con, record_type: RecordType, agency: str, updates) -> N
         WHERE r.comment_id = u.comment_id;
         """
     )
-    con.execute(f"DELETE FROM {tbl} WHERE agency_code = '{ag}' AND comment_id IN (SELECT comment_id FROM _uct_replacement);")
+    con.execute(
+        f"DELETE FROM {tbl} WHERE agency_code = '{ag}' AND comment_id IN (SELECT comment_id FROM _uct_replacement);"
+    )
     con.execute(f"INSERT INTO {tbl} ({col_list}) SELECT {col_list} FROM _uct_replacement;")
     con.execute("DROP TABLE IF EXISTS _uct_updates;")
     con.execute("DROP TABLE IF EXISTS _uct_replacement;")
