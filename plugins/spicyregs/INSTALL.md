@@ -41,11 +41,14 @@ tools.
 Requires Pro, Max, Team, or Enterprise (custom connectors aren't available on
 free plans).
 
-1. Deploy `mcp-server/` to Vercel (see [`mcp-server/README.md`](../../mcp-server/README.md)).
-2. Open **Settings → Connectors → Add custom connector**.
-3. Name: `Spicy Regs`. URL: `https://<your-vercel-deploy>.vercel.app/mcp`.
+1. Open **Settings → Connectors → Add custom connector**.
+2. Name: `Spicy Regs`. URL: `https://mcp.spicy-regs.dev/mcp`.
    Authentication: None.
-4. Toggle the connector on in any conversation.
+3. Toggle the connector on in any conversation.
+
+The public server is already deployed — there's nothing to host yourself.
+[mcp.spicy-regs.dev](https://mcp.spicy-regs.dev/) has copy-paste config for
+every other client too.
 
 Claude.ai doesn't load repo skills directly, so paste the system prompt from
 [`provider-agnostic-prompt.md`](skills/spicyregs/references/provider-agnostic-prompt.md)

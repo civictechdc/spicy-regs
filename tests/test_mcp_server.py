@@ -16,6 +16,7 @@ import pytest
 
 from spicy_regs import mcp_server
 
+
 def test_jsonify_primitives_pass_through():
     assert mcp_server._jsonify(None) is None
     assert mcp_server._jsonify("hi") == "hi"
@@ -29,9 +30,7 @@ def test_jsonify_coerces_non_json_types():
     assert j(date(2024, 1, 2)) == "2024-01-02"
     assert j(datetime(2024, 1, 2, 3, 4, 5)) == "2024-01-02T03:04:05"
     assert j(Decimal("1.50")) == "1.50"
-    assert j(UUID("12345678-1234-5678-1234-567812345678")) == (
-        "12345678-1234-5678-1234-567812345678"
-    )
+    assert j(UUID("12345678-1234-5678-1234-567812345678")) == ("12345678-1234-5678-1234-567812345678")
     assert j(b"\x00\xff") == "00ff"
     assert j([Decimal("1"), date(2024, 1, 1)]) == ["1", "2024-01-01"]
     assert j({"a": Decimal("2"), "b": [b"\xab"]}) == {"a": "2", "b": ["ab"]}
@@ -172,10 +171,7 @@ def test_sandbox_survives_temp_spill():
     out-of-memory error — never the confusing permission error.
     """
     con = _sandboxed_connection(memory_limit="20MB")
-    spilling_sql = (
-        "SELECT i, count(*) AS c FROM range(3_000_000) r(i) "
-        "GROUP BY i ORDER BY c, i DESC"
-    )
+    spilling_sql = "SELECT i, count(*) AS c FROM range(3_000_000) r(i) GROUP BY i ORDER BY c, i DESC"
     try:
         con.execute(spilling_sql).fetchall()
     except duckdb.OutOfMemoryException:
@@ -237,9 +233,7 @@ def test_comments_catalog_view_dedups_on_read():
     )
     rows = con.execute("SELECT comment_id, comment FROM comments ORDER BY comment_id").fetchall()
     assert rows == [("c1", "new"), ("c2", "only-null"), ("c3", "unique")]
-    counts = con.execute(
-        "SELECT count(*), count(DISTINCT comment_id) FROM comments"
-    ).fetchone()
+    counts = con.execute("SELECT count(*), count(DISTINCT comment_id) FROM comments").fetchone()
     assert counts is not None
     total, distinct = counts
     assert total == distinct == 3
@@ -360,9 +354,7 @@ def test_query_sql_reuses_one_connection_across_calls(monkeypatch):
     server = module.build_server()
 
     for _ in range(2):
-        asyncio.run(
-            server.call_tool("query_sql", {"sql": "SELECT docket_count FROM agency_stats", "max_rows": 1})
-        )
+        asyncio.run(server.call_tool("query_sql", {"sql": "SELECT docket_count FROM agency_stats", "max_rows": 1}))
 
     assert build_count["n"] == 1
     module._reset_connection_cache()
@@ -434,3 +426,57 @@ def test_security_settings_honor_memory_and_temp(tmp_path, monkeypatch):
     mcp_server._apply_security_settings(con)
     assert _setting(con, "temp_directory") == str(tmp_path)
     assert _setting(con, "memory_limit") not in ("", None)
+
+
+def test_landing_page_renders_every_table():
+    """The view list is substituted from TABLES, not hand-maintained in the HTML.
+
+    The restored page shipped a hardcoded list that had drifted seven tables
+    behind; this pins the substitution so it cannot silently rot again.
+    """
+    html = mcp_server._landing_page().decode("utf-8")
+    assert "<!--VIEWS-->" not in html
+    for table in mcp_server.TABLES:
+        assert f'<code class="inline">{table}</code>' in html
+
+
+def test_landing_assets_exist_in_package():
+    """Both assets must ship inside the installed package — the container
+    installs the wheel and has no repo checkout to read them from."""
+    assert (mcp_server.STATIC_DIR / "index.html").is_file()
+    assert mcp_server._landing_icon()[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_app_serves_landing_page_and_mcp_endpoint():
+    """/ serves the setup page and /mcp still speaks the protocol."""
+    from starlette.testclient import TestClient
+
+    with TestClient(mcp_server.build_app()) as client:
+        page = client.get("/")
+        assert page.status_code == 200
+        assert page.headers["content-type"].startswith("text/html")
+        assert b"Spicy Regs MCP Server" in page.content
+
+        icon = client.get("/icon.png")
+        assert icon.status_code == 200
+        assert icon.headers["content-type"] == "image/png"
+
+        handshake = client.post(
+            "/mcp",
+            headers={
+                "Accept": "application/json, text/event-stream",
+                "Content-Type": "application/json",
+            },
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test", "version": "1"},
+                },
+            },
+        )
+        assert handshake.status_code == 200
+        assert b'"spicy-regs"' in handshake.content

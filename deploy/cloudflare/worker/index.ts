@@ -33,7 +33,14 @@ export class McpContainer extends Container<Env> {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const { pathname } = new URL(request.url);
-    if (pathname === "/mcp" || pathname.startsWith("/mcp/")) {
+    // /mcp is the protocol endpoint; / and /icon.png are the human-facing setup
+    // page, which the Python server serves (see mcp_server._register_landing_page).
+    if (
+      pathname === "/mcp" ||
+      pathname.startsWith("/mcp/") ||
+      pathname === "/" ||
+      pathname === "/icon.png"
+    ) {
       return getContainer(env.MCP_CONTAINER).fetch(request);
     }
     return new Response("Not found", { status: 404 });

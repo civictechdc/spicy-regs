@@ -236,7 +236,7 @@ A read-only MCP server exposes SQL over the corpus with three tools:
 
 | Client | Setup |
 |---|---|
-| **Claude.ai** or any remote MCP client | Add `https://mcp.spicy-regs.dev/mcp` as a Custom Connector. See [`mcp-server/README.md`](mcp-server/README.md). |
+| **Claude.ai** or any remote MCP client | Add `https://mcp.spicy-regs.dev/mcp` as a Custom Connector. Copy-paste setup for every client is at [mcp.spicy-regs.dev](https://mcp.spicy-regs.dev/). |
 | **Claude Code** (plugin) | `/plugin marketplace add civictechdc/spicy-regs` then `/plugin install spicyregs@spicy-regs-local` |
 | **Claude Code** (stdio, no deploy) | `claude mcp add spicy-regs -- uvx --from "spicy-regs @ git+https://github.com/civictechdc/spicy-regs" spicy-regs-mcp` |
 | **Cursor / Continue / OpenAI / others** | See [`plugins/spicyregs/INSTALL.md`](plugins/spicyregs/INSTALL.md) for the full matrix, including a prompt-only fallback for assistants without MCP support. |
@@ -254,7 +254,7 @@ src/spicy_regs/
 ├── data_dictionary.py# Generates the docs site from the schemas
 └── cli.py            # Local data CLI (download / stats / sample / search)
 
-mcp-server/           # Vercel deployment of the MCP server
+mcp-server/           # MCP server engineering notes (the server itself is src/spicy_regs/mcp_server.py)
 scripts/              # Operational tooling (dedupe, seed, freshness checks)
 notebooks/            # Example analyses (runnable on Binder)
 tests/                # Unit suite; integration tests are opt-in

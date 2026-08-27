@@ -132,7 +132,7 @@ src/spicy_regs/
 ├── mcp_server.py         # stdio MCP server (`spicy-regs-mcp` script)
 └── vectordb/             # embedding pipeline (optional `embed` extra)
 
-mcp-server/               # standalone HTTP MCP server (Vercel-deployable)
+mcp-server/               # MCP server engineering notes (INTERNALS.md; server lives in src/)
 notebooks/                # exploratory Jupyter notebooks (Binder-runnable)
 sample-data/              # tiny fixtures used by tests
 scripts/                  # one-off operational scripts

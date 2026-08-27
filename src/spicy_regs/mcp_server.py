@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import logging
 import os
 import re
@@ -9,6 +10,8 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+from functools import lru_cache
+from pathlib import Path
 from time import monotonic as _monotonic
 from typing import Any
 from urllib.parse import urlparse
@@ -18,6 +21,8 @@ import duckdb
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import Icon
+from starlette.requests import Request
+from starlette.responses import Response
 
 from spicy_regs._icon import ICON_DATA_URI
 
@@ -391,6 +396,54 @@ def build_server() -> FastMCP:
     return mcp
 
 
+STATIC_DIR = Path(__file__).parent / "static"
+
+
+@lru_cache(maxsize=1)
+def _landing_page() -> bytes:
+    """The setup page served at /, with its view list rendered from TABLES.
+
+    The list used to be hand-maintained in the HTML and had drifted seven
+    tables behind by the time this page was restored; substituting it here
+    keeps the page honest as TABLES grows.
+    """
+    views = " ·\n        ".join(f'<code class="inline">{table}</code>' for table in TABLES)
+    html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    return html.replace("<!--VIEWS-->", views).encode("utf-8")
+
+
+@lru_cache(maxsize=1)
+def _landing_icon() -> bytes:
+    """Decoded from ICON_DATA_URI so the PNG has exactly one home in the package."""
+    return base64.b64decode(ICON_DATA_URI.split(",", 1)[1])
+
+
+def _register_landing_page(mcp: FastMCP) -> None:
+    """Serve the human-facing setup page alongside the MCP endpoint.
+
+    Vercel served this as a static file at the site root; when that deploy was
+    retired the page went with it, leaving mcp.spicy-regs.dev/ a bare 404. It
+    lives in the canonical server now so every host (Cloud Run, the Cloudflare
+    container) gets it without host-specific static-file config.
+    """
+
+    @mcp.custom_route("/", methods=["GET"])
+    async def landing(_request: Request) -> Response:
+        return Response(
+            _landing_page(),
+            media_type="text/html; charset=utf-8",
+            headers={"Cache-Control": "public, max-age=300"},
+        )
+
+    @mcp.custom_route("/icon.png", methods=["GET"])
+    async def icon(_request: Request) -> Response:
+        return Response(
+            _landing_icon(),
+            media_type="image/png",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+
+
 def build_app():
     mcp = FastMCP(
         "spicy-regs",
@@ -401,6 +454,7 @@ def build_app():
         transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
     )
     _register_tools(mcp)
+    _register_landing_page(mcp)
     return mcp.streamable_http_app()
 
 
