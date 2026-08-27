@@ -35,12 +35,19 @@ on:
         type: boolean
 
 concurrency:
-  # Same group as the ETL and the dedupe/backfill workflows: every writer to the
-  # catalog must be serialized, since the upsert is DELETE+INSERT (DuckDB's
-  # Iceberg engine has no MERGE INTO) and is not safe under concurrent writers.
-  # cancel-in-progress:false so this queues behind an in-flight ETL run instead
-  # of cancelling it mid-write.
-  group: comments-catalog-write
+  # Writers share one group with the ETL and the dedupe/backfill workflows: every
+  # writer to the catalog must be serialized, since the upsert is DELETE+INSERT
+  # (DuckDB's Iceberg engine has no MERGE INTO) and is not safe under concurrent
+  # writers. cancel-in-progress:false so a write queues behind an in-flight ETL
+  # run instead of cancelling it mid-write.
+  #
+  # A dry run is exempt: it only counts rows and writes nothing, so holding it on
+  # the write lock bought no safety and made the diagnostic unusable exactly when
+  # it was needed — the first dispatch sat pending behind a sweep with ~4.5 hours
+  # of batches left. Giving it a per-run group lets it start immediately. Note
+  # the fallback is the write group, so a malformed or absent input serializes
+  # rather than running free.
+  group: ${{ inputs.dry_run == true && format('seed-dockets-dry-{0}', github.run_id) || 'comments-catalog-write' }}
   cancel-in-progress: false
 
 jobs:
