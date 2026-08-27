@@ -12,13 +12,22 @@ name: Backfill comment attachment text (manual)
 #   3. publish-comments-mirror  — rebuilds the public read files so the UI /
 #      dashboard see the newly-filled text
 #
+# `discover_from_derived` (step 1 only, on by default) is what makes this reach
+# the historical corpus. `attachments_json` was dropped from the comment schema
+# for a stretch and the ingest manifest never revisits an already-processed key,
+# so nearly every pre-2023 comment row carries a NULL there — and the default
+# candidate gate (attachments_json truthy) skips it forever. With the flag, a
+# comment is a candidate on text_extraction_status alone and the per-docket
+# derived-data listing decides whether extracted text actually exists. Step 2
+# cannot take the same flag: it downloads the attachment URLs, which only
+# attachments_json carries.
+#
 # Manual dispatch only — it WRITES the production catalog and republishes the
 # public mirror, so it never runs on a schedule. Defaults to a single-agency
 # smoke test (NARA — small, has attachment comments, verified ~83% fill); flip
 # `full_load` on for every agency once the smoke test looks right. Both backfills
 # are incremental (rows with a text_extraction_status are skipped), so a re-run
-# only does new work. Attachments are ~0.4% of comments, so even the full load
-# touches only tens of thousands of rows.
+# only does new work.
 #
 # Requires these repo secrets:
 #   R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT, R2_BUCKET_NAME, R2_PUBLIC_URL
@@ -55,6 +64,11 @@ on:
         description: 'Re-process rows that already have a text_extraction_status'
         required: false
         default: false
+        type: boolean
+      discover_from_derived:
+        description: 'Step 1: also consider comments with no attachments_json (needed for historical rows). Lists every docket in scope, so it is slower.'
+        required: false
+        default: true
         type: boolean
 
 concurrency:
@@ -108,11 +122,13 @@ jobs:
           AGENCY: ${{ inputs.agency }}
           LIMIT: ${{ inputs.limit }}
           OVERWRITE: ${{ inputs.overwrite }}
+          DISCOVER_FROM_DERIVED: ${{ inputs.discover_from_derived }}
         run: |
           args=()
           if [ "$FULL_LOAD" != "true" ] && [ -n "$AGENCY" ]; then args+=(--agency "$AGENCY"); fi
           if [ -n "$LIMIT" ] && [ "$LIMIT" != "0" ]; then args+=(--limit "$LIMIT"); fi
           if [ "$OVERWRITE" = "true" ]; then args+=(--overwrite); fi
+          if [ "$DISCOVER_FROM_DERIVED" = "true" ]; then args+=(--discover-from-derived); fi
           echo "Running: uv run backfill-comment-text --use-iceberg ${args[*]}"
           uv run backfill-comment-text --use-iceberg "${args[@]}"
 
