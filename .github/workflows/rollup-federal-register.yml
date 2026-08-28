@@ -1,0 +1,19 @@
+name: Rollup — federal_register
+on:
+  schedule:
+    # 21:00 UTC — ingest FR before the fr-docket-links rollup rebuilds at 23:30.
+    - cron: '0 21 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-federal-register
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}

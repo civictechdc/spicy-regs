@@ -1,0 +1,32 @@
+name: Rollup — fcc_filings
+on:
+  schedule:
+    # 18:40 UTC — incremental merge of new FCC ECFS filings (after the
+    # proceedings rollup so a filing's proceeding usually already exists).
+    - cron: '40 18 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+      fcc_since:
+        description: 'Optional backfill start date (YYYY-MM-DD)'
+        required: false
+        default: ''
+        type: string
+      fcc_proceedings:
+        description: 'Optional comma-separated proceeding names to scope the fetch (e.g. 17-108,23-320)'
+        required: false
+        default: ''
+        type: string
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-fcc-filings
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}
+      fcc_since: ${{ github.event_name == 'workflow_dispatch' && inputs.fcc_since || '' }}
+      fcc_proceedings: ${{ github.event_name == 'workflow_dispatch' && inputs.fcc_proceedings || '' }}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Spicy Regs"
+  short_description: "Query the Spicy Regs R2 regulatory dataset"
+  default_prompt: "Use $spicyregs to answer questions from the Spicy Regs Cloudflare R2 data, citing docket, document, or comment IDs whenever possible."

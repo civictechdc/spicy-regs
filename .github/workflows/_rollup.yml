@@ -1,0 +1,112 @@
+name: Rollup (reusable)
+
+# Reusable workflow that runs one decoupled rollup pipeline (`run-rollup-*`).
+# Each rollup has its own thin caller workflow (rollup-*.yml) with its own cron;
+# they all delegate here so the build/publish steps live in one place.
+#
+# The `run-rollup-*` console scripts default to --skip-upload (vetting), so this
+# passes --no-skip-upload for real runs; callers can flip it back for dry runs.
+on:
+  workflow_call:
+    inputs:
+      command:
+        description: 'The run-rollup-* console script to run (e.g. run-rollup-feed-summary)'
+        required: true
+        type: string
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+      lda_since:
+        description: 'Optional LDA catch-up start date (YYYY-MM-DD)'
+        required: false
+        default: ''
+        type: string
+      lda_until:
+        description: 'Optional LDA catch-up end date (YYYY-MM-DD; still capped to a 30-day run)'
+        required: false
+        default: ''
+        type: string
+      congress_since:
+        description: 'Optional Congress.gov backfill start date (YYYY-MM-DD)'
+        required: false
+        default: ''
+        type: string
+      fcc_since:
+        description: 'Optional FCC ECFS backfill start date (YYYY-MM-DD)'
+        required: false
+        default: ''
+        type: string
+      fcc_proceedings:
+        description: 'Optional comma-separated FCC proceeding names to scope the filings fetch (e.g. 17-108,23-320)'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  rollup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run rollup
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          # Cloudflare edge-cache purge after publish (best-effort; no-op if unset).
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
+          # SAM.gov Entity API key. Unlike the generic DATA_GOV_API_KEY, SAM
+          # requires a key provisioned by a SAM.gov account (api.data.gov-backed);
+          # the sam-entities rollup is a no-op without it.
+          SAM_API_KEY: ${{ secrets.SAM_API_KEY }}
+          # Optional: raises the Senate LDA API rate limit. The lobbying-filings
+          # rollup is fully functional keyless, so an unset secret is fine.
+          LDA_API_KEY: ${{ secrets.LDA_API_KEY }}
+          LDA_SINCE: ${{ inputs.lda_since }}
+          LDA_UNTIL: ${{ inputs.lda_until }}
+          CONGRESS_SINCE: ${{ inputs.congress_since }}
+          FCC_SINCE: ${{ inputs.fcc_since }}
+          FCC_PROCEEDINGS: ${{ inputs.fcc_proceedings }}
+          # Optional: raises the CourtListener API rate limit. The court_dockets
+          # rollup is fully functional keyless, so an unset secret is fine.
+          COURTLISTENER_API_TOKEN: ${{ secrets.COURTLISTENER_API_TOKEN }}
+          # Passed via env (not interpolated into the command) to keep the run
+          # step free of any templated string in an executable position.
+          COMMAND: ${{ inputs.command }}
+          SKIP_UPLOAD: ${{ inputs.skip_upload }}
+        run: |
+          if [ "$SKIP_UPLOAD" = "true" ]; then
+            UPLOAD_ARG="--skip-upload"
+          else
+            UPLOAD_ARG="--no-skip-upload"
+          fi
+          echo "Running: uv run $COMMAND $UPLOAD_ARG"
+          uv run "$COMMAND" "$UPLOAD_ARG"
+
+      - name: Upload artifacts (for debugging)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollup-output
+          path: output/
+          retention-days: 7

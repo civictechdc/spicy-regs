@@ -1,0 +1,31 @@
+name: Rollup — lobbying_filings
+on:
+  schedule:
+    # 19:00 UTC — ingest Senate LDA filings daily.
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+      since:
+        description: 'Catch-up start date (YYYY-MM-DD); blank uses the stored watermark'
+        required: false
+        default: ''
+        type: string
+      until:
+        description: 'Catch-up end date (YYYY-MM-DD); each run remains capped at 30 days'
+        required: false
+        default: ''
+        type: string
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-lobbying-filings
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}
+      lda_since: ${{ inputs.since || '' }}
+      lda_until: ${{ inputs.until || '' }}

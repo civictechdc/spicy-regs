@@ -1,0 +1,39 @@
+{
+  "name": "spicyregs",
+  "version": "0.1.0",
+  "description": "Query Spicy Regs regulatory datasets with DuckDB against the public Cloudflare R2 bucket.",
+  "author": {
+    "name": "Civic Tech DC",
+    "email": "opensource@civictechdc.org",
+    "url": "https://github.com/civictechdc/spicy-regs"
+  },
+  "homepage": "https://github.com/civictechdc/spicy-regs",
+  "repository": "https://github.com/civictechdc/spicy-regs",
+  "license": "MIT",
+  "keywords": [
+    "regulations",
+    "regulatory-data",
+    "duckdb",
+    "polars",
+    "spicy-regs"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Spicy Regs",
+    "shortDescription": "Query regulatory data from the Spicy Regs R2 bucket",
+    "longDescription": "Use a lightweight standalone DuckDB helper to answer questions about dockets, documents, comments, agencies, and filing timelines from the public Spicy Regs Cloudflare R2 parquet bucket. If the remote dataset is unavailable, the plugin should say so explicitly rather than silently substituting another source.",
+    "developerName": "Civic Tech DC",
+    "category": "Research",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/civictechdc/spicy-regs",
+    "privacyPolicyURL": "https://github.com/civictechdc/spicy-regs",
+    "termsOfServiceURL": "https://github.com/civictechdc/spicy-regs",
+    "defaultPrompt": [
+      "Query the Spicy Regs Cloudflare R2 parquet data and cite the docket, document, or comment IDs used in the answer."
+    ],
+    "brandColor": "#C2410C"
+  }
+}

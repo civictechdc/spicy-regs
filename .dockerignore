@@ -1,0 +1,31 @@
+# Keep the Docker build context lean. The Cloud Run image (deploy/cloudrun/) needs
+# only pyproject.toml, README.md, and src/; everything below is noise that would
+# bloat the upload or, in the case of .env, leak secrets into the image.
+
+# Original dev/deploy hygiene
+.venv/
+node_modules/
+.git/
+.github/
+output/
+spicy-regs-data/
+notebooks/
+sample-data/
+*.pyc
+__pycache__/
+.vercel/
+.claude/
+.vscode/
+.agent/
+
+# Not needed in the MCP container image
+tests/
+docs/
+data_dictionary/
+scripts/
+recovery/
+mcp-server/
+graphify-out/
+*.parquet
+.env
+.env.*

@@ -1,0 +1,433 @@
+"""The regulations.gov ETL, expressed through the Reader/Writer/Pipeline base classes.
+
+This is also the run file. Invoke it via the ``run-pipeline`` console script::
+
+    uv run run-pipeline --skip-upload --since-year 2025
+    uv run run-pipeline --agency EPA --no-skip-upload
+
+``RegulationsPipeline.run()`` reads top-to-bottom as the data flow:
+
+    1. Prime      — load the incremental Manifest and existing output.
+    2. Extract → stage  — ``stage_agencies`` fans agencies out in parallel; each
+       record stream flows Mirrulations Reader (raw JSON) -> ExtractRecords
+       transform (flatten) -> StagingWriter (local Parquet).
+    3. Merge      — per-agency staging Parquet is merged + deduplicated (a bulk,
+       whole-dataset transform).
+    4. Load       — the Manifest is persisted and the dataset published to R2
+       (upload is off by default while this path is being vetted).
+
+The reusable pieces live elsewhere: connection details + the reader factory in
+``sources.mirrulations``, the json→record transform in ``transforms.extract``,
+the parallel fan-out in ``pipelines.staging``, R2 in ``sources.r2``, and
+processed-key tracking in ``manifest``. This module is just the wiring.
+"""
+
+from os import getenv
+from pathlib import Path
+from shutil import rmtree
+from typing import Annotated, ClassVar
+
+from cyclopts import App, Parameter
+from dotenv import load_dotenv
+from loguru import logger
+
+from spicy_regs.manifest import Manifest, save_failed_keys
+from spicy_regs.pipelines.base import Pipeline
+from spicy_regs.pipelines.staging import stage_agencies
+from spicy_regs.schemas import RECORD_TYPES, RecordType
+from spicy_regs.sources import iceberg, mirrulations, r2
+from spicy_regs.sources.derived_text import DerivedCommentText
+from spicy_regs.transforms import (
+    Chain,
+    EnrichCommentText,
+    ExtractRecords,
+    Transform,
+    merge_comments_partitioned,
+    merge_staging_files,
+    update_comments_index,
+    write_staging,
+)
+
+
+class RegulationsPipeline(Pipeline):
+    """Mirrulations S3 → Parquet ETL, composed from Readers, Writers, and transforms."""
+
+    name: ClassVar[str] = "regulations"
+
+    def __init__(
+        self,
+        *,
+        agency: str | None = None,
+        output_dir: Path | None = None,
+        since_year: int | None = None,
+        skip_upload: bool = True,
+        skip_comments: bool = False,
+        only_comments: bool = False,
+        batch_number: int | None = None,
+        batch_size: int = 45,
+        full_refresh: bool = False,
+        max_workers: int = 4,
+        use_iceberg: bool = False,
+        enrich_text: bool = True,
+        chunk_size: int = 0,
+        verbose: bool = False,
+    ) -> None:
+        self.agency = agency
+        self.output_dir = output_dir
+        self.since_year = since_year
+        self.skip_upload = skip_upload
+        self.skip_comments = skip_comments
+        self.only_comments = only_comments
+        self.batch_number = batch_number
+        self.batch_size = batch_size
+        self.full_refresh = full_refresh
+        self.max_workers = max_workers
+        self.use_iceberg = use_iceberg
+        self.enrich_text = enrich_text
+        self.chunk_size = chunk_size
+        self.verbose = verbose
+
+    def run(self) -> None:
+        output_dir = self.output_dir or (Path.cwd() / "output")
+        staging_dir = output_dir / "staging"
+        staging_dir.mkdir(parents=True, exist_ok=True)
+
+        record_types = self._record_types()
+        agencies = self._agencies()
+
+        # Chunked comments path: for an agency too large to buffer whole (millions
+        # of comments would OOM), ingest its comments in bounded key-chunks,
+        # committing each into the catalog. Only meaningful for the iceberg
+        # comments-only case (the catalog is a row-level upsert surface).
+        if self.chunk_size and self.only_comments and self.use_iceberg:
+            manifest = Manifest.empty() if self.full_refresh else Manifest.load(output_dir)
+            for agency in agencies:
+                self._ingest_comments_chunked(agency, output_dir, staging_dir, manifest)
+            rmtree(staging_dir, ignore_errors=True)
+            logger.info("Done!")
+            return
+
+        # 1. Prime: load processed-key manifest + existing output for incremental work.
+        if self.full_refresh:
+            logger.info("Full refresh — ignoring manifest and existing output")
+            manifest = Manifest.empty()
+        else:
+            manifest = Manifest.load(output_dir)
+            self._download_existing(output_dir, record_types)
+
+        # 2. Extract → stage: fan agencies out, pumping each source into staging.
+        logger.info(
+            "Processing {} agencies × {} record types ({} workers)",
+            len(agencies),
+            len(record_types),
+            self.max_workers,
+        )
+        result = stage_agencies(
+            agencies,
+            record_types,
+            staging_dir,
+            mirrulations.reader_factory(
+                record_types,
+                processed_keys=manifest,
+                since_year=self.since_year,
+                verbose=self.verbose,
+            ),
+            transform_for=self._transform_for,
+            max_workers=self.max_workers,
+        )
+        manifest.record(result.consumed_keys)
+        # Transient download failures were already excluded from consumed_keys, so
+        # the manifest never marks them processed and the next run retries them;
+        # parse failures were staged as processed. Surface both and persist a
+        # local diagnostic (transient count doubles as a download-health alert).
+        if result.failed_keys or result.parse_failed_keys:
+            logger.warning(
+                "{} keys failed download (excluded from manifest, retried next run); "
+                "{} parse failures (marked processed)",
+                len(result.failed_keys),
+                len(result.parse_failed_keys),
+            )
+        else:
+            logger.info("0 download/parse failures this run")
+        save_failed_keys(output_dir, result.failed_keys, result.parse_failed_keys)
+
+        # 3. Transform: merge per-agency staging into the deduplicated dataset.
+        staged = result.rows_by_type
+        changed_comments: list[Path] = []
+        if any(staged.values()):
+            changed_comments = self._merge(staging_dir, output_dir, record_types, staged)
+            rmtree(staging_dir, ignore_errors=True)
+            # Rollups (feed_summary, agency_stats, agency_monthly_volume,
+            # docket_search, rulemaking_lifecycles, discovery_signals,
+            # fr_docket_links) are no longer built here. Each is materialized by
+            # its own decoupled pipeline (`run-rollup-*`) on an independent cron,
+            # reading the base tables this ETL publishes below.
+        else:
+            logger.info("No new records staged; skipping merge.")
+
+        # 4. Load: persist the manifest, then publish to R2 (off by default while vetting).
+        manifest.save(output_dir)
+        if self.skip_upload:
+            logger.info("skip_upload=True — output left in {}", output_dir)
+        elif any(staged.values()):
+            logger.info("Uploading to R2...")
+            r2.upload_dataset(output_dir, [rt.name for rt in record_types if rt.name != "comments"])
+            # Comments are partitioned, not monolithic: publish the partitions
+            # changed this run plus the refreshed index.
+            if changed_comments:
+                logger.info("Uploading {} changed comment partitions...", len(changed_comments))
+                r2.upload_comment_partitions(output_dir, changed_comments)
+            # Iceberg comments path: the MERGE wrote the rows through the catalog
+            # (not under the public comments/ prefix), so there are no partition
+            # files to push — only the refreshed index needs publishing.
+            elif self.use_iceberg and staged.get("comments", 0) > 0:
+                index_file = output_dir / "comments_index.parquet"
+                if index_file.exists():
+                    logger.info("Uploading refreshed comments index (Iceberg path)...")
+                    r2.upload_file(index_file, remote_key="comments_index.parquet")
+
+        logger.info("Done!")
+
+    def _ingest_comments_chunked(self, agency: str, output_dir: Path, staging_dir: Path, manifest: Manifest) -> None:
+        """Ingest one agency's comments in bounded key-chunks, committing each.
+
+        Downloads at most ``chunk_size`` comment files at a time, stages them,
+        MERGEs them into the catalog, then frees memory before the next chunk —
+        so a multi-million-comment agency (which would otherwise buffer every
+        record and OOM) ingests in even, durable pieces. Deleting the staging
+        chunk between iterations keeps peak memory ~one chunk.
+        """
+        comment_rt = RECORD_TYPES["comments"]
+        resource = mirrulations.s3_resource()
+        keys = mirrulations.list_agency_files_by_type(
+            resource,
+            mirrulations.BUCKET,
+            mirrulations.PREFIX,
+            agency,
+            [comment_rt],
+            processed_keys=manifest,
+            since_year=self.since_year,
+            verbose=self.verbose,
+        )["comments"]
+        transform = self._transform_for(comment_rt)
+        total = len(keys)
+        logger.info("[{}] comments: {} files, ingesting in chunks of {}", agency, total, self.chunk_size)
+
+        # Accumulate failures across chunks so the per-run diagnostic is written
+        # once for the whole agency (save_failed_keys overwrites per run).
+        agency_failures = mirrulations.DownloadFailures()
+        for start in range(0, total, self.chunk_size):
+            chunk = keys[start : start + self.chunk_size]
+            label = f"[{agency}] comments {start + len(chunk)}/{total}"
+            failures = mirrulations.DownloadFailures()
+            payloads = mirrulations.download_keys(resource, mirrulations.BUCKET, chunk, label=label, failures=failures)
+            records = list(transform.apply(payloads))
+            # One in-run retry over transient failures before committing the chunk,
+            # mirroring the reader path (a huge agency's chunk shouldn't drop a
+            # record to a single transient blip).
+            if failures.transient:
+                retry = mirrulations.DownloadFailures()
+                retried = mirrulations.download_keys(
+                    resource, mirrulations.BUCKET, list(failures.transient), label=f"{label} retry", failures=retry
+                )
+                records.extend(transform.apply(retried))
+                failures.transient = retry.transient
+                failures.parse.extend(retry.parse)
+            write_staging(agency, comment_rt.name, records, staging_dir, comment_rt.schema)
+            iceberg.merge_comments(staging_dir, output_dir, comment_rt)
+            rmtree(staging_dir / comment_rt.name, ignore_errors=True)
+            # Exclude still-failing transient keys from the manifest so the next
+            # run re-lists them; parse failures stay recorded (marked processed).
+            dropped = set(failures.transient)
+            manifest.record([k for k in chunk if k not in dropped])
+            agency_failures.transient.extend(failures.transient)
+            agency_failures.parse.extend(failures.parse)
+            logger.info("[{}] comments: committed {}/{}", agency, start + len(chunk), total)
+
+        if agency_failures.transient or agency_failures.parse:
+            logger.warning(
+                "[{}] comments: {} download failures (retry next run), {} parse failures (marked processed)",
+                agency,
+                len(agency_failures.transient),
+                len(agency_failures.parse),
+            )
+            save_failed_keys(output_dir, agency_failures.transient, agency_failures.parse)
+
+    # -- regulations-specific wiring ---------------------------------------
+
+    def _transform_for(self, record_type: RecordType) -> Transform:
+        """Build the staging transform for one record type.
+
+        Every type is flattened by :class:`ExtractRecords`. Comments are
+        additionally enriched inline with Mirrulations' pre-extracted attachment
+        text (the primary source for ``text_content``); a fresh
+        :class:`DerivedCommentText` — and thus a fresh S3 resource — is built per
+        call so the chain is safe to run from staging's worker threads.
+        """
+        extract = ExtractRecords(record_type)
+        if record_type.name == "comments" and self.enrich_text:
+            fetcher = DerivedCommentText(mirrulations.s3_resource())
+            return Chain(extract, EnrichCommentText(fetcher))
+        return extract
+
+    def _record_types(self) -> list[RecordType]:
+        """The record types to process, honoring skip/only-comments."""
+        names = list(RECORD_TYPES)
+        if self.skip_comments:
+            names = [n for n in names if n != "comments"]
+        elif self.only_comments:
+            names = ["comments"]
+        return [RECORD_TYPES[n] for n in names]
+
+    def _agencies(self) -> list[str]:
+        """Agencies to process: explicit, AGENCIES env, or S3 discovery; then batched."""
+        if self.agency is not None:
+            agencies = [self.agency]
+        elif (agencies_env := getenv("AGENCIES")) is not None:
+            agencies = agencies_env.split(",")
+        else:
+            agencies = mirrulations.discover_agencies()
+
+        if self.batch_number is not None:
+            start = self.batch_number * self.batch_size
+            agencies = agencies[start : start + self.batch_size]
+        return agencies
+
+    def _download_existing(self, output_dir: Path, record_types: list[RecordType]) -> None:
+        """Fetch existing output from R2 so an incremental run appends to it.
+
+        Monolithic ``{type}.parquet`` files are pulled whole. Comment
+        *partitions* are large and fetched on demand during the merge, but the
+        global comment index must be primed here: ``update_comments_index``
+        rebuilds the index by keeping the existing rows for partitions this run
+        didn't touch, reading them from the local ``comments_index.parquet``.
+        Without the remote index on disk, a batch that stages new comments
+        rewrites the index down to only its own ~21 agencies' partitions — and
+        the upload shrink-guard then (correctly) aborts the run.
+        """
+        for rt in record_types:
+            if rt.name == "comments":
+                # Partitions are fetched on demand at merge, but the index is
+                # global — prime it so the rebuild keeps untouched partitions.
+                index_file = output_dir / "comments_index.parquet"
+                if not index_file.exists():
+                    r2.download("comments_index.parquet", index_file)
+                continue
+            local = output_dir / f"{rt.name}.parquet"
+            if not local.exists():
+                r2.download(f"{rt.name}.parquet", local)
+
+    def _merge(
+        self,
+        staging_dir: Path,
+        output_dir: Path,
+        record_types: list[RecordType],
+        staged: dict[str, int],
+    ) -> list[Path]:
+        """Merge staging files: dockets/documents monolithically, comments partitioned.
+
+        When ``use_iceberg`` is set, the ``dockets`` table is routed through the
+        R2 Data Catalog (Iceberg ``MERGE INTO`` + public Parquet export) instead
+        of the whole-file ``merge_staging_files`` rewrite, and ``comments`` are
+        routed through :func:`iceberg.merge_comments` (row-level upsert into the
+        catalog + index rebuild, no monolithic export) instead of the
+        partitioned ``merge_comments_partitioned`` path. ``documents`` stay on
+        the existing whole-file path until the Iceberg flow is vetted for them.
+
+        Returns the comment partition files changed this run (empty when no
+        comments were staged or when comments went through Iceberg), so the
+        caller can publish exactly those to R2.
+        """
+        names = [rt.name for rt in record_types]
+
+        non_comment = [n for n in names if n != "comments"]
+
+        iceberg_names = []
+        if self.use_iceberg and "dockets" in non_comment:
+            iceberg_names = ["dockets"]
+            non_comment = [n for n in non_comment if n != "dockets"]
+
+        if non_comment:
+            schemas = {n: RECORD_TYPES[n].schema for n in non_comment}
+            dedup_keys = {n: RECORD_TYPES[n].dedup_key for n in non_comment}
+            merge_staging_files(staging_dir, output_dir, non_comment, schemas, dedup_keys)
+
+        # Iceberg path: MERGE into the catalog, then export the public Parquet
+        # snapshot that the existing R2 upload (dual model) will publish.
+        for name in iceberg_names:
+            iceberg.merge_and_export(staging_dir, output_dir, RECORD_TYPES[name])
+
+        changed_comments: list[Path] = []
+        if "comments" in names and staged.get("comments", 0) > 0:
+            if self.use_iceberg:
+                # Row-level upsert into the catalog table (the read surface) and
+                # rebuild the index. No partition files are produced, so
+                # changed_comments stays empty and the caller publishes only the
+                # refreshed index.
+                iceberg.merge_comments(staging_dir, output_dir, RECORD_TYPES["comments"])
+            else:
+                changed_comments = merge_comments_partitioned(
+                    staging_dir,
+                    output_dir,
+                    schema=RECORD_TYPES["comments"].schema,
+                    dedup_key=RECORD_TYPES["comments"].dedup_key,
+                )
+                if changed_comments:
+                    update_comments_index(output_dir, changed_comments)
+        return changed_comments
+
+
+# --- CLI / run file --------------------------------------------------------
+
+app = App(name="run-pipeline", help="Run the regulations.gov ETL through the Pipeline contract.")
+
+
+@app.default
+def main(
+    *,
+    agency: Annotated[str | None, Parameter(help="Process only this agency")] = None,
+    output_dir: Annotated[Path | None, Parameter(help="Output directory")] = None,
+    since_year: Annotated[int | None, Parameter(help="Only process dockets from this year onward")] = None,
+    skip_upload: Annotated[bool, Parameter(help="Skip R2 upload (recommended while vetting)")] = True,
+    skip_comments: Annotated[bool, Parameter(help="Skip comments")] = False,
+    only_comments: Annotated[bool, Parameter(help="Only process comments")] = False,
+    batch_number: Annotated[int | None, Parameter(help="Batch number (0-indexed)")] = None,
+    batch_size: Annotated[int, Parameter(help="Agencies per batch")] = 45,
+    full_refresh: Annotated[bool, Parameter(help="Ignore manifest + existing output")] = False,
+    max_workers: Annotated[int, Parameter(help="Agencies processed in parallel")] = 4,
+    use_iceberg: Annotated[bool, Parameter(help="Route the dockets table through R2 Data Catalog (Iceberg)")] = False,
+    enrich_text: Annotated[
+        bool,
+        Parameter(help="Fill comment text_content inline from Mirrulations derived-data extracted text"),
+    ] = True,
+    chunk_size: Annotated[
+        int,
+        Parameter(
+            help="Ingest comments in bounded key-chunks of this size (0 = whole agency at once). "
+            "Use for agencies too large to buffer in memory; requires --only-comments --use-iceberg."
+        ),
+    ] = 0,
+    verbose: Annotated[bool, Parameter(name=["--verbose", "-v"], help="Verbose logging")] = False,
+) -> None:
+    """Run the regulations.gov ETL pipeline."""
+    load_dotenv()
+    RegulationsPipeline(
+        agency=agency,
+        output_dir=output_dir,
+        since_year=since_year,
+        skip_upload=skip_upload,
+        skip_comments=skip_comments,
+        only_comments=only_comments,
+        batch_number=batch_number,
+        batch_size=batch_size,
+        full_refresh=full_refresh,
+        max_workers=max_workers,
+        use_iceberg=use_iceberg,
+        enrich_text=enrich_text,
+        chunk_size=chunk_size,
+        verbose=verbose,
+    ).run()
+
+
+if __name__ == "__main__":
+    app()

@@ -1,0 +1,19 @@
+name: Rollup — crs_reports
+on:
+  schedule:
+    # 17:30 UTC — ingest new CRS reports from the Congress.gov API.
+    - cron: '30 17 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-crs-reports
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}

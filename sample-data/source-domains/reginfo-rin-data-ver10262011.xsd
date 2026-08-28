@@ -1,0 +1,635 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- edited with XMLSpy v2006 rel. 3 sp1 (http://www.altova.com) by Amy Liu (CyberData Technologies, Inc.) -->
+<!-- edited with XMLSPY v5 rel. 4 U (http://www.xmlspy.com) by CyberData Technologies, Inc ) -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+	<xs:element name="REGINFO_RIN_DATA">
+		<xs:annotation>
+			<xs:documentation>Top level emelemt for a REGINFO RIN list.</xs:documentation>
+		</xs:annotation>
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="RIN_INFO" type="RIN_INFOType" minOccurs="0" maxOccurs="unbounded"/>
+			</xs:sequence>
+			<xs:attribute name="RUN_DATE" type="xs:date"/>
+		</xs:complexType>
+	</xs:element>
+	<xs:complexType name="RIN_INFOType">
+		<xs:sequence>
+			<xs:element name="RIN" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="PARENT_RIN" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>If the RIN is a child rin this tag is populated with its parent RIN.</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="PUBLICATION" type="PUBLICATIONType" minOccurs="0"/>
+			<xs:element name="AGENCY" type="AGENCYType" minOccurs="0"/>
+			<xs:element name="PARENT_AGENCY" type="AGENCYType" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>If the agency is a sub-agency this tag is populated with its parent agency.</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="RULE_TITLE" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="ABSTRACT" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="PRIORITY_CATEGORY" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>One of the following options: "Economically Significant", "Other Significant", "Substantive, Nonsignificant", "Routine and Frequent", "Info./Admin./Other", "Not Major", and "Not Major".</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="RIN_STATUS" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>One of the following options: "First time published in the Unified Agenda", and "Previously published in the Unified Agenda".</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="RULE_STAGE" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>One of the following options: "Prerule Stage", "Proposed Rule Stage", "Final Rule Stage", "Long-Term Actions", "Completed Actions", and "No Stage".</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="MAJOR" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>One of the following options: "Yes", "No" and "Undetermined".</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="UNFUNDED_MANDATE_LIST" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>List of Unfunded Mandates.</xs:documentation>
+				</xs:annotation>
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element name="UNFUNDED_MANDATE" minOccurs="0" maxOccurs="unbounded">
+							<xs:annotation>
+								<xs:documentation>One of the following options: "State, local, or tribal governments", "Private Sector", "No", and "Undetermined".</xs:documentation>
+							</xs:annotation>
+							<xs:simpleType>
+								<xs:restriction base="xs:string"/>
+							</xs:simpleType>
+						</xs:element>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="EO_13771_DESIGNATION" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>One of the following options: "Deregulatory", "Regulatory", "Fully or Partially Exempt", "Not subject to, not significant", "Other", and "Independent agency".</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="RFA_SECTION_610_REVIEW" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>One of the following options: "Completion of a Section 610 Review", "Rulemaking Resulting From a Section 610 Review", "Section 610 Review", and "No".</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="CFR_LIST" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>List of CFR citations.</xs:documentation>
+				</xs:annotation>
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element name="CFR" type="CFRType" minOccurs="0" maxOccurs="unbounded"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="LEGAL_AUTHORITY_LIST" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>List of Legal Authorities.</xs:documentation>
+				</xs:annotation>
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element name="LEGAL_AUTHORITY" type="LEGAL_AUTHORITYType" minOccurs="0" maxOccurs="unbounded"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="LEGAL_DLINE_LIST" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>List of Legal Deadlines.</xs:documentation>
+				</xs:annotation>
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element name="LEGAL_DLINE_INFO" type="LEGAL_DLINE_INFOType" minOccurs="0" maxOccurs="unbounded"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="LEGAL_DLINE_OVERALL_DESC" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="RPLAN_ENTRY" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>One of the following options:  "Yes" and "No".</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="RPLAN_INFO" type="RPLAN_INFOType" minOccurs="0"/>
+			<xs:element name="TIMETABLE_LIST" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>List of Timetable entries.</xs:documentation>
+				</xs:annotation>
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element name="TIMETABLE" type="TIMETABLEType" minOccurs="0" maxOccurs="unbounded"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="CHILD_RIN_LIST" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>If the RIN has child RINs, the list of child RINs is populated in this tag.</xs:documentation>
+				</xs:annotation>
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element name="CHILD_RIN" type="CHILDRINType" minOccurs="0" maxOccurs="unbounded"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="ADDITIONAL_INFO" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="RFA_REQUIRED" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Regulatory Flexibility Analysis Required. One of the following options: "Yes", "No", and  "Undetermined".</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="SMALL_ENTITY_LIST" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>List of Small Entities Affected entries.</xs:documentation>
+				</xs:annotation>
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element name="SMALL_ENTITY" minOccurs="0" maxOccurs="unbounded">
+							<xs:annotation>
+								<xs:documentation>One of the following options: "Businesses", "Governmental Jurisdictions", "Tribal", "Organizations", "No", and "Undetermined".</xs:documentation>
+							</xs:annotation>
+							<xs:simpleType>
+								<xs:restriction base="xs:string"/>
+							</xs:simpleType>
+						</xs:element>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="GOVT_LEVEL_LIST" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>List of Government Levels Affected entries.</xs:documentation>
+				</xs:annotation>
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element name="GOVT_LEVEL" minOccurs="0" maxOccurs="unbounded">
+							<xs:annotation>
+								<xs:documentation>One of the following options: "State", "Local", "Tribal", "Federal", "None", "Undetermined".</xs:documentation>
+							</xs:annotation>
+							<xs:simpleType>
+								<xs:restriction base="xs:string"/>
+							</xs:simpleType>
+						</xs:element>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="FEDERALISM" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>One of the following options: "Yes", "No" and "Undetermined".</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="ENERGY_AFFECTED" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>One of the following options: "Yes", "No" and "Undetermined".</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="FURTHER_INFO_URL" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>URL for more RIN information.</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="PUBLIC_COMMENT_URL" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>URL for public comment..</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="NAICS_LIST" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>List of Afected Sector entries.</xs:documentation>
+				</xs:annotation>
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element name="NAICS" type="NAICSType" minOccurs="0" maxOccurs="unbounded"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="COMPLIANCE_COST" type="COMPLIANCE_COSTType" minOccurs="0"/>
+			<xs:element name="PRINT_PAPER" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>One of the following options: "Yes", "No" and "NA".</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="INTERNATIONAL_INTEREST" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>One of the following options: "Yes", "No" and "Not Collected".</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="RELATED_RIN_LIST" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>List of Related RINs.</xs:documentation>
+				</xs:annotation>
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element name="RELATED_RIN" type="RELATED_RINType" minOccurs="0" maxOccurs="unbounded"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="RELATED_AGENCY_LIST" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>List of Related agencies.</xs:documentation>
+				</xs:annotation>
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element name="RELATED_AGENCY" type="RELATED_AGENCYType" minOccurs="0" maxOccurs="unbounded"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="AGENCY_CONTACT_LIST" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>List of contacts.</xs:documentation>
+				</xs:annotation>
+				<xs:complexType>
+					<xs:sequence>
+						<xs:element name="CONTACT" type="CONTACTType" minOccurs="0" maxOccurs="unbounded"/>
+					</xs:sequence>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="PROCUREMENT" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Procurement description.</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="REINVENT_GOVT" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Reinvent government description.</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="SIC_DESC" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Concatenated SIC descriptions..</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>			
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="AGENCYType">
+		<xs:sequence>
+			<xs:element name="CODE" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="NAME" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="ACRONYM" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="PUBLICATIONType">
+		<xs:sequence>
+			<xs:element name="PUBLICATION_ID" type="xs:string" minOccurs="0"/>
+			<xs:element name="PUBLICATION_TITLE" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:simpleType name="CFRType">
+		<xs:restriction base="xs:string"/>
+	</xs:simpleType>
+	<xs:simpleType name="LEGAL_AUTHORITYType">
+		<xs:restriction base="xs:string"/>
+	</xs:simpleType>
+	<xs:complexType name="LEGAL_DLINE_INFOType">
+		<xs:sequence>
+			<xs:element name="DLINE_TYPE" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>One of the following options: "Statutory", "Judicial", "Overall Description", and "None".</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="DLINE_ACTION_STAGE" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>One of the following options: "Overall Description", "NPRM", "Final", "Other", and "None".</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="DLINE_DATE" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Legal Deadline date in MM/DD/YYYY format.</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="DLINE_DESC" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="RPLAN_INFOType">
+		<xs:sequence>
+			<xs:element name="STMT_OF_NEED" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="LEGAL_BASIS" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="ALTERNATIVES" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="COSTS_AND_BENEFITS" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="RISKS" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:simpleType name="FR_CITATIONType">
+		<xs:restriction base="xs:string"/>
+	</xs:simpleType>
+	<xs:complexType name="TIMETABLEType">
+		<xs:sequence>
+			<xs:element name="TTBL_ACTION" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>One of the following: NPRM, ANPRM Comment Period End, NPRM, NPRM Comment Period End, Interim Final Rule, Interim Final Rule Comment Period End, Interim Final Rule Effective, Other, Case Opened, Comment Period End, Commend Period Extended, Correction, Direct final Rule, Final Rule, Final Rule Effective, Hearing, Notice, NPRM Comment Period Extended, NPRM COmment Period Reopened,  Proposed Rule, Public Hearing, Public meeting, Second ANPRM, Second NPRM, Second NPRM COmment Period End, Supplemental NPRM. FInal Action, Final Action Effective, Begin Review, End Review, Withdrawn, Merged with, Duplicate of, Deleted at Agency Request, Next Action Undetermined, Transferred.</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="TTBL_DATE" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Timetable date in MM/DD/YYYY format. If the data is 00/00/0000, this tag will be populated as "To Be Determined". If the date is MM/00/YYYY, it means a predicted date in a specific future month.</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="FR_CITATION" type="FR_CITATIONType" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>FR Citation of this timetable entry.</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="CHILDRINType">
+		<xs:annotation>
+			<xs:documentation>Child RIN</xs:documentation>
+		</xs:annotation>
+		<xs:sequence>
+			<xs:element name="RIN" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="RULE_TITLE" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="NAICSType">
+		<xs:annotation>
+			<xs:documentation>Sectors Affected information.</xs:documentation>
+		</xs:annotation>
+		<xs:sequence>
+			<xs:element name="NAICS_CD" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="NAICS_DESC" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="COMPLIANCE_COSTType">
+		<xs:sequence>
+			<xs:element name="INITIAL_PUBLIC_COST" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:integer"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="BASE_YEAR" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:integer"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="RECURRING_PUBLIC_COST" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:integer"/>
+				</xs:simpleType>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="RELATED_RINType">
+		<xs:sequence>
+			<xs:element name="RIN" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="RIN_RELATION" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>One of the following options: "Merge with", "Split from", "Previously reported as", "Duplicate of", and "Related to".</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="RELATED_AGENCYType">
+		<xs:sequence>
+			<xs:element name="AGENCY" type="AGENCYType" minOccurs="0"/>
+			<xs:element name="AGENCY_RELATION">
+				<xs:annotation>
+					<xs:documentation>One of the following options: "Joint" and "Common".</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="ADDRESSType">
+		<xs:sequence>
+			<xs:element name="STREET_ADDRESS" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="CITY" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="STATE" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="ZIP" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="CONTACTType">
+		<xs:annotation>
+			<xs:documentation>Global Contact Type</xs:documentation>
+		</xs:annotation>
+		<xs:sequence>
+			<xs:element name="FIRST_NAME" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="LAST_NAME" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="MIDDLE_NAME" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="PREFIX" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="SUFFIX" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="TITLE" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="AGENCY" type="AGENCYType" minOccurs="0"/>
+			<xs:element name="PHONE" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="PHONE_EXT" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="TDD_PHONE" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="FAX" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="EMAIL" minOccurs="0">
+				<xs:simpleType>
+					<xs:restriction base="xs:string"/>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="MAILING_ADDRESS" type="ADDRESSType" minOccurs="0"/>
+		</xs:sequence>
+	</xs:complexType>
+</xs:schema>

@@ -1,0 +1,102 @@
+name: Seed dockets catalog (manual)
+
+# Cutover repair for the R2 Data Catalog `dockets` table. When the dockets ETL
+# moved onto the catalog, `comments` got a real seed (seed-comments-catalog.yml)
+# and `dockets` got none — so the catalog table only ever held rows staged AFTER
+# the cutover (~5.4k of ~276k). Every run exported that sliver as the "full"
+# public snapshot, the shrink guard correctly refused it, and the refusal was
+# swallowed by a discarded executor.map iterator (fixed in #176). The published
+# dockets.parquet sat frozen at 2026-07-02 for eight weeks with the ETL green.
+#
+# This backfills ONLY the docket_ids the catalog is missing: the rows already in
+# the catalog are the post-cutover updates and are newer than the frozen
+# snapshot, so overwriting them from Parquet would roll back eight weeks of
+# ingested changes. That also makes a re-run a no-op rather than a double-load.
+#
+# Manual dispatch only — it WRITES the production catalog, so it never runs on a
+# schedule. Defaults to dry_run: check the numbers first, then dispatch again
+# with dry_run off.
+#
+# Requires the same secrets as the ETL:
+#   R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT, R2_BUCKET_NAME  (read the source snapshot)
+#   R2_CATALOG_URI, R2_CATALOG_WAREHOUSE, R2_CATALOG_TOKEN               (write the catalog table)
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Report what would be backfilled and write nothing'
+        required: false
+        default: true
+        type: boolean
+      upload:
+        description: 'Publish the rebuilt dockets.parquet to R2 immediately (otherwise the next ETL publishes it)'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  # Writers share one group with the ETL and the dedupe/backfill workflows: every
+  # writer to the catalog must be serialized, since the upsert is DELETE+INSERT
+  # (DuckDB's Iceberg engine has no MERGE INTO) and is not safe under concurrent
+  # writers. cancel-in-progress:false so a write queues behind an in-flight ETL
+  # run instead of cancelling it mid-write.
+  #
+  # A dry run is exempt: it only counts rows and writes nothing, so holding it on
+  # the write lock bought no safety and made the diagnostic unusable exactly when
+  # it was needed — the first dispatch sat pending behind a sweep with ~4.5 hours
+  # of batches left. Giving it a per-run group lets it start immediately. Note
+  # the fallback is the write group, so a malformed or absent input serializes
+  # rather than running free.
+  group: ${{ inputs.dry_run == true && format('seed-dockets-dry-{0}', github.run_id) || 'comments-catalog-write' }}
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    # One monolithic ~276k-row file — far smaller than the comments seed, but the
+    # catalog commit itself can be slow, so leave real headroom.
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Seed dockets catalog from the published snapshot
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          # Cloudflare edge-cache purge after publish (best-effort; no-op if unset).
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          R2_CATALOG_URI: ${{ secrets.R2_CATALOG_URI }}
+          R2_CATALOG_WAREHOUSE: ${{ secrets.R2_CATALOG_WAREHOUSE }}
+          R2_CATALOG_TOKEN: ${{ secrets.R2_CATALOG_TOKEN }}
+          R2_CATALOG_NAMESPACE: ${{ secrets.R2_CATALOG_NAMESPACE }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          UPLOAD: ${{ inputs.upload }}
+        run: |
+          set -euo pipefail
+          ARGS=()
+          if [ "$DRY_RUN" = "true" ]; then ARGS+=(--dry-run); fi
+          if [ "$UPLOAD" = "true" ]; then ARGS+=(--upload); fi
+          echo "Running: uv run python scripts/seed_dockets_catalog.py ${ARGS[*]-}"
+          uv run python scripts/seed_dockets_catalog.py ${ARGS[@]+"${ARGS[@]}"}
+
+      - name: Verify published freshness
+        # Only meaningful once the rebuilt snapshot is actually published.
+        if: ${{ inputs.dry_run == false && inputs.upload == true }}
+        run: uv run python scripts/check_rollup_freshness.py

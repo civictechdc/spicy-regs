@@ -1,0 +1,4 @@
+duckdb
+pandas
+pyiceberg[pyarrow]
+python-dotenv

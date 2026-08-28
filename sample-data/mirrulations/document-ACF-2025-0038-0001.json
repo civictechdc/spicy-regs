@@ -1,0 +1,97 @@
+{
+    "data": {
+        "id": "ACF-2025-0038-0001",
+        "type": "documents",
+        "links": {
+            "self": "https://api.regulations.gov/v4/documents/ACF-2025-0038-0001"
+        },
+        "attributes": {
+            "additionalRins": null,
+            "allowLateComments": false,
+            "authorDate": null,
+            "authors": null,
+            "cfrPart": null,
+            "commentEndDate": "2025-09-23T03:59:59Z",
+            "commentStartDate": "2025-07-22T04:00:00Z",
+            "effectiveDate": null,
+            "exhibitLocation": null,
+            "exhibitType": null,
+            "frDocNum": "2025-13790",
+            "frVolNum": "90 FR 34506",
+            "implementationDate": null,
+            "media": null,
+            "ombApproval": null,
+            "paperLength": 0,
+            "paperWidth": 0,
+            "regWriterInstruction": null,
+            "sourceCitation": null,
+            "startEndPage": null,
+            "subject": "Request for Public Comment",
+            "topics": null,
+            "address1": null,
+            "address2": null,
+            "agencyId": "ACF",
+            "city": null,
+            "category": null,
+            "comment": null,
+            "country": null,
+            "displayProperties": [
+                {
+                    "name": "pageCount",
+                    "label": "Page Count",
+                    "tooltip": "Number of pages In the content file"
+                }
+            ],
+            "docAbstract": " The Administration for Children and Families (ACF), Children\u2019s Bureau (CB) is seeking public comment, in particular from State and Tribal title IV\u2013B agencies and Indian Tribes, Tribal organizations and consortia (Tribes), and State and Tribal courts on providing technical assistance related to the Indian Child Welfare Act of 1978 (ICWA), removing undue burden related to meeting the requirements of title IV\u2013 B of the Social Security Act (the Act), changes to the Court Improvement Program, and amendments aimed at increasing the number of studies of programs and services eligible for review by the Title IV\u2013E Prevention Services Clearinghouse.",
+            "docketId": "ACF-2025-0038",
+            "documentType": "Notice",
+            "email": null,
+            "fax": null,
+            "field1": null,
+            "field2": null,
+            "fileFormats": [
+                {
+                    "fileUrl": "https://downloads.regulations.gov/ACF-2025-0038-0001/content.pdf",
+                    "format": "pdf",
+                    "size": 239826
+                }
+            ],
+            "firstName": null,
+            "govAgency": null,
+            "govAgencyType": null,
+            "objectId": "09000064b8e95446",
+            "lastName": null,
+            "legacyId": null,
+            "modifyDate": "2025-09-23T09:00:30Z",
+            "organization": null,
+            "originalDocumentId": null,
+            "pageCount": 0,
+            "phone": null,
+            "postedDate": "2025-07-22T04:00:00Z",
+            "postmarkDate": null,
+            "reasonWithdrawn": null,
+            "receiveDate": "2025-07-22T00:00:00Z",
+            "restrictReason": null,
+            "restrictReasonType": null,
+            "stateProvinceRegion": null,
+            "submitterRep": null,
+            "submitterRepAddress": null,
+            "submitterRepCityState": null,
+            "subtype": null,
+            "title": "Providing Technical Assistance Related to the Indian Child Welfare Act",
+            "trackingNbr": null,
+            "withdrawn": false,
+            "zip": null,
+            "withinCommentPeriod": false,
+            "openForComment": false
+        },
+        "relationships": {
+            "attachments": {
+                "links": {
+                    "self": "https://api.regulations.gov/v4/documents/ACF-2025-0038-0001/relationships/attachments",
+                    "related": "https://api.regulations.gov/v4/documents/ACF-2025-0038-0001/attachments"
+                }
+            }
+        }
+    }
+}

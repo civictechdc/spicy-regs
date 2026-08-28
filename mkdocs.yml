@@ -1,0 +1,64 @@
+site_name: Spicy Regs Data Dictionary
+site_description: Schema reference for the Spicy Regs regulations.gov dataset.
+site_url: https://docs.spicy-regs.dev/
+repo_url: https://github.com/civictechdc/spicy-regs
+repo_name: civictechdc/spicy-regs
+edit_uri: edit/main/data_dictionary/descriptions.yaml
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      accent: red
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      accent: red
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+
+markdown_extensions:
+  - admonition
+  - tables
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+nav:
+  - Overview: index.md
+  - Changelog: changelog.md
+  - Querying with Python: querying-python.md
+  - Tables:
+      - dockets: tables/dockets.md
+      - documents: tables/documents.md
+      - comments: tables/comments.md
+      - comments_index: tables/comments_index.md
+      - feed_summary: tables/feed_summary.md
+      - agency_stats: tables/agency_stats.md
+      - agency_monthly_volume: tables/agency_monthly_volume.md
+      - rulemaking_lifecycles: tables/rulemaking_lifecycles.md
+      - fr_docket_links: tables/fr_docket_links.md
+      - discovery_signals: tables/discovery_signals.md
+      - cfr_sections: tables/cfr_sections.md
+      - congress_bills: tables/congress_bills.md
+      - unified_agenda: tables/unified_agenda.md
+      - federal_register: tables/federal_register.md
+      - sam_entities: tables/sam_entities.md
+      - lobbying_filings: tables/lobbying_filings.md
+      - fec_committees: tables/fec_committees.md
+      - gao_reports: tables/gao_reports.md
+      - crs_reports: tables/crs_reports.md
+      - court_dockets: tables/court_dockets.md
+      - usaspending_recipients: tables/usaspending_recipients.md
+      - fcc_proceedings: tables/fcc_proceedings.md
+      - fcc_filings: tables/fcc_filings.md

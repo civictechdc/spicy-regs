@@ -1,0 +1,134 @@
+"""Shared fixtures for pipeline tests."""
+
+import os
+from pathlib import Path
+
+import polars as pl
+import pytest
+
+_ISOLATED_PREFIXES = ("R2_", "SPICY_REGS_", "CLOUDFLARE_", "AWS_")
+_ISOLATED_NAMES = frozenset({"AGENCIES", "DATA_GOV_API_KEY", "SAM_API_KEY", "LDA_API_KEY", "COURTLISTENER_API_TOKEN"})
+
+
+@pytest.fixture(autouse=True)
+def isolate_env(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    if "integration" in request.keywords:
+        return
+    for name in list(os.environ):
+        if name.startswith(_ISOLATED_PREFIXES) or name in _ISOLATED_NAMES:
+            monkeypatch.delenv(name, raising=False)
+
+
+@pytest.fixture
+def tmp_output(tmp_path: Path) -> Path:
+    """Return a temporary output directory."""
+    out = tmp_path / "output"
+    out.mkdir()
+    return out
+
+
+@pytest.fixture
+def sample_dockets() -> list[dict]:
+    return [
+        {
+            "docket_id": "EPA-2024-0001",
+            "agency_code": "EPA",
+            "title": "Clean Air Standards",
+            "docket_type": "Rulemaking",
+            "modify_date": "2024-06-15",
+            "abstract": "Proposed rule for clean air",
+            "rin": "2060-AG12",
+        },
+        {
+            "docket_id": "FDA-2024-0010",
+            "agency_code": "FDA",
+            "title": "Drug Labeling",
+            "docket_type": "Rulemaking",
+            "modify_date": "2024-05-01",
+            "abstract": "Updated drug labeling requirements",
+            "rin": "0910-AH34",
+        },
+        {
+            "docket_id": "EPA-2024-0002",
+            "agency_code": "EPA",
+            "title": "Water Quality",
+            "docket_type": "Nonrulemaking",
+            "modify_date": "2024-07-20",
+            "abstract": None,
+            "rin": None,
+        },
+    ]
+
+
+@pytest.fixture
+def sample_comments() -> list[dict]:
+    return [
+        {"comment_id": "C-001", "docket_id": "EPA-2024-0001", "agency_code": "EPA", "first_name": "Ada", "last_name": "Lovelace", "organization": None, "category": "Individual", "title": "Support", "comment": "I support this", "document_type": "Public Comment", "posted_date": "2024-06-20", "modify_date": "2024-06-20", "receive_date": "2024-06-20", "attachments_json": None},
+        {"comment_id": "C-002", "docket_id": "EPA-2024-0001", "agency_code": "EPA", "first_name": None, "last_name": None, "organization": "Sierra Club", "category": "Organization", "title": "Oppose", "comment": "I oppose this", "document_type": "Public Comment", "posted_date": "2024-06-21", "modify_date": "2024-06-21", "receive_date": "2024-06-21", "attachments_json": None},
+        {"comment_id": "C-003", "docket_id": "FDA-2024-0010", "agency_code": "FDA", "first_name": "Grace", "last_name": "Hopper", "organization": None, "category": None, "title": "Question", "comment": "What about X?", "document_type": "Public Comment", "posted_date": "2024-05-10", "modify_date": "2024-05-10", "receive_date": "2024-05-10", "attachments_json": None},
+        {"comment_id": "C-004", "docket_id": "EPA-2024-0002", "agency_code": "EPA", "first_name": None, "last_name": None, "organization": None, "category": None, "title": "Feedback", "comment": "More data needed", "document_type": "Public Comment", "posted_date": "2024-07-25", "modify_date": "2024-07-25", "receive_date": "2024-07-25", "attachments_json": None},
+    ]
+
+
+@pytest.fixture
+def sample_documents() -> list[dict]:
+    return [
+        {"document_id": "D-001", "docket_id": "EPA-2024-0001", "agency_code": "EPA", "title": "Proposed Rule", "document_type": "Proposed Rule", "posted_date": "2024-06-01", "modify_date": "2024-06-01", "comment_start_date": "2024-06-01", "comment_end_date": "2024-07-01", "file_url": None, "attachments_json": None, "fr_doc_num": None, "withdrawn": "false", "reason_withdrawn": None, "additional_rins": None, "text_content": None, "text_extraction_status": None},
+        {"document_id": "D-002", "docket_id": "FDA-2024-0010", "agency_code": "FDA", "title": "Notice", "document_type": "Notice", "posted_date": "2024-04-15", "modify_date": "2024-04-15", "comment_start_date": "2024-04-15", "comment_end_date": "2024-05-15", "file_url": None, "attachments_json": None, "fr_doc_num": "2025-13790", "withdrawn": "true", "reason_withdrawn": "Superseded by revised proposal", "additional_rins": "[\"0910-AH35\"]", "text_content": None, "text_extraction_status": None},
+    ]
+
+
+DOCKET_SCHEMA = {
+    "docket_id": pl.Utf8,
+    "agency_code": pl.Utf8,
+    "title": pl.Utf8,
+    "docket_type": pl.Utf8,
+    "modify_date": pl.Utf8,
+    "abstract": pl.Utf8,
+    "rin": pl.Utf8,
+}
+
+COMMENT_SCHEMA = {
+    "comment_id": pl.Utf8,
+    "docket_id": pl.Utf8,
+    "agency_code": pl.Utf8,
+    "first_name": pl.Utf8,
+    "last_name": pl.Utf8,
+    "organization": pl.Utf8,
+    "category": pl.Utf8,
+    "title": pl.Utf8,
+    "comment": pl.Utf8,
+    "document_type": pl.Utf8,
+    "posted_date": pl.Utf8,
+    "modify_date": pl.Utf8,
+    "receive_date": pl.Utf8,
+    "attachments_json": pl.Utf8,
+    "text_content": pl.Utf8,
+    "text_extraction_status": pl.Utf8,
+}
+
+DOCUMENT_SCHEMA = {
+    "document_id": pl.Utf8,
+    "docket_id": pl.Utf8,
+    "agency_code": pl.Utf8,
+    "title": pl.Utf8,
+    "document_type": pl.Utf8,
+    "posted_date": pl.Utf8,
+    "modify_date": pl.Utf8,
+    "comment_start_date": pl.Utf8,
+    "comment_end_date": pl.Utf8,
+    "file_url": pl.Utf8,
+    "attachments_json": pl.Utf8,
+    "fr_doc_num": pl.Utf8,
+    "withdrawn": pl.Utf8,
+    "reason_withdrawn": pl.Utf8,
+    "additional_rins": pl.Utf8,
+    "text_content": pl.Utf8,
+    "text_extraction_status": pl.Utf8,
+}
+
+
+def write_parquet_from_dicts(path: Path, records: list[dict], schema: dict) -> None:
+    """Helper to write a list of dicts as a Parquet file using Polars."""
+    df = pl.DataFrame(records, schema=schema)
+    df.write_parquet(path, compression="zstd")

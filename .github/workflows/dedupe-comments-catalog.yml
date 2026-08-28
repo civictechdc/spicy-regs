@@ -1,0 +1,107 @@
+name: Dedupe comments catalog
+
+# Audits and (optionally) removes duplicate rows from the Iceberg `comments`
+# catalog table. Duplicates arise because DuckDB's Iceberg engine has no
+# MERGE INTO, so the daily upsert (iceberg._merge) removes superseded rows with a
+# plain DELETE — and DELETE does not reliably remove prior rows on the R2 Data
+# Catalog. The one-time seed hit this at large scale (agencies loaded more than
+# once kept exact copies); the daily merge hits it at small scale, so a handful
+# of re-merged comment_ids leak in per run. The read surface hides them
+# (mcp_server dedups the `comments` view on read); this job reclaims the physical
+# rows. See scripts/dedupe_comments_catalog.py.
+#
+# Runs weekly (Sunday 09:00 UTC) as physical compaction — the read-side dedup
+# already keeps queries + the freshness check correct, so this is housekeeping to
+# keep storage bounded — plus manual dispatch. Scheduled runs always `--apply`;
+# manual dispatch defaults to a read-only audit (flip `apply` on to rebuild). The
+# rebuild writes a deduped sibling per agency and swaps it in by DROP + CREATE +
+# per-agency INSERT (never DELETE, never a whole-table single write); the sibling
+# is kept until the rebuilt row count is verified, so an interrupted swap is
+# resumable. After an apply this workflow republishes the public comments mirror
+# so the UI's files reflect the cleaned catalog.
+#
+# Requires: R2_CATALOG_URI, R2_CATALOG_WAREHOUSE, R2_CATALOG_TOKEN (+ optional
+# R2_CATALOG_NAMESPACE) to read/write the catalog; plus R2_ACCESS_KEY_ID,
+# R2_SECRET_ACCESS_KEY, R2_ENDPOINT, R2_BUCKET_NAME, R2_PUBLIC_URL for the mirror.
+on:
+  schedule:
+    - cron: '0 9 * * 0'  # weekly compaction, Sunday 09:00 UTC
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Rebuild the table deduplicated (off = read-only audit)'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  # Shared with the ETL and the text backfill so no two writers ever touch the
+  # catalog `comments` table at once — the dedupe does a whole-table swap, so an
+  # overlapping ETL merge could race or lose data. cancel-in-progress:false makes
+  # a writer queue behind the in-flight one instead of clobbering it.
+  group: comments-catalog-write
+  cancel-in-progress: false
+
+jobs:
+  dedupe:
+    runs-on: ubuntu-latest
+    # A full-table rebuild of tens of millions of rows; give it headroom.
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Audit / dedupe the catalog
+        env:
+          # Scheduled compaction always applies; manual dispatch honors the input.
+          EVENT: ${{ github.event_name }}
+          APPLY: ${{ inputs.apply }}
+          R2_CATALOG_URI: ${{ secrets.R2_CATALOG_URI }}
+          R2_CATALOG_WAREHOUSE: ${{ secrets.R2_CATALOG_WAREHOUSE }}
+          R2_CATALOG_TOKEN: ${{ secrets.R2_CATALOG_TOKEN }}
+          R2_CATALOG_NAMESPACE: ${{ secrets.R2_CATALOG_NAMESPACE }}
+        run: |
+          ARGS=""
+          if [ "$EVENT" = "schedule" ] || [ "$APPLY" = "true" ]; then
+            ARGS="$ARGS --apply"
+          fi
+          echo "Running: uv run python scripts/dedupe_comments_catalog.py $ARGS"
+          uv run python scripts/dedupe_comments_catalog.py $ARGS
+
+      # After an apply the catalog is clean but the public mirror the UI reads is
+      # still the pre-dedupe export, so refresh it. Skipped on an audit-only
+      # dispatch (apply=false), where nothing changed.
+      - name: Republish the public comments mirror
+        if: ${{ github.event_name == 'schedule' || inputs.apply == true }}
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          # Cloudflare edge-cache purge after publish (best-effort; no-op if unset).
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          # Re-exporting from the catalog re-sorts + re-compresses, so a partition
+          # can shrink on disk while holding more rows; the script enforces a
+          # row-count floor instead of the byte-size shrink guard.
+          R2_ALLOW_SHRINK: '1'
+          R2_CATALOG_URI: ${{ secrets.R2_CATALOG_URI }}
+          R2_CATALOG_WAREHOUSE: ${{ secrets.R2_CATALOG_WAREHOUSE }}
+          R2_CATALOG_TOKEN: ${{ secrets.R2_CATALOG_TOKEN }}
+          R2_CATALOG_NAMESPACE: ${{ secrets.R2_CATALOG_NAMESPACE }}
+        run: |
+          echo "Running: uv run python scripts/publish_comments_mirror.py"
+          uv run python scripts/publish_comments_mirror.py

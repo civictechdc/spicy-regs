@@ -1,0 +1,40 @@
+name: I want to help — where do I start?
+description: New to the project and looking for a way to contribute? Tell us about yourself.
+labels: ["help wanted", "onboarding"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Welcome! We'd love to help you find a first contribution. Tell us a bit
+        about your background and interests and we'll point you at something
+        that matches.
+
+  - type: textarea
+    id: background
+    attributes:
+      label: Your background
+      description: What languages / tools are you comfortable with? Any open source experience?
+      placeholder: "I know some Python, I've never opened a PR before, …"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: interest
+    attributes:
+      label: What sounds most interesting to you?
+      multiple: true
+      options:
+        - Writing or improving documentation
+        - Data exploration in notebooks
+        - Building ETL pipelines / data processing
+        - Working on the MCP server / LLM integrations
+        - Testing & CI
+        - Something else (describe below)
+    validations:
+      required: true
+
+  - type: textarea
+    id: other
+    attributes:
+      label: Anything else?
+      description: Questions, time you have available, etc.

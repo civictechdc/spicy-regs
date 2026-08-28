@@ -1,0 +1,41 @@
+*.pyc
+__marimo__
+*.log
+*.db
+*.wal
+.env
+.langgraph_api
+.vercel
+.agent
+.venv
+output
+/data
+*.egg-info
+
+node_modules
+.wrangler
+lance-data
+.DS_Store
+.claude
+./scripts
+# MkDocs build output. The data dictionary *source* lives in docs/ and is tracked.
+site
+recovery
+.env.local
+.env*.local
+__pycache__
+notebooks/.cache
+# Terraform (deploy/terraform)
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+
+# Node (deploy/cloudflare Worker)
+deploy/cloudflare/node_modules/
+
+# Cloudflare Workers generated types
+deploy/cloudflare/worker-configuration.d.ts

@@ -1,0 +1,25 @@
+name: Rollup — congress_bills
+on:
+  schedule:
+    # 20:15 UTC — ingest congressional bills ahead of the evening rollup window.
+    - cron: '15 20 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+      since:
+        description: 'Backfill bills updated since this date (YYYY-MM-DD); blank uses the stored watermark'
+        required: false
+        default: ''
+        type: string
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-congress-bills
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}
+      congress_since: ${{ inputs.since || '' }}

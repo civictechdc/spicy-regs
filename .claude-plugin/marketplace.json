@@ -1,0 +1,16 @@
+{
+  "name": "spicy-regs-local",
+  "owner": {
+    "name": "Civic Tech DC",
+    "email": "opensource@civictechdc.org",
+    "url": "https://github.com/civictechdc/spicy-regs"
+  },
+  "plugins": [
+    {
+      "name": "spicyregs",
+      "source": "./plugins/spicyregs",
+      "description": "Query Spicy Regs regulatory datasets with DuckDB against the public Cloudflare R2 bucket.",
+      "category": "Research"
+    }
+  ]
+}
