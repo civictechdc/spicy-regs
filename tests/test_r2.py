@@ -15,8 +15,8 @@ def test_download_delegates(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     assert calls == [("manifest.parquet", tmp_path / "manifest.parquet")]
 
 
-def test_upload_dataset_uploads_existing_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """upload_dataset publishes the existing {type}.parquet files (+ manifest)."""
+def test_upload_dataset_uploads_only_existing_base_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The dataset publisher leaves the manifest to its pipeline caller."""
     (tmp_path / "dockets.parquet").write_bytes(b"d")
     (tmp_path / "documents.parquet").write_bytes(b"x")
     (tmp_path / "manifest.parquet").write_bytes(b"m")
@@ -30,7 +30,6 @@ def test_upload_dataset_uploads_existing_files(tmp_path: Path, monkeypatch: pyte
     assert set(uploaded) == {
         tmp_path / "dockets.parquet",
         tmp_path / "documents.parquet",
-        tmp_path / "manifest.parquet",
     }
 
 
@@ -117,6 +116,35 @@ def test_upload_dataset_raises_when_an_upload_fails(tmp_path: Path, monkeypatch:
 
     with pytest.raises(RuntimeError, match="dockets.parquet"):
         r2.upload_dataset(tmp_path, ["dockets", "documents"])
+
+
+def test_upload_dataset_preflights_all_guards_before_uploading(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A known shrink refusal must stop the whole dataset before the first write."""
+    _upload_env(monkeypatch)
+    (tmp_path / "documents.parquet").write_bytes(b"x" * 100)
+    (tmp_path / "dockets.parquet").write_bytes(b"d")
+    (tmp_path / "manifest.parquet").write_bytes(b"m" * 100)
+
+    monkeypatch.setattr(r2, "get_r2_client", lambda: object())
+    checked: list[str] = []
+
+    def fake_remote_size(client: object, bucket: str, key: str) -> int:
+        checked.append(key)
+        return 100
+
+    monkeypatch.setattr(
+        r2,
+        "_get_remote_size",
+        fake_remote_size,
+    )
+    uploaded: list[Path] = []
+    monkeypatch.setattr(r2, "upload_file", lambda path, remote_key=None: uploaded.append(path))
+
+    with pytest.raises(RuntimeError, match="Publication preflight failed.*dockets.parquet"):
+        r2.upload_dataset(tmp_path, ["documents", "dockets"])
+
+    assert uploaded == []
+    assert checked == ["documents.parquet", "dockets.parquet"]
 
 
 def test_upload_dataset_reports_every_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

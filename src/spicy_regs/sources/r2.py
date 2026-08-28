@@ -147,6 +147,38 @@ def _assert_upload_safe(
         )
 
 
+def preflight_uploads(files_to_upload: list[tuple[Path, str]]) -> None:
+    """Run every size guard before a multi-file publication starts.
+
+    This closes the predictable partial-publication path where one worker can
+    replace an object before another worker discovers that its local file would
+    catastrophically shrink production. Transfers can still fail after the
+    preflight, so callers must keep the manifest unchanged unless every data
+    file upload succeeds.
+    """
+    if not getenv("R2_ACCESS_KEY_ID"):
+        return
+
+    bucket = getenv("R2_BUCKET_NAME", "spicy-regs")
+    client = get_r2_client()
+    failures: list[tuple[str, Exception]] = []
+
+    for local_path, remote_key in files_to_upload:
+        try:
+            remote_size = _get_remote_size(client, bucket, remote_key)
+            _assert_upload_safe(local_path.stat().st_size, remote_size, remote_key)
+        except Exception as error:
+            failures.append((remote_key, error))
+
+    if failures:
+        for remote_key, error in failures:
+            logger.error("Publication preflight failed for {}: {}", remote_key, error)
+        names = ", ".join(sorted(remote_key for remote_key, _ in failures))
+        raise RuntimeError(
+            f"Publication preflight failed for {len(failures)} of {len(files_to_upload)} file(s): {names}"
+        ) from failures[0][1]
+
+
 def upload_file(local_path: Path, remote_key: str | None = None) -> None:
     """Publish a single file to R2 (remote key defaults to the filename).
 
@@ -226,7 +258,7 @@ def upload_directory_to_r2(local_dir: Path, remote_prefix: str | None = None) ->
 
 
 def upload_dataset(output_dir: Path, data_types: list[str]) -> None:
-    """Publish the merged ``{data_type}.parquet`` base tables (+ manifest) in parallel.
+    """Publish merged base tables in parallel.
 
     Rollups (feed_summary, agency_stats, ...) are no longer published here — each
     is built and uploaded by its own decoupled ``run-rollup-*`` pipeline.
@@ -242,38 +274,46 @@ def upload_dataset(output_dir: Path, data_types: list[str]) -> None:
     instead of ~276k) while the workflow stayed green and the published table sat
     frozen at 2026-07-02.
 
-    Failures are collected rather than raised on the first one, so a broken table
-    can never hide a second broken table behind it.
+    The size guard is preflighted for every candidate before any upload starts.
+    Failures are then collected rather than raised on the first transfer, so a
+    broken table can never hide a second broken table behind it.
+
+    R2 fixed object keys do not provide an atomic multi-object commit. This
+    ordering prevents known guard failures from publishing anything; it does not
+    make the base table uploads atomic against network or service failures. The
+    caller owns publishing ``manifest.parquet`` only after every base and
+    partitioned data file succeeds.
     """
-    files_to_upload = []
+    base_files = []
     for data_type in data_types:
         pf = output_dir / f"{data_type}.parquet"
         if pf.exists():
-            files_to_upload.append(pf)
+            base_files.append(pf)
 
-    manifest_file = output_dir / "manifest.parquet"
-    if manifest_file.exists():
-        files_to_upload.append(manifest_file)
+    files_to_preflight = [(path, path.name) for path in base_files]
 
     # ThreadPoolExecutor rejects max_workers=0, so an empty publish set would
     # otherwise raise ValueError rather than being the no-op it should be.
-    if not files_to_upload:
+    if not files_to_preflight:
         logger.warning("upload_dataset: no files to publish in {}", output_dir)
         return
 
+    preflight_uploads(files_to_preflight)
+
     failures: list[tuple[Path, BaseException]] = []
-    with ThreadPoolExecutor(max_workers=len(files_to_upload)) as executor:
-        futures = {executor.submit(upload_file, pf): pf for pf in files_to_upload}
-        for future in as_completed(futures):
-            if (error := future.exception()) is not None:
-                failures.append((futures[future], error))
+    if base_files:
+        with ThreadPoolExecutor(max_workers=len(base_files)) as executor:
+            futures = {executor.submit(upload_file, pf): pf for pf in base_files}
+            for future in as_completed(futures):
+                if (error := future.exception()) is not None:
+                    failures.append((futures[future], error))
 
     if failures:
         for path, error in failures:
             logger.error("Failed to publish {}: {}", path.name, error)
         names = ", ".join(sorted(path.name for path, _ in failures))
         raise RuntimeError(
-            f"Failed to publish {len(failures)} of {len(files_to_upload)} file(s) to R2: {names}"
+            f"Failed to publish {len(failures)} of {len(base_files)} base file(s) to R2: {names}"
         ) from failures[0][1]
 
 

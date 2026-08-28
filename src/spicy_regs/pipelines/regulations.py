@@ -171,7 +171,26 @@ class RegulationsPipeline(Pipeline):
             logger.info("skip_upload=True — output left in {}", output_dir)
         elif any(staged.values()):
             logger.info("Uploading to R2...")
-            r2.upload_dataset(output_dir, [rt.name for rt in record_types if rt.name != "comments"])
+            base_data_types = [rt.name for rt in record_types if rt.name != "comments"]
+            files_to_preflight = [
+                (output_dir / f"{data_type}.parquet", f"{data_type}.parquet")
+                for data_type in base_data_types
+                if (output_dir / f"{data_type}.parquet").exists()
+            ]
+            files_to_preflight.extend((path, str(path.relative_to(output_dir))) for path in changed_comments)
+            index_file = output_dir / "comments_index.parquet"
+            publish_comments_index = bool(changed_comments) or (self.use_iceberg and staged.get("comments", 0) > 0)
+            if publish_comments_index and not index_file.exists():
+                raise RuntimeError("Expected comments_index.parquet after publishing comment data")
+            if publish_comments_index:
+                files_to_preflight.append((index_file, "comments_index.parquet"))
+            manifest_file = output_dir / "manifest.parquet"
+            if manifest_file.exists():
+                files_to_preflight.append((manifest_file, "manifest.parquet"))
+
+            r2.preflight_uploads(files_to_preflight)
+            if base_data_types:
+                r2.upload_dataset(output_dir, base_data_types)
             # Comments are partitioned, not monolithic: publish the partitions
             # changed this run plus the refreshed index.
             if changed_comments:
@@ -180,11 +199,13 @@ class RegulationsPipeline(Pipeline):
             # Iceberg comments path: the MERGE wrote the rows through the catalog
             # (not under the public comments/ prefix), so there are no partition
             # files to push — only the refreshed index needs publishing.
-            elif self.use_iceberg and staged.get("comments", 0) > 0:
-                index_file = output_dir / "comments_index.parquet"
+            elif publish_comments_index:
                 if index_file.exists():
                     logger.info("Uploading refreshed comments index (Iceberg path)...")
                     r2.upload_file(index_file, remote_key="comments_index.parquet")
+            if manifest_file.exists():
+                logger.info("Uploading manifest after all data files succeeded...")
+                r2.upload_file(manifest_file, remote_key="manifest.parquet")
 
         logger.info("Done!")
 
