@@ -1,16 +1,23 @@
 """Hermetic tests for the Congress.gov bill ingest (no network).
 
 Covers the pieces with real logic: the raw-bill → published-schema mapping
-(``_shape`` / ``_bill_id``), the API-key resolution fallback chain, and the
-offset/limit pagination with early stop at the ``since`` watermark.
+(``_shape`` / ``_bill_id``), the API-key resolution fallback chain, the
+offset/limit pagination, and the request params that bound the fetch window.
+
+The params tests are regression cover for the 510-day freeze: ``sort`` has to
+reach the API as ``updateDate+desc`` (a space, which httpx form-encodes to
+``+``) and the window has to be bounded server-side by ``fromDateTime``.
 """
 
 from __future__ import annotations
 
 from datetime import date
 
+import httpx
+
 from spicy_regs.sources.congress_bills import (
     API_KEY_ENV_VARS,
+    SORT_NEWEST_FIRST,
     CongressBillsReader,
     _resolve_api_key,
 )
@@ -119,18 +126,64 @@ def test_paginate_walks_offsets_until_short_page(monkeypatch):
     assert got == [1, 2, 3]
 
 
-def test_paginate_stops_at_since_watermark(monkeypatch):
-    """Bills come newest-updated first; crossing ``since`` stops the walk."""
-    reader = CongressBillsReader(api_key="test", per_page=3, since=date(2024, 3, 4))
+def test_paginate_does_not_stop_on_an_out_of_order_page(monkeypatch):
+    """Row order must not truncate the walk — the server bounds the window.
+
+    This is the 510-day freeze in miniature: with ``sort`` silently ignored the
+    rows arrive shuffled, and the old client-side watermark stop quit after the
+    first row. Every bill on the page has to survive.
+    """
+    reader = CongressBillsReader(api_key="test", per_page=3, since=date(2025, 4, 4))
     pages = {
         0: {
             "bills": [
-                _bill(1, "2024-03-06"),  # newer -> kept
-                _bill(2, "2024-03-04"),  # == watermark -> kept
-                _bill(3, "2024-03-01"),  # older -> stop here
+                _bill(1, "2025-04-07"),
+                _bill(2, "2025-01-02"),  # out of order — must NOT end the walk
+                _bill(3, "2026-03-24"),
             ]
         },
+        3: {"bills": [_bill(4, "2024-02-07")]},  # short page -> stop
     }
     monkeypatch.setattr(reader, "_get_page", lambda offset: pages.get(offset, {"bills": []}))
     got = [b["number"] for b in reader._paginate()]
-    assert got == [1, 2]
+    assert got == [1, 2, 3, 4]
+
+
+# -- request params ----------------------------------------------------------
+
+
+def _params_for(monkeypatch, reader: CongressBillsReader) -> dict:
+    """Capture the query params ``_get_page`` would send."""
+    captured: dict = {}
+
+    def fake_get(url, params):
+        captured.update(params or {})
+        return None
+
+    monkeypatch.setattr(reader, "_get", fake_get)
+    reader._get_page(0)
+    return captured
+
+
+def test_sort_param_survives_url_encoding(monkeypatch):
+    """httpx must encode ``sort`` to ``updateDate+desc``, not ``updateDate%2Bdesc``.
+
+    The API answers 200 to both but only honours the former; the ``%2B`` form
+    returns rows in arbitrary order, which is what froze this table.
+    """
+    params = _params_for(monkeypatch, CongressBillsReader(api_key="test"))
+    assert params["sort"] == SORT_NEWEST_FIRST
+    url = httpx.Request("GET", "https://api.congress.gov/v3/bill", params=params).url
+    assert "sort=updateDate+desc" in str(url)
+    assert "%2B" not in str(url)
+
+
+def test_since_becomes_a_server_side_from_datetime(monkeypatch):
+    reader = CongressBillsReader(api_key="test", since=date(2025, 4, 4))
+    assert _params_for(monkeypatch, reader)["fromDateTime"] == "2025-04-04T00:00:00Z"
+
+
+def test_no_since_sends_no_window_bound(monkeypatch):
+    """A full backfill must not accidentally bound itself."""
+    params = _params_for(monkeypatch, CongressBillsReader(api_key="test"))
+    assert "fromDateTime" not in params

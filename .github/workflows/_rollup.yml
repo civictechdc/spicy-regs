@@ -43,11 +43,16 @@ on:
         required: false
         default: ''
         type: string
+      timeout_minutes:
+        description: 'Job timeout. Raise it for a rollup whose catch-up window is much larger than its steady state.'
+        required: false
+        default: 30
+        type: number
 
 jobs:
   rollup:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: ${{ inputs.timeout_minutes }}
 
     steps:
       - name: Checkout

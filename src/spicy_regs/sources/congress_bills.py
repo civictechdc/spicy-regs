@@ -10,8 +10,16 @@ the job of
 :func:`~spicy_regs.transforms.build_congress_bills.build_congress_bills`.
 
 The ``/bill`` list endpoint is paginated by ``offset``/``limit`` (``limit`` caps
-at 250) and sorted ``updateDate+desc`` so the newest activity comes first; an
-incremental run stops as soon as it walks past its ``since`` watermark.
+at 250). An incremental run bounds its window *server-side* with ``fromDateTime``
+and pages until the window is exhausted, newest ``updateDate`` first.
+
+**Do not bound the window client-side by stopping at the first out-of-window
+row.** That is what this reader used to do, and it froze the published table for
+510 days: the ``sort`` parameter was being sent as ``updateDate%2Bdesc``, which
+the API ignores while still answering ``200``, so rows arrived in arbitrary
+order. The second row of the first page was older than the watermark, the walk
+stopped there, and every run "succeeded" having yielded exactly one bill. The
+window is now the server's job; ordering is only a paging-stability concern.
 
 **API key.** Congress.gov requires an api.data.gov key sent as the ``api_key``
 query param. The same key works across regulations.gov, Congress.gov, and
@@ -37,6 +45,19 @@ API_BASE = "https://api.congress.gov/v3"
 # Max the API accepts per page.
 PER_PAGE = 250
 
+# Written with a SPACE, never a literal "+". httpx form-encodes a space to "+"
+# (``sort=updateDate+desc`` — what the API wants) but percent-encodes a literal
+# "+" to "%2B", which the API accepts with a 200 and silently ignores. See the
+# module docstring for what that cost.
+SORT_NEWEST_FIRST = "updateDate desc"
+
+# Server-side window bound. The API wants a full RFC3339 instant.
+_FROM_DATETIME_FMT = "%Y-%m-%dT00:00:00Z"
+
+# Warn when a walk returns materially less than the server said it would; the
+# slack absorbs bills whose updateDate shifts mid-walk.
+_COMPLETENESS_TOLERANCE = 0.9
+
 # Env vars checked in order for the api.data.gov key (one key works across
 # regulations.gov, Congress.gov, and GovInfo).
 API_KEY_ENV_VARS = (
@@ -51,9 +72,11 @@ _TIMEOUT = httpx.Timeout(60.0, connect=30.0)
 _MAX_RETRIES = 5
 _PROGRESS_EVERY = 5_000
 
-# The list endpoint refuses very large offsets; stop paging past this to avoid a
-# runaway loop on an unexpectedly large window. Incremental runs stop far sooner.
-_MAX_OFFSET = 200_000
+# Backstop against a runaway loop, not an expected limit: deep offsets page fine
+# (verified past 238k). Must clear a full-archive backfill — ~430k bills as of
+# 2026-08 — or a first run would silently truncate. Hitting it is logged as an
+# error, never a quiet stop.
+_MAX_OFFSET = 500_000
 
 
 def _resolve_api_key() -> str | None:
@@ -72,9 +95,10 @@ def _resolve_api_key() -> str | None:
 class CongressBillsReader(Reader):
     """Yields raw Congress.gov bill dicts, newest ``updateDate`` first.
 
-    ``since`` lets incremental runs stop once they page past the newest
-    ``updateDate`` already stored; the transform handles merging with the prior
-    table. With no key configured the reader yields nothing.
+    ``since`` becomes the ``fromDateTime`` bound on the request, so the server
+    decides what is in the window and the walk simply runs to exhaustion; the
+    transform handles merging with the prior table. With no key configured the
+    reader yields nothing.
     """
 
     def __init__(
@@ -83,14 +107,13 @@ class CongressBillsReader(Reader):
         since: date | None = None,
         per_page: int = PER_PAGE,
         api_key: str | None = None,
-        verbose: bool = False,
     ) -> None:
         self.since = since
         self.per_page = min(per_page, PER_PAGE)
         self.api_key = api_key or _resolve_api_key()
-        self.verbose = verbose
         self._client: httpx.Client | None = None
         self._seen = 0
+        self._expected: int | None = None
 
     def iter_records(self) -> Iterator[dict]:
         if not self.api_key:
@@ -107,26 +130,38 @@ class CongressBillsReader(Reader):
             self._client = client
             yield from self._paginate()
         logger.info("Congress bills: yielded {:,} bills", self._seen)
+        # A walk that returns far less than the server advertised is the shape
+        # of the 510-day freeze. Say so loudly rather than reporting success.
+        if self._expected is not None and self._seen < self._expected * _COMPLETENESS_TOLERANCE:
+            logger.warning(
+                "Congress bills: yielded {:,} of the {:,} bills the server reported "
+                "for this window — the walk ended early",
+                self._seen,
+                self._expected,
+            )
 
     # -- pagination ----------------------------------------------------------
 
     def _paginate(self) -> Iterator[dict]:
-        """Walk ``offset``/``limit`` pages, stopping at the ``since`` watermark."""
+        """Walk ``offset``/``limit`` pages until the server-bounded window runs out."""
         offset = 0
         while offset < _MAX_OFFSET:
             payload = self._get_page(offset)
             if payload is None:
                 break
+            if self._expected is None:
+                self._expected = _pagination_count(payload)
+                if self._expected is not None:
+                    logger.info(
+                        "Congress bills: server reports {:,} bills in this window",
+                        self._expected,
+                    )
             bills = payload.get("bills") or []
+            # An empty page ends the walk; `fromDateTime` already excluded
+            # everything outside the window, so there is no watermark to check.
             if not bills:
                 break
             for bill in bills:
-                # Bills come newest-updated first; once we cross the watermark
-                # everything after is older, so we can stop early.
-                if self.since is not None and _older_than(bill, self.since):
-                    if self.verbose:
-                        logger.debug("Congress bills: reached watermark {} — stopping", self.since)
-                    return
                 self._seen += 1
                 if self._seen % _PROGRESS_EVERY == 0:
                     logger.info("Congress bills: {:,} bills so far...", self._seen)
@@ -135,15 +170,28 @@ class CongressBillsReader(Reader):
             if len(bills) < self.per_page:
                 break
             offset += self.per_page
+        else:
+            # while/else: reached only when the condition goes false, i.e. the
+            # offset backstop — every ordinary exit above is a `break`.
+            logger.error(
+                "Congress bills: hit the {:,}-row offset backstop with pages still "
+                "coming — the window is too wide for one run; narrow it with --since",
+                _MAX_OFFSET,
+            )
 
     def _get_page(self, offset: int) -> dict | None:
         params: dict[str, object] = {
             "offset": offset,
             "limit": self.per_page,
-            "sort": "updateDate+desc",
+            "sort": SORT_NEWEST_FIRST,
             "format": "json",
             "api_key": self.api_key,
         }
+        # Bound the window server-side. Without this the walk would have to
+        # trust the row order to know when to stop — the exact assumption that
+        # failed silently for 510 days.
+        if self.since is not None:
+            params["fromDateTime"] = self.since.strftime(_FROM_DATETIME_FMT)
         return self._get(f"{API_BASE}/bill", params)
 
     def _get(self, url: str, params: dict | None) -> dict | None:
@@ -168,12 +216,14 @@ class CongressBillsReader(Reader):
         return None
 
 
-def _older_than(bill: dict, since: date) -> bool:
-    """True if the bill's ``updateDate`` is strictly before ``since``."""
-    raw = bill.get("updateDate")
-    if not raw:
-        return False
-    try:
-        return date.fromisoformat(str(raw)[:10]) < since
-    except ValueError:
-        return False
+def _pagination_count(payload: dict) -> int | None:
+    """Total rows the server says match the window, or None if absent/unparseable."""
+    raw = (payload.get("pagination") or {}).get("count")
+    if isinstance(raw, int):
+        return raw
+    if isinstance(raw, str):
+        try:
+            return int(raw)
+        except ValueError:
+            return None
+    return None
