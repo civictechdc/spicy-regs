@@ -23,3 +23,7 @@ jobs:
       command: run-rollup-congress-bills
       skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}
       congress_since: ${{ inputs.since || '' }}
+      # A steady-state run is a handful of pages. The catch-up from the 510-day
+      # freeze is ~238k bills / ~950 pages, and a timeout mid-walk publishes
+      # nothing — so it would retry the same walk forever. 60 minutes clears it.
+      timeout_minutes: 60

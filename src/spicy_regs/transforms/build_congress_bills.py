@@ -10,8 +10,9 @@ run. Instead we:
 
 1. Best-effort download the prior ``congress_bills.parquet`` from R2.
 2. Fetch only bills updated since its max ``update_date`` (minus a short overlap
-   to catch late-updated bills). Bills come newest-updated first, so the reader
-   stops as soon as it pages past that watermark.
+   to catch late-updated bills). That watermark goes to the API as a
+   ``fromDateTime`` bound, so the server returns the window and the reader pages
+   it to exhaustion.
 3. Dedup the union on ``bill_id``, preferring the freshly fetched row.
 
 With no prior table (first run) step 2 becomes a full backfill.
