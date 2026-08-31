@@ -25,5 +25,11 @@ jobs:
       congress_since: ${{ inputs.since || '' }}
       # A steady-state run is a handful of pages. The catch-up from the 510-day
       # freeze is ~238k bills / ~950 pages, and a timeout mid-walk publishes
-      # nothing — so it would retry the same walk forever. 60 minutes clears it.
-      timeout_minutes: 60
+      # nothing — so it would retry the same walk forever.
+      #
+      # 120, not 60: the first catch-up attempt was cancelled at the 60-minute
+      # cap having fetched 190,000 of 238,197. Measured throughput is a steady
+      # ~3,050 bills/min (no deep-offset degradation, no rate limiting), so the
+      # walk needs ~78 minutes plus setup and merge. This is a cap, not a
+      # duration — steady-state runs still finish in seconds.
+      timeout_minutes: 120
