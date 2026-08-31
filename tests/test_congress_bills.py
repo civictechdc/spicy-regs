@@ -11,9 +11,10 @@ reach the API as ``updateDate+desc`` (a space, which httpx form-encodes to
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 import httpx
+import pytest
 
 from spicy_regs.sources.congress_bills import (
     API_KEY_ENV_VARS,
@@ -21,7 +22,13 @@ from spicy_regs.sources.congress_bills import (
     CongressBillsReader,
     _resolve_api_key,
 )
-from spicy_regs.transforms.build_congress_bills import COLUMNS, _bill_id, _shape
+from spicy_regs.transforms.build_congress_bills import (
+    COLUMNS,
+    MAX_WINDOW_DAYS,
+    _bill_id,
+    _bounded_until,
+    _shape,
+)
 
 _RAW_BILL = {
     "congress": 118,
@@ -187,3 +194,57 @@ def test_no_since_sends_no_window_bound(monkeypatch):
     """A full backfill must not accidentally bound itself."""
     params = _params_for(monkeypatch, CongressBillsReader(api_key="test"))
     assert "fromDateTime" not in params
+
+
+def test_since_and_until_become_server_side_bounds(monkeypatch):
+    reader = CongressBillsReader(api_key="test", since=date(2025, 4, 4), until=date(2025, 7, 3))
+    params = _params_for(monkeypatch, reader)
+    assert params["fromDateTime"] == "2025-04-04T00:00:00Z"
+    assert params["toDateTime"] == "2025-07-03T00:00:00Z"
+
+
+def test_no_until_sends_no_upper_bound(monkeypatch):
+    params = _params_for(monkeypatch, CongressBillsReader(api_key="test", since=date(2025, 4, 4)))
+    assert "toDateTime" not in params
+
+
+# -- catch-up windowing ------------------------------------------------------
+
+
+def test_window_is_capped_so_a_deep_backfill_converges():
+    """An unbounded catch-up publishes nothing and retries forever; cap it.
+
+    The 510-day freeze needed 238k bills in one walk. That run hit the job
+    timeout at 190k and persisted nothing. Capping the window makes each run
+    publish and advance the watermark.
+    """
+    since = date(2025, 4, 4)
+    until = _bounded_until(since, None, today=date(2026, 8, 30))
+    assert until == since + timedelta(days=MAX_WINDOW_DAYS)
+
+
+def test_explicit_until_is_still_capped():
+    since = date(2025, 4, 4)
+    # An operator asking for the whole 510-day span still gets one window.
+    assert _bounded_until(since, date(2026, 8, 30)) == since + timedelta(days=MAX_WINDOW_DAYS)
+
+
+def test_short_explicit_window_is_left_alone():
+    since, until = date(2026, 8, 1), date(2026, 8, 10)
+    assert _bounded_until(since, until) == until
+
+
+def test_caught_up_run_stops_at_today():
+    """Steady state: the cap must not push the window past now."""
+    since, today = date(2026, 8, 27), date(2026, 8, 30)
+    assert _bounded_until(since, None, today=today) == today
+
+
+def test_backwards_window_is_rejected():
+    with pytest.raises(ValueError, match="precedes"):
+        _bounded_until(date(2026, 8, 10), date(2026, 8, 1))
+
+
+def test_full_backfill_has_no_upper_bound():
+    """No prior table means no watermark to window from."""
+    assert _bounded_until(None, None) is None

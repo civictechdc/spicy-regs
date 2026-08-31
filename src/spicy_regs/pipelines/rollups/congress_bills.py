@@ -33,7 +33,11 @@ class CongressBillsRollup(RollupPipeline):
     output: ClassVar[str] = "congress_bills.parquet"
 
     def build(self, output_dir: Path) -> Path:
-        return build_congress_bills(output_dir, since=_date_env("CONGRESS_SINCE"))
+        return build_congress_bills(
+            output_dir,
+            since=_date_env("CONGRESS_SINCE"),
+            until=_date_env("CONGRESS_UNTIL"),
+        )
 
 
 app = make_rollup_app(CongressBillsRollup)

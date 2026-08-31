@@ -11,7 +11,9 @@ the job of
 
 The ``/bill`` list endpoint is paginated by ``offset``/``limit`` (``limit`` caps
 at 250). An incremental run bounds its window *server-side* with ``fromDateTime``
-and pages until the window is exhausted, newest ``updateDate`` first.
+/ ``toDateTime`` and pages until the window is exhausted, newest ``updateDate``
+first. The upper bound is what lets a large catch-up be split into chunks that
+each publish, so progress survives a failure partway through.
 
 **Do not bound the window client-side by stopping at the first out-of-window
 row.** That is what this reader used to do, and it froze the published table for
@@ -51,8 +53,9 @@ PER_PAGE = 250
 # module docstring for what that cost.
 SORT_NEWEST_FIRST = "updateDate desc"
 
-# Server-side window bound. The API wants a full RFC3339 instant.
+# Server-side window bounds. The API wants a full RFC3339 instant.
 _FROM_DATETIME_FMT = "%Y-%m-%dT00:00:00Z"
+_TO_DATETIME_FMT = "%Y-%m-%dT00:00:00Z"
 
 # Warn when a walk returns materially less than the server said it would; the
 # slack absorbs bills whose updateDate shifts mid-walk.
@@ -95,20 +98,22 @@ def _resolve_api_key() -> str | None:
 class CongressBillsReader(Reader):
     """Yields raw Congress.gov bill dicts, newest ``updateDate`` first.
 
-    ``since`` becomes the ``fromDateTime`` bound on the request, so the server
-    decides what is in the window and the walk simply runs to exhaustion; the
-    transform handles merging with the prior table. With no key configured the
-    reader yields nothing.
+    ``since``/``until`` become the ``fromDateTime``/``toDateTime`` bounds on the
+    request, so the server decides what is in the window and the walk simply runs
+    to exhaustion; the transform handles merging with the prior table. With no
+    key configured the reader yields nothing.
     """
 
     def __init__(
         self,
         *,
         since: date | None = None,
+        until: date | None = None,
         per_page: int = PER_PAGE,
         api_key: str | None = None,
     ) -> None:
         self.since = since
+        self.until = until
         self.per_page = min(per_page, PER_PAGE)
         self.api_key = api_key or _resolve_api_key()
         self._client: httpx.Client | None = None
@@ -123,8 +128,9 @@ class CongressBillsReader(Reader):
             )
             return
         logger.info(
-            "Congress bills: fetching bills updated since {}",
+            "Congress bills: fetching bills updated {} through {}",
             self.since or "the beginning",
+            self.until or "now",
         )
         with httpx.Client(timeout=_TIMEOUT, headers={"Accept": "application/json"}) as client:
             self._client = client
@@ -192,6 +198,8 @@ class CongressBillsReader(Reader):
         # failed silently for 510 days.
         if self.since is not None:
             params["fromDateTime"] = self.since.strftime(_FROM_DATETIME_FMT)
+        if self.until is not None:
+            params["toDateTime"] = self.until.strftime(_TO_DATETIME_FMT)
         return self._get(f"{API_BASE}/bill", params)
 
     def _get(self, url: str, params: dict | None) -> dict | None:

@@ -10,12 +10,20 @@ run. Instead we:
 
 1. Best-effort download the prior ``congress_bills.parquet`` from R2.
 2. Fetch only bills updated since its max ``update_date`` (minus a short overlap
-   to catch late-updated bills). That watermark goes to the API as a
-   ``fromDateTime`` bound, so the server returns the window and the reader pages
-   it to exhaustion.
+   to catch late-updated bills), through at most :data:`MAX_WINDOW_DAYS` later.
+   Those bounds go to the API as ``fromDateTime``/``toDateTime``, so the server
+   returns the window and the reader pages it to exhaustion.
 3. Dedup the union on ``bill_id``, preferring the freshly fetched row.
 
 With no prior table (first run) step 2 becomes a full backfill.
+
+**Why the window is capped.** A run publishes nothing until its walk finishes,
+so one unbounded catch-up is all-or-nothing: the first attempt at the 510-day
+freeze fetched 190,000 of 238,197 bills, hit the job timeout, and persisted
+nothing — it would have retried the same doomed walk every night. Capping the
+window makes each run publish and advance the watermark, so a deep backfill
+converges over successive runs instead of never. Chunks can also be driven
+explicitly with ``CONGRESS_SINCE``/``CONGRESS_UNTIL``.
 
 Scope is deliberately **list-level only**: every column comes from the ``/bill``
 list payload, so there are no per-bill detail fetches (no N+1).
@@ -38,6 +46,12 @@ OUTPUT = "congress_bills.parquet"
 # Re-scan this many days before the last stored update_date on each run, so bills
 # updated after our previous run's cutoff are picked up.
 OVERLAP_DAYS = 3
+
+# Largest span one run will fetch. Sized off measured throughput (~3,050
+# bills/min against this API) and the ~467 bills/day average across the 510-day
+# freeze: ~90 days is ~42k bills, roughly 14 minutes — comfortably inside the
+# job timeout even if a stretch runs several times denser than average.
+MAX_WINDOW_DAYS = 90
 
 # The published schema: 10 columns, all VARCHAR, in a fixed order. ``bill_id`` is
 # the primary / dedup key.
@@ -94,6 +108,15 @@ def _shape(doc: dict) -> dict:
     }
 
 
+def _bounded_until(since: date | None, until: date | None, *, today: date | None = None) -> date | None:
+    """Return a deterministic end date no more than one catch-up window ahead."""
+    if since is None:
+        return until
+    if until is not None and until < since:
+        raise ValueError(f"Congress until date {until} precedes since date {since}")
+    return min(until or today or date.today(), since + timedelta(days=MAX_WINDOW_DAYS))
+
+
 def _prior_max_update_date(prior_file: Path) -> date | None:
     """Largest ``update_date`` in the prior table, or None if empty/absent."""
     if not prior_file.exists():
@@ -109,7 +132,7 @@ def _prior_max_update_date(prior_file: Path) -> date | None:
         return None
 
 
-def build_congress_bills(output_dir: Path, *, since: date | None = None) -> Path:
+def build_congress_bills(output_dir: Path, *, since: date | None = None, until: date | None = None) -> Path:
     """Build ``congress_bills.parquet`` (incremental merge with the prior table)."""
     import duckdb
 
@@ -127,10 +150,15 @@ def build_congress_bills(output_dir: Path, *, since: date | None = None) -> Path
     if since is None:
         prior_max = _prior_max_update_date(prior_file) if have_prior else None
         since = (prior_max - timedelta(days=OVERLAP_DAYS)) if prior_max else None
-    logger.info("Congress bills: fetching bills updated since {}", since or "the beginning")
+    until = _bounded_until(since, until)
+    logger.info(
+        "Congress bills: fetching bills updated {} through {}",
+        since or "the beginning",
+        until or "now",
+    )
 
     # 3. Fetch + shape into a "new rows" parquet.
-    reader = CongressBillsReader(since=since)
+    reader = CongressBillsReader(since=since, until=until)
     rows = [_shape(doc) for doc in reader.iter_records()]
     new_file = output_dir / "_congress_new.parquet"
     table = pa.Table.from_pylist(rows, schema=_SCHEMA) if rows else _SCHEMA.empty_table()
