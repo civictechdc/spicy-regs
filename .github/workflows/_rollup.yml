@@ -33,6 +33,11 @@ on:
         required: false
         default: ''
         type: string
+      congress_until:
+        description: 'Optional Congress.gov backfill end date (YYYY-MM-DD; still capped to one catch-up window)'
+        required: false
+        default: ''
+        type: string
       fcc_since:
         description: 'Optional FCC ECFS backfill start date (YYYY-MM-DD)'
         required: false
@@ -90,6 +95,7 @@ jobs:
           LDA_SINCE: ${{ inputs.lda_since }}
           LDA_UNTIL: ${{ inputs.lda_until }}
           CONGRESS_SINCE: ${{ inputs.congress_since }}
+          CONGRESS_UNTIL: ${{ inputs.congress_until }}
           FCC_SINCE: ${{ inputs.fcc_since }}
           FCC_PROCEEDINGS: ${{ inputs.fcc_proceedings }}
           # Optional: raises the CourtListener API rate limit. The court_dockets
