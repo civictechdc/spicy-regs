@@ -201,6 +201,108 @@ def test_sandbox_locks_configuration():
         con.execute("SET allow_unsigned_extensions=true")
 
 
+# --- read-only statement guard ----------------------------------------------
+
+
+READ_FORMS = [
+    "SELECT 1",
+    "WITH a AS (SELECT 1) SELECT * FROM a",
+    "FROM range(3)",
+    "DESCRIBE SELECT 1",
+    "EXPLAIN SELECT 1",
+    "SHOW ALL TABLES",
+    "SUMMARIZE SELECT 1",
+    "VALUES (1), (2)",
+    "/* lead */ SELECT 1",
+    "SELECT 1 -- COPY (SELECT 1) TO '/tmp/x.csv'",
+    "SELECT 'COPY (SELECT 1) TO /tmp/x.csv' AS s",
+]
+
+WRITE_FORMS = [
+    ("COPY (SELECT 1) TO '/tmp/probe.csv'", "COPY"),
+    ("ATTACH '/tmp/probe.db' AS z", "ATTACH"),
+    ("EXPORT DATABASE '/tmp/probe'", "EXPORT"),
+    ("CREATE TABLE t (i INTEGER)", "CREATE"),
+    ("CREATE VIEW v AS SELECT 1", "CREATE"),
+    ("DROP TABLE IF EXISTS t", "DROP"),
+    ("INSERT INTO t VALUES (1)", "INSERT"),
+    ("UPDATE t SET i = 1", "UPDATE"),
+    ("DELETE FROM t", "DELETE"),
+    ("SET memory_limit='1GB'", "SET"),
+    ("LOAD httpfs", "LOAD"),
+    ("CALL pragma_version()", "CALL"),
+    ("PREPARE p AS SELECT 1", "PREPARE"),
+    ("BEGIN TRANSACTION", "TRANSACTION"),
+]
+
+
+@pytest.mark.parametrize("sql", READ_FORMS)
+def test_read_forms_pass_the_guard(sql):
+    """Every read shape a client might send must survive the allowlist.
+
+    The allowlist is only {SELECT, EXPLAIN} because DuckDB's parser folds
+    DESCRIBE/SHOW/SUMMARIZE/VALUES and the FROM-first shorthand into SELECT.
+    If that ever stops holding, these are the cases that break.
+    """
+    con = _sandboxed_connection()
+    assert mcp_server._first_write_statement(con, sql) is None
+
+
+@pytest.mark.parametrize("sql,expected", WRITE_FORMS)
+def test_write_forms_are_named_and_rejected(sql, expected):
+    con = _sandboxed_connection()
+    assert mcp_server._first_write_statement(con, sql) == expected
+
+
+def test_guard_catches_a_write_stacked_behind_a_select():
+    """A trailing write must not ride in on a leading SELECT.
+
+    ``execute`` runs every statement in the string but returns only the last
+    result, so a stacked write would otherwise land silently.
+    """
+    con = _sandboxed_connection()
+    assert mcp_server._first_write_statement(con, "SELECT 1; DROP TABLE t") == "DROP"
+
+
+def test_guard_ignores_empty_sql():
+    con = _sandboxed_connection()
+    assert mcp_server._first_write_statement(con, "   ") is None
+
+
+def test_guard_lets_parser_errors_through():
+    """Malformed SQL keeps surfacing DuckDB's message, which names the token."""
+    con = _sandboxed_connection()
+    with pytest.raises(duckdb.ParserException):
+        mcp_server._first_write_statement(con, "SELECT ((")
+
+
+def test_query_sql_refuses_a_write_without_executing_it(monkeypatch, tmp_path):
+    """End-to-end: the tool returns an error and the COPY never lands on disk."""
+    module = mcp_server
+    module._reset_connection_cache()
+    _make_local_connection(monkeypatch, module)
+    server = module.build_server()
+    target = tmp_path / "written.csv"
+
+    result = asyncio.run(server.call_tool("query_sql", {"sql": f"COPY (SELECT 1) TO '{target}'", "max_rows": 1}))
+
+    assert not target.exists()
+    assert "read-only" in str(result)
+    module._reset_connection_cache()
+
+
+def test_query_sql_still_runs_a_select(monkeypatch):
+    module = mcp_server
+    module._reset_connection_cache()
+    _make_local_connection(monkeypatch, module)
+    server = module.build_server()
+
+    result = asyncio.run(server.call_tool("query_sql", {"sql": "SELECT docket_count FROM agency_stats", "max_rows": 1}))
+
+    assert "read-only" not in str(result)
+    module._reset_connection_cache()
+
+
 def test_comments_catalog_view_dedups_on_read():
     """The catalog-backed ``comments`` view keeps one row per comment_id.
 

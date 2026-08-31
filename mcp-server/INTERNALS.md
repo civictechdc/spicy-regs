@@ -48,6 +48,45 @@ on `catalog["namespace"]`.
   sandbox is testable without network. Run it after httpfs loads and before any
   user SQL; `SET lock_configuration=true` is last because it freezes everything.
 
+## The read-only statement guard
+
+`query_sql` hands arbitrary SQL to `cursor.execute()`, so without a gate the
+public endpoint accepts writes. `COPY ... TO`, `ATTACH`, and `EXPORT DATABASE`
+all reach the container filesystem, and on Cloud Run that filesystem is
+in-memory — a large enough `COPY` evicts the instance. The service is
+`--allow-unauthenticated`, so that is an anonymous availability lever.
+
+The obvious fix, `SET disabled_filesystems='LocalFileSystem'`, is the one thing
+that must not be done (see above — httpfs needs the CA bundle). Hence
+`_first_write_statement`, which classifies with DuckDB's own parser via
+`extract_statements` and admits only `SELECT` and `EXPLAIN`.
+
+**Do not swap the parser for a prefix regex.** The parser is what makes leading
+comments (`/* c */ COPY ...`), `COPY` inside a string literal, and stacked
+statements (`SELECT 1; DROP TABLE t`) classify correctly. The stacked case
+matters most: `execute` runs every statement in the string but returns only the
+last result, so a trailing write would otherwise land with nothing in the
+response to show for it.
+
+**The two-entry allowlist is not as narrow as it looks.** DuckDB folds
+`DESCRIBE`, `SHOW`, `SUMMARIZE`, `VALUES`, `TABLE`, and the FROM-first
+shorthand (`FROM comments LIMIT 1`) into `StatementType.SELECT`, so all of them
+still run. `tests/test_mcp_server.py::test_read_forms_pass_the_guard` pins that
+folding; if a DuckDB upgrade splits any of them into its own statement type,
+that test fails rather than clients silently losing a query form.
+
+Matching is on `StatementType.name`, not the enum member, because duckdb's type
+stubs do not declare the members and `ty` gates merges — comparing names keeps
+the check honest without a blanket type-ignore.
+
+This guard does **not** stop local file *reads*: `read_text`, `read_csv`, and
+`read_blob` are `SELECT`s. Nothing sensitive sits on the container filesystem
+today (the R2 catalog token arrives as an env var, `getenv` does not exist in
+DuckDB, and `duckdb_secrets()` redacts the token), so the exposure is latent
+rather than live. It stops being latent the moment a secret is mounted as a
+file — if the catalog token ever moves to a Cloud Run secret *volume*, this
+needs a companion path check.
+
 ## The statement timeout
 
 **DuckDB has no `statement_timeout` parameter.** `SET statement_timeout=...`
