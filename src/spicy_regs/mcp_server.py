@@ -189,6 +189,39 @@ def _jsonify(value: Any) -> Any:
     return str(value)
 
 
+READ_ONLY_STATEMENT_TYPES = frozenset({"SELECT", "EXPLAIN"})
+
+
+def _first_write_statement(cursor: duckdb.DuckDBPyConnection, sql: str) -> str | None:
+    """Name of the first non-read-only statement in ``sql``, else None.
+
+    The sandbox cannot express "no writes" on its own. ``disabled_filesystems``
+    is the setting that would, but LocalFileSystem has to stay enabled for
+    httpfs to read the CA bundle (see the security-settings notes), so
+    ``COPY ... TO``, ``ATTACH``, and ``EXPORT DATABASE`` could all write to the
+    container filesystem — on Cloud Run an in-memory one, where a large enough
+    write evicts the instance. This is the gate that says no instead.
+
+    Classification comes from DuckDB's own parser rather than a prefix regex,
+    so leading comments, string literals, and stacked statements cannot smuggle
+    a write past it. ``DESCRIBE``/``SHOW``/``SUMMARIZE``/``VALUES``/``TABLE``
+    and the FROM-first shorthand all parse as SELECT, which is why a two-entry
+    allowlist still admits every read form.
+
+    Matching on ``StatementType.name`` rather than the enum member keeps this
+    working against duckdb's incomplete type stubs, which do not declare the
+    members, without a blanket type-ignore over the comparison.
+
+    A ``ParserException`` propagates untouched: malformed SQL should surface
+    DuckDB's own message, which names the offending token.
+    """
+    for statement in cursor.extract_statements(sql):
+        name = statement.type.name
+        if name not in READ_ONLY_STATEMENT_TYPES:
+            return name
+    return None
+
+
 def _apply_security_settings(con: duckdb.DuckDBPyConnection) -> None:
     con.execute("SET preserve_insertion_order=false")
     con.execute("SET autoinstall_known_extensions=false")
@@ -365,8 +398,11 @@ def _register_tools(mcp: FastMCP) -> None:
 
     @mcp.tool()
     def query_sql(sql: str, max_rows: int = 25) -> dict[str, Any]:
-        """Run a SQL query against the Spicy Regs R2 tables and return up to max_rows rows.
+        """Run a read-only SQL query against the Spicy Regs R2 tables and return up to max_rows rows.
 
+        Only SELECT and EXPLAIN run; DESCRIBE, SHOW, SUMMARIZE, VALUES and the
+        FROM-first shorthand are accepted as SELECT. Statements that write
+        (COPY TO, ATTACH, CREATE, INSERT, DROP, EXPORT, SET, ...) are refused.
         The connection is in-memory and read-only against R2. One view exists per
         table listed by list_sources. Always include a LIMIT in exploratory
         queries; results past max_rows are dropped.
@@ -375,6 +411,10 @@ def _register_tools(mcp: FastMCP) -> None:
             return {"error": "max_rows must be between 1 and 500"}
 
         cursor = _get_connection().cursor()
+        write_statement = _first_write_statement(cursor, sql)
+        if write_statement is not None:
+            return {"error": f"query_sql is read-only; refusing {write_statement} statement"}
+
         with _statement_timeout(cursor):
             cursor.execute(sql)
             columns = [desc[0] for desc in cursor.description] if cursor.description else []
