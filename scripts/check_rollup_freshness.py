@@ -77,6 +77,11 @@ SKIPPED = {
     # publish lands — checking before then would 404 the whole freshness query.
     "fcc_proceedings": "not yet published to R2; first backfill pending",
     "fcc_filings": "not yet published to R2; first backfill pending",
+    # Derived from comments + fec_committees, so it carries no date watermark of
+    # its own; both of its sources are already watched above. Its row count is a
+    # better signal — promote it to ROW_CHANGE_BUDGETS once the first publish
+    # lands and a steady-state row count is known.
+    "org_committee_links": "derived link table; no date watermark of its own",
 }
 
 

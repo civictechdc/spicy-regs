@@ -379,6 +379,44 @@ tables:
       last_file_date: "Date of the committee's most recent filing (ISO 8601 string)."
       cycles_json: "JSON array of election-cycle years the committee was active in (e.g. `[2018, 2020, 2022]`)."
       candidate_ids_json: "JSON array of OpenFEC candidate IDs associated with the committee (e.g. `[\"P00008052\"]`). Often `[]`."
+  org_committee_links:
+    summary: >-
+      One row per (commenter organization name, FEC committee) name match,
+      derived by `build_org_committee_links`. Materializes the organization-name
+      bridge between the regulations.gov corpus and `fec_committees` — the join
+      the data model always described but left to each query author, so every
+      consumer normalized names differently. `organization` is the raw string as
+      filed, joining straight back to `comments.organization`; `committee_id`
+      joins to `fec_committees`. Coverage is inherently small:
+      `comments.organization` is populated on only ~0.08% of comments (~20.7K of
+      ~25.8M), and most commenting organizations do not run a federal PAC, so a
+      few hundred organizations resolving is the correct answer rather than a
+      matcher to tune harder. Matching runs in three tiers (`exact`, `core`,
+      `prefix`) and every row carries `match_method`, `confidence`, and
+      `committee_match_count` so consumers pick their own precision bar instead
+      of trusting an opaque score. A high `committee_match_count` is usually a
+      real affiliate network (Planned Parenthood matches ~90 state committees),
+      not an error — which is why such rows are labelled rather than dropped.
+    columns:
+      organization: "Commenter organization exactly as filed on the comment. Join key back to `comments.organization`."
+      organization_norm: "`organization` uppercased with parenthetical asides, apostrophes and punctuation removed and `&` expanded to `AND`."
+      organization_core: "`organization_norm` with trailing legal suffixes (`INC`, `LLC`, ...) and a leading `THE` removed. The form the `core`/`prefix` tiers compare."
+      name_source: "Where the organization name came from. Always `organization_field` today; text-derived names (comment title, letterhead, signature block) would be added as extra rows under their own source."
+      committee_id: "Matched OpenFEC committee identifier. Joins to `fec_committees.committee_id`."
+      committee_name: "Matched committee name as registered with the FEC."
+      committee_type_full: "Human-readable committee type of the matched committee (e.g. `PAC - Qualified`)."
+      designation_full: "Human-readable committee designation of the matched committee."
+      party_full: "Human-readable political party of the matched committee. Often null for non-party committees."
+      organization_type_full: "Sponsoring organization type of the matched committee (e.g. `Trade Association`, `Labor Organization`). Often null."
+      committee_state: "Two-letter state on the matched committee (`fec_committees.state`). Often null."
+      match_method: "How the pair matched: `exact` (full normalized names equal), `core` (decoration-stripped cores equal), or `prefix` (committee core starts with the whole organization core on a token boundary)."
+      confidence: "`high` for `exact`/`core`; for `prefix`, `medium` when `committee_match_count` <= 5 and `low` above that. Filter on this to pick a precision bar."
+      committee_match_count: "How many committees this organization matched in total. High values are usually genuine affiliate networks (unions, Planned Parenthood); treat with `confidence`."
+      comment_count: "Comments filed under this exact organization string (deduplicated on `comment_id`, newest `modify_date` wins — matching the MCP `comments` view)."
+      docket_count: "Distinct dockets this organization string commented on."
+      agency_codes_json: "JSON array of the distinct agency codes this organization commented to, sorted."
+      first_comment_date: "Earliest `posted_date` across this organization's comments (ISO 8601 string)."
+      last_comment_date: "Latest `posted_date` across this organization's comments (ISO 8601 string)."
   gao_reports:
     summary: >-
       One row per U.S. Government Accountability Office (GAO) product, ingested

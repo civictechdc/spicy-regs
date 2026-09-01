@@ -45,6 +45,7 @@ TABLES = (
     "sam_entities",
     "lobbying_filings",
     "fec_committees",
+    "org_committee_links",
     "gao_reports",
     "crs_reports",
     "court_dockets",

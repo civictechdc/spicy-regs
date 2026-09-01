@@ -1,0 +1,22 @@
+name: Rollup — org_committee_links
+on:
+  schedule:
+    # 20:30 UTC — an hour after the fec_committees ingest (19:30 UTC), so the
+    # committee reference dimension this rollup matches against is same-day
+    # fresh. Nothing breaks if the ingest is late: this run just matches
+    # against the previous day's committees.
+    - cron: '30 20 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-org-committee-links
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}
