@@ -18,7 +18,9 @@ no-ops without R2 credentials, so local runs and tests need no Cloudflare setup.
 
 from __future__ import annotations
 
+from datetime import date, datetime
 from os import getenv
+from typing import Any
 
 import httpx
 from loguru import logger
@@ -65,3 +67,75 @@ def purge_urls(urls: list[str]) -> None:
                 logger.info("Purged {} URL(s) from Cloudflare cache", len(batch))
         except (httpx.HTTPError, ValueError) as exc:
             logger.warning("Cloudflare purge error (upload already succeeded): {}", exc)
+
+
+TOKEN_VERIFY_URL = "https://api.cloudflare.com/client/v4/user/tokens/verify"
+TOKEN_EXPIRY_WARN_DAYS = 14
+
+
+def _parse_expiry(raw: str) -> date | None:
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
+    except ValueError:
+        return None
+
+
+def evaluate_token_status(
+    status_code: int,
+    payload: dict[str, Any],
+    today: date,
+    warn_days: int = TOKEN_EXPIRY_WARN_DAYS,
+) -> list[str]:
+    """Problems with a token-verify response; empty list means healthy.
+
+    Pure so the watchdog's judgement is testable without network: every branch
+    here is a state the live API actually returned at some point.
+
+    An imminent expiry counts as a problem rather than a nicety. The token that
+    lapsed on 2026-08-17 was rejected outright the next morning, and a warning
+    fires only if someone is looking — this is the check that is looking.
+    """
+    if status_code != 200 or not payload.get("success", False):
+        errors = payload.get("errors") or []
+        detail = "; ".join(str(err.get("message", err)) for err in errors)
+        return [f"token rejected by Cloudflare ({detail or f'HTTP {status_code}'})"]
+
+    problems: list[str] = []
+    result = payload.get("result") or {}
+    status = result.get("status")
+    if status != "active":
+        problems.append(f"token status is {status!r}, expected 'active'")
+
+    raw_expiry = result.get("expires_on")
+    if raw_expiry:
+        expiry = _parse_expiry(str(raw_expiry))
+        if expiry is None:
+            problems.append(f"could not parse expires_on {raw_expiry!r}")
+        elif expiry < today:
+            problems.append(f"token expired on {expiry} ({(today - expiry).days}d ago)")
+        elif (expiry - today).days <= warn_days:
+            problems.append(f"token expires on {expiry} (in {(expiry - today).days}d) — rotate it now")
+    return problems
+
+
+def verify_token(today: date | None = None, warn_days: int = TOKEN_EXPIRY_WARN_DAYS) -> list[str] | None:
+    """Check the purge credential against Cloudflare. None when unconfigured.
+
+    Returns the caller's decision to make: ``None`` distinguishes "no
+    credentials here" (fine locally, a silent no-op in CI) from "credentials
+    present and healthy" (empty list).
+    """
+    config = _purge_config()
+    if config is None:
+        return None
+    _, token = config
+    headers = {"Authorization": f"Bearer {token}"}
+    try:
+        resp = httpx.get(TOKEN_VERIFY_URL, headers=headers, timeout=_PURGE_TIMEOUT)
+    except httpx.HTTPError as exc:
+        return [f"could not reach Cloudflare to verify the token: {exc}"]
+    try:
+        payload = resp.json()
+    except ValueError:
+        payload = {}
+    return evaluate_token_status(resp.status_code, payload, today or date.today(), warn_days)
