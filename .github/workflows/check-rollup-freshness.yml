@@ -36,6 +36,16 @@ jobs:
       - name: Check published tables
         run: uv run python scripts/check_rollup_freshness.py
 
+      # Runs even when the freshness check failed: a dead purge credential and a
+      # stale table are independent faults, and hiding one behind the other is
+      # how the purge token went twelve days unnoticed in the first place.
+      - name: Check Cloudflare purge credential
+        if: always()
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+        run: uv run python scripts/check_purge_credential.py
+
       - name: Save row-count history
         if: always()
         uses: actions/cache/save@v4
