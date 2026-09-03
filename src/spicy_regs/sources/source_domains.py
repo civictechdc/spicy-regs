@@ -49,8 +49,9 @@ an ``xs:documentation`` sentence. There is no ``xs:enumeration`` anywhere in the
 file. So the "documented" domain for the Unified Agenda is publisher prose read
 by a parser that refuses any sentence it does not recognise.
 
-Parsers here are pure: bytes in, values out, no network and no I/O beyond the
-manifest and snapshot reads.
+Parsers here are pure — bytes in, values out, no network and no I/O beyond the
+manifest and snapshot reads — and the two document parses are memoized on those
+bytes, because one capture states the domain of several columns.
 """
 
 from __future__ import annotations
@@ -59,8 +60,10 @@ import hashlib
 import json
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
+from functools import lru_cache
 from pathlib import Path
+from typing import Any
 from xml.etree import ElementTree as ET
 
 import yaml
@@ -98,20 +101,10 @@ class DocumentedEnumerationCapture:
     publisher_revision: str
 
 
-_CAPTURE_FIELDS = frozenset(
-    {
-        "byte_length",
-        "bytes_digest",
-        "key",
-        "media_type",
-        "observed_at",
-        "path",
-        "publisher",
-        "publisher_revision",
-        "source_url",
-        "states",
-    }
-)
+# A manifest entry states exactly the capture's fields, so the set is derived from
+# the dataclass rather than kept beside it: a field added to one cannot go missing
+# from the other.
+_CAPTURE_FIELDS = frozenset(field.name for field in fields(DocumentedEnumerationCapture))
 
 
 def load_capture_manifest(root: Path | str = DEFAULT_SOURCE_DOMAIN_DIR) -> dict[str, DocumentedEnumerationCapture]:
@@ -167,6 +160,21 @@ def read_capture(capture: DocumentedEnumerationCapture, *, root: Path | str = DE
 # --- parsing the regulations.gov OpenAPI document ---------------------------
 
 
+# Memoized on the exact bytes, so a changed capture is a different entry and never
+# a stale hit. One capture states the domain of several columns, and parsing this
+# 60 KB document is 35 ms — 97% of the module's runtime — so parsing it once per
+# capture rather than once per column is the whole cost of the register.
+@lru_cache(maxsize=4)
+def _parse_yaml(payload: bytes) -> Mapping[str, Any]:
+    try:
+        document = yaml.safe_load(payload)
+    except yaml.YAMLError as error:
+        raise SourceDomainError(f"openapi capture is not well-formed YAML: {error}") from error
+    if not isinstance(document, Mapping):
+        raise SourceDomainError("openapi capture is not a YAML mapping")
+    return document
+
+
 def openapi_schema_enum(payload: bytes, schema_name: str) -> tuple[str, ...]:
     """Return the ``enum`` members of one ``components.schemas`` entry, in source order.
 
@@ -178,12 +186,7 @@ def openapi_schema_enum(payload: bytes, schema_name: str) -> tuple[str, ...]:
     ampersand because that is what the API returns.
     """
 
-    try:
-        document = yaml.safe_load(payload)
-    except yaml.YAMLError as error:
-        raise SourceDomainError(f"openapi capture is not well-formed YAML: {error}") from error
-    if not isinstance(document, Mapping):
-        raise SourceDomainError("openapi capture is not a YAML mapping")
+    document = _parse_yaml(payload)
     components = document.get("components")
     schemas = components.get("schemas") if isinstance(components, Mapping) else None
     if not isinstance(schemas, Mapping) or schema_name not in schemas:
@@ -214,6 +217,9 @@ _XSD_QUOTED_OPTION = re.compile(r'"([^"]+)"')
 _ROOT_ELEMENT_START = re.compile(rb"<[A-Za-z_]")
 
 
+# Memoized like the YAML parse above, and for the same reason: four documented
+# domains are read out of this one document. Callers only read the tree.
+@lru_cache(maxsize=4)
 def _parse_xsd(payload: bytes) -> ET.Element:
     match = _ROOT_ELEMENT_START.search(payload)
     prolog = payload if match is None else payload[: match.start()]
@@ -422,10 +428,6 @@ class ObservedDomain:
     value_counts: tuple[tuple[str, int], ...]
     null_count: int
     row_count: int
-
-    @property
-    def values(self) -> tuple[str, ...]:
-        return tuple(value for value, _ in self.value_counts)
 
 
 @dataclass(frozen=True)

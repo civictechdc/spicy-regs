@@ -12,7 +12,7 @@ about the publisher's own document, not about a list somebody typed.
 
 from __future__ import annotations
 
-import importlib.util
+import hashlib
 import json
 import shutil
 import subprocess
@@ -22,6 +22,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts.check_source_domain_drift import published_table_url
 from spicy_regs.data_dictionary import DEFAULT_R2_BASE_URL, expected_schemas
 from spicy_regs.sources.source_domains import (
     ACCEPTED_DOMAIN_FINDINGS,
@@ -319,10 +320,17 @@ def test_the_snapshot_states_where_its_rows_came_from(snapshot):
 
 
 def test_the_snapshot_row_counts_add_up(snapshot):
-    """Every row of a domain's table is either a value or a null; nothing is dropped."""
+    """Every row of a domain's table is either a value or a null; nothing is dropped.
 
+    The table's own total is stated twice in the file — once per domain and once per
+    source — so require the two to agree. A hand-edit of one half of the observation
+    has to be consistent with the other half before it can pass.
+    """
+
+    sources = {str(one["table"]): one for one in snapshot.sources}
     for domain in snapshot.domains.values():
         assert sum(count for _, count in domain.value_counts) + domain.null_count == domain.row_count
+        assert domain.row_count == int(sources[domain.table]["row_count"])
 
 
 def test_priority_category_is_the_one_nullable_domain(snapshot):
@@ -331,6 +339,12 @@ def test_priority_category_is_the_one_nullable_domain(snapshot):
     nullable = {key for key, domain in snapshot.domains.items() if domain.null_count}
     assert nullable == {"unified-agenda-priority-category"}
     assert snapshot.domains["unified-agenda-priority-category"].null_count == 2
+
+
+def test_the_snapshot_file_is_small_enough_to_read():
+    """A domain snapshot is a summary, not a copy of the table it summarizes."""
+
+    assert (DOMAIN_DIR / OBSERVED_SNAPSHOT_FILENAME).stat().st_size < 16_384
 
 
 # --- the tool ---------------------------------------------------------------
@@ -352,14 +366,9 @@ def test_the_tool_would_record_the_urls_the_snapshot_already_carries(snapshot):
     run it against every table the snapshot names and require it to reproduce them.
     """
 
-    spec = importlib.util.spec_from_file_location("check_source_domain_drift", TOOL)
-    assert spec is not None and spec.loader is not None
-    tool = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(tool)
-
     for source in snapshot.sources:
-        assert tool.published_table_url(str(source["table"])) == source["publisher_url"]
-    assert tool.published_table_url("documents") == "https://data.spicy-regs.dev/documents.parquet"
+        assert published_table_url(str(source["table"])) == source["publisher_url"]
+    assert published_table_url("documents") == "https://data.spicy-regs.dev/documents.parquet"
 
 
 def test_the_tool_refuses_to_write_a_snapshot_without_provenance():
@@ -376,8 +385,6 @@ def test_the_tool_refuses_to_write_a_snapshot_without_provenance():
 def _repin(manifest_path: Path, key: str, capture_path: Path) -> None:
     """Re-pin one capture's digest and length so a mutation test reaches the parser."""
 
-    import hashlib
-
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     for entry in payload["captures"]:
         if entry["key"] == key:
@@ -385,9 +392,3 @@ def _repin(manifest_path: Path, key: str, capture_path: Path) -> None:
             entry["bytes_digest"] = "sha256:" + hashlib.sha256(body).hexdigest()
             entry["byte_length"] = len(body)
     manifest_path.write_text(json.dumps(payload, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-
-
-def test_the_snapshot_file_is_small_enough_to_read(snapshot):
-    """A domain snapshot is a summary, not a copy of the table it summarizes."""
-
-    assert (DOMAIN_DIR / OBSERVED_SNAPSHOT_FILENAME).stat().st_size < 16_384

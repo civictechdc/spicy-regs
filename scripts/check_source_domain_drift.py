@@ -34,6 +34,7 @@ import hashlib
 import json
 import sys
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
 
 from spicy_regs.data_dictionary import DEFAULT_R2_BASE_URL, TABLES
@@ -41,6 +42,7 @@ from spicy_regs.sources.source_domains import (
     DEFAULT_SOURCE_DOMAIN_DIR,
     OBSERVED_SNAPSHOT_FILENAME,
     OBSERVED_SNAPSHOT_FORMAT_VERSION,
+    DocumentedDomain,
     DomainFinding,
     ObservedDomain,
     ObservedSnapshot,
@@ -80,10 +82,19 @@ def _file_identity(path: Path) -> tuple[str, int]:
     return "sha256:" + digest.hexdigest(), length
 
 
-def observe(data_dir: Path, *, observed_at: str, producer_revision: str) -> ObservedSnapshot:
-    """Scan the published tables in ``data_dir`` for each declared domain's distinct values."""
+def observe(
+    data_dir: Path,
+    documented: Mapping[str, DocumentedDomain],
+    *,
+    observed_at: str,
+    producer_revision: str,
+) -> ObservedSnapshot:
+    """Scan the published tables in ``data_dir`` for each declared domain's distinct values.
 
-    documented = documented_domains(SOURCE_DOMAIN_DIR)
+    Takes the register the caller already parsed, so the observation and the diff
+    it feeds are the same set of domains read from the same captures once.
+    """
+
     tables = sorted({domain.table for domain in documented.values()})
     connection = _connect()
     sources = []
@@ -176,6 +187,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.observe:
         snapshot = observe(
             Path(args.data_dir),
+            documented,
             observed_at=args.observed_at,
             producer_revision=args.producer_revision,
         )
