@@ -1,8 +1,8 @@
 """Hermetic tests for the Federal Register ingest (no network).
 
-Covers the two pieces with real logic: the raw-doc → published-schema mapping
-(``_shape``) and the date-window subdivision the reader uses to work around the
-API's per-query truncation.
+Covers the raw-doc → published-schema mapping (``_shape``), the date-window
+subdivision that works around the API's 10,000-result cap, and the refusal to
+publish once the HTTP retry budget runs out.
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ def test_shape_maps_and_serializes_fields():
     # Integer scalars stringify (schema is all-VARCHAR).
     assert row["volume"] == "89"
     assert row["start_page"] == "1234"
-    # Null passthrough, and modify_date is unknown from the REST API.
+    # Nulls pass through, and the REST API never reports modify_date.
     assert row["effective_on"] is None
     assert row["executive_order_number"] is None
     assert row["modify_date"] is None
@@ -81,11 +81,10 @@ def _doc(n: int, day: str) -> dict:
     return {"document_number": f"D{n}", "publication_date": day}
 
 
-# The two signals that make a window's contents unknowable, and so must force a
-# split: fewer rows than the reported ``count``, or a ``count`` sitting on the
-# API's cap (which clamps at 10,000 and hides the true total). ``result_cap``
-# is the value RESULT_CAP is set to for the case, so the cap case can be
-# written with 2 rows instead of 10,000.
+# The two signals that leave a window's contents unknowable, and so must force a
+# split: fewer rows than the reported ``count``, or a ``count`` sitting on the API
+# cap, which clamps at 10,000 and hides the true total. Each case patches
+# RESULT_CAP to its ``result_cap``, so the cap case needs 2 rows, not 10,000.
 _AMBIGUOUS_WINDOWS = [
     pytest.param(1, 2, federal_register_source.RESULT_CAP, id="rows-short-of-reported-count"),
     pytest.param(2, 2, 2, id="reported-count-at-api-cap"),
@@ -94,10 +93,10 @@ _AMBIGUOUS_WINDOWS = [
 
 @pytest.mark.parametrize(("rows", "count", "result_cap"), _AMBIGUOUS_WINDOWS)
 def test_ambiguous_window_subdivides_so_no_document_is_dropped(monkeypatch, rows, count, result_cap):
-    """An ambiguous multi-day window must split and recurse until days answer completely.
+    """An ambiguous multi-day window must keep splitting until single days answer completely.
 
-    The fake API is ambiguous for any multi-day window but returns each single
-    day's full (small) result set, so a correct reader recovers both documents.
+    The fake API answers ambiguously for every multi-day window but returns each
+    single day's full (tiny) result set, so a correct reader recovers both documents.
     """
     reader = FederalRegisterReader(since=date(2024, 1, 1), until=date(2024, 1, 2))
     monkeypatch.setattr(federal_register_source, "RESULT_CAP", result_cap)
@@ -105,8 +104,9 @@ def test_ambiguous_window_subdivides_so_no_document_is_dropped(monkeypatch, rows
     def fake_page_window(gte: date, lte: date):
         if gte == lte:
             return [_doc(gte.day, gte.isoformat())], 1
-        # Rows from an ambiguous window must never reach the caller, so they are
-        # numbered apart: publishing them unsplit fails the assertion below.
+        # Rows from an ambiguous window must never reach the caller, so number them
+        # apart from the single-day rows. Otherwise a reader that yields the window
+        # unsplit returns the expected documents by coincidence and the test passes.
         return [_doc(900 + n, gte.isoformat()) for n in range(1, rows + 1)], count
 
     monkeypatch.setattr(reader, "_page_window", fake_page_window)
@@ -117,10 +117,10 @@ def test_ambiguous_window_subdivides_so_no_document_is_dropped(monkeypatch, rows
 
 @pytest.mark.parametrize(("rows", "count", "result_cap"), _AMBIGUOUS_WINDOWS)
 def test_ambiguous_single_day_refuses_instead_of_publishing_partial_data(monkeypatch, rows, count, result_cap):
-    """A single day cannot be subdivided further, so ambiguity there must abort the run.
+    """A single day cannot be split further, so ambiguity there must abort the run.
 
     This replaced a tolerant path that logged the gap and published the partial
-    page; without the refusal an API limit becomes silent corpus loss.
+    page. Without the refusal, an API limit becomes silent corpus loss.
     """
     reader = FederalRegisterReader(since=date(2024, 1, 1), until=date(2024, 1, 1))
     monkeypatch.setattr(federal_register_source, "RESULT_CAP", result_cap)
@@ -137,9 +137,9 @@ def test_ambiguous_single_day_refuses_instead_of_publishing_partial_data(monkeyp
 def test_archive_fetch_uses_bounded_top_level_windows(monkeypatch):
     """Top-level windows must be capped in width *and* tile [since, until] exactly.
 
-    Width alone is not enough: a stride that skipped or repeated a day would
-    still produce narrow windows, so the gap/overlap check is what catches an
-    off-by-one in the walk.
+    Width alone missed an off-by-one: a stride of +2 days still yields narrow
+    windows while dropping every 91st day of the archive. Only the gap-and-overlap
+    assertion catches that.
     """
     reader = FederalRegisterReader(since=date(2024, 1, 1), until=date(2024, 12, 31))
     windows: list[tuple[date, date]] = []
