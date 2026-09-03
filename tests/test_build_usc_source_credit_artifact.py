@@ -2,12 +2,12 @@
 
 The builder's whole claim is that one archive yields one set of bytes: the
 receipt names digests, so a build that is not reproducible is a receipt that
-lies. These tests exercise that claim, and the two refusals the build carries --
+lies. These tests exercise that claim and the two refusals the build carries --
 a triple naming several sections is marked rather than dropped, and a
 secret-shaped value stops the seal.
 
-The parquet is written with pyarrow and read back with polars, so the read-back
-cannot agree with the writer merely by sharing its assumptions.
+pyarrow writes the parquet and polars reads it back, so the read-back cannot
+agree with the writer merely by sharing its assumptions.
 """
 
 from __future__ import annotations
@@ -58,7 +58,7 @@ def _archive(tmp_path: Path, name: str, members: dict[str, bytes]) -> Path:
 
 @pytest.fixture
 def archive(tmp_path: Path) -> Path:
-    """Two titles: one act section naming two sections, one naming one, one appendix."""
+    """Two titles: act section 107 names two Code sections, 303 names one, plus one appendix identifier."""
     return _archive(
         tmp_path,
         "uscall.zip",
@@ -81,7 +81,7 @@ def test_a_triple_naming_two_sections_is_kept_and_marked_not_dropped(tmp_path: P
 
     rows = pl.read_parquet(tmp_path / "out" / "usc-source-credits.parquet").sort("usc_section")
     assert rows["usc_section"].to_list() == ["6038E", "6038F", "824s-1"]
-    # 107 named two sections and is refused at resolution; 303 named one and is not.
+    # 107 named two sections, so both its rows carry the refusal; 303 named one.
     assert rows["refusal"].to_list() == ["multi_target", "multi_target", None]
     assert rows["target_count"].to_list() == ["2", "2", "1"]
     # The en dash is straightened in usc_section and kept verbatim alongside it.

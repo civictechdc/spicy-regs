@@ -1,49 +1,51 @@
 """Read the U.S. Code's own source credits from the OLRC's USLM XML.
 
 Every section of the Code carries a ``<sourceCredit>`` naming the law that
-enacted it and every law that has amended it since:
+enacted it and every law that has amended it since. 26 U.S.C. 6038E carries
+this one:
 
     (Added Pub. L. 116-260, div. EE, title I, § 107(d)(1), Dec. 27, 2020,
      134 Stat. 3048.)
 
-Those credits provide a **second independent statement** of the
-act-section-to-U.S.-Code join also described by the Office of the Law Revision
-Counsel's (OLRC) Table III. They also state something Table III does not: the
-*division* of the enacting public law, per section. Table III is keyed by the
-enacting public law alone, and one public law may enact dozens of acts --
-116-260 enacts 94 -- so a division stated per section is exactly the
-discriminator Table III lacks.
+Read it as ``(116-260, div. EE, § 107) -> 26 U.S.C. 6038E``: an act section on
+the left, the Code section it created on the right. This module pulls that
+arrow out of every credit in the Code.
+
+**A credit names the division; Table III does not.** The Office of the Law
+Revision Counsel (OLRC) publishes the same join as Table III, keyed by the
+enacting public law alone -- and one public law may enact dozens of acts, 94 of
+them in the case of 116-260. The division a credit states per section is
+exactly the discriminator Table III lacks.
 
 **The two sources are complementary, not redundant.** Measured on release point
 119-102 against a pinned Table III comparison: of the 222 unambiguous triples
 this module retains for public laws present in that comparison, **176 have no
-in-division Table III row at all**. 26 U.S.C. 6038E is one of them. A
-disagreement between the sources is a coverage fact, not noise, and neither is
-a tiebreaker over the other.
+in-division Table III row at all**, 26 U.S.C. 6038E among them. A disagreement
+between the two states the coverage of one of them; neither settles the other.
 
-**The rule is a refusal rule, and the mess is why.** A credit lists the
-enactment and every amendment, so an expression that accepts any ``Pub. L. N-M,
-div. X ... § S`` anywhere in a credit pairs a division with a section number
-belonging to a different citation in the same credit. Measured: 13,122 triples,
-of which 2,916 map to more than one U.S. Code section. Reading role by proximity
-to the word "amended" does not fix it -- it credits 26 U.S.C. 7652 to
-(116-260, div. EE, § 107), and that credit never says "amended".
+**The rule refuses, and the mess is why.** A credit lists the enactment and
+every amendment, so an expression accepting any
+``Pub. L. N-M, div. X ... § S`` anywhere in a credit pairs a division with a
+section number belonging to a different citation in the same credit. Measured:
+13,122 triples, 2,916 of them mapping to more than one U.S. Code section.
+Reading the role by proximity to the word "amended" fails too -- it credits
+26 U.S.C. 7652 to (116-260, div. EE, § 107), and that credit never says
+"amended".
 
-:data:`STRICT_ENACTMENT_RULE` requires the citation to sit in an explicit
-enactment construction -- ``Added Pub. L. ...`` or ``as added Pub. L. ...``.
-That collapses the population to 2,202 triples, 1,877 of them naming exactly one
-U.S. Code section, and it removes the 7652 false positive. What it does not
-retain, it does not guess at: 22 U.S.C. 2714a reads ``(Pub. L. 114-94, div. C,
-title XXXII, § 32101, ...)`` with no enactment construction, and this module
-carries no row for it.
+:data:`STRICT_ENACTMENT_RULE` therefore demands an explicit enactment
+construction: ``Added Pub. L. ...`` or ``as added Pub. L. ...``. That collapses
+the population to 2,202 triples, 1,877 of them naming exactly one U.S. Code
+section, and it drops the 7652 false positive. What the rule declines it never
+guesses at: 22 U.S.C. 2714a reads ``(Pub. L. 114-94, div. C, title XXXII,
+§ 32101, ...)`` with no enactment construction, so this module carries no row
+for it.
 
-**Why an XML parse rather than a regular expression over the file.** Unlike the
-Popular Name Tool's flat generated HTML, USLM is well-formed XML whose
-``<section>`` elements nest, and a credit must be attributed to the section that
-*contains* it. A nearest-preceding-tag scan attributes a credit sitting after a
-nested close to the wrong section. The ancestry is the fact being read, so it is
-read structurally. The strict rule itself is an expression over the credit's own
-flattened text, because the construction it looks for is prose.
+**Why parse the XML rather than match over the file.** Unlike the Popular Name
+Tool's flat generated HTML, USLM nests its ``<section>`` elements, and a credit
+belongs to the section that *contains* it. A scan for the nearest preceding tag
+misattributes every credit that follows a nested close, so this module reads
+the ancestry structurally. The strict rule stays an expression over the
+credit's own flattened text, because the construction it looks for is prose.
 """
 
 from __future__ import annotations
@@ -55,31 +57,31 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
-#: The whole Code for one release point, one zip. Measured: 109 MB, ~49 s, 58
-#: titles. There is no per-section endpoint worth 51,548 requests.
+#: One zip carries the whole Code for one release point: 109 MB, 58 titles,
+#: ~49 s to scan. No per-section endpoint is worth 51,548 requests.
 USLM_RELEASE_URL_TEMPLATE = (
     "https://uscode.house.gov/download/releasepoints/us/pl/{congress}/{law}/xml_uscAll@{congress}-{law}.zip"
 )
 
-#: Require an explicit enactment construction. See the module docstring for the
-#: measured alternative and why it is unsafe.
+#: Read a citation only inside ``Added Pub. L. ...`` or ``as added Pub. L. ...``.
+#: The module docstring measures the looser alternative and what it misreads.
 STRICT_ENACTMENT_RULE = "added-or-as-added-pub-law-division-act-section-v1"
 
-#: USLM spells a section suffix with an EN DASH (``/us/usc/t16/s824s–1``);
-#: OLRC's Table III and ordinary U.S. Code citations spell it with a hyphen.
-#: Verified on release point 119-102: title 16 alone carries 1,487
-#: en-dash section identifiers and **zero** hyphen ones, so this is a spelling
-#: convention of the source rather than a distinction it draws. Straightening it
-#: is what lets the two OLRC surfaces join at all; the verbatim identifier is
-#: carried alongside so nothing is lost.
+#: USLM spells a section suffix with an EN DASH (``/us/usc/t16/s824s–1``); OLRC's
+#: Table III and ordinary U.S. Code citations spell it with a hyphen. On release
+#: point 119-102, title 16 alone carries 1,487 en-dash section identifiers and
+#: **zero** hyphen ones, so the dash is the source's spelling convention rather
+#: than a distinction it draws. Straightening it is what lets the two OLRC
+#: surfaces join at all, and :attr:`SourceCredit.usc_identifier` keeps the
+#: verbatim spelling, so nothing is lost.
 USLM_SECTION_DASH_RULE = "straighten-uslm-en-dash-to-hyphen-v1"
 
 #: Every way this module declines to read a credit. Codes are data: the artifact
 #: records them per row and the receipt counts them.
 QUARANTINE_REASONS = (
     #: The credit sits under no ``<section>`` at all -- a chapter-level or
-    #: appendix credit. 549 of the release point's 51,548 credits are like this,
-    #: and none of them carries an enactment construction with a division.
+    #: appendix credit. 549 of release point 119-102's 51,548 credits sit there,
+    #: and none of them carries an enactment construction naming a division.
     "credit_outside_usc_section",
     #: The enclosing section's identifier is not ``/us/usc/tN/sX``. The appendix
     #: titles carry ``/us/usc/t18a/pl/91/538/s1`` and its kin.
@@ -101,11 +103,11 @@ _DASH = re.compile(f"[{_DASHES}]")
 
 #: The enactment construction, the public law, its division, and the act section.
 #:
-#: ``lead`` is the whole rule: an empty lead is an amendment (or a re-statement
-#: of the amended act's own citation) and is discarded. Intervening structural
-#: units -- ``title I``, ``subtitle B``, ``ch. 2`` -- are crossed but never
-#: captured, because the act section is the last one and the earlier ones are
-#: not it.
+#: ``lead`` carries the whole rule: an empty lead marks an amendment, or a
+#: restatement of the amended act's own citation, and :func:`scan_source_credits`
+#: discards it. The expression crosses intervening structural units --
+#: ``title I``, ``subtitle B``, ``ch. 2`` -- without capturing them, because the
+#: act section is the one the ``§`` introduces.
 _ENACTMENT = re.compile(
     r"(?P<lead>as\s+added\s+|added\s+|)"
     r"Pub\.\s*L\.\s*(?P<congress>[1-9]\d{0,2})"
@@ -125,8 +127,8 @@ _LEADS = frozenset({"added", "as added"})
 def uslm_release_url(release_point: str) -> str:
     """The whole-Code zip for a release point such as ``"119-102"``.
 
-    A release point of any other shape is refused rather than turned into a URL
-    that would 404, so a build fails on the key rather than on the response.
+    Any other shape raises instead of becoming a URL that would 404, so a build
+    fails on the key rather than on the response.
     """
     match = _RELEASE_POINT.fullmatch(release_point or "")
     if match is None:
@@ -137,8 +139,8 @@ def uslm_release_url(release_point: str) -> str:
 def normalize_usc_section(value: object) -> str:
     """Straighten a USLM section suffix to the spelling everything else uses.
 
-    Implements :data:`USLM_SECTION_DASH_RULE`. Nothing else about the section is
-    touched: this is a dash, not a normalization policy.
+    Implements :data:`USLM_SECTION_DASH_RULE` and touches nothing else about the
+    section: this rewrites a dash, it is not a normalization policy.
     """
     return _DASH.sub("-", str(value or ""))
 
@@ -176,7 +178,16 @@ class QuarantinedCredit:
 
 @dataclass(frozen=True)
 class CreditScan:
-    """What one USLM title said, including what it said nothing usable about."""
+    """One USLM title's credits, its quarantine, and the four counts it keeps.
+
+    ``credits_scanned`` and ``credits_naming_a_division`` count credits.
+    ``strict_matches`` and ``credits_outside_a_section`` count *matches* of
+    :data:`STRICT_ENACTMENT_RULE`, the second only those sitting under no
+    ``<section>``. So ``credits_outside_a_section`` reads 0 on release point
+    119-102, where 549 credits do sit outside a section and none of them
+    matches the strict rule. The name is a key in a sealed receipt; read it as
+    "strict matches outside a section".
+    """
 
     credits: list[SourceCredit] = field(default_factory=list)
     quarantine: list[QuarantinedCredit] = field(default_factory=list)
@@ -199,17 +210,18 @@ class CreditScan:
 def iter_source_credits(document: bytes | str) -> Iterator[tuple[str | None, str]]:
     """Yield ``(enclosing section identifier, credit text)`` for one USLM title.
 
-    The identifier is the nearest **ancestor** ``<section>``'s, which is why this
-    walks the tree: a credit that follows a nested section's close tag has a
-    different nearest-preceding tag than it has ancestor.
+    The identifier is the nearest **ancestor** ``<section>``'s, which is why
+    this walks the tree. A credit that follows a nested section's close tag has
+    the inner section nearest before it and the outer section around it, and
+    only the section around it owns the credit.
 
-    Memory is bounded the same way :mod:`spicy_regs.sources.unified_agenda`
-    bounds it -- the finished record's subtree is dropped as the parse moves on.
+    Clearing each finished ``<section>`` bounds the memory, the same bound
+    :mod:`spicy_regs.sources.unified_agenda` applies for the same reason.
     ``iterparse`` streams the *events*, not the *tree*: without the clear it
-    retains every element it has seen, so the peak is the whole title, and
-    title 42 is 113 MB of it. Measured over a synthetic USLM title of that size:
-    775 MB of resident tree without the clear against 6 MB with it, same output,
-    and 29% quicker for not allocating it.
+    retains every element it has seen, so the peak is the whole title, and title
+    42 is 113 MB of it. Measured over a synthetic USLM title of that size:
+    775 MB of resident tree without the clear against 6 MB with it, identical
+    output, and 29% quicker for never allocating it.
     """
     payload = document.encode("utf-8") if isinstance(document, str) else document
     stack: list[str | None] = []
@@ -229,11 +241,11 @@ def iter_source_credits(document: bytes | str) -> Iterator[tuple[str | None, str
 
 
 def _flatten(element: ElementTree.Element) -> str:
-    """The credit's visible text.
+    """The credit's visible text, with ASCII whitespace collapsed and no more.
 
-    Only ASCII whitespace is collapsed. USLM writes ``§ 107`` with a narrow
-    no-break space, and rewriting it would be editing the source to suit the
-    expression rather than the other way round.
+    USLM writes ``§ 107`` with a narrow no-break space. Rewriting that would
+    edit the source to suit the expression rather than the other way round, so
+    :data:`_ENACTMENT` matches the space where it stands.
     """
     return re.sub(r"[ \t\r\n]+", " ", "".join(element.itertext())).strip()
 

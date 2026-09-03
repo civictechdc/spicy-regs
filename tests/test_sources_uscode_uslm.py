@@ -1,14 +1,14 @@
 """The U.S. Code's own source credits, read as a pure parser over USLM bytes.
 
 Every fixture below is real markup, copied from the release point the artifact
-pins. The parser is asserted against those bytes rather than against a live
-request, so the shapes this module claims to read are pinned by the test.
+pins, so these tests assert against the bytes the parser will meet rather than
+against a live request.
 
-The rule under test is a **refusal** rule. A source credit lists the enactment
-*and* every later amendment, so a match that does not require an enactment
-construction pairs a division with a section number from a different citation in
-the same credit. The measured example is in this file: 26 U.S.C. 7652's credit
-names ``div. EE ... § 107``, and 7652 was not added by it.
+The rule under test **refuses**. A source credit lists the enactment *and*
+every later amendment, so a match that does not demand an enactment
+construction pairs a division with a section number from a different citation
+in the same credit. ``AMENDED_ONLY`` below is the measured case: 26 U.S.C.
+7652's credit names ``div. EE ... § 107``, and 7652 was not added by it.
 """
 
 from __future__ import annotations
@@ -40,17 +40,18 @@ ADDED = _document(
 )
 
 # 29 U.S.C. 1153, verbatim. The construction is "as added Pub. L. ..." and the
-# credit ALSO names Pub. L. 93-406, which enacted the section it was added to.
+# credit ALSO names Pub. L. 93-406, which created the act the section was added
+# to.
 AS_ADDED = _document(
     """<section identifier="/us/usc/t29/s1153"><num value="1153">§ 1153.</num>
 <sourceCredit>(<ref href="/us/pl/93/406/tI/s523">Pub. L. 93–406, title I, § 523</ref>, as added <ref href="/us/pl/117/328/dT/tIII/s303/a">Pub. L. 117–328, div. T, title III, § 303(a)</ref>, <date date="2022-12-29">Dec. 29, 2022</date>, <ref href="/us/stat/136/5339">136 Stat. 5339</ref>.)</sourceCredit>
 </section>"""
 )
 
-# 26 U.S.C. 7652, abbreviated but verbatim in the part that matters. The credit
-# names (116-260, div. EE, sec. 107) as an AMENDMENT, at 134 Stat. 3046 -- the
-# enactment of 6038E is at 3048. A loose rule credits 7652 to that triple. This
-# is the measured false positive the strict rule exists to remove.
+# 26 U.S.C. 7652, abbreviated but verbatim where it matters. This credit names
+# (116-260, div. EE, § 107) as an AMENDMENT at 134 Stat. 3046, while that act
+# section's enactment of 6038E sits at 3048. A loose rule credits 7652 to the
+# triple anyway: the measured false positive the strict rule exists to remove.
 AMENDED_ONLY = _document(
     """<section identifier="/us/usc/t26/s7652"><num value="7652">§ 7652.</num>
 <sourceCredit>(<date date="1954-08-16">Aug. 16, 1954</date>, ch. 736, 68A Stat. 907; <ref href="/us/pl/115/123/dD/tII/s41102/a/1">Pub. L. 115–123, div. D, title II, § 41102(a)(1), (b)(1)</ref>, Feb. 9, 2018, 132 Stat. 155; <ref href="/us/pl/116/260/dEE/tI/s107/a/2">Pub. L. 116–260, div. EE, title I, § 107(a)(2)</ref>, <date date="2020-12-27">Dec. 27, 2020</date>, <ref href="/us/stat/134/3046">134 Stat. 3046</ref>.)</sourceCredit>
@@ -82,8 +83,8 @@ def test_an_added_construction_yields_the_triple_and_its_page():
 def test_an_as_added_construction_credits_the_adding_law_not_the_amended_one():
     """ "Pub. L. 93-406 ... as added Pub. L. 117-328, div. T, sec. 303(a)".
 
-    The section was added BY 117-328 TO the act 93-406 created. Only the adding
-    law is an enactment of this section, and only it names a division.
+    117-328 added the section to the act 93-406 created. Only the adding law
+    enacted this section, and only it names a division.
     """
     scan = scan_source_credits(AS_ADDED)
 
@@ -98,9 +99,8 @@ def test_a_credit_that_only_amends_yields_nothing():
 
     26 U.S.C. 7652's credit names (116-260, div. EE, sec. 107) at 134 Stat.
     3046. A loose expression reads that as an enactment and credits 7652 to the
-    triple that actually enacted 26 U.S.C. 6038E at 3048. Reading the role by
-    proximity to the word "amended" does not fix it -- this credit never uses
-    the word.
+    triple that enacted 26 U.S.C. 6038E at 3048. Reading the role by proximity
+    to the word "amended" fails here too: this credit never uses the word.
     """
     scan = scan_source_credits(AMENDED_ONLY)
 
@@ -155,10 +155,11 @@ def test_a_section_identifier_the_usc_shape_cannot_spell_is_quarantined():
 def test_a_credit_naming_no_division_is_not_read_at_all():
     """The index is keyed by division. A credit without one cannot key into it.
 
-    This is a coverage bound, stated rather than hidden: 22 U.S.C. 2714a reads
-    "(Pub. L. 114-94, div. C, title XXXII, sec. 32101, ...)" with no enactment
-    construction, and 21 U.S.C. 350a-1 likewise -- both are real classifications
-    this index does not carry.
+    Real classifications fall outside this index, and the bound is stated here
+    rather than hidden. The credit below names no division. 22 U.S.C. 2714a
+    reads "(Pub. L. 114-94, div. C, title XXXII, sec. 32101, ...)" and
+    21 U.S.C. 350a-1 likewise: a division, and no enactment construction around
+    it.
     """
     document = _document(
         """<section identifier="/us/usc/t26/s1"><num value="1">§ 1.</num>

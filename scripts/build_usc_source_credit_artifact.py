@@ -1,25 +1,23 @@
 #!/usr/bin/env python
 """Build the pinned U.S. Code source-credit index from the OLRC's USLM XML.
 
-This index gives consumers a second independent statement of the
-act-section-to-U.S.-Code join. The first, the Office of the Law Revision
-Counsel's (OLRC) Table III, is keyed by the enacting public law alone and cannot
-tell apart the dozens of acts one public law may enact. Every section of the
-Code carries a source credit that states the division per section, which is
-exactly what Table III lacks:
+Every section of the Code carries a source credit naming the law that enacted
+it. 26 U.S.C. 6038E carries this one:
 
     26 U.S.C. 6038E  <-  (Added Pub. L. 116-260, div. EE, title I, § 107(d)(1),
                           Dec. 27, 2020, 134 Stat. 3048.)
 
-The builder seals deterministic rows with a digest-pinned receipt,
-repo-relative paths, a secret scan over what is written, and byte-identical
-rebuilds.
+Those credits state the act-section-to-U.S.-Code join a second time, and
+independently. The first statement, the Office of the Law Revision
+Counsel's (OLRC) Table III, is keyed by the enacting public law alone and cannot
+tell apart the dozens of acts one public law may enact. A credit names the
+division per section, which is exactly what Table III lacks.
 
-**It is not a tiebreaker over Table III, and it is not built as one.** The two
-sources have different coverage: measured on release point 119-102, of the 222
-unambiguous triples here whose public law Table III was also fetched for, 176
-have no in-division Table III row at all. 26 U.S.C. 6038E is one of them. A
-disagreement between the sources is a coverage fact about one of them, and this
+**This index is no tiebreaker over Table III, and it is not built as one.** The
+two sources have different coverage: measured on release point 119-102, of the
+222 unambiguous triples here whose public law Table III was also fetched for,
+176 have no in-division Table III row at all, 26 U.S.C. 6038E among them. A
+disagreement between the sources states the coverage of one of them, and this
 artifact never picks a winner.
 
 Outputs, all deterministic and byte-identical across rebuilds from one archive:
@@ -69,8 +67,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 ARTIFACT_SCHEMA_VERSION = "usc-source-credit-artifact-v1"
 
-#: The parser this artifact was produced by. Bump when a parse changes shape, so
-#: a receipt cannot silently describe bytes a different parser would read.
+#: The parser that produced this artifact. Bump it when a parse changes shape,
+#: so a receipt can never describe bytes a different parser would read.
 PARSER_VERSION = "uscode-uslm-parser-v1"
 
 #: How a triple naming more than one U.S. Code section is carried.
@@ -90,8 +88,9 @@ CREDIT_COLUMNS = (
 )
 QUARANTINE_COLUMNS = ("source", "reason", "public_law", "division", "act_section", "raw_value")
 
-#: A build must not seal a secret. The scan is over what is written, not what was
-#: read, so a credential in an environment variable cannot reach the file.
+#: A build must not seal a secret. This runs over what the build writes rather
+#: than over what it read, so a credential reaching a row by any path stops the
+#: seal.
 _SECRET_LIKE = re.compile(r"\b(?:sk-(?:proj-)?[A-Za-z0-9_-]{20,}|api[_-]?key=[^\s&]{8,})\b", re.IGNORECASE)
 
 
@@ -108,10 +107,10 @@ def file_sha256(path: Path) -> str:
 
 
 def _pin_path(path: Path) -> str:
-    """Record a repo-relative path when possible, else the basename.
+    """Record a repo-relative path where one exists, else the basename.
 
-    Keeping absolute scratch paths out of the receipt keeps rebuilds from
-    different working directories byte-identical.
+    An absolute scratch path would differ per working directory and break the
+    byte-identical rebuild the receipt claims.
     """
     resolved = path.resolve()
     try:
@@ -137,6 +136,10 @@ def _scan_for_secrets(rows: list[dict[str, Any]], where: str) -> None:
 
 
 def build(output_dir: Path, *, archive: Path, release_point: str) -> dict:
+    """Scan one release archive into rows, a quarantine file and a sealed receipt.
+
+    Returns the receipt; :func:`main` prints its coverage block.
+    """
     output_dir.mkdir(parents=True, exist_ok=True)
     scan, members = scan_release_zip(archive)
 
