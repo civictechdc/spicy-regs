@@ -70,8 +70,10 @@ def _s(value: object) -> str | None:
     return str(value)
 
 
-# reginfo timetable dates are ``MM/DD/YYYY`` (day may be ``00`` for month-only);
-# anything else (e.g. ``To Be Determined``) is not a real date and is skipped.
+# reginfo timetable dates are ``MM/DD/YYYY``; anything else (``To Be Determined``)
+# never matches. ``strptime`` cannot replace this regex: ``%d`` rejects reginfo's
+# ``00`` day at the format level, so the swap would silently drop the 2,922
+# month-only dates in the published table.
 _MDY = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
 
 

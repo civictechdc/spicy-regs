@@ -178,9 +178,9 @@ def test_shape_handles_missing_and_unparseable_dates():
         ("06/00/2024", ["2024-06-01"]),  # reginfo's month-only marker
         ("02/30/2024", []),  # never existed — dropped, not moved to the 29th
         ("02/29/2023", []),  # not a leap year
-        ("06/32/2024", []),  # was clamped to the 31st
-        ("13/01/2024", []),
-        ("00/15/2024", []),
+        ("06/32/2024", []),  # the old clamp made this 2024-06-31
+        ("13/01/2024", []),  # ``date()`` now owns the month range; the hand check is gone
+        ("00/15/2024", []),  # the ``00`` marker is the day's alone — month 0 stays invalid
         ("To Be Determined", []),
     ],
 )
@@ -198,7 +198,7 @@ def test_shape_drops_impossible_dates_without_fabricating_a_neighbour():
     # The impossible date is absent, so the real one becomes the first action.
     assert row["first_action_date"] == "2024-07-04"
     assert row["next_action_date"] is None
-    # The raw timetable is still carried through verbatim.
+    # ``timetable_json`` still carries the raw date verbatim.
     assert json.loads(row["timetable_json"])[0]["date"] == "02/30/2024"
 
 
