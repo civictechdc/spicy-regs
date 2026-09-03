@@ -1,12 +1,12 @@
 """The documented-versus-observed enumeration gate.
 
 Three kinds of test, in the shape the data-dictionary check already uses: the
-gate passes on the committed inputs, the gate *fires* when an input is broken,
-and the pinned publisher facts are what the pinned publisher bytes actually say.
+gate passes on the committed inputs, the gate *fires* when an input breaks, and
+the pinned publisher facts are what the pinned publisher bytes actually say.
 
 The last kind is the point of checking the captures in rather than transcribing
 them. Every documented value below is re-derived from
-``sample-data/source-domains/`` on each run, so these assertions are a statement
+``sample-data/source-domains/`` on each run, so these assertions state something
 about the publisher's own document, not about a list somebody typed.
 """
 
@@ -67,17 +67,17 @@ def findings(documented, snapshot):
 
 
 def test_every_finding_is_recorded(findings):
-    """The gate's pass condition: nothing drifted that the ledger does not account for."""
+    """The gate's pass condition: the ledger accounts for every disagreement."""
 
     unrecorded = unrecorded_findings(findings)
     assert unrecorded == (), [finding.identifier for finding in unrecorded]
 
 
 def test_the_ledger_holds_nothing_stale(findings):
-    """The other half: an accepted finding the data stopped producing must be deleted, not kept.
+    """The other half: delete an accepted finding once the data stops producing it.
 
-    With the test above, this is set equality in both directions — ledger ⊇ findings
-    and ledger ⊆ findings — so no third assertion of that is needed.
+    With the test above this is set equality in both directions — ledger ⊇ findings
+    and ledger ⊆ findings — so a third assertion of the same thing would add nothing.
     """
 
     assert stale_accepted_findings(findings) == ()
@@ -93,10 +93,10 @@ def test_every_accepted_finding_states_a_reason():
 def test_the_findings_are_the_seven_this_snapshot_carries(findings):
     """Pinned so a silent change in either half shows up as a number, not a shrug.
 
-    This list is deliberately a second transcription of the ledger. The set-equality
-    tests above compare the ledger against the findings, so both pass if someone
-    edits the ledger and the snapshot to agree on something wrong; this one does not,
-    because it states the seven independently of both. Kept for that reason.
+    This list deliberately transcribes the ledger a second time. The set-equality
+    tests above compare the ledger against the findings, so both pass when someone
+    edits the ledger and the snapshot to agree on something wrong. This one states
+    the seven independently of both, and catches that. Kept for that reason.
     """
 
     identifiers = sorted(finding.identifier for finding in findings)
@@ -120,7 +120,7 @@ def test_public_submission_carries_its_row_support(findings):
 
 
 def test_two_domains_agree_completely(findings):
-    """Not every column drifts, and a gate that only ever finds drift is not a gate."""
+    """Some columns agree exactly, and a gate that reports drift everywhere gates nothing."""
 
     drifted = {finding.domain_key for finding in findings}
     assert "regulations-gov-docket-type" not in drifted
@@ -154,7 +154,7 @@ def test_a_documented_value_falling_out_of_the_data_fails(documented, snapshot):
 
 
 def test_a_ledger_entry_the_data_stopped_producing_fails(documented, snapshot):
-    """Record the reverse: 'Public Submission' disappearing must not pass quietly."""
+    """The reverse: 'Public Submission' disappearing must fail loudly, not pass quietly."""
 
     domain = snapshot.domains["regulations-gov-document-type"]
     kept = tuple(one for one in domain.value_counts if one[0] != "Public Submission")
@@ -190,6 +190,8 @@ def test_captures_verify_against_their_pins():
 
 
 def test_a_mutated_capture_is_refused(tmp_path):
+    """Edit one byte of the XSD and the pin refuses it, so nobody can retype a publisher's list."""
+
     shutil.copytree(DOMAIN_DIR, tmp_path / "domains")
     target = tmp_path / "domains" / "reginfo-rin-data-ver10262011.xsd"
     target.write_bytes(target.read_bytes().replace(b"No Stage", b"No stage"))
@@ -205,7 +207,7 @@ def test_regulations_gov_document_type_is_the_five_documented_values(documented)
 
 
 def test_the_docket_type_enums_trailing_space_is_not_part_of_the_value(documented):
-    """The capture writes ``- Nonrulemaking `` with a trailing space; a YAML scalar does not carry it."""
+    """The capture writes ``- Nonrulemaking `` with a trailing space; a YAML plain scalar drops it."""
 
     assert documented["regulations-gov-docket-type"].values == ("Rulemaking", "Nonrulemaking")
     raw = (DOMAIN_DIR / "regulations-gov-openapi-v4-2026-08-03.yaml").read_text(encoding="utf-8")
@@ -231,7 +233,7 @@ def test_unified_agenda_domains_come_from_documentation_prose_not_enumerations(d
 
 
 def test_the_priority_category_sentence_lists_not_major_twice(documented):
-    """The publisher's own duplicate is folded to one value and the raw count is kept."""
+    """The publisher's own duplicate folds to one value; the raw count keeps the evidence."""
 
     domain = documented["unified-agenda-priority-category"]
     assert domain.values == (
@@ -310,8 +312,8 @@ def test_the_snapshot_states_where_its_rows_came_from(snapshot):
     for table, source in sources.items():
         # The recorded URL is a string in a checked-in data file; the expected one
         # comes from the registry that publishes the corpus. Two different origins,
-        # so this fails if the corpus moves and the snapshot is not re-pinned —
-        # which is exactly how this file first shipped naming a host we never served.
+        # so this fails when the corpus moves and nobody re-pins the snapshot —
+        # exactly how this file first shipped naming a host we never served.
         assert source["publisher_url"] == f"{DEFAULT_R2_BASE_URL}/{table}.parquet"
         assert str(source["bytes_digest"]).startswith("sha256:")
         assert int(source["byte_length"]) > 0
@@ -322,9 +324,9 @@ def test_the_snapshot_states_where_its_rows_came_from(snapshot):
 def test_the_snapshot_row_counts_add_up(snapshot):
     """Every row of a domain's table is either a value or a null; nothing is dropped.
 
-    The table's own total is stated twice in the file — once per domain and once per
-    source — so require the two to agree. A hand-edit of one half of the observation
-    has to be consistent with the other half before it can pass.
+    The file states each table's total twice — once per domain and once per source —
+    so require the two to agree. A hand-edit of one half of the observation must
+    match the other half before it can pass.
     """
 
     sources = {str(one["table"]): one for one in snapshot.sources}
@@ -362,8 +364,8 @@ def test_the_tool_would_record_the_urls_the_snapshot_already_carries(snapshot):
     """Close the loop on the writer: what ``--observe`` would record must equal what is pinned.
 
     ``observe()`` needs parquet, so it cannot run here — but the one part of it that
-    shipped wrong was the URL it stamps into the snapshot. That function is pure, so
-    run it against every table the snapshot names and require it to reproduce them.
+    shipped wrong was the URL it stamps into the snapshot. That URL comes from a pure
+    function, so run it over every table the snapshot names and require a match.
     """
 
     for source in snapshot.sources:

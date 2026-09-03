@@ -1,56 +1,55 @@
-"""Documented column domains, and the drift between them and what we observe.
+"""What publishers say a column may hold, and where our data disagrees.
 
-A *source domain* is a controlled value list that a publisher documents for one
+A *source domain* is the controlled value list a publisher documents for one
 column of one published table: regulations.gov's ``documentType`` enum, the
-Unified Agenda's ``RULE_STAGE`` list, and so on. This module holds the
-publisher's half of that claim and the machinery to hold our own data to it.
+Unified Agenda's ``RULE_STAGE`` list, and so on. GSA and reginfo.gov decide
+those lists. This module holds their half of the claim and the machinery to
+hold our data to it.
 
-Why it exists. The published tables are pass-through — ``build_federal_register``
-and ``build_unified_agenda`` copy the publisher's strings verbatim — so the values
-in a column *are* whatever the publisher emitted, and nothing until now compared
-that against what the publisher said it would emit. The two directions differ in
-what they mean:
+Why it exists. ``build_federal_register`` and ``build_unified_agenda`` copy the
+publisher's strings verbatim, so a column holds whatever the publisher emitted,
+and until now nothing compared that against what the publisher said it would
+emit. The two directions of disagreement mean different things:
 
 * an **undocumented** value (observed, not documented) says the documented
   enumeration is incomplete. A consumer that switches on the documented list
   silently mishandles those rows.
 * an **unobserved** value (documented, not observed) says either the snapshot is
-  bounded — the Unified Agenda snapshot holds one semiannual edition, and no
-  edition need exercise every documented value — or the publisher retired a
-  value without saying so.
+  bounded — it holds one semiannual Unified Agenda edition, and no edition need
+  exercise every documented value — or the publisher retired a value in silence.
 
-Neither is automatically an error, and neither is automatically fine. Both are
-therefore carried in :data:`ACCEPTED_DOMAIN_FINDINGS`, a closed ledger: every
-finding needs a recorded reason, and a ledger entry that stops being observed
-fails just as loudly as an unrecorded finding does. That is what keeps the ledger
-from becoming a place where drift goes to be forgotten.
+Neither is automatically an error, and neither is automatically fine, so both
+land in :data:`ACCEPTED_DOMAIN_FINDINGS`, a ledger closed in both directions:
+every finding needs a recorded reason, and a ledger entry the data stops
+producing fails as loudly as an unrecorded finding does. That is what keeps the
+ledger from becoming the place drift goes to be forgotten.
 
-The documented half is not transcribed. Both publisher documents are checked in
-under ``sample-data/source-domains/`` as exact bytes, bound to their SHA-256
-digest, byte length, publisher URL and observation time by
+Nobody transcribes the documented half. Both publisher documents sit in
+``sample-data/source-domains/`` as exact bytes, bound to their SHA-256 digest,
+byte length, publisher URL and capture time by
 ``documented-enumeration-capture-manifest-v1.json``, and every documented value
-is *parsed out of those bytes* on each run. A hand-typed list would rot silently;
-a parse against pinned bytes cannot.
+is *parsed out of those bytes* on each run. A hand-typed list rots in silence; a
+parse against pinned bytes cannot.
 
-What the digest pin does and does not prove. It proves the capture has not
-changed since it was pinned, so no value can be edited into or out of the
-publisher's document without the pin failing. It does not prove the bytes are
-what the publisher serves today, because nothing here refetches ``source_url``
-— re-pinning a capture is a deliberate manual act, and it is that act, not this
-module, that surfaces a change in the publisher's own enumeration. Both halves
-of the comparison are therefore checked-in files, and the result is a function
-of the tree: a lock on a dated finding rather than a live drift detector. The
-lock is the useful part, because it fails when someone moves one half without
-moving the ledger with it.
+What the digest pin proves, and what it does not. It proves the capture has not
+changed since someone pinned it, so no value can be edited into or out of the
+publisher's document without the pin failing. It proves nothing about what the
+publisher serves today, because nothing here refetches ``source_url`` —
+re-pinning a capture is a deliberate manual act, and that act, not this module,
+surfaces a change in the publisher's own enumeration. Both halves of the
+comparison are therefore checked-in files, and the verdict is a function of the
+tree: a lock on a dated finding rather than a live drift detector. The lock is
+the useful part, because it fails when someone moves one half and leaves the
+ledger behind.
 
 Note what the reginfo.gov XSD does *not* do: it declares every one of these
-elements as an unrestricted ``xs:string`` and states the controlled list only in
-an ``xs:documentation`` sentence. There is no ``xs:enumeration`` anywhere in the
-file. So the "documented" domain for the Unified Agenda is publisher prose read
-by a parser that refuses any sentence it does not recognise.
+elements an unrestricted ``xs:string`` and states the controlled list only in an
+``xs:documentation`` sentence. The file carries no ``xs:enumeration`` anywhere.
+So the "documented" domain for the Unified Agenda is publisher prose, read by a
+parser that refuses any sentence it does not recognise.
 
 Parsers here are pure — bytes in, values out, no network and no I/O beyond the
-manifest and snapshot reads — and the two document parses are memoized on those
+manifest and snapshot reads — and both document parses are memoized on those
 bytes, because one capture states the domain of several columns.
 """
 
@@ -101,14 +100,13 @@ class DocumentedEnumerationCapture:
     publisher_revision: str
 
 
-# A manifest entry states exactly the capture's fields, so the set is derived from
-# the dataclass rather than kept beside it: a field added to one cannot go missing
-# from the other.
+# A manifest entry states exactly these fields. Deriving the set from the dataclass
+# beats repeating it here: a field added to one cannot go missing from the other.
 _CAPTURE_FIELDS = frozenset(field.name for field in fields(DocumentedEnumerationCapture))
 
 
 def load_capture_manifest(root: Path | str = DEFAULT_SOURCE_DOMAIN_DIR) -> dict[str, DocumentedEnumerationCapture]:
-    """Read the capture manifest, keyed by capture key. Does not read the captures themselves."""
+    """Read the capture manifest, keyed by capture key. The captures stay unread until :func:`read_capture`."""
 
     path = Path(root) / CAPTURE_MANIFEST_FILENAME
     try:
@@ -160,10 +158,10 @@ def read_capture(capture: DocumentedEnumerationCapture, *, root: Path | str = DE
 # --- parsing the regulations.gov OpenAPI document ---------------------------
 
 
-# Memoized on the exact bytes, so a changed capture is a different entry and never
-# a stale hit. One capture states the domain of several columns, and parsing this
-# 60 KB document is 35 ms — 97% of the module's runtime — so parsing it once per
-# capture rather than once per column is the whole cost of the register.
+# Memoized on the exact bytes, so a changed capture is a different cache entry and
+# never a stale hit. Parsing this 60 KB document costs 35 ms — 97% of the module's
+# runtime — and one capture states the domain of several columns, so parsing it once
+# per capture rather than once per column is the whole cost of building the register.
 @lru_cache(maxsize=4)
 def _parse_yaml(payload: bytes) -> Mapping[str, Any]:
     try:
@@ -178,12 +176,12 @@ def _parse_yaml(payload: bytes) -> Mapping[str, Any]:
 def openapi_schema_enum(payload: bytes, schema_name: str) -> tuple[str, ...]:
     """Return the ``enum`` members of one ``components.schemas`` entry, in source order.
 
-    ``yaml.safe_load`` constructs no arbitrary Python objects, which is the only
-    loader worth pointing at a fetched document. It also settles the capture's
-    one whitespace quirk without help: ``- Nonrulemaking `` is a plain scalar,
-    and a plain scalar's trailing space is not part of its value. Nothing else
-    is normalized — ``Supporting & Related Material`` keeps its literal
-    ampersand because that is what the API returns.
+    ``yaml.safe_load`` constructs no arbitrary Python objects, the only loader
+    worth pointing at a fetched document. It also settles the capture's one
+    whitespace quirk unaided: ``- Nonrulemaking `` is a plain scalar, and a
+    plain scalar drops its trailing space. Nothing else is normalized —
+    ``Supporting & Related Material`` keeps the literal ampersand the API
+    returns.
     """
 
     document = _parse_yaml(payload)
@@ -206,19 +204,19 @@ def openapi_schema_enum(payload: bytes, schema_name: str) -> tuple[str, ...]:
 # --- parsing the reginfo.gov Unified Agenda XSD -----------------------------
 
 # Every controlled Unified Agenda field is declared ``<xs:restriction
-# base="xs:string"/>`` with no facets; the value list exists only as this
-# sentence in the element's xs:documentation. Values are double-quoted, which is
-# what lets "Substantive, Nonsignificant" survive as one value despite its comma.
+# base="xs:string"/>`` with no facets; its value list lives only in the element's
+# xs:documentation sentence. The values are double-quoted, which is what keeps
+# "Substantive, Nonsignificant" one value despite its comma.
 _XSD_OPTIONS_PREFIX = re.compile(r"^One of the following options:\s*")
 _XSD_QUOTED_OPTION = re.compile(r'"([^"]+)"')
 
-# A DOCTYPE is where entity-expansion and XXE payloads live; this publisher emits
-# none. Same guard the document-population readers apply.
+# A DOCTYPE is where entity-expansion and XXE payloads live, and this publisher
+# emits none. The document-population readers apply the same guard.
 _ROOT_ELEMENT_START = re.compile(rb"<[A-Za-z_]")
 
 
-# Memoized like the YAML parse above, and for the same reason: four documented
-# domains are read out of this one document. Callers only read the tree.
+# Memoized like the YAML parse above and for the same reason: four documented
+# domains come out of this one document. Callers only read the tree.
 @lru_cache(maxsize=4)
 def _parse_xsd(payload: bytes) -> ET.Element:
     match = _ROOT_ELEMENT_START.search(payload)
@@ -232,12 +230,12 @@ def _parse_xsd(payload: bytes) -> ET.Element:
 
 
 def xsd_documented_options(payload: bytes, element_name: str) -> tuple[tuple[str, ...], int]:
-    """Return one element's documented options and the raw count the sentence lists.
+    """Return one element's documented options and the raw count its sentence lists.
 
     The sentence is publisher prose, and this publisher's prose repeats itself:
-    ``PRIORITY_CATEGORY`` lists ``Not Major`` twice. A literal duplicate is folded
+    ``PRIORITY_CATEGORY`` lists ``Not Major`` twice. A literal duplicate folds
     into one value — inventing a second meaning for it would be worse — and the
-    raw count is returned alongside so a caller can pin both numbers.
+    raw count comes back alongside, so a caller can pin both numbers.
     """
 
     root = _parse_xsd(payload)
@@ -288,27 +286,27 @@ class _DomainDeclaration:
     expected_raw_options: int
 
 
-# Six columns, across three of the published tables. The absences, so the set is
-# read as a decision and its known hole is not mistaken for one:
+# Six columns across three published tables. What is absent, and why — so a reader
+# takes the set for a decision and knows which hole is not one:
 #
 # * ``TTBL_ACTION`` (XSD L441-448) is a decided exclusion. The publisher's own
 #   data treats the field as free text — the 2026-08-03 snapshot's
 #   ``timetable_json`` holds 1,139 distinct actions over 10,533 entries against
-#   34 documented ones — so a check against its list would report a thousand
+#   34 documented ones — so checking against its list would report a thousand
 #   findings and gate nothing. Its sentence also opens "One of the following:"
 #   with unquoted values, which :func:`xsd_documented_options` could not read
-#   even if we wanted it: the exclusion and the parser's reach coincide here,
-#   and only the first of those is a reason.
+#   anyway: the exclusion and the parser's reach coincide here, and only the
+#   first of the two is a reason.
 # * ``federal_register.document_type`` is absent because no pinned publisher
 #   document states its list. The FR API documentation page is not captured
 #   here, and a domain nobody published is not a documented domain.
 # * ``comments.category`` (documented by OpenAPI ``SubmitterType``, L908-911)
 #   and ``comments.document_type`` (by ``DocumentType``, the same list already
 #   checked against ``documents``) are an open gap, not a decision. ``comments``
-#   is published as a flat ``comments.parquet`` monolith like the rest, so both
-#   are observable; they are uncovered only because the 2026-08-03 observation
-#   did not scan that table. Extending them needs a re-observation, not a code
-#   change here.
+#   ships as a flat ``comments.parquet`` monolith like the rest, so both are
+#   observable; they stay uncovered only because the 2026-08-03 observation
+#   skipped that table. Covering them takes a re-observation, not a code change
+#   here.
 _DECLARATIONS: tuple[_DomainDeclaration, ...] = (
     _DomainDeclaration(
         key="regulations-gov-document-type",
@@ -380,7 +378,7 @@ def documented_domains(root: Path | str = DEFAULT_SOURCE_DOMAIN_DIR) -> dict[str
 
     Counts are pinned per domain: a publisher that adds or drops a documented
     value changes the capture, which changes its digest, which this refuses to
-    read until the new capture is pinned deliberately.
+    read until someone pins the new capture deliberately.
     """
 
     captures = load_capture_manifest(root)
@@ -432,7 +430,7 @@ class ObservedDomain:
 
 @dataclass(frozen=True)
 class ObservedSnapshot:
-    """One dated observation of every domain column, and the tables it was drawn from."""
+    """One dated observation of every domain column, and the tables it came from."""
 
     observed_at: str
     producer_revision: str
@@ -540,7 +538,7 @@ class AcceptedFinding:
     reason: str
 
 
-# Every finding the 2026-08-03 snapshot produces, each with the reason it is
+# Every finding the 2026-08-03 snapshot produces, each with the reason it stands
 # recorded rather than fixed. The ledger is closed in both directions: an
 # unrecorded finding fails the gate, and so does a recorded finding the data no
 # longer produces, because an exception nothing exercises is a claim nobody
@@ -609,7 +607,7 @@ ACCEPTED_DOMAIN_FINDINGS: tuple[AcceptedFinding, ...] = (
 
 
 def unrecorded_findings(findings: Sequence[DomainFinding]) -> tuple[DomainFinding, ...]:
-    """Findings the ledger does not account for — the gate's failure condition."""
+    """Findings missing from the ledger — the gate's failure condition."""
 
     recorded = {(entry.domain_key, entry.kind, entry.value) for entry in ACCEPTED_DOMAIN_FINDINGS}
     return tuple(finding for finding in findings if (finding.domain_key, finding.kind, finding.value) not in recorded)

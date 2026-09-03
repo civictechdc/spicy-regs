@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 """Compare published column values against the value lists their publishers document.
 
-Run with no arguments to diff the documented domains — parsed from the pinned
-publisher captures — against the checked-in observed snapshot, failing on any
-finding the ledger in :mod:`spicy_regs.sources.source_domains` does not record,
-in either direction. It reads no network and no parquet, so it runs anywhere, in
-well under a second.
+GSA and reginfo.gov define these values, not this repository. Run with no
+arguments to diff the documented domains — parsed from the pinned publisher
+captures — against the checked-in observed snapshot. It fails on any finding the
+ledger in :mod:`spicy_regs.sources.source_domains` leaves unrecorded, in either
+direction. It touches no network and no parquet, so it runs anywhere in well
+under a second.
 
-Be precise about what that default run is. Both of its inputs are files in this
+Be precise about what that default run is. Both inputs are files in this
 repository: a publisher capture pinned by digest, and one dated observation of
-the published tables. Neither is refetched here, so the result is a function of
-the tree and changes only when someone changes one of those files. That makes
-this a lock on a dated finding, not a live drift detector — it fails the moment
-a re-pin moves either half without the ledger moving with it, which is exactly
-when a human is looking. The offline half runs in CI through the test suite;
-refreshing the observed half is the manual step below.
+the published tables. Nothing refetches either here, so the verdict is a function
+of the tree and changes only when someone changes one of those files. That makes
+this a lock on a dated finding rather than a live drift detector — it fails the
+moment a re-pin moves either half and leaves the ledger behind, which is exactly
+when a human is watching. The test suite runs the offline half in CI; refreshing
+the observed half is the manual step below.
 
 ``--observe --data-dir DIR`` re-observes the published tables from parquet and
 prints the same report against that data; add ``--write-snapshot`` to re-pin the
@@ -24,7 +25,7 @@ the published corpus, or any directory built from it. Re-pinning a capture is
 the other manual step: refetch it from the ``source_url`` its manifest entry
 names, and record the digest and length of what came back.
 
-Exit status: 0 when every finding is recorded, 1 otherwise.
+Exit status: 0 when the ledger records every finding, 1 otherwise.
 """
 
 from __future__ import annotations
@@ -92,7 +93,7 @@ def observe(
     """Scan the published tables in ``data_dir`` for each declared domain's distinct values.
 
     Takes the register the caller already parsed, so the observation and the diff
-    it feeds are the same set of domains read from the same captures once.
+    it feeds cover the same domains, read from the same captures once.
     """
 
     tables = sorted({domain.table for domain in documented.values()})
@@ -100,9 +101,9 @@ def observe(
     sources = []
     row_counts: dict[str, int] = {}
     for table in tables:
-        # Where the table is published comes from the registry that publishes it,
+        # Where a table is published comes from the registry that publishes it,
         # never from a second list kept here. A hand-kept copy is how the first
-        # version of this snapshot recorded a hostname the project does not serve.
+        # version of this snapshot recorded a hostname this project never served.
         if table not in TABLES:
             raise SourceDomainError(f"{table!r} is not one of the published tables in spicy_regs.data_dictionary")
         path = data_dir / f"{table}.parquet"
