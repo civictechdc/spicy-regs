@@ -1,16 +1,28 @@
 #!/usr/bin/env python3
-"""Gate: published column values against the value lists their publishers document.
+"""Compare published column values against the value lists their publishers document.
 
-Run with no arguments (the default check) to diff the documented domains parsed from the pinned
-publisher captures against the checked-in observed snapshot, and fails on any
-finding the ledger in :mod:`spicy_regs.sources.source_domains` does not record —
-in either direction. It reads no network and no parquet, so it runs anywhere.
+Run with no arguments to diff the documented domains — parsed from the pinned
+publisher captures — against the checked-in observed snapshot, failing on any
+finding the ledger in :mod:`spicy_regs.sources.source_domains` does not record,
+in either direction. It reads no network and no parquet, so it runs anywhere, in
+well under a second.
+
+Be precise about what that default run is. Both of its inputs are files in this
+repository: a publisher capture pinned by digest, and one dated observation of
+the published tables. Neither is refetched here, so the result is a function of
+the tree and changes only when someone changes one of those files. That makes
+this a lock on a dated finding, not a live drift detector — it fails the moment
+a re-pin moves either half without the ledger moving with it, which is exactly
+when a human is looking. The offline half runs in CI through the test suite;
+refreshing the observed half is the manual step below.
 
 ``--observe --data-dir DIR`` re-observes the published tables from parquet and
-prints the same report against live data; add ``--write-snapshot`` to re-pin the
+prints the same report against that data; add ``--write-snapshot`` to re-pin the
 checked-in snapshot from that observation. ``DIR`` holds the published tables
 under their own names (``documents.parquet`` and so on) — a fresh download of
-the R2 tables, or any directory built from them.
+the published corpus, or any directory built from it. Re-pinning a capture is
+the other manual step: refetch it from the ``source_url`` its manifest entry
+names, and record the digest and length of what came back.
 
 Exit status: 0 when every finding is recorded, 1 otherwise.
 """
@@ -24,10 +36,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
-
-from spicy_regs.sources.source_domains import (  # noqa: E402
+from spicy_regs.data_dictionary import DEFAULT_R2_BASE_URL, TABLES
+from spicy_regs.sources.source_domains import (
     DEFAULT_SOURCE_DOMAIN_DIR,
     OBSERVED_SNAPSHOT_FILENAME,
     OBSERVED_SNAPSHOT_FORMAT_VERSION,
@@ -42,17 +52,14 @@ from spicy_regs.sources.source_domains import (  # noqa: E402
     unrecorded_findings,
 )
 
+ROOT = Path(__file__).resolve().parents[1]
 SOURCE_DOMAIN_DIR = ROOT / DEFAULT_SOURCE_DOMAIN_DIR
 
-# The published tables the observed half is drawn from, and where each one is
-# published. A snapshot records the digest it actually read, so a re-observation
-# against a different build is visible rather than silent.
-PUBLISHED_TABLE_URLS = {
-    "dockets": "https://r2.spicy-regs.dev/dockets.parquet",
-    "documents": "https://r2.spicy-regs.dev/documents.parquet",
-    "federal_register": "https://r2.spicy-regs.dev/federal_register.parquet",
-    "unified_agenda": "https://r2.spicy-regs.dev/unified_agenda.parquet",
-}
+
+def published_table_url(table: str) -> str:
+    """Where a published table is served, derived from the registry that publishes it."""
+
+    return f"{DEFAULT_R2_BASE_URL}/{table}.parquet"
 
 
 def _connect():
@@ -82,8 +89,11 @@ def observe(data_dir: Path, *, observed_at: str, producer_revision: str) -> Obse
     sources = []
     row_counts: dict[str, int] = {}
     for table in tables:
-        if table not in PUBLISHED_TABLE_URLS:
-            raise SourceDomainError(f"no publisher URL is recorded for the published table {table!r}")
+        # Where the table is published comes from the registry that publishes it,
+        # never from a second list kept here. A hand-kept copy is how the first
+        # version of this snapshot recorded a hostname the project does not serve.
+        if table not in TABLES:
+            raise SourceDomainError(f"{table!r} is not one of the published tables in spicy_regs.data_dictionary")
         path = data_dir / f"{table}.parquet"
         if not path.is_file():
             raise SourceDomainError(f"{data_dir} lacks the published table {table}.parquet")
@@ -94,7 +104,7 @@ def observe(data_dir: Path, *, observed_at: str, producer_revision: str) -> Obse
             {
                 "byte_length": byte_length,
                 "bytes_digest": digest,
-                "publisher_url": PUBLISHED_TABLE_URLS[table],
+                "publisher_url": published_table_url(table),
                 "row_count": int(row_count),
                 "table": table,
             }

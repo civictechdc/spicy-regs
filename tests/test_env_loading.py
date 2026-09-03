@@ -6,7 +6,11 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SEARCH_ROOTS = (REPO_ROOT / "src", REPO_ROOT / "scripts")
+# Every directory that can hold runnable Python, not just the two that held it
+# when this was written: a guard that names its roots by hand stops guarding the
+# moment someone adds a third. Absent roots are skipped, so listing one costs
+# nothing until it exists.
+SEARCH_ROOTS = (REPO_ROOT / "src", REPO_ROOT / "scripts", REPO_ROOT / "tools")
 
 
 _DEFINITIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)

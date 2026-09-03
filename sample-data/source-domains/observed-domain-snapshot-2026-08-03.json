@@ -154,21 +154,21 @@
     {
       "byte_length": 14347053,
       "bytes_digest": "sha256:b14cd488b7898391cff448ac4de19f85936072dcb1aa105da32eea88e6fd7938",
-      "publisher_url": "https://r2.spicy-regs.dev/dockets.parquet",
+      "publisher_url": "https://data.spicy-regs.dev/dockets.parquet",
       "row_count": 276326,
       "table": "dockets"
     },
     {
       "byte_length": 54865512,
       "bytes_digest": "sha256:bb42f79eacd0a1bfb19b7711f5d6859d288133acffa8f585ee468acdd5cb4975",
-      "publisher_url": "https://r2.spicy-regs.dev/documents.parquet",
+      "publisher_url": "https://data.spicy-regs.dev/documents.parquet",
       "row_count": 1990136,
       "table": "documents"
     },
     {
       "byte_length": 1017503,
       "bytes_digest": "sha256:e6862d5d6a5300f10c70eeaf321f1e82e1f5332f71069d07723cc584ee6a85ae",
-      "publisher_url": "https://r2.spicy-regs.dev/unified_agenda.parquet",
+      "publisher_url": "https://data.spicy-regs.dev/unified_agenda.parquet",
       "row_count": 3954,
       "table": "unified_agenda"
     }

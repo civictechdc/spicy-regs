@@ -30,8 +30,18 @@ under ``sample-data/source-domains/`` as exact bytes, bound to their SHA-256
 digest, byte length, publisher URL and observation time by
 ``documented-enumeration-capture-manifest-v1.json``, and every documented value
 is *parsed out of those bytes* on each run. A hand-typed list would rot silently;
-a parse against pinned bytes cannot, and re-pinning a fresh capture makes any
-change to the publisher's own enumeration show up as a test failure.
+a parse against pinned bytes cannot.
+
+What the digest pin does and does not prove. It proves the capture has not
+changed since it was pinned, so no value can be edited into or out of the
+publisher's document without the pin failing. It does not prove the bytes are
+what the publisher serves today, because nothing here refetches ``source_url``
+— re-pinning a capture is a deliberate manual act, and it is that act, not this
+module, that surfaces a change in the publisher's own enumeration. Both halves
+of the comparison are therefore checked-in files, and the result is a function
+of the tree: a lock on a dated finding rather than a live drift detector. The
+lock is the useful part, because it fails when someone moves one half without
+moving the ledger with it.
 
 Note what the reginfo.gov XSD does *not* do: it declares every one of these
 elements as an unrestricted ``xs:string`` and states the controlled list only in
@@ -52,6 +62,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from xml.etree import ElementTree as ET
+
+import yaml
 
 DEFAULT_SOURCE_DOMAIN_DIR = Path("sample-data/source-domains")
 CAPTURE_MANIFEST_FILENAME = "documented-enumeration-capture-manifest-v1.json"
@@ -154,49 +166,38 @@ def read_capture(capture: DocumentedEnumerationCapture, *, root: Path | str = DE
 
 # --- parsing the regulations.gov OpenAPI document ---------------------------
 
-# The capture is OpenAPI 3.0 YAML with two-space indentation throughout: a
-# schema name sits at indent 4 under ``components.schemas``, its keys at 6, and
-# an enum's items at 8. We scan those three indents rather than take a YAML
-# dependency, the way the reader for any other pinned capture parses only the
-# shape it pinned. Anything else in the block is refused rather than skipped.
-_OPENAPI_SCHEMA_INDENT = 4
-_OPENAPI_KEY_INDENT = 6
-_OPENAPI_ITEM_INDENT = 8
-
 
 def openapi_schema_enum(payload: bytes, schema_name: str) -> tuple[str, ...]:
     """Return the ``enum`` members of one ``components.schemas`` entry, in source order.
 
-    Trailing whitespace is not part of a plain YAML scalar, and the capture has
-    one value that carries it (``Nonrulemaking ``), so each member is right-
-    stripped. Nothing else is normalized: ``Supporting & Related Material``
-    keeps its literal ampersand because that is what the API returns.
+    ``yaml.safe_load`` constructs no arbitrary Python objects, which is the only
+    loader worth pointing at a fetched document. It also settles the capture's
+    one whitespace quirk without help: ``- Nonrulemaking `` is a plain scalar,
+    and a plain scalar's trailing space is not part of its value. Nothing else
+    is normalized — ``Supporting & Related Material`` keeps its literal
+    ampersand because that is what the API returns.
     """
 
-    lines = payload.decode("utf-8").splitlines()
-    header = " " * _OPENAPI_SCHEMA_INDENT + schema_name + ":"
-    starts = [index for index, line in enumerate(lines) if line.rstrip() == header]
-    if len(starts) != 1:
-        raise SourceDomainError(f"openapi capture declares schema {schema_name!r} {len(starts)} times, expected once")
-
-    values: list[str] = []
-    in_enum = False
-    for line in lines[starts[0] + 1 :]:
-        if line.strip() and not line.startswith(" " * (_OPENAPI_SCHEMA_INDENT + 1)):
-            break  # dedented out of the schema block
-        if line.startswith(" " * _OPENAPI_KEY_INDENT) and not line[_OPENAPI_KEY_INDENT].isspace():
-            in_enum = line.rstrip() == " " * _OPENAPI_KEY_INDENT + "enum:"
-            continue
-        if in_enum:
-            item = " " * _OPENAPI_ITEM_INDENT + "- "
-            if not line.startswith(item):
-                raise SourceDomainError(f"openapi schema {schema_name!r} enum carries a non-item line {line!r}")
-            values.append(line[len(item) :].rstrip())
-    if not values:
-        raise SourceDomainError(f"openapi schema {schema_name!r} states no enum members")
-    if len(set(values)) != len(values):
+    try:
+        document = yaml.safe_load(payload)
+    except yaml.YAMLError as error:
+        raise SourceDomainError(f"openapi capture is not well-formed YAML: {error}") from error
+    if not isinstance(document, Mapping):
+        raise SourceDomainError("openapi capture is not a YAML mapping")
+    components = document.get("components")
+    schemas = components.get("schemas") if isinstance(components, Mapping) else None
+    if not isinstance(schemas, Mapping) or schema_name not in schemas:
+        raise SourceDomainError(f"openapi capture declares no components.schemas.{schema_name}")
+    schema = schemas[schema_name]
+    members = schema.get("enum") if isinstance(schema, Mapping) else None
+    if not isinstance(members, list) or not members:
+        raise SourceDomainError(f"openapi schema {schema_name!r} states no enum member list")
+    for member in members:
+        if not isinstance(member, str):
+            raise SourceDomainError(f"openapi schema {schema_name!r} enum carries a non-string member {member!r}")
+    if len(set(members)) != len(members):
         raise SourceDomainError(f"openapi schema {schema_name!r} repeats an enum member")
-    return tuple(values)
+    return tuple(members)
 
 
 # --- parsing the reginfo.gov Unified Agenda XSD -----------------------------
@@ -281,21 +282,27 @@ class _DomainDeclaration:
     expected_raw_options: int
 
 
-# Six columns: every published column for which a pinned publisher document
-# states a closed value list. Two deliberate absences, so the set is a decision
-# rather than an accident:
+# Six columns, across three of the published tables. The absences, so the set is
+# read as a decision and its known hole is not mistaken for one:
 #
-# * ``submitterType`` (OpenAPI L905-911) governs ``comments.category``, and the
-#   published-table snapshot the observed half is drawn from carries no comments
-#   table. A documented domain with nothing to observe is not a check.
-# * ``TTBL_ACTION`` (XSD L441-448) documents 34 timetable actions, but the same
-#   snapshot's ``timetable_json`` holds 1,139 distinct actions over 10,533
-#   entries. The publisher's own data treats that field as free text, so a gate
-#   against its list would report a thousand findings and gate nothing.
-#
-# ``federal_register.document_type`` is absent for a different reason: no pinned
-# publisher document states its list. The FR API documentation page is not
-# captured here, and a domain nobody published is not a documented domain.
+# * ``TTBL_ACTION`` (XSD L441-448) is a decided exclusion. The publisher's own
+#   data treats the field as free text — the 2026-08-03 snapshot's
+#   ``timetable_json`` holds 1,139 distinct actions over 10,533 entries against
+#   34 documented ones — so a check against its list would report a thousand
+#   findings and gate nothing. Its sentence also opens "One of the following:"
+#   with unquoted values, which :func:`xsd_documented_options` could not read
+#   even if we wanted it: the exclusion and the parser's reach coincide here,
+#   and only the first of those is a reason.
+# * ``federal_register.document_type`` is absent because no pinned publisher
+#   document states its list. The FR API documentation page is not captured
+#   here, and a domain nobody published is not a documented domain.
+# * ``comments.category`` (documented by OpenAPI ``SubmitterType``, L908-911)
+#   and ``comments.document_type`` (by ``DocumentType``, the same list already
+#   checked against ``documents``) are an open gap, not a decision. ``comments``
+#   is published as a flat ``comments.parquet`` monolith like the rest, so both
+#   are observable; they are uncovered only because the 2026-08-03 observation
+#   did not scan that table. Extending them needs a re-observation, not a code
+#   change here.
 _DECLARATIONS: tuple[_DomainDeclaration, ...] = (
     _DomainDeclaration(
         key="regulations-gov-document-type",

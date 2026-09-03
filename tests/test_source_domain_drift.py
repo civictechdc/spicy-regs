@@ -12,6 +12,7 @@ about the publisher's own document, not about a list somebody typed.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import shutil
 import subprocess
@@ -21,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from spicy_regs.data_dictionary import expected_schemas
+from spicy_regs.data_dictionary import DEFAULT_R2_BASE_URL, expected_schemas
 from spicy_regs.sources.source_domains import (
     ACCEPTED_DOMAIN_FINDINGS,
     DEFAULT_SOURCE_DOMAIN_DIR,
@@ -43,7 +44,7 @@ from spicy_regs.sources.source_domains import (
 
 ROOT = Path(__file__).resolve().parents[1]
 DOMAIN_DIR = ROOT / DEFAULT_SOURCE_DOMAIN_DIR
-TOOL = ROOT / "tools" / "check_source_domain_drift.py"
+TOOL = ROOT / "scripts" / "check_source_domain_drift.py"
 
 
 @pytest.fixture(scope="module")
@@ -72,17 +73,13 @@ def test_every_finding_is_recorded(findings):
 
 
 def test_the_ledger_holds_nothing_stale(findings):
-    """The other half: an accepted finding the data stopped producing must be deleted, not kept."""
+    """The other half: an accepted finding the data stopped producing must be deleted, not kept.
+
+    With the test above, this is set equality in both directions — ledger ⊇ findings
+    and ledger ⊆ findings — so no third assertion of that is needed.
+    """
 
     assert stale_accepted_findings(findings) == ()
-
-
-def test_the_ledger_is_exactly_what_the_snapshot_produces(findings):
-    """Set equality both directions, so the ledger cannot drift away from the data."""
-
-    assert {(one.domain_key, one.kind, one.value) for one in ACCEPTED_DOMAIN_FINDINGS} == {
-        (one.domain_key, one.kind, one.value) for one in findings
-    }
 
 
 def test_every_accepted_finding_states_a_reason():
@@ -93,7 +90,13 @@ def test_every_accepted_finding_states_a_reason():
 
 
 def test_the_findings_are_the_seven_this_snapshot_carries(findings):
-    """Pinned so a silent change in either half shows up as a number, not a shrug."""
+    """Pinned so a silent change in either half shows up as a number, not a shrug.
+
+    This list is deliberately a second transcription of the ledger. The set-equality
+    tests above compare the ledger against the findings, so both pass if someone
+    edits the ledger and the snapshot to agree on something wrong; this one does not,
+    because it states the seven independently of both. Kept for that reason.
+    """
 
     identifiers = sorted(finding.identifier for finding in findings)
     assert identifiers == [
@@ -255,10 +258,21 @@ def test_a_documented_list_that_grows_is_refused(tmp_path):
         documented_domains(tmp_path / "domains")
 
 
-def test_an_openapi_schema_that_is_not_an_enum_is_refused():
+def test_an_openapi_schema_whose_enum_is_not_a_list_is_refused():
     payload = b"components:\n  schemas:\n    DocumentType:\n      type: string\n      enum:\n        bogus: 1\n"
-    with pytest.raises(SourceDomainError, match="non-item line"):
+    with pytest.raises(SourceDomainError, match="states no enum member list"):
         openapi_schema_enum(payload, "DocumentType")
+
+
+def test_an_openapi_schema_that_is_absent_is_refused():
+    payload = b"components:\n  schemas:\n    DocketType:\n      enum:\n        - Rulemaking\n"
+    with pytest.raises(SourceDomainError, match="declares no components.schemas.DocumentType"):
+        openapi_schema_enum(payload, "DocumentType")
+
+
+def test_an_openapi_capture_that_is_not_yaml_is_refused():
+    with pytest.raises(SourceDomainError, match="not well-formed YAML"):
+        openapi_schema_enum(b"components:\n  schemas:\n   - [unclosed\n", "DocumentType")
 
 
 def test_an_xsd_documentation_string_without_an_option_list_is_refused():
@@ -293,7 +307,11 @@ def test_the_snapshot_states_where_its_rows_came_from(snapshot):
     sources = {str(one["table"]): one for one in snapshot.sources}
     assert sorted(sources) == ["dockets", "documents", "unified_agenda"]
     for table, source in sources.items():
-        assert source["publisher_url"] == f"https://r2.spicy-regs.dev/{table}.parquet"
+        # The recorded URL is a string in a checked-in data file; the expected one
+        # comes from the registry that publishes the corpus. Two different origins,
+        # so this fails if the corpus moves and the snapshot is not re-pinned —
+        # which is exactly how this file first shipped naming a host we never served.
+        assert source["publisher_url"] == f"{DEFAULT_R2_BASE_URL}/{table}.parquet"
         assert str(source["bytes_digest"]).startswith("sha256:")
         assert int(source["byte_length"]) > 0
     assert sources["documents"]["row_count"] == 1_990_136
@@ -324,6 +342,24 @@ def test_the_tool_passes_on_the_committed_inputs():
     assert "6 documented domains" in result.stdout
     assert "7 findings" in result.stdout
     assert "UNRECORDED" not in result.stdout
+
+
+def test_the_tool_would_record_the_urls_the_snapshot_already_carries(snapshot):
+    """Close the loop on the writer: what ``--observe`` would record must equal what is pinned.
+
+    ``observe()`` needs parquet, so it cannot run here — but the one part of it that
+    shipped wrong was the URL it stamps into the snapshot. That function is pure, so
+    run it against every table the snapshot names and require it to reproduce them.
+    """
+
+    spec = importlib.util.spec_from_file_location("check_source_domain_drift", TOOL)
+    assert spec is not None and spec.loader is not None
+    tool = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tool)
+
+    for source in snapshot.sources:
+        assert tool.published_table_url(str(source["table"])) == source["publisher_url"]
+    assert tool.published_table_url("documents") == "https://data.spicy-regs.dev/documents.parquet"
 
 
 def test_the_tool_refuses_to_write_a_snapshot_without_provenance():
