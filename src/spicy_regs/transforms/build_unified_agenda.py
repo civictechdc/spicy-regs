@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import date
 from pathlib import Path
 
 import pyarrow as pa
@@ -69,13 +70,19 @@ def _s(value: object) -> str | None:
     return str(value)
 
 
-# reginfo timetable dates are ``MM/DD/YYYY`` (day may be ``00`` for month-only);
-# anything else (e.g. ``To Be Determined``) is not a real date and is skipped.
+# reginfo timetable dates are ``MM/DD/YYYY``; anything else (``To Be Determined``)
+# never matches. ``strptime`` cannot replace this regex: ``%d`` rejects reginfo's
+# ``00`` day at the format level, so the swap would silently drop the 2,922
+# month-only dates in the published table.
 _MDY = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
 
 
 def _iso_dates(timetable: list) -> list[str]:
-    """Return the timetable's parseable action dates as sorted ISO ``YYYY-MM-DD``."""
+    """Return the timetable's real action dates as sorted ISO ``YYYY-MM-DD``.
+
+    A date the calendar rejects (``02/30/2024``) is dropped, never clamped into a
+    *different* real date; ``00`` stays reginfo's month-only marker for the 1st.
+    """
     dates: set[str] = set()
     for entry in timetable:
         raw = (entry or {}).get("date")
@@ -84,11 +91,15 @@ def _iso_dates(timetable: list) -> list[str]:
         m = _MDY.match(raw.strip())
         if not m:
             continue
-        month, day, year = int(m.group(1)), int(m.group(2)), m.group(3)
-        if not 1 <= month <= 12:
+        month, day, year = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        try:
+            action_date = date(year, month, day or 1)
+        except ValueError:
+            # Warn only here. The regex miss above fires 538 times per edition on
+            # reginfo's own "To Be Determined" and would bury this.
+            logger.warning("Unified Agenda: dropped impossible timetable date {!r}", raw.strip())
             continue
-        day = min(max(day, 1), 31)  # clamp; ``00`` (month-only) becomes the 1st
-        dates.add(f"{year}-{month:02d}-{day:02d}")
+        dates.add(action_date.isoformat())
     return sorted(dates)
 
 
