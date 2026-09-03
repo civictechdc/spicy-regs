@@ -221,7 +221,10 @@ def iter_source_credits(document: bytes | str) -> Iterator[tuple[str | None, str
     retains every element it has seen, so the peak is the whole title, and title
     42 is 113 MB of it. Measured over a synthetic USLM title of that size:
     775 MB of resident tree without the clear against 6 MB with it, identical
-    output, and 29% quicker for never allocating it.
+    output, and 29% quicker for never allocating it. A second metric over the
+    publisher's own bytes agrees: scanning title 42 of release point 119-102,
+    digest-verified against the sealed receipt, takes whole-process peak RSS
+    from 786 MB to 264 MB and yields byte-identical output.
     """
     payload = document.encode("utf-8") if isinstance(document, str) else document
     stack: list[str | None] = []
