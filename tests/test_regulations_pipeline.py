@@ -393,8 +393,7 @@ def test_processes_multiple_agencies_in_parallel(tmp_output: Path, monkeypatch: 
 
 
 def test_run_uploads_changed_comment_partitions(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A run that stages comments must publish the changed partitions + index,
-    then advance the manifest last."""
+    """A comments run publishes the changed partitions and index, then the manifest."""
     store = {
         _comment_key("c1", "EPA-2024-0001"): dumps(
             _comment_payload("c1", "EPA-2024-0001", "2024-01-01T00:00:00Z")
@@ -556,10 +555,11 @@ def test_run_preflight_failure_stops_all_publication(tmp_output: Path, monkeypat
 def test_run_refuses_to_publish_comments_without_a_refreshed_index(
     tmp_output: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A comments run that produced no index must refuse, not skip it silently.
+    """A comments run that produced no index must refuse to publish at all.
 
-    Skipping would publish comment rows and then advance the manifest, retiring
-    the keys while the public index still describes the previous partitions.
+    Skipping the index would publish the comment rows, then advance the
+    manifest — retiring those keys while the public index still describes the
+    previous partitions.
     """
     store = {
         _comment_key("c1", "EPA-2024-0001"): dumps(

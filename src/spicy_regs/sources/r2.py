@@ -1,17 +1,14 @@
-"""Cloudflare R2 storage connector.
+"""Cloudflare R2 storage connector — both bookends of an incremental run.
 
-The project's single home for R2 — both bookends of an incremental run: pulling
-existing datasets down so a run can append to them (:func:`download_from_r2`),
-and publishing finished Parquet, partitions, and the manifest back to the bucket
-(:func:`upload_file` / :func:`upload_dataset` / :func:`upload_comment_partitions`).
-This lets a pipeline treat "load" as one composable stage instead of reaching
-into storage internals.
+:func:`download_from_r2` pulls existing datasets down so a run can append to
+them. :func:`upload_file`, :func:`upload_dataset`, and
+:func:`upload_comment_partitions` publish the finished Parquet back.
 
 Downloads use the public ``R2_PUBLIC_URL`` over HTTPS; uploads use the S3 API
-with ``R2_*`` credentials. Uploads are guarded against catastrophic shrink (see
-:func:`_assert_upload_safe`) — the safeguard added after the March 2026 incident
-where a transient download error produced an empty local file that overwrote the
-3.3 GB historical ``comments.parquet`` on R2.
+with ``R2_*`` credentials. Every upload clears a shrink guard
+(:func:`_assert_upload_safe`), added after the March 2026 incident: a transient
+download error produced an empty local file, and the upload overwrote the
+historical 3.3 GB ``comments.parquet``.
 """
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -29,23 +26,20 @@ from spicy_regs.sources.cloudflare import purge_urls
 
 
 def download_from_r2(remote_key: str, local_path: Path) -> bool:
-    """Download a file from R2 bucket using the public URL.
+    """Download one object from R2 over the public URL.
 
-    Returns ``True`` if the file was downloaded, ``False`` if R2 is not
-    configured or the file does not exist on R2 (HTTP 404). Any other
-    error — 5xx responses, network failures, disk write errors — raises.
+    Returns ``True`` on success, ``False`` when R2 is unconfigured or the object
+    is missing (HTTP 404). Everything else — 5xx, network failures, disk write
+    errors — raises.
 
-    Silent failures here caused the March 2026 data-loss incident: a
-    transient download error on the 3.3 GB ``comments.parquet`` returned
-    ``False``, the merge step then wrote a fresh empty file, and the
-    upload step overwrote the historical data on R2. Raising forces the
-    pipeline to abort before the upload step instead of continuing with
-    an empty input.
+    Returning ``False`` for the rest caused the March 2026 data loss: a
+    transient error on the 3.3 GB ``comments.parquet`` read as "absent", the
+    merge wrote a fresh empty file, and the upload overwrote the history.
+    Raising aborts the run before it can publish an empty table.
 
-    The download is atomic: bytes are streamed to ``{local_path}.tmp``
-    and the temp file is renamed into place only after a successful
-    transfer. On any failure, the temp file is removed and any
-    pre-existing file at ``local_path`` is left untouched.
+    The download is atomic: bytes stream to ``{local_path}.tmp``, which is
+    renamed into place only after a complete transfer. Any failure deletes the
+    temp file and leaves an existing ``local_path`` untouched.
     """
     public_url = getenv("R2_PUBLIC_URL")
     if not public_url:
@@ -95,12 +89,11 @@ def get_r2_client():
 
 
 def _get_remote_size(client, bucket: str, remote_key: str) -> int | None:
-    """Return the existing R2 object size in bytes, or None if absent.
+    """Return the remote object's size in bytes, or ``None`` when it is absent.
 
-    Any other error (permissions, transient 5xx) propagates — callers
-    must not guess at whether the remote object exists, since the
-    upload guard depends on a correct answer to decide if a shrink is
-    catastrophic.
+    Permissions and transient 5xx errors propagate: the shrink guard skips its
+    check when nothing is there, so a guessed absence would wave every upload
+    through.
     """
     from botocore.exceptions import ClientError
 
@@ -150,9 +143,8 @@ def _assert_upload_safe(
 def _raise_for_failures(action: str, failures: list[tuple[str, BaseException]], total: int) -> None:
     """Log every failure, then raise one error naming them all.
 
-    Collecting instead of raising on the first failure keeps one broken file
-    from hiding a second broken file behind it — the whole point of awaiting
-    every outcome (see :func:`upload_dataset`).
+    Collecting rather than raising on the first keeps one broken file from
+    hiding the next behind it (see :func:`upload_dataset`).
     """
     if not failures:
         return
@@ -174,23 +166,29 @@ def _remote_key(output_dir: Path, local_path: Path) -> str:
 def dataset_files(output_dir: Path, data_types: list[str]) -> list[Path]:
     """The base-table ``{data_type}.parquet`` files that exist under ``output_dir``.
 
-    Shared so a caller can preflight or plan around exactly the set
-    :func:`upload_dataset` will publish, rather than rebuilding it.
+    Shared so a caller plans over exactly the set :func:`upload_dataset`
+    publishes instead of rebuilding it.
     """
     return [pf for data_type in data_types if (pf := output_dir / f"{data_type}.parquet").exists()]
 
 
 def preflight_uploads(output_dir: Path, files: list[Path]) -> None:
-    """Run every size guard before a multi-file publication writes its first byte.
+    """HEAD every planned object and run its size guard before the first byte lands.
 
-    Each file is keyed by its path relative to ``output_dir`` — the same
-    derivation :func:`upload_comment_partitions` uses to publish partitions.
+    One worker used to replace its object while a sibling was still discovering
+    that its own local file would catastrophically shrink production. Guarding
+    the whole set first makes that refusal stop the publication before it starts.
+    Each file is keyed by its path relative to ``output_dir``, the derivation
+    :func:`upload_comment_partitions` publishes under. Without R2 credentials
+    this is a no-op, like :func:`upload_file`.
 
-    This closes the predictable partial-publication path where one worker can
-    replace an object before another worker discovers that its local file would
-    catastrophically shrink production. Transfers can still fail after the
-    preflight, so callers must keep the manifest unchanged unless every data
-    file upload succeeds.
+    A transfer can still fail after a clean preflight, so callers must leave the
+    manifest unpublished until every data upload succeeds.
+
+    Costs one serial HEAD per file, and :func:`upload_file` HEADs each again:
+    2N round-trips where it was N. N is unbounded for comment partitions, so
+    profile this loop first when a comment-heavy run drags — the fix is a
+    fixed-width thread pool, not ``max_workers=len(files)``.
     """
     if not getenv("R2_ACCESS_KEY_ID"):
         return
@@ -211,13 +209,11 @@ def preflight_uploads(output_dir: Path, files: list[Path]) -> None:
 
 
 def upload_file(local_path: Path, remote_key: str | None = None) -> None:
-    """Publish a single file to R2 (remote key defaults to the filename).
+    """Publish one file to R2 (the remote key defaults to the filename).
 
-    Before overwriting an existing remote object, checks the current
-    size and refuses to proceed if the new file is much smaller (see
-    :func:`_assert_upload_safe`). This guards against the failure mode
-    where an upstream error produces a near-empty local file that
-    would otherwise silently wipe production data.
+    HEADs the existing object first and refuses to overwrite it with a much
+    smaller one (:func:`_assert_upload_safe`), so an upstream error that
+    produced a near-empty local file cannot wipe production.
     """
     bucket = getenv("R2_BUCKET_NAME", "spicy-regs")
 
@@ -237,14 +233,14 @@ def upload_file(local_path: Path, remote_key: str | None = None) -> None:
     remote_size = _get_remote_size(client, bucket, remote_key)
     _assert_upload_safe(local_size_bytes, remote_size, remote_key)
 
-    # Cache-Control policy. Parquet MUST NOT be edge-cached: DuckDB (both the MCP
-    # server and the browser DuckDB-WASM UI) reads each file via many byte-range
-    # requests, and an edge cache serving inconsistent bytes across those ranges
-    # under concurrent load corrupts the read — observed as `utf-8 codec can't
-    # decode` / ETag-mismatch failures at ~c=10+. (This is why parquet was
-    # `no-cache` originally; a caching experiment reintroduced the corruption and
-    # was reverted.) Non-parquet artifacts (e.g. the UI MiniSearch json.gz, which
-    # is not read by DuckDB) may still be edge-cached. `R2_CACHE_CONTROL` overrides.
+    # Cache-Control policy. Parquet must never be edge-cached: DuckDB (the MCP
+    # server and the browser DuckDB-WASM UI) reads each file through many
+    # byte-range requests, and an edge cache serving inconsistent bytes across
+    # those ranges under concurrent load corrupts the read — `utf-8 codec can't
+    # decode` and ETag mismatches at ~c=10+. Parquet was `no-cache` originally; a
+    # caching experiment brought the corruption back and was reverted. Everything
+    # else (the UI MiniSearch json.gz, which DuckDB never reads) caches safely.
+    # `R2_CACHE_CONTROL` overrides.
     configured_cache_control = getenv("R2_CACHE_CONTROL")
     cache_control = configured_cache_control or (
         "public, no-cache, must-revalidate"
@@ -289,33 +285,32 @@ def upload_directory_to_r2(local_dir: Path, remote_prefix: str | None = None) ->
 
 
 def upload_dataset(output_dir: Path, data_types: list[str]) -> None:
-    """Publish merged base tables in parallel.
-
-    Rollups (feed_summary, agency_stats, ...) are no longer published here — each
-    is built and uploaded by its own decoupled ``run-rollup-*`` pipeline.
-
-    Every upload is awaited and its outcome inspected. This used to be a bare
-    ``executor.map(upload_file, files_to_upload)`` whose return value was
-    discarded — and ``map`` yields a *lazy* iterator, so an exception raised in a
-    worker is only re-raised when the results are consumed. Nothing consumed
-    them, so every publish failure was swallowed and the ETL still exited 0.
-    That masked an 8-week ``dockets`` outage: the shrink guard was correctly
-    refusing a truncated ``dockets.parquet`` on every single run (the Iceberg
-    dockets table was never seeded, so the exported snapshot held ~5k rows
-    instead of ~276k) while the workflow stayed green and the published table sat
-    frozen at 2026-07-02.
+    """Publish the merged base tables in parallel.
 
     Every size guard runs before the first upload starts, so a table this run
     would refuse cannot land after a sibling has already been replaced. The
-    pipeline caller preflights a superset (partitions, index, manifest) first;
-    re-checking here is a few HEAD requests and keeps this function safe for any
-    other caller.
+    pipeline caller preflights a superset (partitions, index, manifest) first,
+    and re-checking here is deliberate rather than an oversight: this function
+    fans out to a thread pool, so its own preflight is what stops one table
+    landing while a sibling is refused. The base tables number two, so it costs
+    two HEAD requests.
 
-    R2 fixed object keys do not provide an atomic multi-object commit. This
-    ordering prevents known guard failures from publishing anything; it does not
-    make the base table uploads atomic against network or service failures. The
-    caller owns publishing ``manifest.parquet`` only after every base and
-    partitioned data file succeeds.
+    Fixed object keys give R2 no atomic multi-object commit. This ordering keeps
+    a known guard failure from publishing anything; the transfers themselves
+    stay exposed to a network or service failure mid-flight. So the caller
+    publishes ``manifest.parquet`` only after every base and partitioned data
+    file has succeeded.
+
+    Every upload is awaited and its outcome inspected. A bare
+    ``executor.map(upload_file, ...)`` whose lazy iterator nobody consumed used
+    to swallow every publish failure while the ETL exited 0, hiding an 8-week
+    ``dockets`` outage: the shrink guard rightly refused a truncated
+    ``dockets.parquet`` on every run (the Iceberg dockets table was never
+    seeded, so the exported snapshot held ~5k rows instead of ~276k) while the
+    workflow stayed green and the published table sat frozen at 2026-07-02.
+
+    Rollups (feed_summary, agency_stats, ...) belong to their own decoupled
+    ``run-rollup-*`` pipelines now.
     """
     base_files = dataset_files(output_dir, data_types)
 
@@ -338,7 +333,7 @@ def upload_dataset(output_dir: Path, data_types: list[str]) -> None:
 
 
 def upload_comment_partitions(output_dir: Path, changed_files: list[Path]) -> None:
-    """Publish changed comment partition files and the comments index to R2."""
+    """Publish the changed comment partitions, then the refreshed comments index."""
     for local_path in changed_files:
         upload_file(local_path, remote_key=_remote_key(output_dir, local_path))
 

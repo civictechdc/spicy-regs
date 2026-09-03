@@ -99,7 +99,7 @@ def test_upload_file_survives_unreachable_edge(tmp_path: Path, monkeypatch: pyte
 
 
 def test_upload_dataset_raises_when_an_upload_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A failing publish must surface, not be swallowed by the executor.
+    """A failing publish must surface rather than die inside the executor.
 
     Regression: `executor.map`'s lazy iterator was discarded, so the shrink
     guard's refusal to overwrite dockets.parquet never propagated and the ETL
@@ -123,6 +123,7 @@ def test_upload_dataset_preflights_all_guards_before_uploading(tmp_path: Path, m
     _upload_env(monkeypatch)
     (tmp_path / "documents.parquet").write_bytes(b"x" * 100)
     (tmp_path / "dockets.parquet").write_bytes(b"d")
+    # The manifest is the pipeline's to publish last; upload_dataset ignores it.
     (tmp_path / "manifest.parquet").write_bytes(b"m" * 100)
 
     monkeypatch.setattr(r2, "get_r2_client", lambda: object())
