@@ -95,6 +95,9 @@ def _iso_dates(timetable: list) -> list[str]:
         try:
             action_date = date(year, month, day or 1)
         except ValueError:
+            # Warn only here. The regex miss above fires 538 times per edition on
+            # reginfo's own "To Be Determined" and would bury this.
+            logger.warning("Unified Agenda: dropped impossible timetable date {!r}", raw.strip())
             continue
         dates.add(action_date.isoformat())
     return sorted(dates)

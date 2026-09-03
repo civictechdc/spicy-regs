@@ -14,6 +14,7 @@ import json
 from unittest.mock import patch
 
 import pytest
+from loguru import logger
 
 from spicy_regs.sources import unified_agenda
 from spicy_regs.sources.unified_agenda import UnifiedAgendaReader
@@ -186,6 +187,29 @@ def test_shape_handles_missing_and_unparseable_dates():
 )
 def test_iso_dates_rejects_impossible_calendar_dates(raw, expected):
     assert _iso_dates([{"action": "NPRM", "date": raw}]) == expected
+
+
+def _warnings_from(timetable: list) -> list[str]:
+    """Collect WARNING records emitted while ``_iso_dates`` runs."""
+    messages: list[str] = []
+    sink = logger.add(messages.append, level="WARNING", format="{message}")
+    try:
+        assert _iso_dates(timetable) == []
+    finally:
+        logger.remove(sink)
+    return messages
+
+
+def test_an_impossible_date_says_so_in_the_run_log():
+    """Dropping is otherwise silent, so an edition that starts emitting impossible
+    dates would shrink the published table with nothing in the log to explain it."""
+    assert any("02/30/2024" in m for m in _warnings_from([{"date": "02/30/2024"}]))
+
+
+def test_an_unparseable_date_stays_quiet():
+    """``To Be Determined`` is reginfo's own placeholder and appears 538 times in a
+    single published edition; warning on it would bury the impossible-date case."""
+    assert _warnings_from([{"date": "To Be Determined"}]) == []
 
 
 def test_shape_drops_impossible_dates_without_fabricating_a_neighbour():
