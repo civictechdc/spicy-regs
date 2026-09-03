@@ -171,43 +171,58 @@ class RegulationsPipeline(Pipeline):
             logger.info("skip_upload=True — output left in {}", output_dir)
         elif any(staged.values()):
             logger.info("Uploading to R2...")
-            base_data_types = [rt.name for rt in record_types if rt.name != "comments"]
-            files_to_preflight = [
-                (output_dir / f"{data_type}.parquet", f"{data_type}.parquet")
-                for data_type in base_data_types
-                if (output_dir / f"{data_type}.parquet").exists()
-            ]
-            files_to_preflight.extend((path, str(path.relative_to(output_dir))) for path in changed_comments)
-            index_file = output_dir / "comments_index.parquet"
-            publish_comments_index = bool(changed_comments) or (self.use_iceberg and staged.get("comments", 0) > 0)
-            if publish_comments_index and not index_file.exists():
-                raise RuntimeError("Expected comments_index.parquet after publishing comment data")
-            if publish_comments_index:
-                files_to_preflight.append((index_file, "comments_index.parquet"))
-            manifest_file = output_dir / "manifest.parquet"
-            if manifest_file.exists():
-                files_to_preflight.append((manifest_file, "manifest.parquet"))
-
-            r2.preflight_uploads(files_to_preflight)
-            if base_data_types:
-                r2.upload_dataset(output_dir, base_data_types)
-            # Comments are partitioned, not monolithic: publish the partitions
-            # changed this run plus the refreshed index.
-            if changed_comments:
-                logger.info("Uploading {} changed comment partitions...", len(changed_comments))
-                r2.upload_comment_partitions(output_dir, changed_comments)
-            # Iceberg comments path: the MERGE wrote the rows through the catalog
-            # (not under the public comments/ prefix), so there are no partition
-            # files to push — only the refreshed index needs publishing.
-            elif publish_comments_index:
-                if index_file.exists():
-                    logger.info("Uploading refreshed comments index (Iceberg path)...")
-                    r2.upload_file(index_file, remote_key="comments_index.parquet")
-            if manifest_file.exists():
-                logger.info("Uploading manifest after all data files succeeded...")
-                r2.upload_file(manifest_file, remote_key="manifest.parquet")
+            self._publish(output_dir, record_types, staged, changed_comments)
 
         logger.info("Done!")
+
+    def _publish(
+        self,
+        output_dir: Path,
+        record_types: list[RecordType],
+        staged: dict[str, int],
+        changed_comments: list[Path],
+    ) -> None:
+        """Publish this run's output to R2, advancing the manifest strictly last.
+
+        ``manifest.parquet`` is the retry checkpoint: republishing it retires the
+        keys this run consumed, so it must not land while a data file is still
+        unpublished or the next run will never re-fetch what went missing. Every
+        planned object is therefore size-guarded up front, and the manifest is
+        uploaded only once every data upload has returned.
+        """
+        base_data_types = [rt.name for rt in record_types if rt.name != "comments"]
+        index_file = output_dir / "comments_index.parquet"
+        manifest_file = output_dir / "manifest.parquet"
+        # The Iceberg comments path MERGEs rows through the catalog rather than
+        # under the public comments/ prefix, so it changes no partition files —
+        # only the refreshed index needs publishing.
+        publish_index = bool(changed_comments) or (self.use_iceberg and staged.get("comments", 0) > 0)
+        if publish_index and not index_file.exists():
+            raise RuntimeError("Expected comments_index.parquet after publishing comment data")
+        # Manifest.save only writes when this run recorded keys; without a
+        # checkpoint to advance there is nothing to publish last.
+        publish_manifest = manifest_file.exists()
+
+        planned = r2.dataset_files(output_dir, base_data_types) + changed_comments
+        if publish_index:
+            planned.append(index_file)
+        if publish_manifest:
+            planned.append(manifest_file)
+        r2.preflight_uploads(output_dir, planned)
+
+        if base_data_types:
+            r2.upload_dataset(output_dir, base_data_types)
+        # Comments are partitioned, not monolithic: publish the partitions
+        # changed this run plus the refreshed index.
+        if changed_comments:
+            logger.info("Uploading {} changed comment partitions...", len(changed_comments))
+            r2.upload_comment_partitions(output_dir, changed_comments)
+        elif publish_index:
+            logger.info("Uploading refreshed comments index (Iceberg path)...")
+            r2.upload_file(index_file, remote_key="comments_index.parquet")
+        if publish_manifest:
+            logger.info("Uploading manifest after all data files succeeded...")
+            r2.upload_file(manifest_file, remote_key="manifest.parquet")
 
     def _ingest_comments_chunked(self, agency: str, output_dir: Path, staging_dir: Path, manifest: Manifest) -> None:
         """Ingest one agency's comments in bounded key-chunks, committing each.

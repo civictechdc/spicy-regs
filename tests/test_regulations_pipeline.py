@@ -406,7 +406,7 @@ def test_run_uploads_changed_comment_partitions(tmp_output: Path, monkeypatch: p
     monkeypatch.setattr(
         regulations.r2,
         "preflight_uploads",
-        lambda files: events.append(("preflight", list(files))),
+        lambda out, files: events.append(("preflight", list(files))),
     )
     monkeypatch.setattr(regulations.r2, "upload_dataset", lambda *args, **kwargs: events.append(("dataset", args)))
     monkeypatch.setattr(
@@ -428,20 +428,15 @@ def test_run_uploads_changed_comment_partitions(tmp_output: Path, monkeypatch: p
         skip_upload=False,
     ).run()
 
-    labels = [label for label, _ in events]
-    assert labels == ["preflight", "partitions", "file"]
-    preflight = dict(events)["preflight"]
-    assert {remote_key for _, remote_key in preflight} >= {
-        "comments_index.parquet",
-        "manifest.parquet",
-    }
-    assert any(remote_key.startswith("comments/") for _, remote_key in preflight)
-    out, changed = dict(events)["partitions"]
+    assert [label for label, _ in events] == ["preflight", "partitions", "file"]
+    preflight = events[0][1]
+    assert tmp_output / "comments_index.parquet" in preflight
+    assert tmp_output / "manifest.parquet" in preflight
+    assert any(p.is_relative_to(tmp_output / "comments") for p in preflight)
+    out, changed = events[1][1]
     assert out == tmp_output
     assert changed and all(p.suffix == ".parquet" for p in changed)
-    manifest_path, manifest_key = events[-1][1]
-    assert manifest_path == tmp_output / "manifest.parquet"
-    assert manifest_key == "manifest.parquet"
+    assert events[2][1] == (tmp_output / "manifest.parquet", "manifest.parquet")
 
 
 def test_run_does_not_advance_manifest_after_comment_upload_failure(
@@ -454,7 +449,7 @@ def test_run_does_not_advance_manifest_after_comment_upload_failure(
         ).encode(),
     }
     monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
-    monkeypatch.setattr(regulations.r2, "preflight_uploads", lambda files: None)
+    monkeypatch.setattr(regulations.r2, "preflight_uploads", lambda out, files: None)
     monkeypatch.setattr(regulations.r2, "upload_dataset", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         regulations.r2,
@@ -488,7 +483,7 @@ def test_run_does_not_advance_manifest_after_base_upload_failure(
         _docket_key("EPA-2024-0001"): dumps(_docket_payload("EPA-2024-0001", "2024-01-01")).encode(),
     }
     monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
-    monkeypatch.setattr(regulations.r2, "preflight_uploads", lambda files: None)
+    monkeypatch.setattr(regulations.r2, "preflight_uploads", lambda out, files: None)
     monkeypatch.setattr(
         regulations.r2,
         "upload_dataset",
@@ -520,9 +515,9 @@ def test_run_preflight_failure_stops_all_publication(tmp_output: Path, monkeypat
         ).encode(),
     }
     monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
-    checked: list[tuple[Path, str]] = []
+    checked: list[Path] = []
 
-    def fail_preflight(files: list[tuple[Path, str]]) -> None:
+    def fail_preflight(out: Path, files: list[Path]) -> None:
         checked.extend(files)
         raise RuntimeError("manifest guard failed")
 
@@ -553,11 +548,41 @@ def test_run_preflight_failure_stops_all_publication(tmp_output: Path, monkeypat
             skip_upload=False,
         ).run()
 
-    assert {remote_key for _, remote_key in checked} >= {
-        "comments_index.parquet",
-        "manifest.parquet",
-    }
+    assert tmp_output / "comments_index.parquet" in checked
+    assert tmp_output / "manifest.parquet" in checked
     assert attempted == []
+
+
+def test_run_refuses_to_publish_comments_without_a_refreshed_index(
+    tmp_output: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A comments run that produced no index must refuse, not skip it silently.
+
+    Skipping would publish comment rows and then advance the manifest, retiring
+    the keys while the public index still describes the previous partitions.
+    """
+    store = {
+        _comment_key("c1", "EPA-2024-0001"): dumps(
+            _comment_payload("c1", "EPA-2024-0001", "2024-01-01T00:00:00Z")
+        ).encode(),
+    }
+    monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
+    # The catalog MERGE "succeeds" but leaves no comments_index.parquet behind.
+    monkeypatch.setattr(regulations.iceberg, "merge_comments", lambda sd, od, rt: None)
+    uploaded: list[Path] = []
+    monkeypatch.setattr(regulations.r2, "upload_file", lambda path, remote_key=None: uploaded.append(path))
+
+    with pytest.raises(RuntimeError, match="comments_index.parquet"):
+        RegulationsPipeline(
+            agency=AGENCY,
+            output_dir=tmp_output,
+            only_comments=True,
+            use_iceberg=True,
+            enrich_text=False,
+            skip_upload=False,
+        ).run()
+
+    assert uploaded == []
 
 
 def test_run_skips_partition_upload_when_no_comments(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:

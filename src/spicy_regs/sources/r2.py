@@ -147,8 +147,44 @@ def _assert_upload_safe(
         )
 
 
-def preflight_uploads(files_to_upload: list[tuple[Path, str]]) -> None:
-    """Run every size guard before a multi-file publication starts.
+def _raise_for_failures(action: str, failures: list[tuple[str, BaseException]], total: int) -> None:
+    """Log every failure, then raise one error naming them all.
+
+    Collecting instead of raising on the first failure keeps one broken file
+    from hiding a second broken file behind it — the whole point of awaiting
+    every outcome (see :func:`upload_dataset`).
+    """
+    if not failures:
+        return
+    for name, error in failures:
+        logger.error("{} failed for {}: {}", action, name, error)
+    names = ", ".join(sorted(name for name, _ in failures))
+    raise RuntimeError(f"{action} failed for {len(failures)} of {total} file(s): {names}") from failures[0][1]
+
+
+def _remote_key(output_dir: Path, local_path: Path) -> str:
+    """The object key a file published from ``output_dir`` lands under.
+
+    One definition so the preflight guards exactly the key the upload writes;
+    two derivations that drifted would silently check the wrong object.
+    """
+    return str(local_path.relative_to(output_dir))
+
+
+def dataset_files(output_dir: Path, data_types: list[str]) -> list[Path]:
+    """The base-table ``{data_type}.parquet`` files that exist under ``output_dir``.
+
+    Shared so a caller can preflight or plan around exactly the set
+    :func:`upload_dataset` will publish, rather than rebuilding it.
+    """
+    return [pf for data_type in data_types if (pf := output_dir / f"{data_type}.parquet").exists()]
+
+
+def preflight_uploads(output_dir: Path, files: list[Path]) -> None:
+    """Run every size guard before a multi-file publication writes its first byte.
+
+    Each file is keyed by its path relative to ``output_dir`` — the same
+    derivation :func:`upload_comment_partitions` uses to publish partitions.
 
     This closes the predictable partial-publication path where one worker can
     replace an object before another worker discovers that its local file would
@@ -161,22 +197,17 @@ def preflight_uploads(files_to_upload: list[tuple[Path, str]]) -> None:
 
     bucket = getenv("R2_BUCKET_NAME", "spicy-regs")
     client = get_r2_client()
-    failures: list[tuple[str, Exception]] = []
+    failures: list[tuple[str, BaseException]] = []
 
-    for local_path, remote_key in files_to_upload:
+    for local_path in files:
+        remote_key = _remote_key(output_dir, local_path)
         try:
             remote_size = _get_remote_size(client, bucket, remote_key)
             _assert_upload_safe(local_path.stat().st_size, remote_size, remote_key)
         except Exception as error:
             failures.append((remote_key, error))
 
-    if failures:
-        for remote_key, error in failures:
-            logger.error("Publication preflight failed for {}: {}", remote_key, error)
-        names = ", ".join(sorted(remote_key for remote_key, _ in failures))
-        raise RuntimeError(
-            f"Publication preflight failed for {len(failures)} of {len(files_to_upload)} file(s): {names}"
-        ) from failures[0][1]
+    _raise_for_failures("Publication preflight", failures, len(files))
 
 
 def upload_file(local_path: Path, remote_key: str | None = None) -> None:
@@ -274,9 +305,11 @@ def upload_dataset(output_dir: Path, data_types: list[str]) -> None:
     instead of ~276k) while the workflow stayed green and the published table sat
     frozen at 2026-07-02.
 
-    The size guard is preflighted for every candidate before any upload starts.
-    Failures are then collected rather than raised on the first transfer, so a
-    broken table can never hide a second broken table behind it.
+    Every size guard runs before the first upload starts, so a table this run
+    would refuse cannot land after a sibling has already been replaced. The
+    pipeline caller preflights a superset (partitions, index, manifest) first;
+    re-checking here is a few HEAD requests and keeps this function safe for any
+    other caller.
 
     R2 fixed object keys do not provide an atomic multi-object commit. This
     ordering prevents known guard failures from publishing anything; it does not
@@ -284,44 +317,30 @@ def upload_dataset(output_dir: Path, data_types: list[str]) -> None:
     caller owns publishing ``manifest.parquet`` only after every base and
     partitioned data file succeeds.
     """
-    base_files = []
-    for data_type in data_types:
-        pf = output_dir / f"{data_type}.parquet"
-        if pf.exists():
-            base_files.append(pf)
-
-    files_to_preflight = [(path, path.name) for path in base_files]
+    base_files = dataset_files(output_dir, data_types)
 
     # ThreadPoolExecutor rejects max_workers=0, so an empty publish set would
     # otherwise raise ValueError rather than being the no-op it should be.
-    if not files_to_preflight:
+    if not base_files:
         logger.warning("upload_dataset: no files to publish in {}", output_dir)
         return
 
-    preflight_uploads(files_to_preflight)
+    preflight_uploads(output_dir, base_files)
 
-    failures: list[tuple[Path, BaseException]] = []
-    if base_files:
-        with ThreadPoolExecutor(max_workers=len(base_files)) as executor:
-            futures = {executor.submit(upload_file, pf): pf for pf in base_files}
-            for future in as_completed(futures):
-                if (error := future.exception()) is not None:
-                    failures.append((futures[future], error))
+    failures: list[tuple[str, BaseException]] = []
+    with ThreadPoolExecutor(max_workers=len(base_files)) as executor:
+        futures = {executor.submit(upload_file, pf): pf for pf in base_files}
+        for future in as_completed(futures):
+            if (error := future.exception()) is not None:
+                failures.append((futures[future].name, error))
 
-    if failures:
-        for path, error in failures:
-            logger.error("Failed to publish {}: {}", path.name, error)
-        names = ", ".join(sorted(path.name for path, _ in failures))
-        raise RuntimeError(
-            f"Failed to publish {len(failures)} of {len(base_files)} base file(s) to R2: {names}"
-        ) from failures[0][1]
+    _raise_for_failures("R2 base table publish", failures, len(base_files))
 
 
 def upload_comment_partitions(output_dir: Path, changed_files: list[Path]) -> None:
     """Publish changed comment partition files and the comments index to R2."""
     for local_path in changed_files:
-        remote_key = str(local_path.relative_to(output_dir))
-        upload_file(local_path, remote_key=remote_key)
+        upload_file(local_path, remote_key=_remote_key(output_dir, local_path))
 
     index_file = output_dir / "comments_index.parquet"
     if index_file.exists():
