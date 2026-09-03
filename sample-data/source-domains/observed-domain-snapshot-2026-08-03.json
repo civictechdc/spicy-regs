@@ -1,0 +1,176 @@
+{
+  "domains": [
+    {
+      "column": "docket_type",
+      "key": "regulations-gov-docket-type",
+      "null_count": 0,
+      "row_count": 276326,
+      "table": "dockets",
+      "value_counts": [
+        [
+          "Nonrulemaking",
+          213858
+        ],
+        [
+          "Rulemaking",
+          62468
+        ]
+      ]
+    },
+    {
+      "column": "document_type",
+      "key": "regulations-gov-document-type",
+      "null_count": 0,
+      "row_count": 1990136,
+      "table": "documents",
+      "value_counts": [
+        [
+          "Other",
+          725566
+        ],
+        [
+          "Supporting & Related Material",
+          713446
+        ],
+        [
+          "Notice",
+          395715
+        ],
+        [
+          "Rule",
+          103318
+        ],
+        [
+          "Proposed Rule",
+          51718
+        ],
+        [
+          "Public Submission",
+          373
+        ]
+      ]
+    },
+    {
+      "column": "major",
+      "key": "unified-agenda-major",
+      "null_count": 0,
+      "row_count": 3954,
+      "table": "unified_agenda",
+      "value_counts": [
+        [
+          "No",
+          2780
+        ],
+        [
+          "Undetermined",
+          865
+        ],
+        [
+          "Yes",
+          309
+        ]
+      ]
+    },
+    {
+      "column": "priority_category",
+      "key": "unified-agenda-priority-category",
+      "null_count": 2,
+      "row_count": 3954,
+      "table": "unified_agenda",
+      "value_counts": [
+        [
+          "Substantive, Nonsignificant",
+          2190
+        ],
+        [
+          "Other Significant",
+          1275
+        ],
+        [
+          "Economically Significant",
+          345
+        ],
+        [
+          "Info./Admin./Other",
+          101
+        ],
+        [
+          "Routine and Frequent",
+          41
+        ]
+      ]
+    },
+    {
+      "column": "rin_status",
+      "key": "unified-agenda-rin-status",
+      "null_count": 0,
+      "row_count": 3954,
+      "table": "unified_agenda",
+      "value_counts": [
+        [
+          "Previously Published in The Unified Agenda",
+          2835
+        ],
+        [
+          "First Time Published in The Unified Agenda",
+          1119
+        ]
+      ]
+    },
+    {
+      "column": "rule_stage",
+      "key": "unified-agenda-rule-stage",
+      "null_count": 0,
+      "row_count": 3954,
+      "table": "unified_agenda",
+      "value_counts": [
+        [
+          "Proposed Rule Stage",
+          1437
+        ],
+        [
+          "Final Rule Stage",
+          985
+        ],
+        [
+          "Long-Term Actions",
+          808
+        ],
+        [
+          "Completed Actions",
+          628
+        ],
+        [
+          "Prerule Stage",
+          96
+        ]
+      ]
+    }
+  ],
+  "format_version": "spicyregs-source-domains/observed-v1",
+  "observed_at": "2026-08-03T22:35:00Z",
+  "producer_revision": "f1fcb8c9c8838071e9c45462799db788971baca4",
+  "sources": [
+    {
+      "byte_length": 14347053,
+      "bytes_digest": "sha256:b14cd488b7898391cff448ac4de19f85936072dcb1aa105da32eea88e6fd7938",
+      "publisher_url": "https://r2.spicy-regs.dev/dockets.parquet",
+      "row_count": 276326,
+      "table": "dockets"
+    },
+    {
+      "byte_length": 54865512,
+      "bytes_digest": "sha256:bb42f79eacd0a1bfb19b7711f5d6859d288133acffa8f585ee468acdd5cb4975",
+      "publisher_url": "https://r2.spicy-regs.dev/documents.parquet",
+      "row_count": 1990136,
+      "table": "documents"
+    },
+    {
+      "byte_length": 1017503,
+      "bytes_digest": "sha256:e6862d5d6a5300f10c70eeaf321f1e82e1f5332f71069d07723cc584ee6a85ae",
+      "publisher_url": "https://r2.spicy-regs.dev/unified_agenda.parquet",
+      "row_count": 3954,
+      "table": "unified_agenda"
+    }
+  ]
+}
