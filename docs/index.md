@@ -65,6 +65,7 @@ is queryable through the MCP server (`list_sources` / `describe_table` /
 | [`sam_entities`](tables/sam_entities.md) | one row per SAM-registered entity | `uei` |
 | [`lobbying_filings`](tables/lobbying_filings.md) | one row per LDA filing | `filing_uuid` |
 | [`fec_committees`](tables/fec_committees.md) | one row per FEC committee / PAC | `committee_id` |
+| [`org_committee_links`](tables/org_committee_links.md) | one row per (commenter org name, FEC committee) match | `organization` + `committee_id` |
 
 ### Outcomes & context
 
@@ -106,13 +107,18 @@ of `dockets`; they join to the corpus (and to each other) on a few shared keys:
   entity.
 - **Organization name** bridges the softer influence sources — `lobbying_filings`
   (registrant/client), `fec_committees`, and comment filers — where no shared id
-  exists.
+  exists. For `fec_committees` that bridge is now materialized:
+  [`org_committee_links`](tables/org_committee_links.md) resolves
+  `comments.organization` to `committee_id` once, with `match_method` /
+  `confidence` on every row, so consumers stop re-inventing the normalization.
 - **`agency_code` / agency name** appears across nearly every table.
 
 > Coverage notes: `sam_entities` covers the active public registry (~885K rows;
 > chunked ingestion walks SAM's bulk extract by `registrationDate` year window
 > across runs), `lobbying_filings` covers 2024-onward, `usaspending_recipients`
-> is the top ~100K recipients by award amount, and `gao_reports` tracks GAO's
+> is the top ~100K recipients by award amount, `org_committee_links` is bounded
+> by the ~0.08% of comments that carry an `organization` value at all, and
+> `gao_reports` tracks GAO's
 > recent-items RSS window (it grows as the daily job runs). Each table page
 > notes its own scope.
 

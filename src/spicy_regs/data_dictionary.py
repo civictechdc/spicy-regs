@@ -60,6 +60,7 @@ TABLES: tuple[str, ...] = (
     "sam_entities",
     "lobbying_filings",
     "fec_committees",
+    "org_committee_links",
     "gao_reports",
     "crs_reports",
     "court_dockets",
@@ -90,6 +91,7 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
         "sam_entities",
         "lobbying_filings",
         "fec_committees",
+        "org_committee_links",
         "gao_reports",
         "crs_reports",
         "court_dockets",
@@ -311,6 +313,30 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("last_file_date", "VARCHAR"),
         ("cycles_json", "VARCHAR"),
         ("candidate_ids_json", "VARCHAR"),
+    ],
+    # Derived by build_org_committee_links: commenter organization names from
+    # comments.organization name-matched to fec_committees. One row per
+    # (organization, committee_id); counts are BIGINT, everything else VARCHAR.
+    "org_committee_links": [
+        ("organization", "VARCHAR"),
+        ("organization_norm", "VARCHAR"),
+        ("organization_core", "VARCHAR"),
+        ("name_source", "VARCHAR"),
+        ("committee_id", "VARCHAR"),
+        ("committee_name", "VARCHAR"),
+        ("committee_type_full", "VARCHAR"),
+        ("designation_full", "VARCHAR"),
+        ("party_full", "VARCHAR"),
+        ("organization_type_full", "VARCHAR"),
+        ("committee_state", "VARCHAR"),
+        ("match_method", "VARCHAR"),
+        ("confidence", "VARCHAR"),
+        ("committee_match_count", "BIGINT"),
+        ("comment_count", "BIGINT"),
+        ("docket_count", "BIGINT"),
+        ("agency_codes_json", "VARCHAR"),
+        ("first_comment_date", "VARCHAR"),
+        ("last_comment_date", "VARCHAR"),
     ],
     # Ingested from the GAO reports RSS feed (build_gao_reports); an append-only
     # accumulator of recently published products. All columns are stored as

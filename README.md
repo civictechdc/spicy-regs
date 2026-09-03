@@ -103,7 +103,7 @@ rulemaking lifecycle, the organizations engaged in it, and its downstream
 context are all joinable in one place:
 
 - *Lifecycle:* `federal_register`, `unified_agenda`, `congress_bills`, `cfr_sections`
-- *Organizations & influence:* `sam_entities`, `lobbying_filings`, `fec_committees`
+- *Organizations & influence:* `sam_entities`, `lobbying_filings`, `fec_committees`, `org_committee_links`
 - *Outcomes & context:* `usaspending_recipients`, `court_dockets`, `gao_reports`, `crs_reports`
 - *Telecom:* `fcc_proceedings`, `fcc_filings`
 
