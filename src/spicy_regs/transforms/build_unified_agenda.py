@@ -78,10 +78,8 @@ _MDY = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
 def _iso_dates(timetable: list) -> list[str]:
     """Return the timetable's real action dates as sorted ISO ``YYYY-MM-DD``.
 
-    Fail-closed on the calendar: a value that names no day that ever existed
-    (``02/30/2024``, ``13/01/2024``) is dropped like any other unparseable
-    date rather than repaired into a *different* real date. ``00`` remains
-    reginfo's month-only marker and resolves to the first of that month.
+    A date the calendar rejects (``02/30/2024``) is dropped, never clamped into a
+    *different* real date; ``00`` stays reginfo's month-only marker for the 1st.
     """
     dates: set[str] = set()
     for entry in timetable:
@@ -93,10 +91,10 @@ def _iso_dates(timetable: list) -> list[str]:
             continue
         month, day, year = int(m.group(1)), int(m.group(2)), int(m.group(3))
         try:
-            action = date(year, month, day or 1)
+            action_date = date(year, month, day or 1)
         except ValueError:
             continue
-        dates.add(action.isoformat())
+        dates.add(action_date.isoformat())
     return sorted(dates)
 
 
