@@ -8,7 +8,7 @@ API's per-query truncation.
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, timedelta
 
 import httpx
 import pytest
@@ -81,21 +81,33 @@ def _doc(n: int, day: str) -> dict:
     return {"document_number": f"D{n}", "publication_date": day}
 
 
-def test_window_subdivides_on_truncation(monkeypatch):
-    """A truncated window must split and recurse so no document is dropped.
+# The two signals that make a window's contents unknowable, and so must force a
+# split: fewer rows than the reported ``count``, or a ``count`` sitting on the
+# API's cap (which clamps at 10,000 and hides the true total). ``result_cap``
+# is the value RESULT_CAP is set to for the case, so the cap case can be
+# written with 2 rows instead of 10,000.
+_AMBIGUOUS_WINDOWS = [
+    pytest.param(1, 2, federal_register_source.RESULT_CAP, id="rows-short-of-reported-count"),
+    pytest.param(2, 2, 2, id="reported-count-at-api-cap"),
+]
 
-    We simulate an API that returns only 1 of 2 documents for any multi-day
-    window, but the full set for a single day. The reader should recover all
-    documents by subdividing down to single days.
+
+@pytest.mark.parametrize(("rows", "count", "result_cap"), _AMBIGUOUS_WINDOWS)
+def test_ambiguous_window_subdivides_so_no_document_is_dropped(monkeypatch, rows, count, result_cap):
+    """An ambiguous multi-day window must split and recurse until days answer completely.
+
+    The fake API is ambiguous for any multi-day window but returns each single
+    day's full (small) result set, so a correct reader recovers both documents.
     """
     reader = FederalRegisterReader(since=date(2024, 1, 1), until=date(2024, 1, 2))
+    monkeypatch.setattr(federal_register_source, "RESULT_CAP", result_cap)
 
     def fake_page_window(gte: date, lte: date):
         if gte == lte:
-            # Single day: return that day's full (small) result set.
             return [_doc(gte.day, gte.isoformat())], 1
-        # Multi-day window: report 2 total but only hand back 1 (truncated).
-        return [_doc(gte.day, gte.isoformat())], 2
+        # Rows from an ambiguous window must never reach the caller, so they are
+        # numbered apart: publishing them unsplit fails the assertion below.
+        return [_doc(900 + n, gte.isoformat()) for n in range(1, rows + 1)], count
 
     monkeypatch.setattr(reader, "_page_window", fake_page_window)
     # _fetch_window doesn't need the httpx client once _page_window is stubbed.
@@ -103,50 +115,32 @@ def test_window_subdivides_on_truncation(monkeypatch):
     assert sorted(got) == ["D1", "D2"]
 
 
-def test_single_day_truncation_aborts_instead_of_dropping_documents(monkeypatch):
+@pytest.mark.parametrize(("rows", "count", "result_cap"), _AMBIGUOUS_WINDOWS)
+def test_ambiguous_single_day_refuses_instead_of_publishing_partial_data(monkeypatch, rows, count, result_cap):
+    """A single day cannot be subdivided further, so ambiguity there must abort the run.
+
+    This replaced a tolerant path that logged the gap and published the partial
+    page; without the refusal an API limit becomes silent corpus loss.
+    """
     reader = FederalRegisterReader(since=date(2024, 1, 1), until=date(2024, 1, 1))
+    monkeypatch.setattr(federal_register_source, "RESULT_CAP", result_cap)
     monkeypatch.setattr(
         reader,
         "_page_window",
-        lambda gte, lte: ([_doc(1, gte.isoformat())], 2),
+        lambda gte, lte: ([_doc(n, gte.isoformat()) for n in range(1, rows + 1)], count),
     )
 
-    with pytest.raises(RuntimeError, match="truncated"):
-        list(reader._fetch_window(date(2024, 1, 1), date(2024, 1, 1)))
-
-
-def test_reported_result_cap_subdivides_even_when_visible_rows_are_complete(monkeypatch):
-    reader = FederalRegisterReader(since=date(2024, 1, 1), until=date(2024, 1, 2))
-    monkeypatch.setattr(federal_register_source, "RESULT_CAP", 2)
-
-    def fake_page_window(gte: date, lte: date):
-        if gte == lte:
-            return [_doc(gte.day, gte.isoformat())], 1
-        return [
-            _doc(1, "2024-01-01"),
-            _doc(2, "2024-01-02"),
-        ], 2
-
-    monkeypatch.setattr(reader, "_page_window", fake_page_window)
-
-    got = [d["document_number"] for d in reader._fetch_window(date(2024, 1, 1), date(2024, 1, 2))]
-    assert got == ["D1", "D2"]
-
-
-def test_capped_single_day_refuses_ambiguous_source_state(monkeypatch):
-    reader = FederalRegisterReader(since=date(2024, 1, 1), until=date(2024, 1, 1))
-    monkeypatch.setattr(federal_register_source, "RESULT_CAP", 2)
-    monkeypatch.setattr(
-        reader,
-        "_page_window",
-        lambda gte, lte: ([_doc(1, gte.isoformat()), _doc(2, gte.isoformat())], 2),
-    )
-
-    with pytest.raises(RuntimeError, match="truncated.*2/2"):
+    with pytest.raises(RuntimeError, match=f"truncated.*{rows}/{count}"):
         list(reader._fetch_window(date(2024, 1, 1), date(2024, 1, 1)))
 
 
 def test_archive_fetch_uses_bounded_top_level_windows(monkeypatch):
+    """Top-level windows must be capped in width *and* tile [since, until] exactly.
+
+    Width alone is not enough: a stride that skipped or repeated a day would
+    still produce narrow windows, so the gap/overlap check is what catches an
+    off-by-one in the walk.
+    """
     reader = FederalRegisterReader(since=date(2024, 1, 1), until=date(2024, 12, 31))
     windows: list[tuple[date, date]] = []
 
@@ -158,6 +152,9 @@ def test_archive_fetch_uses_bounded_top_level_windows(monkeypatch):
     assert list(reader.iter_records()) == []
     assert len(windows) > 1
     assert all((lte - gte).days < federal_register_source.MAX_WINDOW_DAYS for gte, lte in windows)
+    assert windows[0][0] == reader.since
+    assert windows[-1][1] == reader.until
+    assert all(nxt[0] == prev[1] + timedelta(days=1) for prev, nxt in zip(windows, windows[1:]))
 
 
 def test_request_exhaustion_aborts_instead_of_returning_partial_data(monkeypatch):

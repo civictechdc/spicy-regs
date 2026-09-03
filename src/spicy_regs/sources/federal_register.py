@@ -39,10 +39,12 @@ PER_PAGE = 1000
 # when all 10,000 visible rows were collected.
 RESULT_CAP = 10_000
 
-# Avoid paying for a capped 10,000-row traversal of the full archive before
-# discovering that it must be split. Quarter-sized top-level windows remain
-# below the cap in normal Federal Register history; unusually busy quarters are
-# still split recursively by ``_fetch_window``.
+# Not a correctness knob — ``_fetch_window`` bisects the whole span on its own.
+# It is a cost bound: bisecting 1994..today from the top pays a full capped
+# traversal (10,000 rows, 10 pages) at every node above the split threshold,
+# ~127 nodes and ~1,300 requests whose rows are all discarded. Sized off the
+# live archive, whose busiest 90-day window holds 9,122 documents; a quarter
+# that does exceed the cap is still split recursively by ``_fetch_window``.
 MAX_WINDOW_DAYS = 90
 
 # FR's oldest documents. A full backfill with no prior table walks from here.
@@ -186,4 +188,7 @@ class FederalRegisterReader(Reader):
                 backoff = min(2**attempt, 30)
                 logger.warning("FR: {} (attempt {}/{}), retrying in {}s", exc, attempt, _MAX_RETRIES, backoff)
                 time.sleep(backoff)
-        raise AssertionError("unreachable")
+        # Only reached if the retry budget is non-positive; ``_get`` must never
+        # fall through to an implicit None, which pagination would read as an
+        # empty final page and publish as a complete window.
+        raise RuntimeError(f"Federal Register retry budget _MAX_RETRIES={_MAX_RETRIES} makes no request: {url}")
