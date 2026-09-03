@@ -119,7 +119,6 @@ def test_the_en_dash_in_a_uslm_section_identifier_is_straightened():
     # the bytes it was read from.
     assert credit.usc_identifier == "/us/usc/t16/s824s–1"
     assert normalize_usc_section("824s–1") == "824s-1"
-    assert USLM_SECTION_DASH_RULE == "straighten-uslm-en-dash-to-hyphen-v1"
 
 
 def test_a_credit_outside_any_usc_section_is_quarantined_not_dropped():
@@ -185,16 +184,38 @@ def test_the_page_belongs_to_the_citation_it_follows():
     assert {(c.act_section, c.statutes_at_large_page) for c in scan.credits} == {("107", "3048"), ("303", "5339")}
 
 
-def test_the_strict_rule_is_a_named_constant():
+def test_a_credit_after_a_nested_section_belongs_to_the_section_containing_it():
+    """The module's stated reason for walking the tree rather than scanning it.
+
+    The outer section's credit follows the inner section's close tag, so its
+    nearest *preceding* section identifier is the inner one while its nearest
+    *ancestor* is the outer one. Only the ancestor is the fact.
+    """
+    document = _document(
+        """<section identifier="/us/usc/t26/s100"><num value="100">§ 100.</num>
+<section identifier="/us/usc/t26/s100A"><num value="100A">§ 100A.</num>
+<sourceCredit>(Added <ref href="/us/pl/117/328/dT/tIII/s303">Pub. L. 117–328, div. T, title III, § 303</ref>, <ref href="/us/stat/136/5339">136 Stat. 5339</ref>.)</sourceCredit>
+</section>
+<sourceCredit>(Added <ref href="/us/pl/116/260/dEE/tI/s107">Pub. L. 116–260, div. EE, title I, § 107</ref>, <ref href="/us/stat/134/3048">134 Stat. 3048</ref>.)</sourceCredit>
+</section>"""
+    )
+    scan = scan_source_credits(document)
+
+    assert {(c.act_section, c.usc_section) for c in scan.credits} == {("303", "100A"), ("107", "100")}
+    assert scan.quarantine == []
+
+
+def test_the_pinned_rules_are_named_constants():
+    """Both ids are written into the artifact receipt; a silent bump is the risk."""
     assert STRICT_ENACTMENT_RULE == "added-or-as-added-pub-law-division-act-section-v1"
+    assert USLM_SECTION_DASH_RULE == "straighten-uslm-en-dash-to-hyphen-v1"
 
 
-@pytest.mark.parametrize(
-    ("congress", "law", "expected"),
-    [(119, 102, "https://uscode.house.gov/download/releasepoints/us/pl/119/102/xml_uscAll@119-102.zip")],
-)
-def test_the_release_point_url_is_derived_from_the_release_point(congress, law, expected):
-    assert uslm_release_url(f"{congress}-{law}") == expected
+def test_the_release_point_url_is_derived_from_the_release_point():
+    assert (
+        uslm_release_url("119-102")
+        == "https://uscode.house.gov/download/releasepoints/us/pl/119/102/xml_uscAll@119-102.zip"
+    )
 
 
 def test_a_release_point_of_the_wrong_shape_is_refused():

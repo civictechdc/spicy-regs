@@ -37,7 +37,7 @@ Outputs, all deterministic and byte-identical across rebuilds from one archive:
 
 Usage::
 
-    uv run python tools/build_usc_source_credit_artifact.py \\
+    uv run python scripts/build_usc_source_credit_artifact.py \\
         --output output/usc-source-credit-index-2026-08-02 \\
         --archive /tmp/uscall.zip \\
         --release-point 119-102
@@ -57,16 +57,15 @@ from typing import Any
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT / "src"))
-
-from spicy_regs.sources.uscode_uslm import (  # noqa: E402
+from spicy_regs.sources.uscode_uslm import (
     QUARANTINE_REASONS,
     STRICT_ENACTMENT_RULE,
     USLM_SECTION_DASH_RULE,
     scan_release_zip,
     uslm_release_url,
 )
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 ARTIFACT_SCHEMA_VERSION = "usc-source-credit-artifact-v1"
 
