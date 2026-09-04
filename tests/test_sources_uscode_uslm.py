@@ -134,7 +134,7 @@ def test_a_credit_outside_any_usc_section_is_quarantined_not_dropped():
     (quarantined,) = scan.quarantine
     assert quarantined.reason == "credit_outside_usc_section"
     assert (quarantined.public_law, quarantined.division, quarantined.act_section) == ("116-260", "EE", "107")
-    assert scan.credits_outside_a_section == 1
+    assert scan.strict_matches_outside_a_section == 1
 
 
 def test_a_section_identifier_the_usc_shape_cannot_spell_is_quarantined():

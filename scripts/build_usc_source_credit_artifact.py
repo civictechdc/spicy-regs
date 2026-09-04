@@ -195,7 +195,7 @@ def build(output_dir: Path, *, archive: Path, release_point: str) -> dict:
             "titles": len(members),
             "source_credits_scanned": scan.credits_scanned,
             "credits_naming_a_division": scan.credits_naming_a_division,
-            "credits_outside_a_section": scan.credits_outside_a_section,
+            "strict_matches_outside_a_section": scan.strict_matches_outside_a_section,
             "strict_matches": scan.strict_matches,
             "triples": len(targets),
             "unambiguous_triples": sum(1 for v in targets.values() if len(v) == 1),

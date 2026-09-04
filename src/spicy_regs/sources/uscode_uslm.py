@@ -181,19 +181,17 @@ class CreditScan:
     """One USLM title's credits, its quarantine, and the four counts it keeps.
 
     ``credits_scanned`` and ``credits_naming_a_division`` count credits.
-    ``strict_matches`` and ``credits_outside_a_section`` count *matches* of
-    :data:`STRICT_ENACTMENT_RULE`, the second only those sitting under no
-    ``<section>``. So ``credits_outside_a_section`` reads 0 on release point
-    119-102, where 549 credits do sit outside a section and none of them
-    matches the strict rule. The name is a key in a sealed receipt; read it as
-    "strict matches outside a section".
+    ``strict_matches`` and ``strict_matches_outside_a_section`` count matches
+    of :data:`STRICT_ENACTMENT_RULE`, the second only those under no
+    ``<section>``. On release point 119-102 that second count is 0: 549
+    credits sit outside a section, and none matches the strict rule.
     """
 
     credits: list[SourceCredit] = field(default_factory=list)
     quarantine: list[QuarantinedCredit] = field(default_factory=list)
     credits_scanned: int = 0
     credits_naming_a_division: int = 0
-    credits_outside_a_section: int = 0
+    strict_matches_outside_a_section: int = 0
     strict_matches: int = 0
 
     def merge(self, other: CreditScan) -> CreditScan:
@@ -202,7 +200,8 @@ class CreditScan:
             quarantine=self.quarantine + other.quarantine,
             credits_scanned=self.credits_scanned + other.credits_scanned,
             credits_naming_a_division=self.credits_naming_a_division + other.credits_naming_a_division,
-            credits_outside_a_section=self.credits_outside_a_section + other.credits_outside_a_section,
+            strict_matches_outside_a_section=self.strict_matches_outside_a_section
+            + other.strict_matches_outside_a_section,
             strict_matches=self.strict_matches + other.strict_matches,
         )
 
@@ -307,7 +306,7 @@ def scan_source_credits(document: bytes | str) -> CreditScan:
         quarantine=quarantine,
         credits_scanned=scanned,
         credits_naming_a_division=naming_a_division,
-        credits_outside_a_section=outside,
+        strict_matches_outside_a_section=outside,
         strict_matches=strict_matches,
     )
 
