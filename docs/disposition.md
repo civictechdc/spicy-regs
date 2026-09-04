@@ -2,7 +2,11 @@
 
 Written 2026-09-04. One record of what the program built, what each piece gives
 a user of the platform, and where each piece now lives. Decisions were taken
-2026-09-04 by the platform owner; this document records them.
+2026-09-04 by the platform owner; this document records them. Two were revised
+the same afternoon and are recorded as revised: the table publisher's home is
+spicy-docs, not spicy-regs, and the document-AI orchestration's home is not yet
+ruled. Three of the spicy-regs pieces have since shipped; the *Order of work*
+section says where.
 
 Every claim below was checked against a pinned commit, not read from a
 document. The pins:
@@ -59,8 +63,10 @@ four earlier snapshots whose tip trees are copies of one or the other:
 `bc8f534`, `feat/rkaf-boundary-freeze` `a8938b4`. Everything has a remote.
 
 Fifteen `src/` files exist on both branches with different content. Two matter:
-`sources/supreme_court_opinions.py` and `transforms/build_supreme_court_opinions.py`,
-when the courts PR is cut. The rest belong to pieces that ship from one branch
+`sources/supreme_court_opinions.py` and `transforms/build_supreme_court_opinions.py`.
+The `8d9e7a2` versions are the fuller ones — `9a79569` stripped the measured
+403 rate-limit guard and the bound-volume page-range logic — so `8d9e7a2` is
+the branch to cut from. The rest belong to pieces that ship from one branch
 only.
 
 Neither branch has PRs #181, #182, or #183. Both carry the earlier
@@ -73,7 +79,8 @@ corrected versions are on their own branches, and the PRs below cut from
 Each of these becomes one PR cut from `integrate/payload-prereqs` (or
 `archive/landing-final` where noted) onto `origin/main`, with the same
 treatment as #181: rebase, gate through `uv run`, validate against real data,
-one-paragraph description. In this order.
+one-paragraph description. Items 1–3 shipped on 2026-09-04 as PRs #194, #195,
+#196 — open on civictechdc, merged on the fork; see *Order of work*.
 
 ### 1. The rulemaking join surface
 
@@ -95,12 +102,19 @@ This is the product the platform was built to be.
 
 ### 2. Courts
 
-`sources/courtlistener_bulk.py`, `transforms/build_court_opinion_bodies.py`
-(356 lines), `build_court_opinion_clusters.py` (410), `court_scope.py` (348),
-`pipelines/court_opinion_{bodies,clusters}.py`, `sources/supreme_court_opinions.py`,
-`transforms/build_supreme_court_opinions.py`, `pipelines/supreme_court_opinions.py`,
-`transforms/pdf_text_pymupdf.py` (171). Ten files, about 2,000 lines, on
-`integrate`. A real run exists: `output/court-data-2026-08-22/`, 5.7 GB.
+Two sub-clusters, on `integrate`. **CourtListener** — `sources/courtlistener_bulk.py`,
+`transforms/build_court_opinion_bodies.py` (356 lines),
+`build_court_opinion_clusters.py` (410), `court_scope.py` (348),
+`pipelines/rollups/court_opinion_{bodies,clusters}.py`,
+`scripts/backfill_cluster_court_scope.py`, plus 84 additive lines in
+`sources/courtlistener.py`. Shipped as PR #195. **Supreme Court** —
+`sources/supreme_court_opinions.py`, `transforms/build_supreme_court_opinions.py`,
+`pipelines/rollups/supreme_court_opinions.py` — held back: its source imports
+`bs4`, which `origin/main` does not carry and no other source uses, so that
+dependency is a separate PR and a separate decision. `transforms/pdf_text_pymupdf.py`
+is not courts at all: it is imported by `docpipeline/source.py`, and it is
+AGPL; it goes with the document-AI producer, where the licence choice is made
+explicitly. A real run exists: `output/court-data-2026-08-22/`, 5.7 GB.
 
 **What a user gets.** Court opinions cite statutes, not CFR parts, so a user
 asking "which cases touch this rule" gets nothing today. These pipelines bring
@@ -127,21 +141,7 @@ statute citation.
 
 Ships whole, same reasoning as courts.
 
-### 4. The table publisher
-
-`public_table.py`, `public_table_profiles.py`, `publication.py`. 1,230 lines
-on `integrate`.
-
-**What a user gets.** Everything a user touches — the Parquet files at
-`data.spicy-regs.dev`, the MCP server, the app — is a table something built.
-Today that something is 21 hand-written scrapers. This is the path that builds
-the same tables from verified, digest-pinned source-native releases instead: an
-admitted release goes in, faithful Parquet/DuckDB/Iceberg views come out, and
-the provenance of every row is the release it came from. spicy-docs' supply
-rule already treats these tables as its first rung of acquisition and captures
-them; this is what makes them.
-
-### 5. The document-AI producer
+### 4. The document-AI producer
 
 `docpipeline/rkaf_projection.py` (3,124 lines), `docpipeline/{extraction,runtime,tag_task,relation_task,executor}.py`,
 `docpipeline/adapters/` (Anthropic, OpenAI, OpenAI-compatible, Codex CLI,
@@ -171,9 +171,27 @@ they must trust.
 
 Rulespec's own spec (`spec/rulespec-releases.md` §7, 2026-08-04) recorded
 these duties as parked with no owner and assigned the decision to the platform
-owner. Decided 2026-09-04: spicy-regs owns them. One line changes on the way
-in — `rkaf_projection.py:2334` imports `refspec` directly; it takes a vendored
-wheel instead, the pattern spicysearch uses.
+owner. Decided 2026-09-04, then refined the same afternoon into a split, from
+an AST map of `rkaf_projection.py`:
+
+- **The deterministic layer, about 2,400 lines** — `assemble` (476),
+  `verify_candidate_rows` (191), `_federal_register_facts` (204),
+  `_unified_agenda_facts` (91), `verify_fragment`, `project_document`,
+  `load_artifact` — depends only on artifact identity, citation grammar,
+  attestations, and offset verification. It becomes
+  `rulespec/packages/rulespec-projection`: the format owner ships the reference
+  producer beside its verifier and fifteen conformance bundles. Its inputs turn
+  into a data contract — artifact identity from DocSpec's DocumentRelease 2.0,
+  IRIs from RefSpec's `iri_minting`, and the 286-line vocabulary loader's
+  `from refspec import` (line 2334, a cross-product import) becomes an ordinary
+  package dependency.
+- **The orchestration, 355 lines** — `_run_model_layer_with_vocabulary` is the
+  one function that calls the model, plus the six provider adapters,
+  `extraction`, `runtime`, `tag_task`, and `corpora/`. Its home is **not yet
+  ruled**. spicy-regs is the default; DocSpec is the alternative if
+  "interpretation lives in DocSpec" is meant strictly, because this layer emits
+  RKAF documents, not tables. Two lanes asked for an explicit ruling rather than
+  a default. Nothing is cut until it comes.
 
 ## Ships to spicy-docs
 
@@ -194,6 +212,51 @@ spicy-docs is the acquisition product — "spicy-docs gets; it does not
 interpret" — and already carries `source_domains.py`, the documented-vs-observed
 drift gate. Populations are the same kind of thing: acquisition metadata. It
 goes through spicy-docs' own intake, commit-never-push.
+
+### The table publisher
+
+`public_table.py` (1,000 lines), `public_table_profiles.py` (165),
+`publication.py` (65), and `tests/test_public_table.py`. Ruled 2026-09-04
+afternoon: **canonical home spicy-docs**, superseding the morning's assignment
+to spicy-regs.
+
+**What a user gets.** Everything a user touches — the Parquet files at
+`data.spicy-regs.dev`, the MCP server, the app — is a table something built.
+Today that something is 21 hand-written scrapers. This is the path that builds
+the same tables from verified, digest-pinned source-native releases instead: an
+admitted release goes in, faithful Parquet/DuckDB/Iceberg views come out, and
+the provenance of every row is the release it came from. Its own docstring
+draws the line — "Rulespec owns the artifact root, member manifests, digests,
+and admission; [the product] owns only the faithful flat source view" — and a
+faithful flat view is no interpretation.
+
+**Why spicy-docs.** `public_table_profiles.py` imports thirteen names from the
+source-native readers spicy-docs owns, and every one resolves at spicy-docs
+`9f8c7ee`; the publisher and `publication.py` import nineteen names from
+`rulespec_artifacts`, every one present in 1.0.11; the six release schemas are
+byte-identical between `8d9e7a2` and spicy-docs, so it reads what spicy-docs
+emits today. Its CLI entry, `spicy-regs-source-native`, is already spicy-docs'
+`source_native_cli.py`. `duckdb` is test-only — zero imports in the three
+modules, one in the test, proving the "DuckDB reads the declared members
+directly" claim; it stays a test dependency and the claim stays proven.
+
+**Provenance and the rule that keeps one implementation.** The four files
+exist on no live line — zero on `origin/main`, zero on `fork/main`, zero on
+`archive/landing-final`. They exist on eight refs, all history:
+`integrate/payload-prereqs` @ `8d9e7a2` on both civictechdc and the fork,
+`archive/integrate-payload-prereqs-pre-reorg`, `archive/pre-strip-2026-08-26`,
+`snapshots/pre-strip-2026-08-26`, and the fork's copies of those. spicy-docs
+copies from `8d9e7a2` and becomes the only implementation. **No spicy-regs
+branch re-cuts these modules.** There is nothing to delete and nothing to
+freeze on a live line; the archived branches are the record, not a rival.
+
+One thing for spicy-docs' supply-precedence rule, recorded where the rule
+lives: once spicy-docs both produces the public tables and captures them as its
+first rung, "capture the pinned upstream artifact" and "capture our own output"
+are the same operation for this one source. Benign — it is how every source is
+treated — but a rule that appears to defer to an upstream authority must say
+that here the upstream is itself, or it reads as corroboration when it is a
+self-reference.
 
 ## Ships to RefSpec
 
@@ -280,23 +343,39 @@ layout.
 
 ## Order of work
 
-1. Tell Eugene. Six PRs from a collaborator he has not heard from in five days
-   now sit in his repo, one of them this document.
-2. Merge #183 (changes no row of live data), then #181 (stops a full rebuild
-   publishing 1% of the Federal Register as complete), watch one nightly, then
-   #182 (stops a half-finished publish from retiring work it never uploaded).
-3. Reset local `main` to `origin/main`. The archived `main` is
-   `archive/landing-final` on the fork.
-4. PRs to spicy-regs in the order above: join surface, courts, bills, table
-   publisher, document-AI with corpora.
-5. Document populations to spicy-docs through its intake.
+1. Tell Eugene. Seven PRs from a collaborator he has not heard from in five
+   days now sit in his repo, one of them this document.
+2. **Done 2026-09-04, on the fork and the local checkout only.** By the
+   platform owner's ruling the seven PRs stay open on civictechdc and were
+   merged onto `fork/main` and local `main` as merge commits, each gated
+   through `uv run` before the next:
+   `1918409` #181 (639 passed) → `1374f90` #182 (645) → `64aa35d` #183 (657)
+   → `abd229f` #193 (657) → `a3dc1b6` #194 (941) → `4b041c0` #195 (979)
+   → `765815a` #196 (1,005 passed, 3 deselected; baseline 634).
+   `fork/main` = local `main` = `765815a`; `origin/main` untouched at `1f02a7f`.
+3. **Done.** Local `main` was reset to `origin/main` before the merges; the
+   archived `main` is `archive/landing-final` on the fork at `9a79569`.
+4. PRs to spicy-regs: join surface (#194), CourtListener (#195), bill subjects
+   (#196) — **done**, each validated against live data before opening. The
+   Supreme Court sub-cluster waits on the `bs4` decision. The document-AI
+   producer waits on the orchestration ruling above.
+5. The table publisher to spicy-docs through its intake (ruled afternoon
+   2026-09-04; see *Ships to spicy-docs*). Document populations likewise.
 6. The publish gate to RefSpec as a local commit; the minter to whoever holds
    `iri_minting.py`.
-7. Delete `integrate/payload-prereqs` from civictechdc once step 4 has cut from
-   it. It stays on the fork at `8d9e7a2`.
-8. Remove the worktrees for closed PRs; delete the local branches that are on
-   the fork. What remains: one checkout tracking `origin/main`, a worktree per
-   open PR.
+7. Delete the `integrate/payload-prereqs` branch from civictechdc once
+   spicy-docs has landed its copy of the publisher. A branch delete on another
+   owner's remote, reversible from the fork at `8d9e7a2`; the platform owner's
+   call. A file-deletion PR is not the shape: `origin/main` has none of the
+   files.
+8. Register the eight new tables — five from #194, two from #195, one from
+   #196 — in the data dictionary and MCP server as one follow-up PR, the way
+   #175 exposed the lifecycle rollups after they existed. The first
+   `materialize-rulemaking` run needs `--allow-bootstrap` via
+   `workflow_dispatch`.
+9. Remove the worktrees for merged and closed PRs; delete the local branches
+   that are on the fork. What remains: one checkout tracking `origin/main`, a
+   worktree per open PR.
 
 ## Supersedes
 
