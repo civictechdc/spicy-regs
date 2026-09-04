@@ -56,7 +56,6 @@ from spicy_regs.sources.bill_subjects import (
     BillSubjects,
     BillSubjectsFetcher,
     FetchCounts,
-    FetchCounts,
 )
 
 OUTPUT = "bill_subjects.parquet"
