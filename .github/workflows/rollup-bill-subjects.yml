@@ -1,0 +1,26 @@
+name: Rollup — bill_subjects
+on:
+  schedule:
+    # 21:15 UTC — one hour after the congress_bills ingest, so each enrichment
+    # run walks a bill table that has already been refreshed.
+    - cron: '15 21 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+      max_bills:
+        description: "Bills to enrich this run; blank uses the carrier's own cap (5000 keyless, 2000 keyed)"
+        required: false
+        default: ''
+        type: string
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-bill-subjects
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}
+      bill_subjects_max: ${{ inputs.max_bills || '' }}
