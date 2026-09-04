@@ -1,9 +1,8 @@
-# Disposition of the archived spicy-regs work
+# Disposition of the July–August research program
 
-Written 2026-09-04. One record of where every piece of the July–August 2026
-research program now lives, what replaced it, and what still needs a home. It
-replaces three earlier documents that disagreed with each other and with the
-code; see *Supersedes*.
+Written 2026-09-04. One record of what the program built, what each piece gives
+a user of the platform, and where each piece now lives. Decisions were taken
+2026-09-04 by the platform owner; this document records them.
 
 Every claim below was checked against a pinned commit, not read from a
 document. The pins:
@@ -19,164 +18,306 @@ document. The pins:
 | RefSpec | `main` | `da4fe055` |
 | rulespec | `main` | `a87d839` |
 
-## Where the work is
+## What the program was
 
-Two branches carry all the content. They forked from `origin/main` at
-`01ecbef` (2026-08-19) and were cut one day apart from the same program.
-Neither removes anything from upstream; the nine files they "lack" are what
-upstream added after the fork (`org_committee_links`, `seed_dockets_catalog`,
-`check_purge_credential`).
+Between 2026-07-23 and 2026-08-29 a document-AI research program ran on this
+repository: read federal documents, segment them, tag what they are about,
+extract how rules relate, and publish the result in a portable graph format
+that other products can consume. It measured everything it did — 202 evidence
+files, 20 design specs, 14 notebooks — and it left behind about 270,000 lines
+across two branches.
+
+Users of the platform ask four kinds of question this program answers:
+
+- *Follow one rule* — from the Unified Agenda through its docket, CFR parts,
+  RIN, comment periods, and final rule, across the four identifier systems the
+  government uses for it.
+- *What is this document about* — in words no 1995 thesaurus anticipated.
+- *Which cases touch this rule* — court opinions cite statutes, not CFR parts,
+  and nothing joined them.
+- *Is this all of them* — whether a result set is complete or the platform
+  never fetched the rest.
+
+The sections below say which piece answers which question and where it ships.
+
+## Where the work lives
+
+Two branches carry the content. They forked from `origin/main` at `01ecbef`
+(2026-08-19) and were cut one day apart from the same program. Neither removes
+anything from upstream; the nine files they lack are what upstream added after
+the fork.
 
 | branch | commit | date | vs `origin/main` | holds |
 |---|---|---|---|---|
+| `integrate/payload-prereqs` | `8d9e7a2` | 2026-08-28 | +649 files | the shared core plus source-native, courts, bills, the table publisher |
 | `archive/landing-final` | `9a79569` | 2026-08-29 | +609 files | the shared core plus `source_catalog/`, `universes/` |
-| `integrate/payload-prereqs` | `8d9e7a2` | 2026-08-28 | +649 files | the shared core plus source-native, courts, bills, `public_table` |
 
-Both are on `github.com/mikewolfd/spicy-regs` (a fork; remote `fork`), with
-four older snapshots whose tip trees are copies of one or the other:
+Both are on `github.com/mikewolfd/spicy-regs` (a fork; remote `fork`) with
+four earlier snapshots whose tip trees are copies of one or the other:
 `archive/landing-main-pre-reorg` `31a4bfe`, `archive/integrate-payload-prereqs-pre-reorg`
 `a6ab98a`, `archive/pre-strip-2026-08-26` `57d46bf`, `backup/pre-marker-fix`
-`bc8f534`, `feat/rkaf-boundary-freeze` `a8938b4`. Nothing is single-disk.
+`bc8f534`, `feat/rkaf-boundary-freeze` `a8938b4`. Everything has a remote.
 
-Fifteen `src/` files exist on both branches with different content. Only two
-matter after the dispositions below — `sources/supreme_court_opinions.py` and
-`transforms/build_supreme_court_opinions.py` — and only when the courts PR is
-cut. The rest belong to buckets that drop.
+Fifteen `src/` files exist on both branches with different content. Two matter:
+`sources/supreme_court_opinions.py` and `transforms/build_supreme_court_opinions.py`,
+when the courts PR is cut. The rest belong to pieces that ship from one branch
+only.
 
-Neither branch has PRs #181, #182, or #183. Both carry the pre-fix
-`uscode_uslm.py` (no memory bound) and `integrate` carries the pre-fix
-`source_domains.py` (fabricated publisher URL). Landing `integrate` wholesale
-would reintroduce both.
+Neither branch has PRs #181, #182, or #183. Both carry the earlier
+`uscode_uslm.py` and `integrate` carries the earlier `source_domains.py`; the
+corrected versions are on their own branches, and the PRs below cut from
+`integrate` by file, never wholesale.
 
-## Dispositions
+## Ships to spicy-regs
 
-**Drop** means: the code stays on the fork, nothing is ported, and the check
-in the last column is the reason. **PR** means cut a branch from
-`integrate/payload-prereqs` onto `origin/main` and treat it like #181 — rebase,
-gate through `uv run`, validate against real data, one-paragraph description.
-**Port** means the work belongs in another repo and goes through that repo's
-own intake.
+Each of these becomes one PR cut from `integrate/payload-prereqs` (or
+`archive/landing-final` where noted) onto `origin/main`, with the same
+treatment as #181: rebase, gate through `uv run`, validate against real data,
+one-paragraph description. In this order.
 
-### A. Already re-homed — drop
+### 1. The rulemaking join surface
 
-| bucket | branch | files | replaced by | check |
-|---|---|---|---|---|
-| `source_native*.py`, `schemas/source_native_release/1.0/` | integrate | 22 | spicy-docs `src/spicy_docs/source_native.py` and siblings, shipped `70a5b16` 2026-08-29 | integrate's copy is byte-identical to `ff8d202`, the extraction point; zero commits touched it since |
-| `sources/uscode_uslm.py`, `uscode_olrc.py` | both | 2 | RefSpec `tools/build_usc_source_credits.py` (`5b8f4d8b`), `registry/act_resolution.py` | both copies got the `element.clear()` memory bound independently: spicy-regs `5ecfd5a`, RefSpec `93d244a3` |
-| `ontology/citations.py` | both | 1 | RefSpec `registry/iri_minting.py` (`582461fe`) — seven minters, 1,570 test lines | one minter did not travel; see D |
-| `ontology/act_index.py` | both | 1 | RefSpec `registry/act_resolution.py`, which names it as provenance | — |
-| `transforms/build_authority_edges.py` | both | 1 | RefSpec `registry/unified_agenda_parquet.py` | — |
-| `document_release.py` (M1) | both | 1 | DocSpec `tests/fixtures/document_release_v2{,_docspec}/` (`bdab0b8`, 2026-08-30) — 49 sealed cases, FR-2026-03227 included | — |
-| `document_release_v3*.py` (6) and `fixtures/releases/` (56) | both | 77 | DocSpec DocumentRelease 2.0: `src/docspec/schemas/document_release/2.0/`, `adapters/document_release_verify.py`, ADR `docs/decisions/0001-document-release-2-0.md`, three mint receipts | the two directories are one bucket; earlier counts listed them twice |
-| `docpipeline/source.py`, `segments.py` | both | 2 | DocSpec `processing/bounded_segmentation.py`, `retention_floors.py` (`be3c865`, `9bcc9ba`, 2026-08-30) | DocSpec addresses UTF-8 bytes; spicy-regs addressed codepoints. Region ids do not compare equal across the two. |
-| `sources/source_domains.py` | integrate | 1 | archived on `feat/source-domain-drift-gate-revived` `f8e9e35` (PR #192, closed) | the archived copy has the corrected publisher URL; integrate's does not |
-| `enrichment/accepted_output.py` | landing-final | 1 | nothing | imports `refspec.accepted_output`, which RefSpec no longer provides (`9a79569` commit message says so) |
-| `enrichment/managed_release.py` | landing-final | 1 | RefSpec `src/refspec/managed_release.py` (2,638 lines) — this was a consumer wrapper over it | — |
+`transforms/build_rule_targets.py`, `build_proceedings.py`,
+`build_regulatory_agenda.py`, `build_comment_periods.py`, with `published.py`
+and `pipelines/materialized.py` that serve their tables. On both branches.
 
-### B. Unowned — PR to spicy-regs
+**What a user gets.** Today the platform pairs a proposed rule with its final
+rule (`rulemaking_lifecycles`) and links Federal Register documents to dockets
+(`fr_docket_links`). It cannot follow one rule end to end, because a rule is a
+RIN on reginfo, a docket on regulations.gov, a set of CFR parts in the Code, and
+a document number in the Register, and nothing joins the four. These transforms
+build that spine — docket ↔ CFR ↔ RIN — then promote each rulemaking to a
+first-class proceeding with its actions, link agenda items to those actions,
+and materialize every comment period including reopenings. A user follows one
+rule from agenda to final under every name the government gives it.
 
-Absent from DocSpec, spicysearch, and spicy-docs at the pinned commits. Each
-was grepped in all three.
+This is the product the platform was built to be.
 
-| bucket | files | lines | why it matters | what downstream has instead |
-|---|---|---|---|---|
-| `sources/document_populations.py`, `sample-data/document-populations/` | 2 + 7 captures | 468 | the coverage denominator. Its docstring: "you cannot state what a run missed without a publisher-issued enumeration to miss it against." Digest-pinned captures of CBO, FCC ECFS, GovInfo PREMIS; refuses a bot-challenge body rather than yield an empty population. **No consumer anywhere.** | nothing |
-| `public_table.py`, `public_table_profiles.py`, `publication.py` | 3 | 1,230 | the Parquet/DuckDB/Iceberg **producer**. The 2026-08-27 sweep ruled the public-view path "not safe to abandon." | spicy-docs has a **consumer** (`spicy_regs_public_tables_source_native.py`) whose supply-precedence ruling assumes these tables keep existing. No producer. |
-| courts: `sources/courtlistener_bulk.py`, `transforms/build_court_opinion_{bodies,clusters}.py`, `court_scope.py`, `pipelines/court_opinion_{bodies,clusters}.py`, `sources/supreme_court_opinions.py`, `transforms/build_supreme_court_opinions.py`, `pipelines/supreme_court_opinions.py`, `transforms/pdf_text_pymupdf.py` | 10 | ~2,000 | rollup pipelines that emit parquet. A real run exists: `output/court-data-2026-08-22/`, 5.7 GB. | spicysearch consumes pinned court parquet and tags it (`derived_topic_passes/postings.py`); no fetcher, no PyMuPDF dependency. spicy-docs took `courtlistener_bulk.py` as a reader (`9c75f0b`) and built nothing on it. DocSpec: zero hits. |
-| `sources/bill_subjects.py`, `transforms/enrich_bill_subjects.py`, `pipelines/bill_subjects.py` | 3 | 722 | wired with a cron entry point and workflow | nothing |
+### 2. Courts
 
-When cutting the courts PR, diff `sources/supreme_court_opinions.py` and
-`transforms/build_supreme_court_opinions.py` between `8d9e7a2` and `9a79569`
-first; they differ.
+`sources/courtlistener_bulk.py`, `transforms/build_court_opinion_bodies.py`
+(356 lines), `build_court_opinion_clusters.py` (410), `court_scope.py` (348),
+`pipelines/court_opinion_{bodies,clusters}.py`, `sources/supreme_court_opinions.py`,
+`transforms/build_supreme_court_opinions.py`, `pipelines/supreme_court_opinions.py`,
+`transforms/pdf_text_pymupdf.py` (171). Ten files, about 2,000 lines, on
+`integrate`. A real run exists: `output/court-data-2026-08-22/`, 5.7 GB.
 
-### C. Refused on the record — drop
+**What a user gets.** Court opinions cite statutes, not CFR parts, so a user
+asking "which cases touch this rule" gets nothing today. These pipelines bring
+CourtListener's bulk dumps and the Supreme Court's own opinion PDFs into the
+same tables as everything else — opinion text, cluster identity, and the court
+that decided (which the cluster dump omits) — so the U.S.C. bridge can join
+litigation to rulemaking. spicysearch already tags court opinions it is handed
+as pinned parquet; this is what produces that parquet.
 
-| bucket | files | lines | who refused, where |
-|---|---|---|---|
-| `docpipeline/{extraction,runtime,tag_task,relation_task,executor}.py`, `docpipeline/adapters/` (Anthropic, OpenAI, OpenAI-compatible, Codex CLI, Docling, sentence-transformers) | 11 | — | rulespec `spec/rulespec-releases.md:340-361` §7 parks approval, selection, and baseline-validation execution with no owner and rejects the inference that the Extrapolator inherits them. `docs/decisions.md:170-175` (ADR 2026-08-02): "no producer of an `ExtrapolationRelease` outside the fixture path … do not implement." |
-| `docpipeline/retrieval.py` | 1 | 5,479 | spicysearch reimplemented it as three lanes plus one optional (`src/spicysearch/search_application.py`, `POST /v1/search`). The interface the manifest named, `search_documents` / `SearchResultSet`, has zero hits in spicysearch source. |
-| `ontology/concepts.py`, `concept_dimensions.py`, `transforms/build_concept{s,_assignments,_events}.py` | 5 | — | RefSpec REF-053 (2026-08-31): "Open-vocabulary concept lifecycle stays unported — no owner, no consumer, no check." |
-| `candidate_release.py` | 1 | — | reads `ATLAS_FORMAT = "refspec-vocabulary-atlas-nquads-1.0"` (line 24). RefSpec retired Atlas 1.0 and 2.0 at `5c6d889a`, 2026-08-09. No producer of that format exists. |
-| `docpipeline/rkaf_projection.py` | 1 | 3,124 | rulespec's refusal above. Also: `from refspec import` at line 2334 violates spicysearch `docs/decisions/0001-four-product-boundary.md:56-57`; its `RulespecCoreRelease` pin `urn:rulespec:core:5ac6ba59…` was re-keyed by rulespec `8bce779` on 2026-08-11. The largest single module in this group. |
-| `feat/rkaf-boundary-freeze` fixture schemas | 26 | — | a superseded v3 fixture layout; nothing references them by name; `9a79569`'s 645 tests pass without them |
+Ships whole. The 21 tables on `origin/main` each keep their fetch beside their
+transform; courts follows the same shape.
 
-### D. Genuine gaps — port
+### 3. Bill subjects
 
-| bucket | lines | to | why |
-|---|---|---|---|
-| `ontology/rulespec_release.py` | 178 | RefSpec | an executable publish gate that recomputes the L0 contract digest from the tagged rulespec archive and refuses on mismatch. RefSpec's pin is verified only against its own `RULESPEC_DEPENDENCY_SHA256`; `profiles/rulespec-dependency.json` says `releaseAvailability: localUnpublished`; `vendor/README.md` calls rc18 a provisional pin from an unmerged branch. |
-| `canonical_usc_chapter_iri` and its lowercase-suffix rule (`citations.py:404-418`) | ~15 | RefSpec `iri_minting.py` | the one URN producer of eight that the port left behind |
-| `ontology/attestations.py` | — | RefSpec, when REF-058 reopens | RefSpec considered and deferred `rkaf:Attestation` alignment. Hold on the fork until then. |
+`sources/bill_subjects.py`, `transforms/enrich_bill_subjects.py`,
+`pipelines/bill_subjects.py`. 722 lines on `integrate`, already wired with a
+cron entry point and workflow.
 
-### E. No owner, no refusal — decision pending
+**What a user gets.** Every bill carries a CRS policy area and legislative
+subjects that Congress.gov assigns. With them in the tables, a user filters
+bills by topic and relates bills to rules by subject — the first link between
+the legislative and regulatory halves of the corpus that does not go through a
+statute citation.
 
-Nothing downstream took these and nothing on the record rules them out. The
-call is between dropping them with the evidence preserved on the fork, or
-holding them as gaps to fill.
+Ships whole, same reasoning as courts.
 
-| bucket | files | note |
+### 4. The table publisher
+
+`public_table.py`, `public_table_profiles.py`, `publication.py`. 1,230 lines
+on `integrate`.
+
+**What a user gets.** Everything a user touches — the Parquet files at
+`data.spicy-regs.dev`, the MCP server, the app — is a table something built.
+Today that something is 21 hand-written scrapers. This is the path that builds
+the same tables from verified, digest-pinned source-native releases instead: an
+admitted release goes in, faithful Parquet/DuckDB/Iceberg views come out, and
+the provenance of every row is the release it came from. spicy-docs' supply
+rule already treats these tables as its first rung of acquisition and captures
+them; this is what makes them.
+
+### 5. The document-AI producer
+
+`docpipeline/rkaf_projection.py` (3,124 lines), `docpipeline/{extraction,runtime,tag_task,relation_task,executor}.py`,
+`docpipeline/adapters/` (Anthropic, OpenAI, OpenAI-compatible, Codex CLI,
+Docling, sentence-transformers), and `corpora/` (16 modules) with
+`evaluation_boundary.py` as their test bench. On both branches.
+
+**What a user gets.** Two things no product provides today.
+
+*What is this document about.* Search knows the Federal Register Thesaurus
+(last revised 1995) and RefSpec's curated vocabularies. A document about a
+topic no curator anticipated is invisible to a topic query. This pipeline reads
+the document with a model, tags what it is about in open language, and extracts
+how it relates to other rules — with identity minted deterministically and
+every claim bound to an exact span of source text the model cannot alter.
+
+*A format other products can read.* The result is written as Rulespec RKAF
+JSON-LD. Seven production modules across rulespec, RefSpec, and spicysearch
+already read that format; this module is the only thing that writes it from a
+real document. Without a producer, the platform's portable, validated graph is
+a schema with no instances.
+
+`corpora/` ships with it: six console scripts run the segmentation and
+relation-extraction experiments whose numbers appear in the evidence, and
+`evaluation_boundary.py` freezes the train/holdout split so every accuracy
+claim can be re-run. A quality number a user can check is worth more than one
+they must trust.
+
+Rulespec's own spec (`spec/rulespec-releases.md` §7, 2026-08-04) recorded
+these duties as parked with no owner and assigned the decision to the platform
+owner. Decided 2026-09-04: spicy-regs owns them. One line changes on the way
+in — `rkaf_projection.py:2334` imports `refspec` directly; it takes a vendored
+wheel instead, the pattern spicysearch uses.
+
+## Ships to spicy-docs
+
+### Publisher-issued document populations
+
+`sources/document_populations.py` (468 lines) and seven digest-pinned captures
+under `sample-data/document-populations/` — CBO's cost-estimate feed, FCC ECFS
+filing pages, GovInfo PREMIS records. On `integrate`.
+
+**What a user gets.** When a query returns 412 CBO cost estimates, the user
+cannot tell today whether that is all of them. This captures what the publisher
+itself says exists, so the platform answers "412 of 415" and can distinguish
+"there are no more" from "we never fetched the rest." The parsers refuse a
+bot-challenge page rather than report an empty population, so a blocked fetch
+never reads as a complete one.
+
+spicy-docs is the acquisition product — "spicy-docs gets; it does not
+interpret" — and already carries `source_domains.py`, the documented-vs-observed
+drift gate. Populations are the same kind of thing: acquisition metadata. It
+goes through spicy-docs' own intake, commit-never-push.
+
+## Ships to RefSpec
+
+### The rulespec publish gate
+
+`ontology/rulespec_release.py` (178 lines). On both branches.
+
+**What a user gets.** Confidence that what RefSpec publishes was checked
+against the rulespec release it claims to depend on. Today RefSpec verifies its
+pin against its own recorded digest — proof the note did not change, not proof
+the note is true — and its `profiles/rulespec-dependency.json` says
+`localUnpublished`. This gate recomputes the L0 contract digest from the tagged
+rulespec archive and refuses to publish on mismatch.
+
+Committed to RefSpec, not pushed, once the current merge settles.
+
+### One missing minter
+
+`canonical_usc_chapter_iri` and its lowercase-suffix rule
+(`ontology/citations.py:404-418`). The 2026-08-31 port of the citation grammar
+into RefSpec's `iri_minting.py` carried seven of eight producers; this is the
+eighth.
+
+**What a user gets.** `26 U.S.C. chapter 13A` and `chapter 13a` resolve to the
+same place.
+
+Goes to whoever is editing `iri_minting.py`; it lives inside that file.
+
+## Already delivered elsewhere
+
+Users have these today through the product that maintains them. The
+spicy-regs copies stay on the fork as the record of where each started.
+
+| piece | where users get it now | what they get |
 |---|---|---|
-| `ontology/ann_index.py`, `candidate_channels.py` | 2 | RefSpec's ledger books them as spicysearch's. spicysearch has zero hits for usearch, hnsw, faiss, annoy, or `candidate_channels`. The older manifest's "inventoried-not-moved" was right. |
-| `corpora/` | 16 | six console scripts point into it. No document addresses it. |
-| `ontology/{ledger,invariants,receipt,relation_findings,evaluation,common,adapters,subjects,segmentation,checkpoint,llm,codex_cli}.py` | 12 | RefSpec ported one of five functions from `invariants.py` (`2b4960e1`). `ledger.py` is out of RefSpec's scope by REF-022. The rest are unaddressed. |
-| `evaluation_boundary.py`, `rulespec_testbed.py`, `evaluate_tag_quality.py`, `source_profiles.py`, `source_profile_artifacts*.py`, `published.py`, `document_file_pipeline.py`, `pipelines/{materialized,ontology_dataset}.py` | 10 | `published.py` reads the ontology tables at `data.spicy-regs.dev/materialized/ontology/latest.json`, which has returned 404 since at least 2026-08-27. The `materialize-ontology` workflow is not on `origin/main`. |
-| `transforms/{build_comment_periods,build_proceedings,build_regulatory_agenda,build_rule_targets}.py` | 4 | RefSpec's ledger assigns `build_rule_targets` to DocSpec's scope; DocSpec has nothing. |
-| `universes/` | 3 JSON | 600 lines of the archived `PLAN.md` describe them |
-| `docs/superpowers/specs/` (20), `docs/evidence/` (202), 12 of 14 notebooks | 234 | provenance for the decisions above. Stays on the fork either way. |
+| `source_native*.py`, `schemas/source_native_release/1.0/` (22 files) | spicy-docs `src/spicy_docs/source_native.py` and siblings, from `70a5b16` 2026-08-29; integrate's copy is the byte-identical ancestor at `ff8d202` | faithful, digest-pinned captures from the Federal Register, regulations.gov, GAO product pages, and CourtListener — GAO capture the original never had |
+| `sources/uscode_uslm.py`, `uscode_olrc.py` | RefSpec `tools/build_usc_source_credits.py` (`5b8f4d8b`), `registry/act_resolution.py` | from an act section to the U.S. Code section it created, with the division that public Table III lacks. Both copies gained the memory bound the same day: spicy-regs `5ecfd5a`, RefSpec `93d244a3` |
+| `ontology/citations.py` | RefSpec `registry/iri_minting.py` (`582461fe`) — seven minters, 1,570 test lines, contract-tested across four compiled forms | every CFR, U.S.C., RIN, Federal Register, and docket identifier resolves to one stable IRI |
+| `ontology/act_index.py` | RefSpec `registry/act_resolution.py`, which names it as its provenance | "section 107 of the X Act" resolves through two OLRC sources |
+| `transforms/build_authority_edges.py` | RefSpec `registry/unified_agenda_parquet.py` | Unified Agenda legal-authority strings become edges a user can traverse |
+| `document_release.py`, `document_release_v3*.py`, `fixtures/releases/` (77 files) | DocSpec DocumentRelease 2.0 — schemas, verifier, 49 sealed fixture cases, three mint receipts (8,284 documents, 220,582 segments) | sealed document releases with bodies and segments, minted and verified |
+| `docpipeline/source.py`, `segments.py` | DocSpec `processing/bounded_segmentation.py`, `retention_floors.py` (2026-08-30) | bounded, retention-checked segmentation. DocSpec addresses UTF-8 bytes where spicy-regs addressed codepoints; ids from the two do not compare equal |
+| `sources/source_domains.py` | `feat/source-domain-drift-gate-revived` `f8e9e35` (PR #192, ready to reopen) | a check that the values in `document_type`, `rule_stage`, `rin_status` still match what GSA and reginfo document — it already found that every `rin_status` row uses a spelling the publisher's schema does not |
+| `enrichment/accepted_output.py`, `managed_release.py` | RefSpec `src/refspec/managed_release.py` (2,638 lines) | candidate lookup against curated, sealed vocabulary releases |
+| `docpipeline/retrieval.py` (5,479 lines) | spicysearch `search_application.py`, `POST /v1/search` — lexical, semantic, and concept lanes in production | search over the corpus, served |
+| `candidate_release.py` | RefSpec managed releases | the same lookup against a format RefSpec maintains, rather than the Atlas 1.0 format retired 2026-08-09 |
+| `source_catalog/` (10 files, 7,239 lines; `archive/landing-final` only) | DocSpec `src/docspec/domain/source_catalog.py`, `schemas/source_catalog/1.0/` — about 1,800 live lines | the catalog of what exists, what was requested, and what was admitted |
 
-### F. `source_catalog/` — drop the code, keep the namespace
+One thing outlives the `source_catalog/` code: DocSpec pins
+`urn:spicy-regs:source-catalog-release:v1:` in 83 files. That prefix is
+DocSpec's contract. spicy-regs never reuses it.
 
-Ten files, 7,239 lines, on `archive/landing-final` only. DocSpec owns it:
-`src/docspec/domain/source_catalog.py`, `schemas/source_catalog/1.0/`, about
-1,800 live lines. The commit that added it (`4e9d192`) says "This is superseded
-work. DocSpec owns SourceCatalog."
+## Preserved on the fork
 
-But DocSpec pins `urn:spicy-regs:source-catalog-release:v1:` in **83 files**
-(`adapters/document_release_verify.py:138`, with a sealed
-`catalog-pin-mismatch` refusal case). That URN prefix is DocSpec's contract
-now. Never reuse it in spicy-regs for anything else.
+These wait for a reader. Each names what would bring it back.
+
+**The open-vocabulary concept lifecycle** — `ontology/concepts.py`,
+`concept_dimensions.py`, `transforms/build_concept{s,_assignments,_events}.py`,
+with `ann_index.py` and `candidate_channels.py` as its serving layer. A SKOS
+registry that grows from the corpus: mint a term from what documents say,
+promote it on multi-source evidence, deprecate it, merge within one facet.
+What a user would get: a vocabulary that tracks what agencies write rather than
+what a curator listed. Why it waits: RefSpec is closed-world by design and
+spicysearch is closed-vocabulary by design, so no product reads a minted term
+today (RefSpec REF-053, 2026-08-31). It returns when one does, and REF-053
+asks that the quota and single-facet merge rules already paid for be weighed
+then.
+
+**The rest of `ontology/`** — `ledger`, `invariants`, `receipt`,
+`relation_findings`, `evaluation`, `common`, `adapters`, `subjects`,
+`segmentation`, `checkpoint`, `llm`, `codex_cli`. Supporting modules for the
+lifecycle above and for experiments now concluded. RefSpec took what it needed
+from `invariants.py` (`2b4960e1`).
+
+**`universes/`** — three JSON files naming the requested regulations.gov
+universes, with 600 lines of the archived `PLAN.md` describing them. DocSpec
+owns the universe now.
+
+**The record** — `docs/superpowers/specs/` (20), `docs/evidence/` (202), 12
+of 14 notebooks. Every decision above has its measurement here.
+
+**`feat/rkaf-boundary-freeze`'s 26 fixture schemas** — an earlier v3 fixture
+layout.
+
+## Order of work
+
+1. Tell Eugene. Six PRs from a collaborator he has not heard from in five days
+   now sit in his repo, one of them this document.
+2. Merge #183 (changes no row of live data), then #181 (stops a full rebuild
+   publishing 1% of the Federal Register as complete), watch one nightly, then
+   #182 (stops a half-finished publish from retiring work it never uploaded).
+3. Reset local `main` to `origin/main`. The archived `main` is
+   `archive/landing-final` on the fork.
+4. PRs to spicy-regs in the order above: join surface, courts, bills, table
+   publisher, document-AI with corpora.
+5. Document populations to spicy-docs through its intake.
+6. The publish gate to RefSpec as a local commit; the minter to whoever holds
+   `iri_minting.py`.
+7. Delete `integrate/payload-prereqs` from civictechdc once step 4 has cut from
+   it. It stays on the fork at `8d9e7a2`.
+8. Remove the worktrees for closed PRs; delete the local branches that are on
+   the fork. What remains: one checkout tracking `origin/main`, a worktree per
+   open PR.
 
 ## Supersedes
 
-Three documents tried to do this before. Each was read against the pinned
-commits above; none survives as an authority.
+Three documents recorded parts of this before, each from its own product's
+side. This one reads across all of them against the pinned commits and adds
+the decisions.
 
-**`docs/migration/spicysearch-product-migration-manifest.json`** (spicy-regs,
-2026-08-29; on `9a79569` and `8d9e7a2`, not on `origin/main`). Two copies exist
-under one `manifest_version`, and they contradict each other on items 1, 6, and
-16 and on `status`. Its own `retirement_authorized` is `false`; the archived
-`PLAN.md` says it "cannot authorize deletion or shutdown by itself." Six of nine
-RefSpec paths it names do not exist. Three destinations it assigns to the
-rulespec Extrapolator were refused by rulespec in writing (C above). Its
-pinning test (`tests/test_document_release.py:615-663`) asserts that sixteen
-strings appear in the file it just read.
+- spicy-regs `docs/migration/spicysearch-product-migration-manifest.json`
+  (2026-08-29, on the archived branches only) inventoried sixteen product
+  surfaces for the SpicySearch migration and marked itself
+  `retirement_authorized: false`, pending a reconciliation. This is that
+  reconciliation.
+- RefSpec `plans/2026-08-31-refspec-intake-ledger.md` planned six ports from
+  this program. All six landed the day it was written (`5b8f4d8b`, `582461fe`,
+  `2b4960e1`). The ledger stands as the record of what was planned; the
+  table above records what shipped.
+- spicysearch `docs/history/2026-09-01-script-product-disposition.md` drew the
+  product boundaries this document uses, and set deletion gates for
+  spicysearch's own body-fetch scripts. Its boundaries hold; its premise that
+  the source-native gate had no survivor predates spicy-docs' `70a5b16` by
+  three days.
 
-**`plans/2026-08-31-refspec-intake-ledger.md`** (RefSpec, last edited
-2026-08-31 17:14, `18bf8a3d`). All six §1 ports landed on 2026-08-31 —
-`5b8f4d8b` 03:52, `582461fe` 04:12, `2b4960e1` 21:38 — four of them before the
-ledger's last edit. It still says none has. §2.2 was ruled the same day
-(REF-053); the ledger still says "until ruled." §5 item 3 books `ann_index` and
-`candidate_channels` as spicysearch's; spicysearch has neither.
-
-**`docs/history/2026-09-01-script-product-disposition.md`** (spicysearch). Its
-five deletion gates govern three spicysearch scripts and release no spicy-regs
-file. Its premise that the source-native gate "has no survivor in any product"
-was false three days before it was written (spicy-docs `70a5b16`). It says the
-landing branch is "not merged"; `dc89c65` is an ancestor of `main`. It is
-silent on nine of the thirteen buckets above.
-
-All three defer to a "platform value ledger" or "platform-value validator" as
-the reconciling authority. `git grep` for those terms at `fc1f5fa` returns no
-files.
-
-RefSpec and spicysearch are not pushed from this checkout. Each of those two
-documents needs a one-line note pointing here, through its own repo's lane.
-
-## Closing the checkout
-
-In order, once B has been cut and D has been handed over:
-
-1. Remove the worktrees for closed PRs: `spicy-regs-pr/feat/uscode-uslm-source-credits`, `spicy-regs-pr/feat/source-domain-drift-gate`. Their branches stay on origin.
-2. Delete the local branches that are on the fork: `archive/*`, `backup/pre-marker-fix`, `feat/rkaf-boundary-freeze`, and `integrate/payload-prereqs` (also on origin).
-3. Reset local `main` to `origin/main`. The archived `main` is `archive/landing-final` on the fork; its README banner declaring this checkout superseded goes with it.
-4. What remains: one checkout tracking `origin/main`, and a worktree per open PR.
+Each of the RefSpec and spicysearch documents takes a one-line note pointing
+here, through its own repo.
