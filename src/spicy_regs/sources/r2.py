@@ -333,13 +333,18 @@ def upload_dataset(output_dir: Path, data_types: list[str]) -> None:
 
 
 def upload_comment_partitions(output_dir: Path, changed_files: list[Path]) -> None:
-    """Publish the changed comment partitions, then the refreshed comments index."""
+    """Publish the changed comment partitions, then the refreshed comments index.
+
+    Refuses before the first upload if the index is missing: partitions the
+    index cannot see are rows nobody can find.
+    """
+    index_file = output_dir / "comments_index.parquet"
+    if not index_file.exists():
+        raise RuntimeError("Expected comments_index.parquet beside the changed partitions")
+
     for local_path in changed_files:
         upload_file(local_path, remote_key=_remote_key(output_dir, local_path))
-
-    index_file = output_dir / "comments_index.parquet"
-    if index_file.exists():
-        upload_file(index_file, remote_key="comments_index.parquet")
+    upload_file(index_file, remote_key="comments_index.parquet")
 
     logger.info("Uploaded {} comment partitions + index", len(changed_files))
 

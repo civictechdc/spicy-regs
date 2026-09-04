@@ -49,6 +49,20 @@ def test_upload_comment_partitions_uploads_changed_and_index(tmp_path: Path, mon
     assert (tmp_path / "comments_index.parquet", "comments_index.parquet") in uploaded
 
 
+def test_upload_comment_partitions_refuses_without_an_index(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A missing index refuses before any partition is written, not after."""
+    changed = tmp_path / "comments" / "agency_code=EPA" / "part-0.parquet"
+    changed.parent.mkdir(parents=True)
+    changed.write_bytes(b"c")
+
+    uploaded: list[Path] = []
+    monkeypatch.setattr(r2, "upload_file", lambda p, remote_key=None: uploaded.append(p))
+
+    with pytest.raises(RuntimeError, match="comments_index.parquet"):
+        r2.upload_comment_partitions(tmp_path, [changed])
+    assert uploaded == []
+
+
 def _upload_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Minimal R2 env so upload_file runs its body (isolate_env strips these)."""
     monkeypatch.setenv("R2_ACCESS_KEY_ID", "k")
