@@ -161,3 +161,87 @@ class CourtListenerReader(Reader):
                 )
                 time.sleep(backoff)
         return None
+
+
+class CourtListenerOpinionSearchReader(CourtListenerReader):
+    """Yields raw CourtListener *opinion* search results (``type=o``), keyless.
+
+    This is the incremental catch-up path for the opinion tables, whose bulk
+    dumps are published only every month or two. It reuses the parent's cursor
+    pagination and retry policy and changes only the query.
+
+    **Why search rather than the opinion endpoint.** ``/opinions/`` and
+    ``/clusters/`` both answer ``401`` without an API token (verified
+    2026-08-22), so neither is usable in the keyless posture the rest of this
+    connector assumes. ``/search/?type=o`` is keyless and returns one result per
+    *cluster*, carrying ``cluster_id``, ``docket_id``, the case-level metadata,
+    and a nested ``opinions`` array with each opinion's ``id``, ``type``,
+    ``sha1``, ``download_url``, ``local_path``, and a text ``snippet``.
+
+    What it does **not** carry is the full ``plain_text`` / ``html_with_citations``
+    body — those exist only in the bulk dumps. So this reader keeps cluster
+    metadata current between dumps; it cannot backfill opinion text, and callers
+    must not pretend otherwise.
+    """
+
+    def __init__(
+        self,
+        *,
+        since: date | None = None,
+        court: str | None = None,
+        max_records: int | None = None,
+        api_token: str | None = None,
+        verbose: bool = False,
+    ) -> None:
+        super().__init__(
+            since=since,
+            max_records=max_records,
+            api_token=api_token,
+            verbose=verbose,
+        )
+        self.court = court
+
+    def iter_records(self) -> Iterator[dict]:
+        keyed = "with API token" if self.api_token else "keyless (lower rate limit)"
+        logger.info(
+            "CourtListener: fetching opinion clusters {} (court={}, since={}, max_records={})",
+            keyed,
+            self.court or "all",
+            self.since or "the beginning",
+            self.max_records or "unbounded",
+        )
+        headers = {"Accept": "application/json"}
+        if self.api_token:
+            headers["Authorization"] = f"Token {self.api_token}"
+        with httpx.Client(timeout=_TIMEOUT, headers=headers) as client:
+            self._client = client
+            yield from self._paginate()
+        logger.info("CourtListener: yielded {:,} opinion clusters", self._seen)
+
+    def _paginate(self) -> Iterator[dict]:
+        """Follow the cursor ``next`` URL over ``type=o`` results."""
+        params: dict[str, object] = {
+            "type": "o",  # opinions (one result per cluster)
+            "order_by": "dateFiled asc",
+        }
+        if self.court is not None:
+            params["court"] = self.court
+        if self.since is not None:
+            params["filed_after"] = self.since.strftime("%m/%d/%Y")
+        url = f"{API_BASE}/search/"
+        first = True
+        while url:
+            payload = self._get(url, params if first else None)
+            first = False
+            if payload is None:
+                break
+            for cluster in payload.get("results") or []:
+                self._seen += 1
+                if self._seen % _PROGRESS_EVERY == 0:
+                    logger.info("CourtListener: {:,} opinion clusters so far...", self._seen)
+                yield cluster
+                if self.max_records is not None and self._seen >= self.max_records:
+                    if self.verbose:
+                        logger.debug("CourtListener: reached max_records {} — stopping", self.max_records)
+                    return
+            url = payload.get("next") or ""
