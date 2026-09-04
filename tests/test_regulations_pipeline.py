@@ -393,8 +393,7 @@ def test_processes_multiple_agencies_in_parallel(tmp_output: Path, monkeypatch: 
 
 
 def test_run_uploads_changed_comment_partitions(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A run that stages comments must publish the changed partitions + index,
-    not just the monolithic dataset."""
+    """A comments run publishes the changed partitions and index, then the manifest."""
     store = {
         _comment_key("c1", "EPA-2024-0001"): dumps(
             _comment_payload("c1", "EPA-2024-0001", "2024-01-01T00:00:00Z")
@@ -402,16 +401,22 @@ def test_run_uploads_changed_comment_partitions(tmp_output: Path, monkeypatch: p
     }
     monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
 
-    calls: dict[str, list] = {}
+    events: list[tuple[str, Any]] = []
     monkeypatch.setattr(
         regulations.r2,
-        "upload_dataset",
-        lambda out, types: calls.setdefault("dataset", []).append((out, types)),
+        "preflight_uploads",
+        lambda out, files: events.append(("preflight", list(files))),
     )
+    monkeypatch.setattr(regulations.r2, "upload_dataset", lambda *args, **kwargs: events.append(("dataset", args)))
     monkeypatch.setattr(
         regulations.r2,
         "upload_comment_partitions",
-        lambda out, changed: calls.setdefault("partitions", []).append((out, list(changed))),
+        lambda out, changed: events.append(("partitions", (out, list(changed)))),
+    )
+    monkeypatch.setattr(
+        regulations.r2,
+        "upload_file",
+        lambda path, remote_key=None: events.append(("file", (path, remote_key))),
     )
 
     RegulationsPipeline(
@@ -422,12 +427,162 @@ def test_run_uploads_changed_comment_partitions(tmp_output: Path, monkeypatch: p
         skip_upload=False,
     ).run()
 
-    assert "partitions" in calls, "changed comment partitions were never uploaded"
-    out, changed = calls["partitions"][0]
+    assert [label for label, _ in events] == ["preflight", "partitions", "file"]
+    preflight = events[0][1]
+    assert tmp_output / "comments_index.parquet" in preflight
+    assert tmp_output / "manifest.parquet" in preflight
+    assert any(p.is_relative_to(tmp_output / "comments") for p in preflight)
+    out, changed = events[1][1]
     assert out == tmp_output
     assert changed and all(p.suffix == ".parquet" for p in changed)
-    # The dataset upload (manifest etc.) still runs alongside it.
-    assert "dataset" in calls
+    assert events[2][1] == (tmp_output / "manifest.parquet", "manifest.parquet")
+
+
+def test_run_does_not_advance_manifest_after_comment_upload_failure(
+    tmp_output: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failed comment publication must leave the remote retry checkpoint unchanged."""
+    store = {
+        _comment_key("c1", "EPA-2024-0001"): dumps(
+            _comment_payload("c1", "EPA-2024-0001", "2024-01-01T00:00:00Z")
+        ).encode(),
+    }
+    monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
+    monkeypatch.setattr(regulations.r2, "preflight_uploads", lambda out, files: None)
+    monkeypatch.setattr(regulations.r2, "upload_dataset", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        regulations.r2,
+        "upload_comment_partitions",
+        lambda out, changed: (_ for _ in ()).throw(RuntimeError("comment upload failed")),
+    )
+    uploaded: list[tuple[Path, str | None]] = []
+    monkeypatch.setattr(
+        regulations.r2,
+        "upload_file",
+        lambda path, remote_key=None: uploaded.append((path, remote_key)),
+    )
+
+    with pytest.raises(RuntimeError, match="comment upload failed"):
+        RegulationsPipeline(
+            agency=AGENCY,
+            output_dir=tmp_output,
+            only_comments=True,
+            enrich_text=False,
+            skip_upload=False,
+        ).run()
+
+    assert (tmp_output / "manifest.parquet", "manifest.parquet") not in uploaded
+
+
+def test_run_does_not_advance_manifest_after_base_upload_failure(
+    tmp_output: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failed base-table publication must leave the remote retry checkpoint unchanged."""
+    store = {
+        _docket_key("EPA-2024-0001"): dumps(_docket_payload("EPA-2024-0001", "2024-01-01")).encode(),
+    }
+    monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
+    monkeypatch.setattr(regulations.r2, "preflight_uploads", lambda out, files: None)
+    monkeypatch.setattr(
+        regulations.r2,
+        "upload_dataset",
+        lambda out, types: (_ for _ in ()).throw(RuntimeError("base upload failed")),
+    )
+    uploaded: list[tuple[Path, str | None]] = []
+    monkeypatch.setattr(
+        regulations.r2,
+        "upload_file",
+        lambda path, remote_key=None: uploaded.append((path, remote_key)),
+    )
+
+    with pytest.raises(RuntimeError, match="base upload failed"):
+        RegulationsPipeline(
+            agency=AGENCY,
+            output_dir=tmp_output,
+            skip_comments=True,
+            skip_upload=False,
+        ).run()
+
+    assert (tmp_output / "manifest.parquet", "manifest.parquet") not in uploaded
+
+
+def test_run_preflight_failure_stops_all_publication(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every planned public object must pass its guard before the first write."""
+    store = {
+        _comment_key("c1", "EPA-2024-0001"): dumps(
+            _comment_payload("c1", "EPA-2024-0001", "2024-01-01T00:00:00Z")
+        ).encode(),
+    }
+    monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
+    checked: list[Path] = []
+
+    def fail_preflight(out: Path, files: list[Path]) -> None:
+        checked.extend(files)
+        raise RuntimeError("manifest guard failed")
+
+    monkeypatch.setattr(regulations.r2, "preflight_uploads", fail_preflight)
+    attempted: list[str] = []
+    monkeypatch.setattr(
+        regulations.r2,
+        "upload_dataset",
+        lambda *args, **kwargs: attempted.append("dataset"),
+    )
+    monkeypatch.setattr(
+        regulations.r2,
+        "upload_comment_partitions",
+        lambda *args, **kwargs: attempted.append("comments"),
+    )
+    monkeypatch.setattr(
+        regulations.r2,
+        "upload_file",
+        lambda *args, **kwargs: attempted.append("file"),
+    )
+
+    with pytest.raises(RuntimeError, match="manifest guard failed"):
+        RegulationsPipeline(
+            agency=AGENCY,
+            output_dir=tmp_output,
+            only_comments=True,
+            enrich_text=False,
+            skip_upload=False,
+        ).run()
+
+    assert tmp_output / "comments_index.parquet" in checked
+    assert tmp_output / "manifest.parquet" in checked
+    assert attempted == []
+
+
+def test_run_refuses_to_publish_comments_without_a_refreshed_index(
+    tmp_output: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A comments run that produced no index must refuse to publish at all.
+
+    Skipping the index would publish the comment rows, then advance the
+    manifest — retiring those keys while the public index still describes the
+    previous partitions.
+    """
+    store = {
+        _comment_key("c1", "EPA-2024-0001"): dumps(
+            _comment_payload("c1", "EPA-2024-0001", "2024-01-01T00:00:00Z")
+        ).encode(),
+    }
+    monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
+    # The catalog MERGE "succeeds" but leaves no comments_index.parquet behind.
+    monkeypatch.setattr(regulations.iceberg, "merge_comments", lambda sd, od, rt: None)
+    uploaded: list[Path] = []
+    monkeypatch.setattr(regulations.r2, "upload_file", lambda path, remote_key=None: uploaded.append(path))
+
+    with pytest.raises(RuntimeError, match="comments_index.parquet"):
+        RegulationsPipeline(
+            agency=AGENCY,
+            output_dir=tmp_output,
+            only_comments=True,
+            use_iceberg=True,
+            enrich_text=False,
+            skip_upload=False,
+        ).run()
+
+    assert uploaded == []
 
 
 def test_run_skips_partition_upload_when_no_comments(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -438,7 +593,11 @@ def test_run_skips_partition_upload_when_no_comments(tmp_output: Path, monkeypat
     monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
 
     calls: dict[str, list] = {}
-    monkeypatch.setattr(regulations.r2, "upload_dataset", lambda out, types: calls.setdefault("dataset", []).append(1))
+    monkeypatch.setattr(
+        regulations.r2,
+        "upload_dataset",
+        lambda out, types: calls.setdefault("dataset", []).append((out, types)),
+    )
     monkeypatch.setattr(
         regulations.r2,
         "upload_comment_partitions",

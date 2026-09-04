@@ -11,10 +11,11 @@ This is also the run file. Invoke it via the ``run-pipeline`` console script::
     2. Extract → stage  — ``stage_agencies`` fans agencies out in parallel; each
        record stream flows Mirrulations Reader (raw JSON) -> ExtractRecords
        transform (flatten) -> StagingWriter (local Parquet).
-    3. Merge      — per-agency staging Parquet is merged + deduplicated (a bulk,
-       whole-dataset transform).
-    4. Load       — the Manifest is persisted and the dataset published to R2
-       (upload is off by default while this path is being vetted).
+    3. Merge      — merge and deduplicate the per-agency staging Parquet in one
+       whole-dataset transform.
+    4. Load       — save the Manifest, then publish to R2 (``_publish``, which
+       advances the manifest strictly last). Publishing stays off until this
+       path is vetted; pass ``--no-skip-upload`` to turn it on.
 
 The reusable pieces live elsewhere: connection details + the reader factory in
 ``sources.mirrulations``, the json→record transform in ``transforms.extract``,
@@ -95,10 +96,9 @@ class RegulationsPipeline(Pipeline):
         record_types = self._record_types()
         agencies = self._agencies()
 
-        # Chunked comments path: for an agency too large to buffer whole (millions
-        # of comments would OOM), ingest its comments in bounded key-chunks,
-        # committing each into the catalog. Only meaningful for the iceberg
-        # comments-only case (the catalog is a row-level upsert surface).
+        # Chunked comments path (see _ingest_comments_chunked). Only the Iceberg
+        # comments-only case can use it: the catalog is a row-level upsert
+        # surface, so each chunk commits on its own.
         if self.chunk_size and self.only_comments and self.use_iceberg:
             manifest = Manifest.empty() if self.full_refresh else Manifest.load(output_dir)
             for agency in agencies:
@@ -171,31 +171,70 @@ class RegulationsPipeline(Pipeline):
             logger.info("skip_upload=True — output left in {}", output_dir)
         elif any(staged.values()):
             logger.info("Uploading to R2...")
-            r2.upload_dataset(output_dir, [rt.name for rt in record_types if rt.name != "comments"])
-            # Comments are partitioned, not monolithic: publish the partitions
-            # changed this run plus the refreshed index.
-            if changed_comments:
-                logger.info("Uploading {} changed comment partitions...", len(changed_comments))
-                r2.upload_comment_partitions(output_dir, changed_comments)
-            # Iceberg comments path: the MERGE wrote the rows through the catalog
-            # (not under the public comments/ prefix), so there are no partition
-            # files to push — only the refreshed index needs publishing.
-            elif self.use_iceberg and staged.get("comments", 0) > 0:
-                index_file = output_dir / "comments_index.parquet"
-                if index_file.exists():
-                    logger.info("Uploading refreshed comments index (Iceberg path)...")
-                    r2.upload_file(index_file, remote_key="comments_index.parquet")
+            self._publish(output_dir, record_types, staged, changed_comments)
 
         logger.info("Done!")
+
+    def _publish(
+        self,
+        output_dir: Path,
+        record_types: list[RecordType],
+        staged: dict[str, int],
+        changed_comments: list[Path],
+    ) -> None:
+        """Publish this run's output to R2, advancing the manifest strictly last.
+
+        ``manifest.parquet`` is the restart checkpoint: a fresh workspace pulls
+        it from R2 and skips every key it lists, so publishing it retires the
+        work this run consumed. Publish it while a data file is still missing
+        and the next run skips those keys as already processed — the rows stay
+        missing from the bucket until a ``--full-refresh``. So every planned
+        object clears its size guard first, and the manifest uploads last, once
+        every data upload has returned.
+        """
+        base_data_types = [rt.name for rt in record_types if rt.name != "comments"]
+        index_file = output_dir / "comments_index.parquet"
+        manifest_file = output_dir / "manifest.parquet"
+        # The Iceberg comments path MERGEs rows through the catalog rather than
+        # under the public comments/ prefix, so it changes no partition files —
+        # only the refreshed index needs publishing.
+        publish_index = bool(changed_comments) or (self.use_iceberg and staged.get("comments", 0) > 0)
+        if publish_index and not index_file.exists():
+            raise RuntimeError("Expected comments_index.parquet after publishing comment data")
+        # Manifest.save writes only when this run recorded keys, so a missing
+        # file means there is no checkpoint to advance.
+        publish_manifest = manifest_file.exists()
+
+        planned = r2.dataset_files(output_dir, base_data_types) + changed_comments
+        if publish_index:
+            planned.append(index_file)
+        if publish_manifest:
+            planned.append(manifest_file)
+        r2.preflight_uploads(output_dir, planned)
+
+        # Redundant-looking, but --only-comments leaves base_data_types empty and
+        # upload_dataset would log a misleading "no files to publish" warning.
+        if base_data_types:
+            r2.upload_dataset(output_dir, base_data_types)
+        # Comments are partitioned, not monolithic: publish the partitions
+        # changed this run plus the refreshed index.
+        if changed_comments:
+            logger.info("Uploading {} changed comment partitions...", len(changed_comments))
+            r2.upload_comment_partitions(output_dir, changed_comments)
+        elif publish_index:
+            logger.info("Uploading refreshed comments index (Iceberg path)...")
+            r2.upload_file(index_file, remote_key="comments_index.parquet")
+        if publish_manifest:
+            logger.info("Uploading manifest after all data files succeeded...")
+            r2.upload_file(manifest_file, remote_key="manifest.parquet")
 
     def _ingest_comments_chunked(self, agency: str, output_dir: Path, staging_dir: Path, manifest: Manifest) -> None:
         """Ingest one agency's comments in bounded key-chunks, committing each.
 
         Downloads at most ``chunk_size`` comment files at a time, stages them,
-        MERGEs them into the catalog, then frees memory before the next chunk —
-        so a multi-million-comment agency (which would otherwise buffer every
-        record and OOM) ingests in even, durable pieces. Deleting the staging
-        chunk between iterations keeps peak memory ~one chunk.
+        MERGEs them into the catalog, then deletes the staging chunk — so peak
+        memory stays at about one chunk and a multi-million-comment agency, which
+        would otherwise buffer every record and OOM, ingests in durable pieces.
         """
         comment_rt = RECORD_TYPES["comments"]
         resource = mirrulations.s3_resource()
@@ -307,8 +346,6 @@ class RegulationsPipeline(Pipeline):
         """
         for rt in record_types:
             if rt.name == "comments":
-                # Partitions are fetched on demand at merge, but the index is
-                # global — prime it so the rebuild keeps untouched partitions.
                 index_file = output_dir / "comments_index.parquet"
                 if not index_file.exists():
                     r2.download("comments_index.parquet", index_file)
