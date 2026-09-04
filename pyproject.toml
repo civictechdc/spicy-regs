@@ -43,6 +43,7 @@ docs = [
 ]
 
 [project.scripts]
+materialize-rulemaking = "spicy_regs.pipelines.rulemaking_dataset:app"
 run-pipeline = "spicy_regs.pipelines.regulations:app"
 run-rollup-feed-summary = "spicy_regs.pipelines.rollups.feed_summary:app"
 run-rollup-agency-stats = "spicy_regs.pipelines.rollups.agency_stats:app"
