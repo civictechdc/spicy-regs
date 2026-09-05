@@ -174,53 +174,119 @@ they must trust.
 
 Rulespec's own spec (`spec/rulespec-releases.md` §7, 2026-08-04) recorded
 these duties as parked with no owner and assigned the decision to the platform
-owner. Decided 2026-09-04 as a split; ruled complete 2026-09-05. The split below is
-from the call graph of `rkaf_projection.py` at `8d9e7a2`, which corrects the
-first draft's count: `project_document` was listed as deterministic, but it
-calls the model layer, so it belongs to the orchestration.
+owner. Decided 2026-09-04 as a split; ruled complete 2026-09-05. The split is from
+the call graph of `rkaf_projection.py` at `8d9e7a2`, which corrects the first
+draft's count: `project_document` was listed as deterministic, but it calls the
+model layer, so it belongs to the orchestration. Both receiving lanes reproduced
+every count below by AST on 2026-09-05 and added the seams recorded here.
 
 - **The deterministic layer** — 21 functions, 1,307 lines of
-  `rkaf_projection.py`, plus its 13 data classes (221 lines): `assemble`
-  (476), `verify_candidate_rows` (191), `_federal_register_facts` (204),
-  `_unified_agenda_facts` (91), `verify_fragment`, `load_artifact`, and the
-  IRI and fragment helpers under them. It becomes
+  `rkaf_projection.py`, plus 12 of its 13 data classes (209 lines;
+  `NormalizedVocabulary` serves only the model path and stays). Roots:
+  `assemble` (476), `verify_candidate_rows` (191), `_federal_register_facts`
+  (204), `_unified_agenda_facts` (91), `verify_fragment`, `load_artifact`, and
+  the IRI and fragment helpers under them. It becomes
   `rulespec/packages/rulespec-projection`, beside `rulespec-artifacts`, the
   only package there today: the format owner ships the reference producer next
-  to its verifier and fifteen conformance bundles. Priced against rulespec's
-  closure (`rulespec-artifacts`, `pyshacl`, `rdflib`, `rdfcanon`): the layer's
-  own functions import nothing outside the standard library. What they reach
-  through spicy-regs modules: `ontology.citations` (1,025 lines, standard
-  library only), `ontology.attestations` (544, same), four helpers from
-  `ontology.common` (`canonical_json`, `stable_id`, `text_digest`,
-  `RunContext`; that module imports pyarrow and loguru at the top, so the four
-  are copied, or replaced by `rulespec_artifacts.canonical_json_bytes` and
-  `sha256_digest`, and the module is not), and `resolve_exact_evidence_offsets`
-  from `ontology.llm` (35 lines, no imports). `SourceArtifact` from
-  `docpipeline/source.py` becomes the input contract, filled from DocSpec's
-  DocumentRelease 2.0; IRIs come from RefSpec's `iri_minting`. Zero new
-  dependencies.
+  to its verifier and fifteen conformance bundles. Priced against rulespec at
+  `a519d06` (`rulespec-artifacts`, `pyshacl`, `rdflib`, `rdfcanon`): zero new
+  dependencies. The functions themselves import nothing outside the standard
+  library. What they reach is copied at the name, not the module, because the
+  host modules import pyarrow and loguru at the top:
+  - `ontology.citations`: ten parser and IRI functions. The module is 1,025
+    lines of standard library and can move whole.
+  - `ontology.attestations`: `attestation_row` and `ATTESTOR_KIND_AI_MODEL`,
+    which close over about 100 lines, plus `OntologyInvariantError` from
+    `invariants`. Not the 544-line module.
+  - `ontology.common`: `canonical_json`, `stable_id`, `text_digest`,
+    `RunContext`; or `rulespec_artifacts.canonical_json_bytes` and
+    `sha256_digest` for the first two.
+  - `ontology.llm`: `resolve_exact_evidence_offsets` with its
+    `EvidenceOffsetResolution` dataclass, 50 lines, no imports.
+
+  Two seams stay with the caller as a Protocol or an injected mapping:
+  `PublishedTables`, whose cache fills through `read_parquet_rows` (the one
+  pyarrow path in the set), and `_source_table_for_profile`, which reads
+  `SOURCE_PROFILES`. `SourceArtifact`, a 34-line dataclass, becomes the input
+  contract, filled from DocSpec's DocumentRelease 2.0, with `AccessScope` and
+  docling's default size limit inlined; IRIs come from RefSpec's `iri_minting`.
+
 - **The orchestration** — the 13 functions only the model path uses, 1,150
   lines of `rkaf_projection.py` (`_run_model_layer_with_vocabulary` 355, the
   two vocabulary loaders 552, `project_document` 71), plus the six provider
   adapters (6,932 lines), `extraction` (954), `runtime` (1,792), `tag_task`
-  (961), `relation_task` (2,102), `executor` (536), and `corpora/` (16
-  modules, 23,798 lines). Its home is **spicy-docs**, ruled 2026-09-05: it
-  sits beside the source-native releases it reads and the table publisher it
-  feeds, so one install runs the whole path. It depends on
-  `rulespec-projection` for the 13 functions both layers share (878 lines).
-  Priced against spicy-docs at `86e8416` (`rulespec-artifacts`, `boto3`,
-  `httpx`, `jsonschema`, `loguru`, `polars`, `tqdm`; `pyarrow` as the
+  (961), `relation_task` (2,102), and `executor` (536). Its home is
+  **spicy-docs**, ruled 2026-09-05: it sits beside the source-native releases
+  it reads and the table publisher it feeds, so one install runs the whole
+  path. It depends on `rulespec-projection` for the 13 functions both layers
+  share (878 lines).
+
+  *The constraint that shapes it.* spicy-docs' read and verify path is
+  contractually thin. DocSpec installs the spicy-docs wheel with `--no-deps`
+  (`tests/test_source_catalog_installed_wheel.py:911` at `20fcb24`) and imports
+  five of its modules, and spicy-docs' `tests/test_reader_closure.py` at
+  `86e8416` fails if `polars`, `httpx`, `boto3`, `botocore`, `loguru`, or
+  `tqdm` sit in `sys.modules` after importing `source_native` and
+  `source_native_profiles`. That guard is the enforcement for this port. It
+  gains the seven model names (`anthropic`, `openai`, `sentence_transformers`,
+  `torch`, `docling`, `tiktoken`, `transformers`), and since DocSpec imports
+  five modules on that path and all five are clean today, it should name all
+  five. Import direction, after spicysearch's `AGENTS.md` table
+  (`f97b904:100`):
+
+  | From | Read/verify | Acquisition/publish | Orchestration | Experiments |
+  |---|---|---|---|---|
+  | Read/verify | Yes | No | No | No |
+  | Acquisition/publish | Yes | Yes | No | No |
+  | Orchestration | Yes | Yes | Yes | No |
+  | Experiments | Yes | Yes | Yes | Yes |
+  | Tests | Yes | Yes | Yes | Yes |
+
+  Model output is nondeterministic by construction and spicy-docs' releases are
+  byte-reproducible; the table keeps them apart in the direction that matters.
+
+  *Dependencies*, priced against spicy-docs at `86e8416` (`rulespec-artifacts`,
+  `boto3`, `httpx`, `jsonschema`, `loguru`, `polars`, `tqdm`; `pyarrow` as the
   `public-table` extra). Present: `jsonschema`, `loguru`, `pyarrow`. Absent at
   runtime: `anthropic`, `openai`, `tiktoken` (the model adapters);
   `sentence_transformers` and `torch` (the embedding adapter); `docling` (the
-  layout adapter, imported lazily); `refspec` (the vocabulary loader);
-  `rdflib` (through `candidate_release`); `numpy` and `scikit-learn` (through
-  `ontology.concepts`, lazily). Each adapter's dependency belongs in an extra
-  named for it, the way `public-table` carries pyarrow. `corpora/` adds
-  `transformers`, `scipy`, `ir_measures`, `pypdf`, `python-dotenv`, `duckdb`:
-  an `experiments` extra. Test-only and absent: `docling_core`, `python-docx`,
-  `openpyxl`, `python-pptx` (the real-Docling test); `refspec` and `duckdb`
-  (the projection test).
+  layout adapter, imported lazily); `refspec` (the vocabulary loader); `rdflib`
+  (through `candidate_release`); `numpy` and `scikit-learn` (through
+  `ontology.concepts`, lazily). One extra per adapter, copying all four
+  properties of `public-table`: the extra, the reason in the module docstring,
+  a lazy CLI import that reports the missing dependency instead of crashing,
+  and presence in the dev group so the default suite tests it. The embedding
+  extra's note states its size: `pyarrow` is one wheel, `torch` is gigabytes.
+  Test-only and absent: `docling_core`, `python-docx`, `openpyxl`,
+  `python-pptx` (the real-Docling test); `refspec` and `duckdb` (the projection
+  test). spicy-docs has no model or adapter code at `86e8416`, so nothing
+  collides.
+
+  *Seams.* The cost is the first-party closure, 20 modules and 19,209 lines
+  before adapters, not the packages. Each module below is touched at a few
+  names, and a module touched at a few names is a contract to define, not code
+  to move:
+
+  | module | lines | names the orchestration uses |
+  |---|---|---|
+  | `docpipeline/source.py` | 3,593 | 5: `SourceArtifact`, `build_source_artifact`, `profile_for_table`, `SOURCE_PROFILES`, `iter_source_records` |
+  | `ontology/concepts.py` | 1,407 | 4 |
+  | `docpipeline/segments.py` | 1,163 | 3 |
+  | `ontology/llm.py` | 1,036 | 7: the prompt constants, the tag schema, the resolver |
+  | `candidate_release.py` | 705 | 2 |
+  | `document_release_v3.py` | 678 | 6: digest and key helpers |
+  | `ontology/common.py` | 226 | 6: `canonical_json` alone from ten call sites |
+  | `connected_concepts`, `ontology/segmentation`, `concept_dimensions` | 856 | 7 |
+
+- **`corpora/`** — 16 modules, 23,798 lines of experiment scripts, over half
+  the producer by volume. Experiments may import everything and nothing imports
+  them, so they sequence last and defer at no cost. All 15 scripts were last
+  touched 2026-08-28; 13 of them are registered as 13 console-script
+  entries at `8d9e7a2`, and `mirrulations_document_corpus` is neither
+  registered nor cited by the evidence. They move per module, when the evidence
+  that cites one needs re-running, under an `experiments` extra
+  (`transformers`, `scipy`, `ir_measures`, `pypdf`, `python-dotenv`,
+  `duckdb`). None moves in the same change as the adapters.
 
 ## Ships to spicy-docs
 
