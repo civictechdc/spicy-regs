@@ -2,11 +2,11 @@
 
 Written 2026-09-04. One record of what the program built, what each piece gives
 a user of the platform, and where each piece now lives. Decisions were taken
-2026-09-04 by the platform owner; this document records them. Two were revised
-the same afternoon and are recorded as revised: the table publisher's home is
-spicy-docs, not spicy-regs, and the document-AI orchestration's home is not yet
-ruled. Three of the spicy-regs pieces have since shipped; the *Order of work*
-section says where.
+2026-09-04 by the platform owner and completed 2026-09-05; this document records
+them. Two were revised after the first draft and are recorded as revised: the
+table publisher's home is spicy-docs, not spicy-regs, and the document-AI
+orchestration's home is spicy-docs (ruled 2026-09-05). Three of the spicy-regs
+pieces have shipped; the *Order of work* section says where.
 
 Every claim below was checked against a pinned commit, not read from a
 document. The pins:
@@ -21,6 +21,9 @@ document. The pins:
 | spicy-docs | `main` | `9f8c7ee` |
 | RefSpec | `main` | `da4fe055` |
 | rulespec | `main` | `a87d839` |
+| spicy-docs | `main`, for the 2026-09-05 pricing | `86e8416` |
+| rulespec | `main`, for the 2026-09-05 pricing | `a519d06` |
+| RefSpec | `main`, for the 2026-09-05 pricing | `00f22e9c` |
 
 ## What the program was
 
@@ -171,27 +174,53 @@ they must trust.
 
 Rulespec's own spec (`spec/rulespec-releases.md` §7, 2026-08-04) recorded
 these duties as parked with no owner and assigned the decision to the platform
-owner. Decided 2026-09-04, then refined the same afternoon into a split, from
-an AST map of `rkaf_projection.py`:
+owner. Decided 2026-09-04 as a split; ruled complete 2026-09-05. The split below is
+from the call graph of `rkaf_projection.py` at `8d9e7a2`, which corrects the
+first draft's count: `project_document` was listed as deterministic, but it
+calls the model layer, so it belongs to the orchestration.
 
-- **The deterministic layer, about 2,400 lines** — `assemble` (476),
-  `verify_candidate_rows` (191), `_federal_register_facts` (204),
-  `_unified_agenda_facts` (91), `verify_fragment`, `project_document`,
-  `load_artifact` — depends only on artifact identity, citation grammar,
-  attestations, and offset verification. It becomes
-  `rulespec/packages/rulespec-projection`: the format owner ships the reference
-  producer beside its verifier and fifteen conformance bundles. Its inputs turn
-  into a data contract — artifact identity from DocSpec's DocumentRelease 2.0,
-  IRIs from RefSpec's `iri_minting`, and the 286-line vocabulary loader's
-  `from refspec import` (line 2334, a cross-product import) becomes an ordinary
-  package dependency.
-- **The orchestration, 355 lines** — `_run_model_layer_with_vocabulary` is the
-  one function that calls the model, plus the six provider adapters,
-  `extraction`, `runtime`, `tag_task`, and `corpora/`. Its home is **not yet
-  ruled**. spicy-regs is the default; DocSpec is the alternative if
-  "interpretation lives in DocSpec" is meant strictly, because this layer emits
-  RKAF documents, not tables. Two lanes asked for an explicit ruling rather than
-  a default. Nothing is cut until it comes.
+- **The deterministic layer** — 21 functions, 1,307 lines of
+  `rkaf_projection.py`, plus its 13 data classes (221 lines): `assemble`
+  (476), `verify_candidate_rows` (191), `_federal_register_facts` (204),
+  `_unified_agenda_facts` (91), `verify_fragment`, `load_artifact`, and the
+  IRI and fragment helpers under them. It becomes
+  `rulespec/packages/rulespec-projection`, beside `rulespec-artifacts`, the
+  only package there today: the format owner ships the reference producer next
+  to its verifier and fifteen conformance bundles. Priced against rulespec's
+  closure (`rulespec-artifacts`, `pyshacl`, `rdflib`, `rdfcanon`): the layer's
+  own functions import nothing outside the standard library. What they reach
+  through spicy-regs modules: `ontology.citations` (1,025 lines, standard
+  library only), `ontology.attestations` (544, same), four helpers from
+  `ontology.common` (`canonical_json`, `stable_id`, `text_digest`,
+  `RunContext`; that module imports pyarrow and loguru at the top, so the four
+  are copied, or replaced by `rulespec_artifacts.canonical_json_bytes` and
+  `sha256_digest`, and the module is not), and `resolve_exact_evidence_offsets`
+  from `ontology.llm` (35 lines, no imports). `SourceArtifact` from
+  `docpipeline/source.py` becomes the input contract, filled from DocSpec's
+  DocumentRelease 2.0; IRIs come from RefSpec's `iri_minting`. Zero new
+  dependencies.
+- **The orchestration** — the 13 functions only the model path uses, 1,150
+  lines of `rkaf_projection.py` (`_run_model_layer_with_vocabulary` 355, the
+  two vocabulary loaders 552, `project_document` 71), plus the six provider
+  adapters (6,932 lines), `extraction` (954), `runtime` (1,792), `tag_task`
+  (961), `relation_task` (2,102), `executor` (536), and `corpora/` (16
+  modules, 23,798 lines). Its home is **spicy-docs**, ruled 2026-09-05: it
+  sits beside the source-native releases it reads and the table publisher it
+  feeds, so one install runs the whole path. It depends on
+  `rulespec-projection` for the 13 functions both layers share (878 lines).
+  Priced against spicy-docs at `86e8416` (`rulespec-artifacts`, `boto3`,
+  `httpx`, `jsonschema`, `loguru`, `polars`, `tqdm`; `pyarrow` as the
+  `public-table` extra). Present: `jsonschema`, `loguru`, `pyarrow`. Absent at
+  runtime: `anthropic`, `openai`, `tiktoken` (the model adapters);
+  `sentence_transformers` and `torch` (the embedding adapter); `docling` (the
+  layout adapter, imported lazily); `refspec` (the vocabulary loader);
+  `rdflib` (through `candidate_release`); `numpy` and `scikit-learn` (through
+  `ontology.concepts`, lazily). Each adapter's dependency belongs in an extra
+  named for it, the way `public-table` carries pyarrow. `corpora/` adds
+  `transformers`, `scipy`, `ir_measures`, `pypdf`, `python-dotenv`, `duckdb`:
+  an `experiments` extra. Test-only and absent: `docling_core`, `python-docx`,
+  `openpyxl`, `python-pptx` (the real-Docling test); `refspec` and `duckdb`
+  (the projection test).
 
 ## Ships to spicy-docs
 
@@ -361,30 +390,31 @@ layout.
    `1918409` #181 (639 passed) → `1374f90` #182 (645) → `64aa35d` #183 (657)
    → `abd229f` #193 (657) → `a3dc1b6` #194 (941) → `4b041c0` #195 (979)
    → `765815a` #196 (1,005 passed, 3 deselected; baseline 634).
-   `fork/main` = local `main` = `765815a`; `origin/main` untouched at `1f02a7f`.
+   After the seven merges `fork/main` = local `main` = `765815a`; this
+   document's revisions were merged on top. `origin/main` untouched at `1f02a7f`.
 3. **Done.** Local `main` was reset to `origin/main` before the merges; the
    archived `main` is `archive/landing-final` on the fork at `9a79569`.
 4. PRs to spicy-regs: join surface (#194), CourtListener (#195), bill subjects
    (#196) — **done**, each validated against live data before opening. The
    Supreme Court sub-cluster waits on the `bs4` decision. The document-AI
-   producer waits on the orchestration ruling above.
+   producer is split, priced, and ruled above; the brief went to the spicy-docs
+   and rulespec lanes 2026-09-05.
 5. The table publisher to spicy-docs through its intake (ruled afternoon
    2026-09-04; see *Ships to spicy-docs*). Document populations likewise.
 6. The publish gate to RefSpec as a local commit; the minter to whoever holds
    `iri_minting.py`.
-7. Delete the `integrate/payload-prereqs` branch from civictechdc once
-   spicy-docs has landed its copy of the publisher. A branch delete on another
-   owner's remote, reversible from the fork at `8d9e7a2`; the platform owner's
-   call. A file-deletion PR is not the shape: `origin/main` has none of the
-   files.
+7. **Done 2026-09-05.** `integrate/payload-prereqs` deleted from civictechdc
+   after spicy-docs landed the publisher at `2bb1dcf`; the fork holds it at
+   `8d9e7a2`. A file-deletion PR was not the shape: `origin/main` has none of
+   the files.
 8. Register the eight new tables — five from #194, two from #195, one from
    #196 — in the data dictionary and MCP server as one follow-up PR, the way
    #175 exposed the lifecycle rollups after they existed. The first
    `materialize-rulemaking` run needs `--allow-bootstrap` via
    `workflow_dispatch`.
-9. Remove the worktrees for merged and closed PRs; delete the local branches
-   that are on the fork. What remains: one checkout tracking `origin/main`, a
-   worktree per open PR.
+9. **Done 2026-09-05.** The nine worktrees for merged and closed PRs are
+   removed. What remains: one checkout on `main` with the merges on top of
+   `origin/main`, and a local branch per open PR, each at its PR head.
 
 ## Supersedes
 
