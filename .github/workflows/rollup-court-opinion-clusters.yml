@@ -1,0 +1,27 @@
+name: Rollup — court_opinion_clusters
+on:
+  schedule:
+    # 04:20 UTC Mondays — the bulk dumps are cut monthly to quarterly, so a
+    # weekly pass is enough to pick up a new one and run the search catch-up.
+    - cron: '20 4 * * 1'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-court-opinion-clusters
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}
+      # This rollup streams two bulk dumps, not one: opinion-clusters for the
+      # decisions (2.3 GiB, ~23 min) and dockets for the court each was decided
+      # in (4.67 GiB, ~46 min), because the cluster dump carries no court_id.
+      # The bucket serves one client about 1.75 MiB/s no matter how many
+      # connections it opens, so that is ~70 minutes of waiting on someone
+      # else's bandwidth. The default 30 would kill the job mid-stream.
+      timeout_minutes: 120

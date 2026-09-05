@@ -1,0 +1,22 @@
+name: Rollup — court_opinion_bodies
+on:
+  schedule:
+    # 05:40 UTC Mondays — after the cluster rollup, so opinion text lands
+    # against decisions the cluster table already knows about. Each run takes a
+    # bounded slice of the opinions dump; see the rollup module for the cap and
+    # docs/evidence/court-data-coverage-2026-08-22.md for what that leaves uncovered.
+    - cron: '40 5 * * 1'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-court-opinion-bodies
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}
