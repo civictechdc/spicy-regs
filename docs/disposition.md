@@ -227,11 +227,14 @@ every count below by AST on 2026-09-05 and added the seams recorded here.
   five of its modules, and spicy-docs' `tests/test_reader_closure.py` at
   `86e8416` fails if `polars`, `httpx`, `boto3`, `botocore`, `loguru`, or
   `tqdm` sit in `sys.modules` after importing `source_native` and
-  `source_native_profiles`. That guard is the enforcement for this port. It
+  `source_native_profiles`. That guard is the enforcement for this port; it
   gains the seven model names (`anthropic`, `openai`, `sentence_transformers`,
-  `torch`, `docling`, `tiktoken`, `transformers`), and since DocSpec imports
-  five modules on that path and all five are clean today, it should name all
-  five. Import direction, after spicysearch's `AGENTS.md` table
+  `torch`, `docling`, `tiktoken`, `transformers`) in its one tuple. It named
+  two of the five modules DocSpec imports; spicy-docs `160dbe9` (local `main`,
+  2026-09-05) probes all five, together and each alone, because a batch probe
+  cannot tell a clean module from one shadowed by a sibling that imported
+  first. All five were already clean. An orchestration guard, if the port adds
+  one, mirrors the per-module probe. Import direction, after spicysearch's `AGENTS.md` table
   (`f97b904:100`):
 
   | From | Read/verify | Acquisition/publish | Orchestration | Experiments |
@@ -280,13 +283,23 @@ every count below by AST on 2026-09-05 and added the seams recorded here.
 
 - **`corpora/`** — 16 modules, 23,798 lines of experiment scripts, over half
   the producer by volume. Experiments may import everything and nothing imports
-  them, so they sequence last and defer at no cost. All 15 scripts were last
-  touched 2026-08-28; 13 of them are registered as 13 console-script
-  entries at `8d9e7a2`, and `mirrulations_document_corpus` is neither
-  registered nor cited by the evidence. They move per module, when the evidence
-  that cites one needs re-running, under an `experiments` extra
-  (`transformers`, `scipy`, `ir_measures`, `pypdf`, `python-dotenv`,
-  `duckdb`). None moves in the same change as the adapters.
+  them, so they sequence last and defer at no cost. Registration and
+  last-touched dates say someone declared them, not that anyone runs them:
+  all 15 were last touched 2026-08-28 and 13 are console scripts at `8d9e7a2`.
+  The basis that decides it is whether an in-tree evidence or receipt file
+  cites the script. Six do (`segmentation_experiment` four times;
+  `document_acceptance_scope`, `embedding_audit`,
+  `segmentation_embedding_audit`, `segmentation_rerank`,
+  `segmentation_tagging` once each; same nine files on `9a79569`). Nine are
+  cited by none: `artifact_retrieval_baseline`, `body_retrieval_corpus`,
+  `mirrulations_document_corpus`, `mixed_real_data`, `profile_evaluation`,
+  both `relation_exclusion_evaluation` scripts, `segmentation_evaluation`,
+  `segmentation_sparse_retrieval`. Runs whose outputs never entered the tree
+  are invisible to this count. The six move per module, when the evidence that
+  cites one needs re-running, under an `experiments` extra (`transformers`,
+  `scipy`, `ir_measures`, `pypdf`, `python-dotenv`, `duckdb`); the nine stay
+  on the fork unless someone names a run. None moves in the same change as
+  the adapters.
 
 ## Ships to spicy-docs
 
