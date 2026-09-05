@@ -218,7 +218,12 @@ goes through spicy-docs' own intake, commit-never-push.
 `public_table.py` (1,000 lines), `public_table_profiles.py` (165),
 `publication.py` (65), and `tests/test_public_table.py`. Ruled 2026-09-04
 afternoon: **canonical home spicy-docs**, superseding the morning's assignment
-to spicy-regs.
+to spicy-regs. **Landed on spicy-docs `main` at `2bb1dcf`** the same evening:
+`publication.py` was not copied because an identical module already existed
+there; `SUPPORTED_PRODUCER_PRODUCTS` was reused rather than re-hardcoded;
+`pyarrow` — a runtime import of the module, which spicy-docs did not carry and
+this record's first version did not name — was added as an optional extra plus
+a dev entry; the eight-ref provenance is in the commit.
 
 **What a user gets.** Everything a user touches — the Parquet files at
 `data.spicy-regs.dev`, the MCP server, the app — is a table something built.
@@ -248,7 +253,11 @@ exist on no live line — zero on `origin/main`, zero on `fork/main`, zero on
 `snapshots/pre-strip-2026-08-26`, and the fork's copies of those. spicy-docs
 copies from `8d9e7a2` and becomes the only implementation. **No spicy-regs
 branch re-cuts these modules.** There is nothing to delete and nothing to
-freeze on a live line; the archived branches are the record, not a rival.
+freeze on a live line; the archived branches are the record, not a rival. The
+lesson the landing taught: a port brief must list every *runtime* third-party
+import per module against the target's actual dependency closure, not only
+the test's — the first version of this record named `duckdb` and missed
+`pyarrow`, and the module would not import until it was added.
 
 One thing for spicy-docs' supply-precedence rule, recorded where the rule
 lives: once spicy-docs both produces the public tables and captures them as its
