@@ -6,7 +6,7 @@ compressed and takes roughly 8.6 hours to stream end to end, which is not a
 sensible unit of work for a scheduled job that also has to leave the disk
 usable. ``DEFAULT_MAX_RECORDS`` caps a scheduled run; the full backfill is a
 deliberate, separately-invoked operation documented in
-``docs/evidence/court-data-coverage.md``.
+``docs/evidence/court-data-coverage-2026-08-22.md``.
 """
 
 from pathlib import Path

@@ -4,7 +4,7 @@ on:
     # 05:40 UTC Mondays — after the cluster rollup, so opinion text lands
     # against decisions the cluster table already knows about. Each run takes a
     # bounded slice of the opinions dump; see the rollup module for the cap and
-    # docs/evidence/court-data-coverage.md for what that leaves uncovered.
+    # docs/evidence/court-data-coverage-2026-08-22.md for what that leaves uncovered.
     - cron: '40 5 * * 1'
   workflow_dispatch:
     inputs:
