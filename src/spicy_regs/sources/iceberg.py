@@ -34,6 +34,7 @@ Credentials are read from the environment, alongside the existing ``R2_*`` vars:
 * ``R2_CATALOG_NAMESPACE``  — Iceberg namespace/schema (optional, default ``default``)
 """
 
+import time
 from os import getenv
 from pathlib import Path
 from urllib.parse import urlparse
@@ -587,9 +588,15 @@ def dedupe_table(con, record_type: RecordType) -> tuple[int, int]:
       replaces the live table by ``DROP`` + ``CREATE`` + per-agency ``INSERT``
       from the sibling — all operations this catalog supports. The sibling is the
       durable copy: it is dropped only after the rebuilt table's row count is
-      verified, so an interruption mid-swap loses nothing. A re-run detects the
-      live table missing (but the sibling present) and resumes from the sibling
-      instead of rebuilding it from a table that no longer exists.
+      verified, so an interruption mid-swap loses nothing.
+
+    A swap marker table (``{name}_dedup_swap``) is created once the sibling is
+    fully built and before the live table is dropped, and removed only after the
+    rebuilt row count is verified. Its presence is what tells a re-run that the
+    sibling is complete and the live table may be partial, so the re-run resumes
+    the swap from the sibling. Without it a half-refilled live table looks like a
+    healthy one: on 2026-09-13 a re-run rebuilt from a live table holding 103 of
+    179 agencies and dropped the sibling that still held all of them (#197).
 
     Returns ``(rows_before, rows_after)``; ``rows_after`` equals the number of
     distinct keys when the rebuild succeeds.
@@ -598,6 +605,7 @@ def dedupe_table(con, record_type: RecordType) -> tuple[int, int]:
     name = record_type.name
     tbl = _qualified(record_type)
     dedup_tbl = f'{_schema_ref()}."{name}_dedup"'
+    marker_tbl = f'{_schema_ref()}."{name}_dedup_swap"'
     col_defs = ", ".join(f'"{c}" VARCHAR' for c in record_type.schema)
     col_list = ", ".join(f'"{c}"' for c in record_type.schema)
 
@@ -608,34 +616,88 @@ def dedupe_table(con, record_type: RecordType) -> tuple[int, int]:
         except Exception:
             return False
 
+    def _agencies(ident: str) -> set:
+        return {r[0] for r in con.execute(f"SELECT DISTINCT agency_code FROM {ident}").fetchall()}
+
+    def _where(agency) -> str:
+        return "agency_code IS NULL" if agency is None else f"agency_code = '{_sql_str(agency)}'"
+
+    def _copy_agency(agency, expected_rows: int) -> None:
+        # One agency's INSERT from the sibling, retried on a transient catalog
+        # error (the 2026-09-06 swap died on a single 502). Each INSERT is one
+        # Iceberg commit, so after a failure the agency holds either none of its
+        # rows or all of them; re-check before retrying so a commit that landed
+        # despite the error isn't inserted twice.
+        attempts = int(getenv("DEDUP_SWAP_RETRIES", "3"))
+        for attempt in range(1, attempts + 1):
+            try:
+                con.execute(
+                    f"INSERT INTO {tbl} ({col_list}) SELECT {col_list} FROM {dedup_tbl} WHERE {_where(agency)};"
+                )
+                return
+            except Exception as e:
+                have = con.execute(f"SELECT count(*) FROM {tbl} WHERE {_where(agency)}").fetchone()[0]
+                if have == expected_rows:
+                    return
+                if have != 0 or attempt == attempts:
+                    raise
+                logger.warning("iceberg: swap INSERT for {} failed ({}); retry {}/{}", agency, e, attempt, attempts - 1)
+                time.sleep(2**attempt)
+
     def _replace_live_from_sibling() -> int:
         # Swap without RENAME: rebuild the live table from the deduped sibling
         # using DROP/CREATE/INSERT (per-agency, so no whole-table statement). The
         # sibling still holds every row throughout, so this is safe to re-run if
-        # interrupted; it is dropped only once the rebuilt row count matches.
+        # interrupted; the marker and then the sibling are dropped only once the
+        # rebuilt row count matches.
         expected = con.execute(f"SELECT count(*) FROM {dedup_tbl}").fetchone()[0]
-        sibling_agencies = [r[0] for r in con.execute(f"SELECT DISTINCT agency_code FROM {dedup_tbl}").fetchall()]
+        per_agency = con.execute(f"SELECT agency_code, count(*) FROM {dedup_tbl} GROUP BY agency_code").fetchall()
+        if not _exists(marker_tbl):
+            con.execute(f"CREATE TABLE IF NOT EXISTS {marker_tbl} (expected_rows BIGINT);")
+            con.execute(f"INSERT INTO {marker_tbl} VALUES ({int(expected)});")
         con.execute(f"DROP TABLE IF EXISTS {tbl};")
         con.execute(f"CREATE TABLE {tbl} ({col_defs});")
-        for agency in sibling_agencies:
-            where = "agency_code IS NULL" if agency is None else f"agency_code = '{_sql_str(agency)}'"
-            con.execute(f"INSERT INTO {tbl} ({col_list}) SELECT {col_list} FROM {dedup_tbl} WHERE {where};")
+        for agency, n in per_agency:
+            _copy_agency(agency, n)
         rebuilt = con.execute(f"SELECT count(*) FROM {tbl}").fetchone()[0]
         if rebuilt != expected:
             raise RuntimeError(
                 f"dedupe rebuild mismatch: {tbl} has {rebuilt:,} rows, expected {expected:,}; "
                 f"{dedup_tbl} left in place as the safe copy — re-run to retry the swap"
             )
+        # Marker first: a crash between the two drops leaves a sibling with no
+        # marker, which the next run treats as a stale build and rebuilds from the
+        # (now complete) live table.
+        con.execute(f"DROP TABLE IF EXISTS {marker_tbl};")
         con.execute(f"DROP TABLE IF EXISTS {dedup_tbl};")
         return rebuilt
 
-    # Resume an interrupted swap: the live table is gone but the deduped sibling
-    # is intact. Rebuild from the sibling rather than rebuilding the sibling from
-    # a missing table (which would destroy the only good copy).
-    if not _exists(tbl) and _exists(dedup_tbl):
-        logger.warning("iceberg: {} missing but {} present — resuming interrupted dedupe swap", tbl, dedup_tbl)
+    live_exists, sibling_exists = _exists(tbl), _exists(dedup_tbl)
+
+    # Resume an interrupted swap. The marker means the sibling was complete when
+    # the swap began, so the live table (whether dropped or partly refilled) is
+    # not to be trusted. A missing live table with a sibling also means the swap
+    # had started (the DROP only follows a finished build); that covers a swap
+    # interrupted before markers existed.
+    if sibling_exists and (_exists(marker_tbl) or not live_exists):
+        logger.warning("iceberg: resuming interrupted dedupe swap of {} from {}", tbl, dedup_tbl)
         after = _replace_live_from_sibling()
         return after, after
+
+    # A sibling with no marker is normally a build that died before the swap, and
+    # is safe to discard: it was built from the live table, so every agency in it
+    # is also in the live table. An agency only in the sibling means the live
+    # table lost rows the sibling still holds — a pre-marker interrupted swap, as
+    # on 2026-09-06. Discarding the sibling then destroys the only full copy.
+    if sibling_exists and live_exists:
+        lost = _agencies(dedup_tbl) - _agencies(tbl)
+        if lost:
+            raise RuntimeError(
+                f"{dedup_tbl} holds {len(lost)} agency(ies) missing from {tbl} "
+                f"(e.g. {sorted(str(a) for a in lost)[:10]}); the live table looks like a "
+                f"partly-refilled interrupted swap. Refusing to discard the sibling — restore "
+                f"the live table from it before re-running."
+            )
 
     before = con.execute(f"SELECT count(*) FROM {tbl}").fetchone()[0]
 
