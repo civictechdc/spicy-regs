@@ -12,8 +12,8 @@ name: Publish comments mirror
 #
 # Runs daily after the ETL batches finish (last batch ~20:25 UTC), plus manual
 # dispatch. Read-only against the catalog; the only writes are the public mirror
-# files, and upload_file refuses to overwrite a much smaller remote object, so a
-# truncated export can't wipe the live data.
+# files. The script refuses to publish an export under its row-count floor, or one
+# that drops an agency the live comments_index.parquet still has (#197).
 #
 # Requires:
 #   R2_CATALOG_URI, R2_CATALOG_WAREHOUSE, R2_CATALOG_TOKEN   (read the catalog)
@@ -28,6 +28,11 @@ on:
         required: false
         default: false
         type: boolean
+      allow_missing_agency:
+        description: 'Space-separated agency codes that may be absent from the export (deliberate removals only)'
+        required: false
+        default: ''
+        type: string
 
 concurrency:
   group: publish-comments-mirror
@@ -69,16 +74,20 @@ jobs:
           # re-sorts + re-compresses the data, so a partition can be several times
           # smaller on disk while holding *more* rows (verified: ACF 19.7 MB -> 6.0 MB
           # with more rows + fresher dates). The script enforces a row-count floor
-          # instead, which is the right check for a full export.
+          # and an agency-set check against the published index instead.
           R2_ALLOW_SHRINK: '1'
           R2_CATALOG_URI: ${{ secrets.R2_CATALOG_URI }}
           R2_CATALOG_WAREHOUSE: ${{ secrets.R2_CATALOG_WAREHOUSE }}
           R2_CATALOG_TOKEN: ${{ secrets.R2_CATALOG_TOKEN }}
           R2_CATALOG_NAMESPACE: ${{ secrets.R2_CATALOG_NAMESPACE }}
+          ALLOW_MISSING_AGENCY: ${{ inputs.allow_missing_agency }}
         run: |
           ARGS=""
           if [ "${{ inputs.skip_upload }}" = "true" ]; then
             ARGS="$ARGS --skip-upload"
           fi
+          for code in $ALLOW_MISSING_AGENCY; do
+            ARGS="$ARGS --allow-missing-agency $code"
+          done
           echo "Running: uv run python scripts/publish_comments_mirror.py $ARGS"
           uv run python scripts/publish_comments_mirror.py $ARGS

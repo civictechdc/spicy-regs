@@ -629,6 +629,122 @@ def test_dedupe_table_resumes_interrupted_swap(tmp_path, local_catalog) -> None:
         con.execute(f"SELECT 1 FROM {dedup_tbl} LIMIT 1")
 
 
+def _seed_three_agencies(tmp_path, con) -> None:
+    base = tmp_path / "seed.parquet"
+    pl.DataFrame(
+        [
+            _comment("c1", "EPA-1", "EPA", "2025-01-01T00:00:00Z"),
+            _comment("c2", "EPA-1", "EPA", "2025-01-02T00:00:00Z"),
+            _comment("c3", "OMB-1", "OMB", "2025-02-01T00:00:00Z"),
+            _comment("c4", "VA-1", "VA", "2025-03-01T00:00:00Z"),
+        ],
+        schema=COMMENT.schema,
+    ).write_parquet(base)
+    iceberg._ensure_table(con, COMMENT)
+    iceberg.seed_comments_from_parquet(con, str(base), COMMENT)
+
+
+def _partly_refilled_swap(con, *, marker: bool) -> tuple[str, str, str]:
+    """Leave the catalog as the 2026-09-06 run did: a complete sibling, and a live
+    table dropped then refilled with only some agencies (EPA, not OMB or VA)."""
+    tbl = iceberg._qualified(COMMENT)
+    dedup_tbl = f'{iceberg._schema_ref()}."comments_dedup"'
+    marker_tbl = f'{iceberg._schema_ref()}."comments_dedup_swap"'
+    col_defs = ", ".join(f'"{c}" VARCHAR' for c in COMMENT.schema)
+    col_list = ", ".join(f'"{c}"' for c in COMMENT.schema)
+    con.execute(f"CREATE TABLE {dedup_tbl} ({col_defs});")
+    con.execute(f"INSERT INTO {dedup_tbl} ({col_list}) SELECT {col_list} FROM {tbl};")
+    if marker:
+        con.execute(f"CREATE TABLE {marker_tbl} (expected_rows BIGINT);")
+        con.execute(f"INSERT INTO {marker_tbl} VALUES (4);")
+    con.execute(f"DROP TABLE {tbl};")
+    con.execute(f"CREATE TABLE {tbl} ({col_defs});")
+    con.execute(f"INSERT INTO {tbl} ({col_list}) SELECT {col_list} FROM {dedup_tbl} WHERE agency_code = 'EPA';")
+    return tbl, dedup_tbl, marker_tbl
+
+
+def test_dedupe_table_resumes_partly_refilled_swap_from_marker(tmp_path, local_catalog) -> None:
+    """#197: a swap that died partway through the per-agency refill leaves a live
+    table that exists but is short. The marker must send the re-run back to the
+    sibling, not rebuild from the short live table and drop the sibling."""
+    con = local_catalog
+    _seed_three_agencies(tmp_path, con)
+    tbl, dedup_tbl, marker_tbl = _partly_refilled_swap(con, marker=True)
+
+    before, after = iceberg.dedupe_table(con, COMMENT)
+    assert (before, after) == (4, 4)
+
+    agencies = {r[0] for r in con.execute(f"SELECT DISTINCT agency_code FROM {tbl}").fetchall()}
+    assert agencies == {"EPA", "OMB", "VA"}
+    for ident in (dedup_tbl, marker_tbl):
+        with pytest.raises(duckdb.Error):
+            con.execute(f"SELECT 1 FROM {ident} LIMIT 1")
+
+
+def test_dedupe_table_refuses_to_discard_sibling_holding_lost_agencies(tmp_path, local_catalog) -> None:
+    """Without a marker (a swap interrupted before markers existed), a sibling
+    holding agencies the live table lacks is the only full copy. Refuse instead of
+    dropping it."""
+    con = local_catalog
+    _seed_three_agencies(tmp_path, con)
+    _, dedup_tbl, _ = _partly_refilled_swap(con, marker=False)
+
+    with pytest.raises(RuntimeError, match="Refusing to discard the sibling"):
+        iceberg.dedupe_table(con, COMMENT)
+    assert con.execute(f"SELECT count(*) FROM {dedup_tbl}").fetchone()[0] == 4
+
+
+def test_dedupe_table_discards_stale_sibling_from_interrupted_build(tmp_path, local_catalog) -> None:
+    """A sibling left by a build that died before the swap is a subset of the live
+    table, so the re-run discards it and rebuilds from the live table."""
+    con = local_catalog
+    _seed_three_agencies(tmp_path, con)
+    tbl = iceberg._qualified(COMMENT)
+    dedup_tbl = f'{iceberg._schema_ref()}."comments_dedup"'
+    col_defs = ", ".join(f'"{c}" VARCHAR' for c in COMMENT.schema)
+    col_list = ", ".join(f'"{c}"' for c in COMMENT.schema)
+    con.execute(f"CREATE TABLE {dedup_tbl} ({col_defs});")
+    con.execute(f"INSERT INTO {dedup_tbl} ({col_list}) SELECT {col_list} FROM {tbl} WHERE agency_code = 'EPA';")
+
+    before, after = iceberg.dedupe_table(con, COMMENT)
+    assert (before, after) == (4, 4)
+    assert con.execute(f"SELECT count(DISTINCT agency_code) FROM {tbl}").fetchone()[0] == 3
+
+
+class _FlakyInsert:
+    """Proxy a DuckDB connection, failing the first swap INSERT for one agency
+    the way the catalog's 502 did."""
+
+    def __init__(self, con, agency: str, commit_anyway: bool = False) -> None:
+        self._con, self._agency, self._commit_anyway = con, agency, commit_anyway
+        self.failed = False
+
+    def execute(self, sql: str, *args):
+        target = f"INSERT INTO {iceberg._qualified(COMMENT)} ("
+        if not self.failed and sql.startswith(target) and f"agency_code = '{self._agency}'" in sql:
+            self.failed = True
+            if self._commit_anyway:
+                self._con.execute(sql, *args)
+            raise duckdb.HTTPException("HTTP Error: Bad Gateway (HTTP code 502)")
+        return self._con.execute(sql, *args)
+
+
+@pytest.mark.parametrize("commit_anyway", [False, True])
+def test_dedupe_swap_retries_a_transient_insert_failure(tmp_path, local_catalog, monkeypatch, commit_anyway) -> None:
+    """A transient error on one agency's swap INSERT is retried, and an INSERT
+    that committed despite the error is not repeated."""
+    monkeypatch.setattr(iceberg.time, "sleep", lambda _s: None)
+    con = local_catalog
+    _seed_three_agencies(tmp_path, con)
+    flaky = _FlakyInsert(con, "OMB", commit_anyway=commit_anyway)
+
+    before, after = iceberg.dedupe_table(flaky, COMMENT)
+    assert flaky.failed
+    assert (before, after) == (4, 4)
+    tbl = iceberg._qualified(COMMENT)
+    assert con.execute(f"SELECT count(*) FROM {tbl} WHERE agency_code = 'OMB'").fetchone()[0] == 1
+
+
 def _write_snapshot(path: Path, rows: list[dict]) -> None:
     """A published monolithic {name}.parquet snapshot."""
     pl.DataFrame(rows, schema={c: pl.Utf8 for c in DOCKET.schema}).write_parquet(path)
