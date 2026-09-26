@@ -24,7 +24,9 @@ agency-set guard that refuses to publish when an agency in the currently
 published ``comments_index.parquet`` is absent from the new export. The second
 exists because a dedupe swap that died mid-refill left the catalog holding 103 of
 179 agencies, and the mirror republished that for weeks with nothing noticing
-(#197). A deliberate removal is let through with ``--allow-missing-agency``.
+(#197). A deliberate removal is let through with ``--allow-missing-agency``. The
+same comparison also refuses an agency that loses most of its rows (override:
+``--allow-agency-shrink``).
 
 Usage:
     uv run python scripts/publish_comments_mirror.py
@@ -56,18 +58,49 @@ from spicy_regs.transforms import partition_comments
 MIN_EXPECTED_ROWS = 1_000_000
 
 
-def _index_agencies(index_file: Path) -> set[str]:
-    table = pq.read_table(index_file, columns=["agency_code"])
-    return {a for a in table.column("agency_code").to_pylist() if a is not None}
+# Per-agency shrink guard: the agency-set check alone passes an agency that is
+# still present but holds a sliver of its rows. After #197's recovery started,
+# VA reappeared with 12 comments of its ~386k, and publishing overwrote its full
+# partition with that stub. An agency trips only when it loses at least half its
+# rows *and* at least MIN_AGENCY_DROP rows, so small agencies and the normal
+# dedupe trickle (a handful of duplicate rows) never do. A dedupe that
+# legitimately collapses a heavily duplicated agency needs --allow-agency-shrink.
+MAX_AGENCY_DROP_RATIO = 0.5
+MIN_AGENCY_DROP = 1_000
+
+
+def _index_counts(index_file: Path) -> dict[str, int]:
+    table = pq.read_table(index_file, columns=["agency_code", "row_count"])
+    counts: dict[str, int] = {}
+    for agency, n in zip(table.column("agency_code").to_pylist(), table.column("row_count").to_pylist()):
+        if agency is not None:
+            counts[agency] = counts.get(agency, 0) + (n or 0)
+    return counts
 
 
 def missing_agencies(published_index: Path, new_index: Path, allowed: set[str]) -> list[str]:
     """Agencies in the published index but absent from the new one, minus ``allowed``."""
-    return sorted(_index_agencies(published_index) - _index_agencies(new_index) - allowed)
+    return sorted(_index_counts(published_index).keys() - _index_counts(new_index).keys() - allowed)
 
 
-def check_agency_set(new_index: Path, allowed: set[str]) -> bool:
-    """False when the new export drops an agency the live mirror still publishes.
+def shrunken_agencies(published_index: Path, new_index: Path, allowed: set[str]) -> list[tuple[str, int, int]]:
+    """``(agency, published_rows, new_rows)`` for agencies that lost most of their rows.
+
+    Only agencies present in both indexes; absent ones are :func:`missing_agencies`.
+    """
+    old, new = _index_counts(published_index), _index_counts(new_index)
+    shrunk = []
+    for agency, before in old.items():
+        after = new.get(agency)
+        if after is None or agency in allowed:
+            continue
+        if before - after >= MIN_AGENCY_DROP and after < before * (1 - MAX_AGENCY_DROP_RATIO):
+            shrunk.append((agency, before, after))
+    return sorted(shrunk, key=lambda r: r[1] - r[2], reverse=True)
+
+
+def check_agencies(new_index: Path, allow_missing: set[str], allow_shrink: set[str]) -> bool:
+    """False when the new export drops or guts an agency the live mirror publishes.
 
     Compares against the ``comments_index.parquet`` currently on R2. When there
     is none yet (first publish, or R2 not configured) there is nothing to
@@ -76,9 +109,11 @@ def check_agency_set(new_index: Path, allowed: set[str]) -> bool:
     with tempfile.TemporaryDirectory() as tmp:
         published = Path(tmp) / "comments_index.parquet"
         if not r2.download_from_r2("comments_index.parquet", published):
-            logger.warning("No published comments_index.parquet to compare against; skipping agency-set check")
+            logger.warning("No published comments_index.parquet to compare against; skipping agency checks")
             return True
-        missing = missing_agencies(published, new_index, allowed)
+        missing = missing_agencies(published, new_index, allow_missing)
+        shrunk = shrunken_agencies(published, new_index, allow_shrink)
+    ok = True
     if missing:
         logger.error(
             "Export drops {} agency(ies) the live mirror still publishes: {}. The catalog has "
@@ -87,9 +122,19 @@ def check_agency_set(new_index: Path, allowed: set[str]) -> bool:
             len(missing),
             " ".join(missing),
         )
-        return False
-    logger.info("Agency-set check passed: no published agency is missing from the export")
-    return True
+        ok = False
+    if shrunk:
+        logger.error(
+            "Export shrinks {} agency(ies) by more than half: {}. Refusing to publish. If the "
+            "shrink is deliberate (e.g. a dedupe of a heavily duplicated agency), re-run with "
+            "--allow-agency-shrink for each code.",
+            len(shrunk),
+            ", ".join(f"{a} {b:,} -> {n:,}" for a, b, n in shrunk),
+        )
+        ok = False
+    if ok:
+        logger.info("Agency checks passed: no published agency is missing or gutted in the export")
+    return ok
 
 
 def main() -> int:
@@ -104,6 +149,13 @@ def main() -> int:
         default=[],
         metavar="CODE",
         help="Publish even though this agency is absent from the export (repeatable)",
+    )
+    parser.add_argument(
+        "--allow-agency-shrink",
+        action="append",
+        default=[],
+        metavar="CODE",
+        help="Publish even though this agency loses most of its rows in the export (repeatable)",
     )
     args = parser.parse_args()
 
@@ -130,7 +182,9 @@ def main() -> int:
         return 1
     logger.info("Exported monolith has {:,} rows", n_rows)
 
-    if not check_agency_set(result["index"], {a.upper() for a in args.allow_missing_agency}):
+    allow_missing = {a.upper() for a in args.allow_missing_agency}
+    allow_shrink = {a.upper() for a in args.allow_agency_shrink}
+    if not check_agencies(result["index"], allow_missing, allow_shrink):
         return 1
 
     # 2. Derive the per-agency tree the UI reads for scoped queries from that monolith.
