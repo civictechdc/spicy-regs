@@ -13,7 +13,8 @@ name: Publish comments mirror
 # Runs daily after the ETL batches finish (last batch ~20:25 UTC), plus manual
 # dispatch. Read-only against the catalog; the only writes are the public mirror
 # files. The script refuses to publish an export under its row-count floor, or one
-# that drops an agency the live comments_index.parquet still has (#197).
+# that drops an agency the live comments_index.parquet still has, or cuts one to
+# under half its rows (#197).
 #
 # Requires:
 #   R2_CATALOG_URI, R2_CATALOG_WAREHOUSE, R2_CATALOG_TOKEN   (read the catalog)
@@ -30,6 +31,11 @@ on:
         type: boolean
       allow_missing_agency:
         description: 'Space-separated agency codes that may be absent from the export (deliberate removals only)'
+        required: false
+        default: ''
+        type: string
+      allow_agency_shrink:
+        description: 'Space-separated agency codes that may lose most of their rows (e.g. a deliberate dedupe)'
         required: false
         default: ''
         type: string
@@ -81,6 +87,7 @@ jobs:
           R2_CATALOG_TOKEN: ${{ secrets.R2_CATALOG_TOKEN }}
           R2_CATALOG_NAMESPACE: ${{ secrets.R2_CATALOG_NAMESPACE }}
           ALLOW_MISSING_AGENCY: ${{ inputs.allow_missing_agency }}
+          ALLOW_AGENCY_SHRINK: ${{ inputs.allow_agency_shrink }}
         run: |
           ARGS=""
           if [ "${{ inputs.skip_upload }}" = "true" ]; then
@@ -88,6 +95,9 @@ jobs:
           fi
           for code in $ALLOW_MISSING_AGENCY; do
             ARGS="$ARGS --allow-missing-agency $code"
+          done
+          for code in $ALLOW_AGENCY_SHRINK; do
+            ARGS="$ARGS --allow-agency-shrink $code"
           done
           echo "Running: uv run python scripts/publish_comments_mirror.py $ARGS"
           uv run python scripts/publish_comments_mirror.py $ARGS
