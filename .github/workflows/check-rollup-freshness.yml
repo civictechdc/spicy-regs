@@ -5,11 +5,23 @@ name: Check published table freshness
 # upload failure froze `dockets` at 2026-07-02 for ~8 weeks with the ETL still
 # reporting success — comments had check-comments-freshness.yml, the rollups had
 # this check, and the two largest base tables had nothing watching them at all.
+#
+# It also watches comment coverage: per-agency row counts from
+# comments_index.parquet against the last known-good counts in the cached state
+# file. check-comments-freshness only compares agencies present on both sides, so
+# it stayed green through #197 while 76 agencies were missing from both. After a
+# deliberate removal, dispatch once with accept_comment_coverage to rebaseline.
 
 on:
   schedule:
     - cron: '50 23 * * *'
   workflow_dispatch:
+    inputs:
+      accept_comment_coverage:
+        description: 'Rebaseline comment coverage to current counts (after a deliberate removal)'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   check:
@@ -34,7 +46,12 @@ jobs:
           restore-keys: rollup-freshness-
 
       - name: Check published tables
-        run: uv run python scripts/check_rollup_freshness.py
+        env:
+          ACCEPT_COVERAGE: ${{ inputs.accept_comment_coverage }}
+        run: |
+          ARGS=()
+          if [ "$ACCEPT_COVERAGE" = "true" ]; then ARGS+=(--accept-comment-coverage); fi
+          uv run python scripts/check_rollup_freshness.py "${ARGS[@]}"
 
       # Runs even when the freshness check failed: a dead purge credential and a
       # stale table are independent faults, and hiding one behind the other is
