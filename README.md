@@ -161,13 +161,16 @@ and writes Parquet to `./output/`. Scope your first run tight so it finishes in
 minutes instead of hours:
 
 ```bash
-# Smallest useful run: one agency, recent dockets, comments only, no upload.
-uv run run-pipeline --agency EPA --only-comments --since-year 2025
+# Smallest useful run: one agency, recent dockets + documents, no upload.
+uv run run-pipeline --agency EPA --skip-comments --since-year 2025
 ```
+
+Comments are written only through the R2 Data Catalog, so a run that includes
+them needs `--use-iceberg` and the `R2_CATALOG_*` credentials in `.env`.
 
 What you get:
 
-- `output/comments.parquet` — merged and deduplicated comments
+- `output/dockets.parquet` / `output/documents.parquet` — merged and deduplicated
 - `output/manifest.parquet` — a Bloom filter of already-processed source keys,
   so the next run is incremental. Delete it or pass `--full-refresh` to rebuild
   from scratch.
@@ -183,7 +186,7 @@ Useful flags (`uv run run-pipeline --help` for the full list):
 | `--max-workers 8` | Agencies processed in parallel (default 4) |
 | `--full-refresh` | Ignore the existing manifest and rebuild from scratch |
 | `--no-skip-upload` | Also publish to R2 (needs credentials in `.env`) |
-| `--use-iceberg` | Route dockets + comments through the R2 Data Catalog |
+| `--use-iceberg` | Route dockets + comments through the R2 Data Catalog (required for comments) |
 | `--chunk-size 50000` | Bounded-memory comment ingest for very large agencies |
 | `--no-enrich-text` | Skip filling comment `text_content` from Mirrulations' pre-extracted attachment text |
 

@@ -2,15 +2,15 @@
 
 # `comments_index`
 
-A tiny per-partition row-count index for the partitioned comments. It maps each `comments/` partition to its row count so consumers can compute comment totals and discover partitions without scanning the full comments dataset. Maintained by `update_comments_index`.
+A tiny row-count rollup of comments per agency, docket, and posted month, so consumers can compute comment totals without scanning the full comments dataset. Rebuilt from the Iceberg catalog on every comments ETL run. It counts rows; it is not a list of files — the old `comments/agency_code=/docket_id=/year=/month=` tree it once described is no longer written, and building paths from this index 404s. Read comment rows from `comments/agency/agency_code={X}/part-0.parquet` instead.
 
 - **Parquet file:** `comments_index.parquet`
 - **Queryable via MCP `query_sql`:** Yes
 
 | Column | Type | Description |
 | --- | --- | --- |
-| `agency_code` | `VARCHAR` | Agency code of the partition (the `agency_code=` path segment). |
-| `docket_id` | `VARCHAR` | Docket id of the partition (the `docket_id=` path segment). |
-| `year` | `BIGINT` | Year of the partition, from `posted_date` (the `year=` path segment). |
-| `month` | `BIGINT` | Month (1–12) of the partition (the `month=` path segment). |
-| `row_count` | `BIGINT` | Number of comment rows in that partition file. |
+| `agency_code` | `VARCHAR` | Agency code of the counted comments. |
+| `docket_id` | `VARCHAR` | Docket id of the counted comments. |
+| `year` | `BIGINT` | Year of the comments' `posted_date`. |
+| `month` | `BIGINT` | Month (1–12) of the comments' `posted_date`. |
+| `row_count` | `BIGINT` | Number of comments in that agency / docket / month. |

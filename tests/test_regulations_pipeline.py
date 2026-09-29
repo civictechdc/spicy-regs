@@ -392,9 +392,21 @@ def test_processes_multiple_agencies_in_parallel(tmp_output: Path, monkeypatch: 
 # --- upload ----------------------------------------------------------------
 
 
-def test_run_uploads_changed_comment_partitions(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A run that stages comments must publish the changed partitions + index,
-    not just the monolithic dataset."""
+def test_comments_without_iceberg_are_refused(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Comments have no non-catalog write path: a run that includes them without
+    use_iceberg must fail before touching the source, not write the orphaned
+    agency_code=/docket_id=/year=/month= tree (#201)."""
+    monkeypatch.setattr(mirrulations, "s3_resource", lambda: pytest.fail("source read before the guard"))
+
+    with pytest.raises(ValueError, match="--use-iceberg"):
+        RegulationsPipeline(agency=AGENCY, output_dir=tmp_output, only_comments=True, skip_upload=True).run()
+    assert not (tmp_output / "comments").exists()
+
+
+def test_run_uploads_only_comments_index_for_iceberg_comments(
+    tmp_output: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A comments run publishes the catalog-rebuilt index and no partition files."""
     store = {
         _comment_key("c1", "EPA-2024-0001"): dumps(
             _comment_payload("c1", "EPA-2024-0001", "2024-01-01T00:00:00Z")
@@ -402,123 +414,27 @@ def test_run_uploads_changed_comment_partitions(tmp_output: Path, monkeypatch: p
     }
     monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
 
-    calls: dict[str, list] = {}
-    monkeypatch.setattr(
-        regulations.r2,
-        "upload_dataset",
-        lambda out, types: calls.setdefault("dataset", []).append((out, types)),
-    )
-    monkeypatch.setattr(
-        regulations.r2,
-        "upload_comment_partitions",
-        lambda out, changed: calls.setdefault("partitions", []).append((out, list(changed))),
-    )
+    def fake_merge_comments(staging_dir: Path, output_dir: Path, rt: Any) -> None:
+        (output_dir / "comments_index.parquet").write_bytes(b"index")
 
-    RegulationsPipeline(
-        agency=AGENCY,
-        output_dir=tmp_output,
-        only_comments=True,
-        enrich_text=False,
-        skip_upload=False,
-    ).run()
-
-    assert "partitions" in calls, "changed comment partitions were never uploaded"
-    out, changed = calls["partitions"][0]
-    assert out == tmp_output
-    assert changed and all(p.suffix == ".parquet" for p in changed)
-    # The dataset upload (manifest etc.) still runs alongside it.
-    assert "dataset" in calls
-
-
-def test_run_skips_partition_upload_when_no_comments(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A dockets-only run must not call the comment-partition upload."""
-    store = {
-        _docket_key("EPA-2024-0001"): dumps(_docket_payload("EPA-2024-0001", "2024-01-01")).encode(),
-    }
-    monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
-
-    calls: dict[str, list] = {}
-    monkeypatch.setattr(regulations.r2, "upload_dataset", lambda out, types: calls.setdefault("dataset", []).append(1))
-    monkeypatch.setattr(
-        regulations.r2,
-        "upload_comment_partitions",
-        lambda out, changed: calls.setdefault("partitions", []).append(1),
-    )
-
-    RegulationsPipeline(
-        agency=AGENCY,
-        output_dir=tmp_output,
-        skip_comments=True,
-        skip_upload=False,
-    ).run()
-
-    assert "dataset" in calls
-    assert "partitions" not in calls
-
-
-def test_run_primes_comments_index_from_r2_before_merge(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """An incremental comments run must download the existing global index.
-
-    ``update_comments_index`` keeps the rows for partitions this batch didn't
-    touch by reading the local ``comments_index.parquet``. If that file is
-    never fetched from R2, the rebuilt index collapses to only this batch's
-    partitions and the upload shrink-guard aborts the run. Guard against the
-    regression by asserting the index is requested during the prime step and
-    that pre-existing rows survive the rebuild.
-    """
-    store = {
-        _comment_key("c1", "EPA-2024-0001"): dumps(
-            _comment_payload("c1", "EPA-2024-0001", "2024-01-01T00:00:00Z")
-        ).encode(),
-    }
-    monkeypatch.setattr(mirrulations, "s3_resource", lambda: _FakeS3Resource(store))
+    monkeypatch.setattr(regulations.iceberg, "merge_comments", fake_merge_comments)
     monkeypatch.setattr(regulations.r2, "upload_dataset", lambda out, types: None)
-    monkeypatch.setattr(regulations.r2, "upload_comment_partitions", lambda out, changed: None)
-
-    # A pre-existing remote index covering a partition this batch won't touch.
-    prior = pl.DataFrame(
-        {
-            "agency_code": ["NOAA"],
-            "docket_id": ["NOAA-2020-0009"],
-            "year": [2020],
-            "month": [5],
-            "row_count": [42],
-        },
-        schema={
-            "agency_code": pl.Utf8,
-            "docket_id": pl.Utf8,
-            "year": pl.Int64,
-            "month": pl.Int64,
-            "row_count": pl.Int64,
-        },
+    uploaded: list[str | None] = []
+    monkeypatch.setattr(regulations.r2, "upload_file", lambda path, remote_key=None: uploaded.append(remote_key))
+    monkeypatch.setattr(
+        regulations.r2, "upload_comment_partitions", lambda out, changed: pytest.fail("partitions uploaded")
     )
-
-    requested: list[str] = []
-
-    def fake_download(remote_key: str, local_path: Path) -> bool:
-        requested.append(remote_key)
-        if remote_key == "comments_index.parquet":
-            prior.write_parquet(local_path)
-            return True
-        return False  # partitions are absent on R2 in this test
-
-    monkeypatch.setattr(regulations.r2, "download", fake_download)
 
     RegulationsPipeline(
         agency=AGENCY,
         output_dir=tmp_output,
         only_comments=True,
+        use_iceberg=True,
         enrich_text=False,
         skip_upload=False,
     ).run()
 
-    assert "comments_index.parquet" in requested, "existing comment index was never fetched from R2"
-
-    index = pl.read_parquet(tmp_output / "comments_index.parquet")
-    keys = set(zip(index["agency_code"].to_list(), index["docket_id"].to_list()))
-    # The untouched NOAA partition survives the rebuild alongside the new EPA one.
-    assert ("NOAA", "NOAA-2020-0009") in keys
-    assert ("EPA", "EPA-2024-0001") in keys
+    assert uploaded == ["comments_index.parquet"]
 
 
 # --- CLI -------------------------------------------------------------------

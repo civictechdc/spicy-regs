@@ -2,8 +2,8 @@
 
 This is also the run file. Invoke it via the ``run-pipeline`` console script::
 
-    uv run run-pipeline --skip-upload --since-year 2025
-    uv run run-pipeline --agency EPA --no-skip-upload
+    uv run run-pipeline --skip-comments --since-year 2025
+    uv run run-pipeline --agency EPA --use-iceberg --no-skip-upload
 
 ``RegulationsPipeline.run()`` reads top-to-bottom as the data flow:
 
@@ -42,9 +42,7 @@ from spicy_regs.transforms import (
     EnrichCommentText,
     ExtractRecords,
     Transform,
-    merge_comments_partitioned,
     merge_staging_files,
-    update_comments_index,
     write_staging,
 )
 
@@ -93,13 +91,21 @@ class RegulationsPipeline(Pipeline):
         staging_dir.mkdir(parents=True, exist_ok=True)
 
         record_types = self._record_types()
+        # Comments have one write path: the Iceberg catalog. The pre-catalog
+        # path wrote a comments/agency_code=/docket_id=/year=/month= tree that
+        # nothing reads any more and that comments_index no longer describes
+        # (#201), so refuse rather than resurrect it.
+        if not self.use_iceberg and any(rt.name == "comments" for rt in record_types):
+            raise ValueError(
+                "Comments are written only through the Iceberg catalog: pass --use-iceberg or --skip-comments."
+            )
         agencies = self._agencies()
 
         # Chunked comments path: for an agency too large to buffer whole (millions
         # of comments would OOM), ingest its comments in bounded key-chunks,
-        # committing each into the catalog. Only meaningful for the iceberg
+        # committing each into the catalog. Only meaningful for the
         # comments-only case (the catalog is a row-level upsert surface).
-        if self.chunk_size and self.only_comments and self.use_iceberg:
+        if self.chunk_size and self.only_comments:
             manifest = Manifest.empty() if self.full_refresh else Manifest.load(output_dir)
             for agency in agencies:
                 self._ingest_comments_chunked(agency, output_dir, staging_dir, manifest)
@@ -153,9 +159,8 @@ class RegulationsPipeline(Pipeline):
 
         # 3. Transform: merge per-agency staging into the deduplicated dataset.
         staged = result.rows_by_type
-        changed_comments: list[Path] = []
         if any(staged.values()):
-            changed_comments = self._merge(staging_dir, output_dir, record_types, staged)
+            self._merge(staging_dir, output_dir, record_types, staged)
             rmtree(staging_dir, ignore_errors=True)
             # Rollups (feed_summary, agency_stats, agency_monthly_volume,
             # docket_search, rulemaking_lifecycles, discovery_signals,
@@ -172,15 +177,10 @@ class RegulationsPipeline(Pipeline):
         elif any(staged.values()):
             logger.info("Uploading to R2...")
             r2.upload_dataset(output_dir, [rt.name for rt in record_types if rt.name != "comments"])
-            # Comments are partitioned, not monolithic: publish the partitions
-            # changed this run plus the refreshed index.
-            if changed_comments:
-                logger.info("Uploading {} changed comment partitions...", len(changed_comments))
-                r2.upload_comment_partitions(output_dir, changed_comments)
-            # Iceberg comments path: the MERGE wrote the rows through the catalog
-            # (not under the public comments/ prefix), so there are no partition
-            # files to push — only the refreshed index needs publishing.
-            elif self.use_iceberg and staged.get("comments", 0) > 0:
+            # Comments: the MERGE wrote the rows through the catalog (not under
+            # the public comments/ prefix), so only the refreshed index needs
+            # publishing here; publish-comments-mirror regenerates the rest.
+            if staged.get("comments", 0) > 0:
                 index_file = output_dir / "comments_index.parquet"
                 if index_file.exists():
                     logger.info("Uploading refreshed comments index (Iceberg path)...")
@@ -296,22 +296,12 @@ class RegulationsPipeline(Pipeline):
     def _download_existing(self, output_dir: Path, record_types: list[RecordType]) -> None:
         """Fetch existing output from R2 so an incremental run appends to it.
 
-        Monolithic ``{type}.parquet`` files are pulled whole. Comment
-        *partitions* are large and fetched on demand during the merge, but the
-        global comment index must be primed here: ``update_comments_index``
-        rebuilds the index by keeping the existing rows for partitions this run
-        didn't touch, reading them from the local ``comments_index.parquet``.
-        Without the remote index on disk, a batch that stages new comments
-        rewrites the index down to only its own ~21 agencies' partitions — and
-        the upload shrink-guard then (correctly) aborts the run.
+        Monolithic ``{type}.parquet`` files are pulled whole. Comments live in
+        the catalog, and ``iceberg.merge_comments`` rebuilds the index from the
+        whole table, so there is nothing to prime for them.
         """
         for rt in record_types:
             if rt.name == "comments":
-                # Partitions are fetched on demand at merge, but the index is
-                # global — prime it so the rebuild keeps untouched partitions.
-                index_file = output_dir / "comments_index.parquet"
-                if not index_file.exists():
-                    r2.download("comments_index.parquet", index_file)
                 continue
             local = output_dir / f"{rt.name}.parquet"
             if not local.exists():
@@ -323,20 +313,16 @@ class RegulationsPipeline(Pipeline):
         output_dir: Path,
         record_types: list[RecordType],
         staged: dict[str, int],
-    ) -> list[Path]:
-        """Merge staging files: dockets/documents monolithically, comments partitioned.
+    ) -> None:
+        """Merge staging files: dockets/documents monolithically, comments into the catalog.
 
         When ``use_iceberg`` is set, the ``dockets`` table is routed through the
         R2 Data Catalog (Iceberg ``MERGE INTO`` + public Parquet export) instead
-        of the whole-file ``merge_staging_files`` rewrite, and ``comments`` are
-        routed through :func:`iceberg.merge_comments` (row-level upsert into the
-        catalog + index rebuild, no monolithic export) instead of the
-        partitioned ``merge_comments_partitioned`` path. ``documents`` stay on
-        the existing whole-file path until the Iceberg flow is vetted for them.
-
-        Returns the comment partition files changed this run (empty when no
-        comments were staged or when comments went through Iceberg), so the
-        caller can publish exactly those to R2.
+        of the whole-file ``merge_staging_files`` rewrite. ``comments`` always go
+        through :func:`iceberg.merge_comments` (row-level upsert into the catalog
+        + index rebuild, no monolithic export); ``run`` refuses comments without
+        ``use_iceberg``. ``documents`` stay on the existing whole-file path until
+        the Iceberg flow is vetted for them.
         """
         names = [rt.name for rt in record_types]
 
@@ -357,24 +343,10 @@ class RegulationsPipeline(Pipeline):
         for name in iceberg_names:
             iceberg.merge_and_export(staging_dir, output_dir, RECORD_TYPES[name])
 
-        changed_comments: list[Path] = []
         if "comments" in names and staged.get("comments", 0) > 0:
-            if self.use_iceberg:
-                # Row-level upsert into the catalog table (the read surface) and
-                # rebuild the index. No partition files are produced, so
-                # changed_comments stays empty and the caller publishes only the
-                # refreshed index.
-                iceberg.merge_comments(staging_dir, output_dir, RECORD_TYPES["comments"])
-            else:
-                changed_comments = merge_comments_partitioned(
-                    staging_dir,
-                    output_dir,
-                    schema=RECORD_TYPES["comments"].schema,
-                    dedup_key=RECORD_TYPES["comments"].dedup_key,
-                )
-                if changed_comments:
-                    update_comments_index(output_dir, changed_comments)
-        return changed_comments
+            # Row-level upsert into the catalog table (the read surface) and
+            # rebuild the index; the caller publishes only the refreshed index.
+            iceberg.merge_comments(staging_dir, output_dir, RECORD_TYPES["comments"])
 
 
 # --- CLI / run file --------------------------------------------------------
@@ -395,7 +367,9 @@ def main(
     batch_size: Annotated[int, Parameter(help="Agencies per batch")] = 45,
     full_refresh: Annotated[bool, Parameter(help="Ignore manifest + existing output")] = False,
     max_workers: Annotated[int, Parameter(help="Agencies processed in parallel")] = 4,
-    use_iceberg: Annotated[bool, Parameter(help="Route the dockets table through R2 Data Catalog (Iceberg)")] = False,
+    use_iceberg: Annotated[
+        bool, Parameter(help="Route dockets + comments through R2 Data Catalog (Iceberg); required for comments")
+    ] = False,
     enrich_text: Annotated[
         bool,
         Parameter(help="Fill comment text_content inline from Mirrulations derived-data extracted text"),
@@ -404,7 +378,7 @@ def main(
         int,
         Parameter(
             help="Ingest comments in bounded key-chunks of this size (0 = whole agency at once). "
-            "Use for agencies too large to buffer in memory; requires --only-comments --use-iceberg."
+            "Use for agencies too large to buffer in memory; requires --only-comments."
         ),
     ] = 0,
     verbose: Annotated[bool, Parameter(name=["--verbose", "-v"], help="Verbose logging")] = False,
