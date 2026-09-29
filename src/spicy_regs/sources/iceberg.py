@@ -35,6 +35,8 @@ Credentials are read from the environment, alongside the existing ``R2_*`` vars:
 """
 
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from os import getenv
 from pathlib import Path
 from urllib.parse import urlparse
@@ -133,6 +135,28 @@ def _staging_files(staging_dir: Path, record_type: RecordType) -> list[Path]:
     return sorted(staging_type_dir.glob("*.parquet"))
 
 
+@contextmanager
+def _transaction(con) -> Iterator[None]:
+    """Run the enclosed statements as one catalog commit, or not at all.
+
+    Outside a transaction every ``DELETE`` / ``INSERT`` is its own Iceberg commit,
+    so a job killed between the two (the ETL's 60-minute timeout, #202) leaves the
+    deleted rows gone until something re-inserts them. Inside one, DuckDB sends
+    both snapshots to the catalog in a single commit at ``COMMIT``; a process that
+    dies first commits nothing. Verified against an Iceberg REST catalog.
+    """
+    con.execute("BEGIN TRANSACTION;")
+    try:
+        yield
+    except BaseException:
+        try:
+            con.execute("ROLLBACK;")
+        except Exception as rollback_exc:  # the original error is the one worth raising
+            logger.warning("iceberg: ROLLBACK failed after an aborted write: {}", rollback_exc)
+        raise
+    con.execute("COMMIT;")
+
+
 def _merge(con, staging_files: list[Path], record_type: RecordType) -> None:
     """Row-level upsert of the staged rows into the Iceberg table.
 
@@ -199,9 +223,11 @@ def _merge(con, staging_files: list[Path], record_type: RecordType) -> None:
            OR s.modify_date > t.modify_date;
         """
     )
-    # 3. Upsert = delete exactly the winning keys, then insert their rows.
-    con.execute(f'DELETE FROM {tbl} WHERE "{key}" IN (SELECT "{key}" FROM {winners});')
-    con.execute(f"INSERT INTO {tbl} ({col_list}) SELECT {col_list} FROM {winners};")
+    # 3. Upsert = delete exactly the winning keys, then insert their rows, as one
+    #    commit so an interrupted run can't leave the keys deleted.
+    with _transaction(con):
+        con.execute(f'DELETE FROM {tbl} WHERE "{key}" IN (SELECT "{key}" FROM {winners});')
+        con.execute(f"INSERT INTO {tbl} ({col_list}) SELECT {col_list} FROM {winners};")
 
     con.execute(f"DROP TABLE IF EXISTS {staged};")
     con.execute(f"DROP TABLE IF EXISTS {winners};")
@@ -297,8 +323,6 @@ def seed_comments_from_parquet(
     """
     columns = list(record_type.schema)
     esc = _sql_str(source_glob)
-    if replace_agency is not None:
-        con.execute(f"DELETE FROM {_qualified(record_type)} WHERE agency_code = '{_sql_str(replace_agency)}';")
     present = {
         row[0]
         for row in con.execute(
@@ -309,13 +333,18 @@ def seed_comments_from_parquet(
         f'CAST("{c}" AS VARCHAR) AS "{c}"' if c in present else f'CAST(NULL AS VARCHAR) AS "{c}"' for c in columns
     )
     col_list = ", ".join(f'"{c}"' for c in columns)
-    con.execute(
-        f"""
-        INSERT INTO {_qualified(record_type)} ({col_list})
-        SELECT {projection}
-        FROM read_parquet('{esc}', union_by_name=true, hive_partitioning=false);
-        """
-    )
+    # One commit: an agency-wide DELETE that lands without its INSERT would leave
+    # the agency empty in the catalog.
+    with _transaction(con):
+        if replace_agency is not None:
+            con.execute(f"DELETE FROM {_qualified(record_type)} WHERE agency_code = '{_sql_str(replace_agency)}';")
+        con.execute(
+            f"""
+            INSERT INTO {_qualified(record_type)} ({col_list})
+            SELECT {projection}
+            FROM read_parquet('{esc}', union_by_name=true, hive_partitioning=false);
+            """
+        )
     return con.execute(f"SELECT count(*) FROM {_qualified(record_type)}").fetchone()[0]
 
 
@@ -464,10 +493,11 @@ def upsert_comment_text(con, record_type: RecordType, agency: str, updates) -> N
         WHERE r.comment_id = u.comment_id;
         """
     )
-    con.execute(
-        f"DELETE FROM {tbl} WHERE agency_code = '{ag}' AND comment_id IN (SELECT comment_id FROM _uct_replacement);"
-    )
-    con.execute(f"INSERT INTO {tbl} ({col_list}) SELECT {col_list} FROM _uct_replacement;")
+    with _transaction(con):
+        con.execute(
+            f"DELETE FROM {tbl} WHERE agency_code = '{ag}' AND comment_id IN (SELECT comment_id FROM _uct_replacement);"
+        )
+        con.execute(f"INSERT INTO {tbl} ({col_list}) SELECT {col_list} FROM _uct_replacement;")
     con.execute("DROP TABLE IF EXISTS _uct_updates;")
     con.execute("DROP TABLE IF EXISTS _uct_replacement;")
 
