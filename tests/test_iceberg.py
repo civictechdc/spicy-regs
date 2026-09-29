@@ -848,3 +848,73 @@ def test_backfill_rejects_a_source_without_the_key_column(tmp_path, local_catalo
 
     with pytest.raises(RuntimeError, match="docket_id"):
         iceberg.backfill_missing_from_parquet(con, str(snapshot), DOCKET)
+
+
+# --- interrupted writes (#202) ---------------------------------------------
+
+
+class _InsertFails:
+    """Connection proxy whose catalog INSERT raises after the DELETE has run,
+    standing in for a job killed between the two statements."""
+
+    def __init__(self, con) -> None:
+        self._con = con
+
+    def execute(self, sql: str, *args):
+        if sql.lstrip().startswith(f"INSERT INTO {iceberg._CATALOG_ALIAS}"):
+            raise KeyboardInterrupt("killed mid-upsert")
+        return self._con.execute(sql, *args)
+
+    def __getattr__(self, name):
+        return getattr(self._con, name)
+
+
+def test_merge_interrupted_after_delete_keeps_existing_rows(tmp_path, local_catalog) -> None:
+    con = local_catalog
+    iceberg._ensure_table(con, DOCKET)
+    staging = tmp_path / "staging"
+    _write_staging(staging, "EPA", [_docket("EPA-1", "EPA", "First", "2025-01-01")])
+    iceberg._merge(con, iceberg._staging_files(staging, DOCKET), DOCKET)
+
+    staging2 = tmp_path / "staging2"
+    _write_staging(staging2, "EPA", [_docket("EPA-1", "EPA", "First UPDATED", "2025-02-01")])
+    with pytest.raises(KeyboardInterrupt):
+        iceberg._merge(_InsertFails(con), iceberg._staging_files(staging2, DOCKET), DOCKET)
+
+    rows = con.execute(f"SELECT docket_id, title FROM {iceberg._qualified(DOCKET)}").fetchall()
+    assert rows == [("EPA-1", "First")]
+
+
+def test_seed_replace_agency_interrupted_leaves_agency_intact(tmp_path, local_catalog) -> None:
+    con = local_catalog
+    iceberg._ensure_table(con, COMMENT)
+    base = tmp_path / "seed.parquet"
+    rows = [
+        _comment("c1", "EPA-1", "EPA", "2025-01-01T00:00:00Z"),
+        _comment("c2", "EPA-1", "EPA", "2025-01-02T00:00:00Z"),
+    ]
+    pl.DataFrame(rows, schema=COMMENT.schema).write_parquet(base)
+    iceberg.seed_comments_from_parquet(con, str(base), COMMENT, replace_agency="EPA")
+
+    with pytest.raises(KeyboardInterrupt):
+        iceberg.seed_comments_from_parquet(_InsertFails(con), str(base), COMMENT, replace_agency="EPA")
+
+    assert con.execute(f"SELECT count(*) FROM {iceberg._qualified(COMMENT)}").fetchone()[0] == 2
+
+
+def test_upsert_comment_text_interrupted_keeps_rows(tmp_path, local_catalog) -> None:
+    con = local_catalog
+    iceberg._ensure_table(con, COMMENT)
+    base = tmp_path / "seed.parquet"
+    pl.DataFrame([_comment("c1", "EPA-1", "EPA", "2025-01-01T00:00:00Z")], schema=COMMENT.schema).write_parquet(base)
+    iceberg.seed_comments_from_parquet(con, str(base), COMMENT)
+
+    updates = pl.DataFrame(
+        {"comment_id": ["c1"], "_new_text": ["filled"], "_new_status": ["ok"]},
+        schema={"comment_id": pl.Utf8, "_new_text": pl.Utf8, "_new_status": pl.Utf8},
+    )
+    with pytest.raises(KeyboardInterrupt):
+        iceberg.upsert_comment_text(_InsertFails(con), COMMENT, "EPA", updates)
+
+    tbl = iceberg._qualified(COMMENT)
+    assert con.execute(f"SELECT comment_id, text_content FROM {tbl}").fetchall() == [("c1", None)]

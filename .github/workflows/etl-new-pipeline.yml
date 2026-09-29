@@ -140,7 +140,10 @@ jobs:
   etl-new:
     needs: setup
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # A batch with a heavy agency (batch 4: EPA, ~18 min to stage) plus the
+    # dockets catalog merge (15-40 min per batch) overran 60 minutes, and GitHub
+    # reports a timed-out job as "cancelled" (#202).
+    timeout-minutes: 120
     strategy:
       # Serialize batches: they all write the single Iceberg `comments` table, so
       # running them concurrently would contend on catalog commits.
