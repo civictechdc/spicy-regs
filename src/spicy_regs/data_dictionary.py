@@ -102,8 +102,8 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
 )
 
 # Schemas for the derived rollups. These mirror the SQL/Polars schemas in
-# src/spicy_regs/transforms/{build_feed_summary,build_agency_rollups,
-# update_comments_index}.py. Types are DuckDB type names, matching what a
+# src/spicy_regs/transforms/{build_feed_summary,build_agency_rollups}.py and
+# sources/iceberg.py (_build_comments_index). Types are DuckDB type names, matching what a
 # DESCRIBE of the published parquet returns (see `check --source r2`).
 DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
     "comments_index": [

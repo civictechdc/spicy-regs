@@ -71,9 +71,9 @@ on:
         default: true
         type: boolean
       use_iceberg:
-        description: 'Route dockets + comments through R2 Data Catalog (Iceberg). Dispatch runs only; scheduled runs always use Iceberg.'
+        description: 'Route dockets + comments through R2 Data Catalog (Iceberg). Required for comments. Dispatch runs only; scheduled runs always use Iceberg.'
         required: false
-        default: false
+        default: true
         type: boolean
 
 concurrency:

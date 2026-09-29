@@ -239,8 +239,9 @@ def _build_comments_index(con, record_type: RecordType, output_dir: Path) -> Pat
     artifact that ``build_feed_summary`` / ``build_agency_rollups`` read instead
     of scanning the full comments table. With comments living in the catalog
     there is no partitioned ``comments/`` tree to count, so the index is derived
-    straight from the table — keeping the same schema (agency_code, docket_id,
-    year, month, row_count) ``transforms.update_comments_index`` produces.
+    straight from the table — keeping the (agency_code, docket_id, year, month,
+    row_count) schema of the retired partition-tree index. It counts catalog
+    rows only; it is not a listing of files on R2 (#201).
 
     ``year`` / ``month`` come from ``posted_date`` to match the partitioning the
     legacy path used; ``docket_id`` is trimmed of stray quotes for the same
@@ -290,9 +291,8 @@ def seed_comments_from_parquet(
     them, since the plain ``INSERT`` does no dedup.
 
     Columns absent from every file in the glob (an older partition written before
-    a column was added) are inserted as ``NULL`` — mirroring the schema-evolution
-    handling in ``transforms.merge_comments_partitioned`` — so a mixed-vintage
-    tree loads cleanly. The connection + any S3 secret are set up by the caller
+    a column was added) are inserted as ``NULL``, so a mixed-vintage tree loads
+    cleanly. The connection + any S3 secret are set up by the caller
     so this stays testable against a local catalog and local files.
     """
     columns = list(record_type.schema)
