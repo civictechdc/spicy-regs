@@ -1,0 +1,80 @@
+name: Deploy MCP server
+
+# Builds the MCP container and deploys it to Cloud Run (mcp.spicy-regs.dev)
+# whenever code the server image contains changes on main. Runs the same
+# deploy/cloudrun/deploy.sh used for manual deploys, so the two can't drift;
+# the script's smoke check fails the job if the new revision is unhealthy.
+#
+# Auth is keyless (Workload Identity Federation): GitHub's OIDC token is
+# exchanged for the spicy-regs-deployer service account, scoped to this repo.
+# One-time GCP setup is documented in deploy/cloudrun/README.md. Needs repo
+# variables GCP_WORKLOAD_IDENTITY_PROVIDER and GCP_DEPLOY_SERVICE_ACCOUNT.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/spicy_regs/mcp_server.py'
+      - 'src/spicy_regs/_icon.py'
+      - 'pyproject.toml'
+      - 'deploy/cloudflare/Dockerfile'
+      - 'deploy/cloudrun/**'
+      - '.github/workflows/deploy-mcp.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+# Never run two deploys at once, and never cancel one mid-rollout.
+concurrency:
+  group: deploy-mcp
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run MCP server tests
+        run: uv run pytest tests/test_mcp_server.py
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: mcp-production
+      url: https://mcp.spicy-regs.dev
+    env:
+      PROJECT: spicy-regs-mcp
+      SKIP_BOOTSTRAP: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build, deploy and smoke-check
+        run: ./deploy/cloudrun/deploy.sh

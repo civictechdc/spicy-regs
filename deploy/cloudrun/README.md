@@ -24,6 +24,43 @@ PROJECT=spicy-regs-mcp ./deploy/cloudrun/deploy.sh
 The script enables APIs, ensures the Artifact Registry repo, builds+pushes the
 image (amd64), and deploys. It prints the service URL.
 
+## Continuous deploy
+
+`.github/workflows/deploy-mcp.yml` runs this same script on every push to
+`main` that touches the server (`mcp_server.py`, `_icon.py`, `pyproject.toml`,
+the Dockerfile, or this directory), after `tests/test_mcp_server.py` passes. It
+can also be run by hand from the Actions tab. A failed smoke check fails the
+job; the new revision is still serving, so roll back with the
+`update-traffic` command the script prints.
+
+Auth is keyless via Workload Identity Federation. One-time setup (already done
+for `spicy-regs-mcp`; repeat only for a new project):
+
+```bash
+PROJECT=spicy-regs-mcp
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT --format='value(projectNumber)')
+SA=spicy-regs-deployer@$PROJECT.iam.gserviceaccount.com
+
+gcloud iam service-accounts create spicy-regs-deployer --project $PROJECT
+for role in roles/run.admin roles/artifactregistry.writer roles/iam.serviceAccountUser; do
+  gcloud projects add-iam-policy-binding $PROJECT --member "serviceAccount:$SA" --role $role
+done
+
+gcloud iam workload-identity-pools create github --project $PROJECT --location global
+gcloud iam workload-identity-pools providers create-oidc github --project $PROJECT \
+  --location global --workload-identity-pool github \
+  --issuer-uri https://token.actions.githubusercontent.com \
+  --attribute-mapping 'google.subject=assertion.sub,attribute.repository=assertion.repository' \
+  --attribute-condition "assertion.repository == 'civictechdc/spicy-regs'"
+gcloud iam service-accounts add-iam-policy-binding $SA --project $PROJECT \
+  --role roles/iam.workloadIdentityUser \
+  --member "principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/attribute.repository/civictechdc/spicy-regs"
+
+gh variable set GCP_WORKLOAD_IDENTITY_PROVIDER \
+  --body "projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/github"
+gh variable set GCP_DEPLOY_SERVICE_ACCOUNT --body "$SA"
+```
+
 ## Two one-time hurdles we hit (documented so you don't rediscover them)
 
 1. **Billing quota.** Linking a *new* project to the Primary billing account
