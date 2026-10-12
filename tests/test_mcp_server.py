@@ -7,7 +7,7 @@ Covers the canonical MCP server implementation in ``spicy_regs.mcp_server``
 from __future__ import annotations
 
 import asyncio
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
@@ -60,7 +60,7 @@ def _tool_names(fastmcp) -> set[str]:
 
 def test_build_server_registers_expected_tools():
     server = mcp_server.build_server()
-    assert _tool_names(server) == {"list_sources", "describe_table", "query_sql"}
+    assert _tool_names(server) == {"list_sources", "describe_table", "query_sql", "prepare_comment"}
 
 
 # --- catalog config resolution ----------------------------------------------
@@ -582,3 +582,99 @@ def test_app_serves_landing_page_and_mcp_endpoint():
         )
         assert handshake.status_code == 200
         assert b'"spicy-regs"' in handshake.content
+
+
+# --- prepare_comment ----------------------------------------------------------
+
+_NOW = datetime(2026, 10, 12, 16, 0, tzinfo=timezone.utc)
+
+
+def _comment_fixture_connection() -> duckdb.DuckDBPyConnection:
+    con = duckdb.connect()
+    con.execute(
+        "CREATE TABLE dockets AS SELECT * FROM (VALUES "
+        "('USBC-2026-0628', 'USBC', 'Decennial Census residence criteria'), "
+        "('EPA-HQ-OAR-2001-0001', 'EPA', 'An old rule')) t(docket_id, agency_code, title)"
+    )
+    con.execute(
+        "CREATE TABLE documents AS SELECT * FROM (VALUES "
+        "('USBC-2026-0628-0001', 'USBC-2026-0628', 'Proposed Rule', 'Residence criteria', "
+        " '2026-09-10T04:00:00Z', '2026-11-03T04:59:59Z', NULL), "
+        "('USBC-2026-0628-0003', 'USBC-2026-0628', 'Notice', 'Information collection', "
+        " '2026-09-20T04:00:00Z', '2026-10-20T03:59:59Z', NULL), "
+        "('USBC-2026-0628-0004', 'USBC-2026-0628', 'Notice', 'Withdrawn notice', "
+        " '2026-09-20T04:00:00Z', '2026-12-01T04:59:59Z', 'true'), "
+        "('USBC-2026-0628-0005', 'USBC-2026-0628', 'Notice', 'Not open yet', "
+        " '2026-11-01T04:00:00Z', '2026-12-01T04:59:59Z', NULL), "
+        "('USBC-2026-0628-0002', 'USBC-2026-0628', 'Supporting & Related Material', 'Impact analysis', "
+        " '2026-09-10T04:00:00Z', NULL, NULL), "
+        "('EPA-HQ-OAR-2001-0001-0001', 'EPA-HQ-OAR-2001-0001', 'Proposed Rule', 'Old', "
+        " '2001-01-01T05:00:00Z', '2001-03-01T04:59:59Z', NULL)"
+        ") t(document_id, docket_id, document_type, title, comment_start_date, comment_end_date, withdrawn)"
+    )
+    return con
+
+
+def test_build_server_registers_prepare_comment():
+    assert "prepare_comment" in _tool_names(mcp_server.build_server())
+
+
+def test_prepare_comment_lists_open_documents_proposed_rule_first():
+    result = mcp_server._prepare_comment(_comment_fixture_connection(), "USBC-2026-0628", "", _NOW)
+
+    assert result["status"] == "open"
+    assert [d["document_id"] for d in result["open_documents"]] == ["USBC-2026-0628-0001", "USBC-2026-0628-0003"]
+    first = result["open_documents"][0]
+    assert first["comment_url"] == "https://www.regulations.gov/commenton/USBC-2026-0628-0001"
+    assert first["days_left"] == 21
+    assert "draft_check" not in result
+    assert "does not submit" in result["how_to_submit"]
+
+
+def test_prepare_comment_reports_closed_docket_with_last_deadline():
+    result = mcp_server._prepare_comment(_comment_fixture_connection(), "EPA-HQ-OAR-2001-0001", "", _NOW)
+
+    assert result["status"] == "closed"
+    assert result["open_documents"] == []
+    assert result["last_comment_deadline"] == "2001-03-01T04:59:59+00:00"
+    assert "comment_url" not in result["how_to_submit"]
+
+
+def test_prepare_comment_unknown_docket():
+    result = mcp_server._prepare_comment(_comment_fixture_connection(), "NOPE-2026-0001", "", _NOW)
+    assert "not in the Spicy Regs mirror" in result["error"]
+
+
+@pytest.mark.parametrize("bad", ["", "x", "USBC'; DROP TABLE dockets; --", "USBC 2026 0628"])
+def test_prepare_comment_rejects_malformed_ids(bad):
+    con = _comment_fixture_connection()
+    result = mcp_server._prepare_comment(con, bad, "", _NOW)
+    assert "Not a docket ID" in result["error"]
+    assert con.execute("SELECT count(*) FROM dockets").fetchone() == (2,)
+
+
+def test_prepare_comment_checks_draft_length():
+    con = _comment_fixture_connection()
+    fits = mcp_server._prepare_comment(con, "USBC-2026-0628", "I oppose this rule.", _NOW)["draft_check"]
+    assert fits["fits_comment_box"] is True
+    assert "advice" not in fits
+
+    too_long = mcp_server._prepare_comment(con, "USBC-2026-0628", "a" * 5001, _NOW)["draft_check"]
+    assert too_long["fits_comment_box"] is False
+    assert "attached file" in too_long["advice"]
+
+
+def test_prepare_comment_counts_utf8_bytes_against_the_limit():
+    check = mcp_server._check_draft("é" * 2600)
+    assert check["characters"] == 2600
+    assert check["utf8_bytes"] == 5200
+    assert check["fits_comment_box"] is False
+
+
+def test_prepare_comment_tool_runs_through_the_server(monkeypatch):
+    monkeypatch.setattr(mcp_server, "_build_connection", _comment_fixture_connection)
+    server = mcp_server.build_server()
+
+    result = asyncio.run(server.call_tool("prepare_comment", {"docket_id": "USBC-2026-0628"}))
+
+    assert "commenton/USBC-2026-0628-0001" in str(result)

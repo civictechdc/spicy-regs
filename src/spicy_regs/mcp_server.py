@@ -8,7 +8,7 @@ import tempfile
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
@@ -87,8 +87,16 @@ INSTRUCTIONS = (
     "the public Cloudflare R2 parquet bucket. Use list_sources to discover "
     "tables, describe_table for schemas, and query_sql for everything else. "
     "Always LIMIT result sets while exploring. Cite docket IDs, document "
-    "IDs, comment IDs, agency codes, and dates from the rows you return."
+    "IDs, comment IDs, agency codes, and dates from the rows you return. "
+    "When someone wants to comment on a rule, use prepare_comment: it finds "
+    "the document open for comment and checks their draft, and they submit "
+    "it themselves on regulations.gov. Help them say what they think in "
+    "their own words; never submit or invent comments for anyone."
 )
+
+REGULATIONS_GOV = "https://www.regulations.gov"
+COMMENT_MAX_CHARS = 5000
+DOCKET_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{2,63}")
 
 ICONS = [Icon(src=ICON_DATA_URI, mimeType="image/png", sizes=["512x512"])]
 
@@ -358,6 +366,114 @@ def _statement_timeout(cursor: duckdb.DuckDBPyConnection) -> Iterator[None]:
         timer.cancel()
 
 
+def _parse_utc(value: Any) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _check_draft(draft: str) -> dict[str, Any]:
+    chars = len(draft)
+    utf8_bytes = len(draft.encode("utf-8"))
+    over = utf8_bytes > COMMENT_MAX_CHARS
+    check: dict[str, Any] = {
+        "characters": chars,
+        "utf8_bytes": utf8_bytes,
+        "limit": COMMENT_MAX_CHARS,
+        "fits_comment_box": not over,
+    }
+    if over:
+        check["advice"] = (
+            f"The regulations.gov comment box takes at most {COMMENT_MAX_CHARS} characters. "
+            "Shorten it, or put the full text in an attached file and summarize it in the box."
+        )
+    return check
+
+
+def _prepare_comment(
+    cursor: duckdb.DuckDBPyConnection,
+    docket_id: str,
+    draft: str,
+    now: datetime,
+) -> dict[str, Any]:
+    docket_id = docket_id.strip()
+    if not DOCKET_ID_PATTERN.fullmatch(docket_id):
+        return {"error": f"Not a docket ID: {docket_id!r}. Docket IDs look like 'USBC-2026-0628'."}
+
+    docket = cursor.execute(
+        "SELECT docket_id, agency_code, title FROM dockets WHERE docket_id = ? LIMIT 1",
+        [docket_id],
+    ).fetchone()
+    if docket is None:
+        return {"error": f"Docket {docket_id} is not in the Spicy Regs mirror."}
+
+    rows = cursor.execute(
+        "SELECT document_id, document_type, title, comment_start_date, comment_end_date, withdrawn "
+        "FROM documents WHERE docket_id = ? AND comment_end_date IS NOT NULL",
+        [docket_id],
+    ).fetchall()
+
+    open_documents = []
+    latest_close: datetime | None = None
+    for document_id, document_type, title, start_raw, end_raw, withdrawn in rows:
+        if str(withdrawn).strip().lower() in ("true", "1", "yes"):
+            continue
+        closes = _parse_utc(end_raw)
+        if closes is None:
+            continue
+        if latest_close is None or closes > latest_close:
+            latest_close = closes
+        opens = _parse_utc(start_raw)
+        if closes <= now or (opens is not None and opens > now):
+            continue
+        open_documents.append(
+            {
+                "document_id": document_id,
+                "document_type": document_type,
+                "title": title,
+                "comment_start_date": _jsonify(start_raw),
+                "comment_end_date": _jsonify(end_raw),
+                "days_left": max(0, (closes - now).days),
+                "comment_url": f"{REGULATIONS_GOV}/commenton/{document_id}",
+                "document_url": f"{REGULATIONS_GOV}/document/{document_id}",
+            }
+        )
+    open_documents.sort(key=lambda d: (d["document_type"] != "Proposed Rule", d["comment_end_date"]))
+
+    result: dict[str, Any] = {
+        "docket_id": docket[0],
+        "agency_code": docket[1],
+        "docket_title": docket[2],
+        "docket_url": f"{REGULATIONS_GOV}/docket/{docket[0]}",
+        "checked_at": now.isoformat(timespec="seconds"),
+        "status": "open" if open_documents else "closed",
+        "open_documents": open_documents,
+        "how_to_submit": (
+            "Spicy Regs does not submit comments. Open comment_url, paste the comment, "
+            "and submit it on regulations.gov. Deadlines change when agencies extend them, "
+            "and this mirror refreshes nightly, so confirm the date on that page."
+        ),
+    }
+    if not open_documents:
+        result["last_comment_deadline"] = latest_close.isoformat(timespec="seconds") if latest_close else None
+        result["how_to_submit"] = (
+            "Nothing in this docket is open for comment in the mirror. Check docket_url in case "
+            "the agency reopened or extended the comment period since the last nightly refresh."
+        )
+    if draft.strip():
+        result["draft_check"] = _check_draft(draft)
+    return result
+
+
 def _register_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def list_sources() -> dict[str, Any]:
@@ -429,6 +545,23 @@ def _register_tools(mcp: FastMCP) -> None:
             "max_rows": max_rows,
             "rows": result_rows,
         }
+
+    @mcp.tool()
+    def prepare_comment(docket_id: str, draft: str = "") -> dict[str, Any]:
+        """Get ready to comment on a docket: find where to submit, and check a draft.
+
+        Returns the docket's documents that are open for public comment right
+        now, each with its deadline, days left, and the regulations.gov
+        comment_url where the person submits. If draft is given, also reports
+        whether it fits the 5,000-character comment box.
+
+        This tool never submits anything. The person reviews their comment and
+        submits it themselves at comment_url. Help them write in their own
+        words; agencies weigh the substance of comments, not their number.
+        """
+        cursor = _get_connection().cursor()
+        with _statement_timeout(cursor):
+            return _prepare_comment(cursor, docket_id, draft, datetime.now(timezone.utc))
 
 
 def build_server() -> FastMCP:

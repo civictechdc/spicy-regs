@@ -18,7 +18,7 @@ and why.
 
 ## What must never be deleted
 
-**The three `@mcp.tool()` docstrings are not documentation — do not delete them.**
+**The four `@mcp.tool()` docstrings are not documentation — do not delete them.**
 FastMCP reflects over `fn.__doc__` to build the tool descriptions sent to every
 client during `list_tools`. `describe_table`'s docstring is how a client learns
 which tables are valid; `query_sql`'s is how it learns the available views.
@@ -140,6 +140,30 @@ Deliberate. The deployment is reached via `mcp.spicy-regs.dev` and per-deploy Cl
 `*.run.app` hosts; FastMCP's default localhost-only allowlist would reject all
 of them with **421**. The server is public, stateless, and read-only, so
 rebinding protection buys nothing.
+
+## `prepare_comment` and why it never submits
+
+`prepare_comment(docket_id, draft)` looks up the docket's documents whose
+comment window contains "now", sorts any Proposed Rule first, and returns each
+one's `https://www.regulations.gov/commenton/<document_id>` link. With a draft it
+reports characters and UTF-8 bytes against the API's 5,000 limit (GSA states the
+limit as "characters/bytes"; UTF-8 bytes are never fewer than characters, so the
+byte count is the one checked).
+
+It deliberately stops there. Regulations.gov does have a `POST /v4/comments`
+API, but it needs a separate commenting key whose holder certifies that every
+comment is from a real person, under a fixed 50/minute and 500/hour limit. On
+this unauthenticated public server that key would be shared by every caller:
+one person scripting comments could get it revoked for everyone, and Spicy Regs
+would be certifying text it never saw a person write. So the person submits on
+regulations.gov themselves. A bring-your-own-key submit tool, if it is ever
+added, belongs in the local stdio server only, never in `build_app`.
+
+The docket ID is checked against `DOCKET_ID_PATTERN` and both lookups are
+parameterized, so this tool takes no SQL from the caller. Withdrawn documents
+and windows that have not opened yet are skipped. Dates come from the nightly
+mirror, so the response tells the caller to confirm the deadline on the linked
+page; an extension published today will not show until tomorrow.
 
 ## Other invariants
 
