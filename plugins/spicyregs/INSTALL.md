@@ -32,7 +32,7 @@ claude mcp add spicy-regs -- uvx --from "spicy-regs @ git+https://github.com/civ
 claude mcp add --transport http spicy-regs https://<your-vercel-deploy>.vercel.app/mcp
 ```
 
-You get `list_sources`, `describe_table`, and `query_sql` either way. The
+You get `list_sources`, `describe_table`, `query_sql`, and `prepare_comment` either way. The
 plugin install above pairs the skill's workflow guidance on top of these
 tools.
 
