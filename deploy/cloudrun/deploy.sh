@@ -18,6 +18,11 @@
 #
 # Usage:
 #   PROJECT=spicy-regs-mcp ./deploy/cloudrun/deploy.sh
+#
+# CI (.github/workflows/deploy-mcp.yml) runs this same script with
+# SKIP_BOOTSTRAP=1: enabling APIs and creating the Artifact Registry repo are
+# one-time setup that would need far broader IAM than the deploy service account
+# has, so CI skips steps 1-2 and only builds, pushes, deploys and smoke-checks.
 set -euo pipefail
 
 : "${PROJECT:?set PROJECT to your GCP project id}"
@@ -36,12 +41,16 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/${AR_REPO}/mcp:$(git -C "$ROOT" rev-parse --short HEAD)"
 
-echo "1/6 Enable APIs"
-gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com --project "$PROJECT"
+if [ "${SKIP_BOOTSTRAP:-0}" = 1 ]; then
+  echo "1-2/6 Skipping API enable + Artifact Registry repo (SKIP_BOOTSTRAP=1)"
+else
+  echo "1/6 Enable APIs"
+  gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com --project "$PROJECT"
 
-echo "2/6 Ensure Artifact Registry repo"
-gcloud artifacts repositories describe "$AR_REPO" --location "$REGION" --project "$PROJECT" >/dev/null 2>&1 || \
-  gcloud artifacts repositories create "$AR_REPO" --repository-format=docker --location "$REGION" --project "$PROJECT"
+  echo "2/6 Ensure Artifact Registry repo"
+  gcloud artifacts repositories describe "$AR_REPO" --location "$REGION" --project "$PROJECT" >/dev/null 2>&1 || \
+    gcloud artifacts repositories create "$AR_REPO" --repository-format=docker --location "$REGION" --project "$PROJECT"
+fi
 
 echo "3/6 Build + push (amd64 — Cloud Run requires it; reuses the shared Dockerfile)"
 gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
