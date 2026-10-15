@@ -18,7 +18,7 @@ and why.
 
 ## What must never be deleted
 
-**The four `@mcp.tool()` docstrings are not documentation — do not delete them.**
+**The five `@mcp.tool()` docstrings are not documentation — do not delete them.**
 FastMCP reflects over `fn.__doc__` to build the tool descriptions sent to every
 client during `list_tools`. `describe_table`'s docstring is how a client learns
 which tables are valid; `query_sql`'s is how it learns the available views.
@@ -140,6 +140,45 @@ Deliberate. The deployment is reached via `mcp.spicy-regs.dev` and per-deploy Cl
 `*.run.app` hosts; FastMCP's default localhost-only allowlist would reject all
 of them with **421**. The server is public, stateless, and read-only, so
 rebinding protection buys nothing.
+
+## `get_rule_text` and where the text comes from
+
+`get_rule_text(document, section, offset, max_chars)` returns the text of a
+Federal Register document, usually a proposed or final rule. It resolves the
+argument in this order: a Federal Register document number (`2026-18481`) is
+used as is; a regulations.gov document ID uses that row's `documents.fr_doc_num`;
+a docket ID picks the docket's documents that have an `fr_doc_num`, preferring
+Proposed Rule, then Rule, then the most recently posted, and lists the rest as
+`other_notices_in_docket`. It does **not** match on
+`federal_register.docket_ids_json`: the Federal Register records the agency's
+own docket number there (the Census rule lists `Docket No. 260903-0005`, not
+`USBC-2026-0628`), so that join misses. Agency catch-all dockets
+(`*_FRDOC_0001`) hold thousands of unrelated notices, so they are refused with
+a request for a specific document.
+
+The text comes from GPO's copy on govinfo.gov,
+`https://www.govinfo.gov/content/pkg/FR-<publication_date>/html/<number>.htm`,
+not from federalregister.gov. The `full_text` URLs the Federal Register API
+hands out answer automated clients with a CAPTCHA page ("Request Access"),
+even though the JSON API itself works. govinfo serves the same document as
+plain text inside one `<pre>`, which is also byte-identical to the `content.html`
+regulations.gov attaches to the document. The fetch refuses to follow a
+redirect off `www.govinfo.gov`, caps the download at `RULE_TEXT_MAX_BYTES`, and
+keeps the last 16 documents in an `lru_cache`, so paging through one rule
+fetches it once per instance.
+
+Structure is read from the text's own conventions. A heading is a line, after
+a blank line, that starts `PART <n>--` or `Sec.  <n.n>  <title>`; the blank-line
+rule keeps inline references such as "in accordance with Sec.  60.2." from
+being taken as headings. `[[Page n]]` markers are dropped. One section ends at
+the next heading, the `[FR Doc.` trailer, or a numbered amendatory instruction
+("3. Amend Sec. 751.307 by…"), because final rules interleave those between
+the sections they change; a whole part keeps its instructions. Text is paged
+with `offset` / `next_offset` so a 300-page rule never lands in one response.
+
+`comments_close_on_in_notice` is the deadline printed in the notice and goes
+stale when an agency extends the period; `prepare_comment` reads the current
+deadline from `documents`.
 
 ## `prepare_comment` and why it never submits
 

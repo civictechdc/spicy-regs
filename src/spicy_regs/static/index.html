@@ -221,7 +221,7 @@
     <!-- Tools -->
     <div class="tools">
       <h2>Tools exposed</h2>
-      <p class="sub">Four read-only tools, querying parquet on Cloudflare R2 via DuckDB.</p>
+      <p class="sub">Five read-only tools, querying parquet on Cloudflare R2 via DuckDB.</p>
       <dl>
         <dt>list_sources</dt>
         <dd>List the logical tables available in the dataset.</dd>
@@ -229,6 +229,8 @@
         <dd>Return the column schema for one table.</dd>
         <dt>query_sql(sql, max_rows=25)</dt>
         <dd>Run a read-only SQL query against the views below (always <code class="inline">LIMIT</code> while exploring).</dd>
+        <dt>get_rule_text(document, section="")</dt>
+        <dd>Read what a proposed or final rule actually says: an outline of its CFR parts and sections, then any section (like <code class="inline">60.4</code>) from the official Federal Register text.</dd>
         <dt>prepare_comment(docket_id, draft="")</dt>
         <dd>Find the documents open for comment on a docket, check a draft against the 5,000-character limit, and get the regulations.gov link to submit it yourself. It never submits anything.</dd>
       </dl>

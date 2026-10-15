@@ -235,8 +235,10 @@ from the schema.
 ## Use it from an AI assistant
 
 A read-only MCP server exposes SQL over the corpus with `list_sources()`,
-`describe_table(table)`, and `query_sql(sql)`. A fourth tool,
-`prepare_comment(docket_id, draft)`, helps you comment on an open rule: it finds
+`describe_table(table)`, and `query_sql(sql)`. `get_rule_text(document, section)`
+reads a rule's actual text from the Federal Register: an outline of its CFR
+parts and sections first, then any section you ask for. And
+`prepare_comment(docket_id, draft)` helps you comment on an open rule: it finds
 the document taking comments, checks your draft against the 5,000-character
 limit, and gives you the regulations.gov link. You submit the comment yourself;
 the server never posts anything.

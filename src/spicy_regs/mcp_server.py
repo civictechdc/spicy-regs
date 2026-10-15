@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import base64
+import json
 import logging
 import os
 import re
 import tempfile
 import threading
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from functools import lru_cache
+from html import unescape
 from pathlib import Path
 from time import monotonic as _monotonic
 from typing import Any
@@ -18,6 +20,7 @@ from urllib.parse import urlparse
 from uuid import UUID
 
 import duckdb
+import httpx
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import Icon
@@ -88,6 +91,8 @@ INSTRUCTIONS = (
     "tables, describe_table for schemas, and query_sql for everything else. "
     "Always LIMIT result sets while exploring. Cite docket IDs, document "
     "IDs, comment IDs, agency codes, and dates from the rows you return. "
+    "To read what a proposed or final rule actually says, use get_rule_text: "
+    "call it once for the outline, then ask for a section such as '60.4'. "
     "When someone wants to comment on a rule, use prepare_comment: it finds "
     "the document open for comment and checks their draft, and they submit "
     "it themselves on regulations.gov. Help them say what they think in "
@@ -95,8 +100,25 @@ INSTRUCTIONS = (
 )
 
 REGULATIONS_GOV = "https://www.regulations.gov"
+USER_AGENT = "spicy-regs-mcp (+https://github.com/civictechdc/spicy-regs)"
 COMMENT_MAX_CHARS = 5000
 DOCKET_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{2,63}")
+
+GOVINFO_FR_URL = "https://www.govinfo.gov/content/pkg/FR-{date}/html/{number}.htm"
+FR_DOC_NUMBER_PATTERN = re.compile(r"(?:FR\s*Doc\.?\s*)?(\d{4}-\d{4,6})", re.IGNORECASE)
+RULE_TEXT_MAX_BYTES = 8 * 1024 * 1024
+RULE_TEXT_DEFAULT_CHARS = 8000
+RULE_TEXT_MAX_CHARS = 20000
+RULE_TYPE_PRIORITY = ("Proposed Rule", "Rule", "Interim Final Rule", "Direct Final Rule")
+_SECTION_HEADING = re.compile(r"^Sec\.\s+(\d+[A-Za-z]?\.\d+[A-Za-z0-9-]*)\s+(\S.*)$")
+_PART_HEADING = re.compile(r"^PART\s+(\d+[A-Za-z]?)\s*--\s*(.*)$")
+_PAGE_MARKER = re.compile(r"^\s*\[\[Page \d+\]\]\s*$")
+_SECTION_ARG = re.compile(r"^(?:§+|sec(?:tion)?\.?)?\s*(\d+[A-Za-z]?\.\d+[A-Za-z0-9-]*)$", re.IGNORECASE)
+_PART_ARG = re.compile(r"^part\s+(\d+[A-Za-z]?)$", re.IGNORECASE)
+_AMENDATORY_INSTRUCTION = re.compile(
+    r"^\d+\.\s+(Amend|Revise|Add|Remove|Redesignate|Republish|Suspend|Reserve|Effective|"
+    r"The authority citation|In Sec\.|Section|Part|Subpart|Appendix)\b"
+)
 
 ICONS = [Icon(src=ICON_DATA_URI, mimeType="image/png", sizes=["512x512"])]
 
@@ -474,6 +496,269 @@ def _prepare_comment(
     return result
 
 
+class RuleTextError(RuntimeError):
+    pass
+
+
+def _fetch_url_text(url: str) -> str:
+    with httpx.Client(timeout=20.0, follow_redirects=True, headers={"User-Agent": USER_AGENT}) as client:
+        with client.stream("GET", url) as response:
+            if urlparse(str(response.url)).hostname != "www.govinfo.gov":
+                raise RuleTextError(f"govinfo redirected off its own host to {response.url}")
+            if response.status_code == 404:
+                raise RuleTextError("govinfo has no text for this document yet")
+            response.raise_for_status()
+            chunks = []
+            size = 0
+            for chunk in response.iter_bytes():
+                size += len(chunk)
+                if size > RULE_TEXT_MAX_BYTES:
+                    raise RuleTextError(f"the document is larger than {RULE_TEXT_MAX_BYTES // (1024 * 1024)} MB")
+                chunks.append(chunk)
+            encoding = response.encoding or "utf-8"
+    return b"".join(chunks).decode(encoding, errors="replace")
+
+
+def _govinfo_text(page: str) -> str:
+    match = re.search(r"<pre>(.*)</pre>", page, re.DOTALL | re.IGNORECASE)
+    body = unescape(re.sub(r"<[^>]+>", "", match.group(1) if match else page))
+    lines = [line.rstrip() for line in body.splitlines() if not _PAGE_MARKER.match(line)]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+
+@lru_cache(maxsize=16)
+def _fetch_rule_text(document_number: str, publication_date: str) -> str:
+    return _govinfo_text(_fetch_url_text(GOVINFO_FR_URL.format(date=publication_date, number=document_number)))
+
+
+def _rule_structure(text: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    lines = text.splitlines()
+    parts: list[dict[str, Any]] = []
+    sections: list[dict[str, Any]] = []
+    current_part = None
+    for i, line in enumerate(lines):
+        if i > 0 and lines[i - 1].strip():
+            continue
+        following = lines[i + 1].strip() if i + 1 < len(lines) else ""
+        part = _PART_HEADING.match(line)
+        if part:
+            current_part = part.group(1)
+            title = part.group(2).strip()
+            if following and following.isupper():
+                title = f"{title} {following}"
+            parts.append({"part": current_part, "title": " ".join(title.split()), "line": i})
+            continue
+        section = _SECTION_HEADING.match(line)
+        if section:
+            title = section.group(2).strip()
+            if following and not title.endswith("."):
+                title = f"{title} {following}"
+            sections.append(
+                {"section": section.group(1), "title": " ".join(title.split()), "part": current_part, "line": i}
+            )
+    return parts, sections
+
+
+def _slice_lines(text: str, start: int, stops: list[int], stop_at_instructions: bool) -> str:
+    lines = text.splitlines()
+    end = min([s for s in stops if s > start], default=len(lines))
+    for j in range(start + 1, end):
+        if lines[j].startswith("[FR Doc") or (stop_at_instructions and _AMENDATORY_INSTRUCTION.match(lines[j])):
+            end = j
+            break
+    while end > start + 1 and lines[end - 1].strip() in ("", "0"):
+        end -= 1
+    return "\n".join(lines[start:end]).strip()
+
+
+def _labeled_paragraph(text: str, label: str) -> str | None:
+    match = re.search(rf"^{label}:\s*(.*?)(?:\n\s*\n|\Z)", text, re.MULTILINE | re.DOTALL)
+    return " ".join(match.group(1).split())[:1500] if match else None
+
+
+def _page_of(text: str, offset: int, max_chars: int) -> dict[str, Any]:
+    chunk = text[offset : offset + max_chars]
+    end = offset + len(chunk)
+    return {
+        "text": chunk,
+        "offset": offset,
+        "total_chars": len(text),
+        "next_offset": end if end < len(text) else None,
+    }
+
+
+def _resolve_fr_number(
+    cursor: duckdb.DuckDBPyConnection, ref: str
+) -> tuple[str | None, list[dict[str, Any]], str | None]:
+    fr_match = FR_DOC_NUMBER_PATTERN.fullmatch(ref)
+    if fr_match:
+        return fr_match.group(1), [], None
+    if not DOCKET_ID_PATTERN.fullmatch(ref):
+        return (
+            None,
+            [],
+            (
+                f"Not a docket, document, or Federal Register number: {ref!r}. "
+                "Try 'USBC-2026-0628', 'USBC-2026-0628-0001', or '2026-18481'."
+            ),
+        )
+    rows = cursor.execute(
+        "SELECT document_id, document_type, title, posted_date, fr_doc_num FROM documents "
+        "WHERE (document_id = ? OR docket_id = ?) AND fr_doc_num IS NOT NULL AND fr_doc_num <> ''",
+        [ref, ref],
+    ).fetchall()
+    candidates = []
+    for document_id, document_type, title, posted, fr_doc_num in rows:
+        number = FR_DOC_NUMBER_PATTERN.search(str(fr_doc_num))
+        if number:
+            candidates.append(
+                {
+                    "document_id": document_id,
+                    "document_type": document_type,
+                    "title": title,
+                    "posted_date": _jsonify(posted),
+                    "fr_doc_num": number.group(1),
+                }
+            )
+    if not candidates:
+        return (
+            None,
+            [],
+            (
+                f"No Federal Register notice is linked to {ref} in the mirror. "
+                "Pass its Federal Register document number (e.g. '2026-18481') instead."
+            ),
+        )
+    exact = [c for c in candidates if c["document_id"] == ref]
+    if exact:
+        return exact[0]["fr_doc_num"], [], None
+    if "_FRDOC_" in ref.upper():
+        return (
+            None,
+            [],
+            (
+                f"{ref} is an agency catch-all docket holding many unrelated notices. "
+                "Pass the regulations.gov document ID or the Federal Register document number instead."
+            ),
+        )
+
+    def priority(c: dict[str, Any]) -> int:
+        kind = c["document_type"] or ""
+        return RULE_TYPE_PRIORITY.index(kind) if kind in RULE_TYPE_PRIORITY else len(RULE_TYPE_PRIORITY)
+
+    candidates.sort(key=lambda c: c["posted_date"] or "", reverse=True)
+    candidates.sort(key=priority)
+    return candidates[0]["fr_doc_num"], candidates[1:10], None
+
+
+def _get_rule_text(
+    cursor: duckdb.DuckDBPyConnection,
+    document: str,
+    section: str,
+    offset: int,
+    max_chars: int,
+    fetch: Callable[[str, str], str] | None = None,
+) -> dict[str, Any]:
+    if max_chars < 500 or max_chars > RULE_TEXT_MAX_CHARS:
+        return {"error": f"max_chars must be between 500 and {RULE_TEXT_MAX_CHARS}"}
+    if offset < 0:
+        return {"error": "offset must be 0 or more"}
+
+    number, others, error = _resolve_fr_number(cursor, document.strip())
+    if error:
+        return {"error": error}
+
+    row = cursor.execute(
+        "SELECT document_number, title, document_type, publication_date, comments_close_on, abstract, "
+        "cfr_references_json, regulation_id_numbers_json, html_url "
+        "FROM federal_register WHERE document_number = ? LIMIT 1",
+        [number],
+    ).fetchone()
+    if row is None:
+        return {"error": f"Federal Register document {number} is not in the mirror's federal_register table."}
+    number, title, doc_type, published, closes, abstract, cfr_json, rin_json, html_url = row
+    published = str(published or "")[:10]
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", published):
+        return {"error": f"Federal Register document {number} has no usable publication date."}
+
+    result: dict[str, Any] = {
+        "fr_document_number": number,
+        "title": title,
+        "document_type": doc_type,
+        "publication_date": published,
+        "comments_close_on_in_notice": _jsonify(closes),
+        "cfr_references": _json_list(cfr_json),
+        "rins": _json_list(rin_json),
+        "federal_register_url": html_url,
+        "source": GOVINFO_FR_URL.format(date=published, number=number),
+    }
+    if others:
+        result["other_notices_in_docket"] = others
+
+    try:
+        text = (fetch or _fetch_rule_text)(number, published)
+    except (RuleTextError, httpx.HTTPError) as exc:
+        result["error"] = f"Could not fetch the text from govinfo: {exc}. Read it at federal_register_url."
+        return result
+
+    parts, sections = _rule_structure(text)
+    wanted = section.strip()
+    if not wanted:
+        result.update(
+            {
+                "mode": "outline",
+                "summary": abstract or _labeled_paragraph(text, "SUMMARY"),
+                "dates": _labeled_paragraph(text, "DATES"),
+                "parts": [{"part": p["part"], "title": p["title"]} for p in parts],
+                "sections": [{"section": s["section"], "title": s["title"], "part": s["part"]} for s in sections],
+                "total_chars": len(text),
+                "next_step": (
+                    "Call again with section='<number>' (e.g. '"
+                    + (sections[0]["section"] if sections else "60.1")
+                    + "') for one section, 'part <n>' for a whole part, or 'full' for the whole document in pages."
+                    if sections
+                    else "This document has no regulatory text sections; call again with section='full' to read it."
+                ),
+            }
+        )
+        return result
+
+    stops = [p["line"] for p in parts] + [s["line"] for s in sections]
+    part_arg = _PART_ARG.match(wanted)
+    section_arg = _SECTION_ARG.match(wanted)
+    if wanted.lower() == "full":
+        body = text
+    elif part_arg:
+        match = next((p for p in parts if p["part"] == part_arg.group(1)), None)
+        if match is None:
+            result["error"] = f"No part {part_arg.group(1)} in this document. Parts: {[p['part'] for p in parts]}"
+            return result
+        body = _slice_lines(text, match["line"], [p["line"] for p in parts], stop_at_instructions=False)
+    elif section_arg:
+        match = next((s for s in sections if s["section"] == section_arg.group(1)), None)
+        if match is None:
+            result["error"] = (
+                f"No section {section_arg.group(1)} in this document. Sections: {[s['section'] for s in sections][:60]}"
+            )
+            return result
+        body = _slice_lines(text, match["line"], stops, stop_at_instructions=True)
+    else:
+        result["error"] = "section must be empty (outline), a section number like '60.4', 'part 60', or 'full'."
+        return result
+
+    result["section"] = wanted
+    result.update(_page_of(body, offset, max_chars))
+    return result
+
+
+def _json_list(raw: Any) -> list[Any]:
+    try:
+        value = json.loads(raw) if raw else []
+    except (TypeError, ValueError):
+        return []
+    return value if isinstance(value, list) else []
+
+
 def _register_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def list_sources() -> dict[str, Any]:
@@ -562,6 +847,33 @@ def _register_tools(mcp: FastMCP) -> None:
         cursor = _get_connection().cursor()
         with _statement_timeout(cursor):
             return _prepare_comment(cursor, docket_id, draft, datetime.now(timezone.utc))
+
+    @mcp.tool()
+    def get_rule_text(
+        document: str,
+        section: str = "",
+        offset: int = 0,
+        max_chars: int = RULE_TEXT_DEFAULT_CHARS,
+    ) -> dict[str, Any]:
+        """Read the text of a proposed or final rule as published in the Federal Register.
+
+        document is a docket ID ('USBC-2026-0628'), a regulations.gov document
+        ID ('USBC-2026-0628-0001'), or a Federal Register document number
+        ('2026-18481'). For a docket, the proposed or final rule is picked
+        first; the docket's other notices are listed so you can pick another.
+
+        Call it first with no section to get the outline: title, summary,
+        dates, CFR parts, and every regulatory section with its title. Then
+        pass section='60.4' for one section, 'part 60' for a whole part, or
+        'full' for the whole document. Long text comes back in pages: call
+        again with offset=next_offset until next_offset is null.
+
+        Quote the section numbers you rely on. The text is GPO's official
+        Federal Register copy on govinfo.gov.
+        """
+        cursor = _get_connection().cursor()
+        with _statement_timeout(cursor):
+            return _get_rule_text(cursor, document, section, offset, max_chars)
 
 
 def build_server() -> FastMCP:
