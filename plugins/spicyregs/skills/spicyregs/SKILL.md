@@ -31,6 +31,7 @@ Keep this workflow provider-neutral.
   - `uv run --script plugins/spicyregs/skills/spicyregs/scripts/find_duplicate_regulations.py --source r2 --limit 20`
 - Remote MCP equivalent (when running without a local Python toolchain, e.g. claude.ai):
   - `list_sources`, `describe_table`, `query_sql` tools exposed by the Spicy Regs MCP server in `mcp-server/`.
+  - `get_rule_text` when the user asks what a rule actually says or changes: call it with no section for the outline, then fetch the sections that matter and cite their numbers.
   - `prepare_comment` when the user wants to comment on a rule: it returns the open document's regulations.gov comment link and checks a draft's length. It never submits; the user posts the comment themselves, in their own words.
   - Prefer the MCP tools when the skill is loaded in a chat surface that has the connector attached; prefer the `uv` scripts when running locally where they're faster and cover the duplicate-finder workflow.
 - Optional alternate sources, only when explicitly requested:

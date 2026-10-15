@@ -12,6 +12,7 @@ from decimal import Decimal
 from uuid import UUID
 
 import duckdb
+import httpx
 import pytest
 
 from spicy_regs import mcp_server
@@ -60,7 +61,7 @@ def _tool_names(fastmcp) -> set[str]:
 
 def test_build_server_registers_expected_tools():
     server = mcp_server.build_server()
-    assert _tool_names(server) == {"list_sources", "describe_table", "query_sql", "prepare_comment"}
+    assert _tool_names(server) == {"list_sources", "describe_table", "query_sql", "prepare_comment", "get_rule_text"}
 
 
 # --- catalog config resolution ----------------------------------------------
@@ -678,3 +679,254 @@ def test_prepare_comment_tool_runs_through_the_server(monkeypatch):
     result = asyncio.run(server.call_tool("prepare_comment", {"docket_id": "USBC-2026-0628"}))
 
     assert "commenton/USBC-2026-0628-0001" in str(result)
+
+
+# --- get_rule_text -------------------------------------------------------------
+
+_GOVINFO_PAGE = """<html><head><title>Federal Register</title></head><body><pre>
+[Federal Register Volume 91, Number 174 (Thursday, September 10, 2026)]
+[Proposed Rules]
+From the Federal Register Online via the Government Publishing Office [<a href="http://www.gpo.gov">www.gpo.gov</a>]
+[FR Doc No: 2026-18481]
+
+SUMMARY: The Census Bureau is proposing to add two new parts.
+
+DATES: Comments must be received by October 13, 2026.
+
+SUPPLEMENTARY INFORMATION:
+
+    The preamble discusses the residence rule in
+Sec.  60.4 at length, and &ldquo;usual residence&rdquo; generally.
+
+[[Page 57529]]
+
+PART 60--RESIDENCE CRITERIA FOR THE DECENNIAL CENSUS OF THE
+AMERICAN POPULATION
+
+Sec.
+60.1 Purpose.
+60.4 Foreign citizens in the United States.
+
+Sec.  60.1   Purpose.
+
+    This part sets forth the criteria.
+
+
+Sec.  60.4  Foreign citizens in the United States.
+
+    (a) Citizens or lawful permanent residents. Counted at their usual
+residence in accordance with
+
+[[Page 57530]]
+
+Sec.  60.2.
+    (b) All other citizens of foreign countries. Not counted for
+apportionment.
+
+0
+2. Amend Sec.  70.2 by revising paragraph (a) to read as follows:
+
+
+Sec.  70.2  Restrictions on the inclusion of certain demographic
+questions.
+
+    (a) No question about race shall appear.
+
+[FR Doc. 2026-18481 Filed 9-9-26; 8:45 am]
+</pre></body></html>"""
+
+
+def _rule_fixture_connection() -> duckdb.DuckDBPyConnection:
+    con = duckdb.connect()
+    con.execute(
+        "CREATE TABLE documents AS SELECT * FROM (VALUES "
+        "('USBC-2026-0628-0001', 'USBC-2026-0628', 'Proposed Rule', 'Residence criteria', "
+        " '2026-09-10T04:00:00Z', '2026-18481'), "
+        "('USBC-2026-0628-0099', 'USBC-2026-0628', 'Notice', 'Public hearing', '2026-10-01T04:00:00Z', '2026-19999'), "
+        "('USBC-2026-0628-0002', 'USBC-2026-0628', 'Supporting & Related Material', 'Analysis', "
+        " '2026-09-10T04:00:00Z', NULL), "
+        "('FDA_FRDOC_0001-0001', 'FDA_FRDOC_0001', 'Rule', 'Feed additive', '2026-10-14T04:00:00Z', '2026-20979')"
+        ") t(document_id, docket_id, document_type, title, posted_date, fr_doc_num)"
+    )
+    con.execute(
+        "CREATE TABLE federal_register AS SELECT * FROM (VALUES "
+        "('2026-18481', 'Decennial Census residence criteria', 'Proposed Rule', '2026-09-10', '2026-10-13', "
+        " 'The Census Bureau is proposing to add two new parts.', "
+        ' \'[{"title": 15, "part": "60"}, {"title": 15, "part": "70"}]\', \'["0607-AA75"]\', '
+        " 'https://www.federalregister.gov/d/2026-18481'), "
+        "('2026-19999', 'Public hearing', 'Notice', '2026-10-01', NULL, NULL, '[]', '[]', "
+        " 'https://www.federalregister.gov/d/2026-19999')"
+        ") t(document_number, title, document_type, publication_date, comments_close_on, abstract, "
+        "cfr_references_json, regulation_id_numbers_json, html_url)"
+    )
+    return con
+
+
+def _fixture_fetch(calls: list | None = None):
+    def fetch(number: str, published: str) -> str:
+        if calls is not None:
+            calls.append((number, published))
+        return mcp_server._govinfo_text(_GOVINFO_PAGE)
+
+    return fetch
+
+
+def _rule(document, section="", offset=0, max_chars=8000, fetch=None):
+    return mcp_server._get_rule_text(
+        _rule_fixture_connection(), document, section, offset, max_chars, fetch or _fixture_fetch()
+    )
+
+
+def test_build_server_registers_get_rule_text():
+    assert "get_rule_text" in _tool_names(mcp_server.build_server())
+
+
+def test_get_rule_text_outline_from_a_docket_prefers_the_proposed_rule():
+    calls: list = []
+    result = _rule("USBC-2026-0628", fetch=_fixture_fetch(calls))
+
+    assert calls == [("2026-18481", "2026-09-10")]
+    assert result["mode"] == "outline"
+    assert result["fr_document_number"] == "2026-18481"
+    assert result["rins"] == ["0607-AA75"]
+    assert [c["part"] for c in result["cfr_references"]] == ["60", "70"]
+    assert result["comments_close_on_in_notice"] == "2026-10-13"
+    assert result["summary"] == "The Census Bureau is proposing to add two new parts."
+    assert result["dates"] == "Comments must be received by October 13, 2026."
+    assert result["parts"] == [
+        {"part": "60", "title": "RESIDENCE CRITERIA FOR THE DECENNIAL CENSUS OF THE AMERICAN POPULATION"}
+    ]
+    assert [(s["section"], s["title"]) for s in result["sections"]] == [
+        ("60.1", "Purpose."),
+        ("60.4", "Foreign citizens in the United States."),
+        ("70.2", "Restrictions on the inclusion of certain demographic questions."),
+    ]
+    assert [n["document_id"] for n in result["other_notices_in_docket"]] == ["USBC-2026-0628-0099"]
+    assert result["source"] == "https://www.govinfo.gov/content/pkg/FR-2026-09-10/html/2026-18481.htm"
+
+
+@pytest.mark.parametrize("ref", ["USBC-2026-0628-0001", "2026-18481", "FR Doc. 2026-18481"])
+def test_get_rule_text_accepts_document_ids_and_fr_numbers(ref):
+    result = _rule(ref)
+    assert result["fr_document_number"] == "2026-18481"
+    assert "other_notices_in_docket" not in result
+
+
+@pytest.mark.parametrize("section", ["60.4", "§ 60.4", "Sec. 60.4", "section 60.4"])
+def test_get_rule_text_returns_one_section(section):
+    text = _rule("USBC-2026-0628", section)["text"]
+
+    assert text.startswith("Sec.  60.4  Foreign citizens in the United States.")
+    assert text.endswith("Not counted for\napportionment.")
+    assert "[[Page" not in text
+    assert "Amend" not in text
+    assert "70.2" not in text
+
+
+def test_get_rule_text_ignores_section_mentions_inside_paragraphs():
+    sections = [s["section"] for s in _rule("USBC-2026-0628")["sections"]]
+    assert sections.count("60.4") == 1
+    assert "60.2" not in sections
+
+
+def test_get_rule_text_strips_markup_and_entities():
+    text = _rule("2026-18481", "full", max_chars=20000)["text"]
+    assert "<a" not in text and "&ldquo;" not in text
+    assert "“usual residence”" in text
+    assert "[[Page" not in text
+
+
+def test_get_rule_text_returns_a_part_and_stops_at_the_fr_doc_trailer():
+    text = _rule("2026-18481", "part 60")["text"]
+    assert text.startswith("PART 60--RESIDENCE CRITERIA")
+    assert "No question about race" in text
+    assert "[FR Doc." not in text
+
+
+def test_get_rule_text_pages_long_text():
+    first = _rule("2026-18481", "full", max_chars=500)
+    second = _rule("2026-18481", "full", offset=first["next_offset"], max_chars=500)
+
+    assert len(first["text"]) == 500
+    assert first["next_offset"] == 500
+    assert second["offset"] == 500
+    assert first["text"] + second["text"] == _rule("2026-18481", "full", max_chars=1000)["text"]
+    last = _rule("2026-18481", "full", offset=first["total_chars"] - 10, max_chars=500)
+    assert last["next_offset"] is None
+
+
+@pytest.mark.parametrize(
+    "ref, message",
+    [
+        ("x'; DROP TABLE documents; --", "Not a docket, document, or Federal Register number"),
+        ("FDA_FRDOC_0001", "catch-all docket"),
+        ("NOPE-2026-0001", "No Federal Register notice is linked"),
+        ("2001-12345", "not in the mirror"),
+    ],
+)
+def test_get_rule_text_explains_unresolvable_references(ref, message):
+    result = _rule(ref)
+    assert message in result["error"]
+
+
+def test_get_rule_text_lists_valid_sections_for_an_unknown_one():
+    result = _rule("2026-18481", "99.9")
+    assert "No section 99.9" in result["error"]
+    assert "60.4" in result["error"]
+
+
+@pytest.mark.parametrize("kwargs", [{"max_chars": 10}, {"max_chars": 50_000}, {"offset": -1}])
+def test_get_rule_text_validates_paging_arguments(kwargs):
+    assert "error" in _rule("2026-18481", "full", **kwargs)
+
+
+def test_get_rule_text_reports_a_fetch_failure_with_a_link():
+    def failing(number: str, published: str) -> str:
+        raise mcp_server.RuleTextError("govinfo has no text for this document yet")
+
+    result = _rule("2026-18481", fetch=failing)
+    assert "govinfo has no text" in result["error"]
+    assert result["federal_register_url"] == "https://www.federalregister.gov/d/2026-18481"
+
+
+def _patch_httpx(monkeypatch, handler):
+    real_client = httpx.Client
+
+    def client(*args, **kwargs):
+        return real_client(*args, transport=httpx.MockTransport(handler), **kwargs)
+
+    monkeypatch.setattr(mcp_server.httpx, "Client", client)
+
+
+def test_fetch_refuses_a_redirect_off_govinfo(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "www.govinfo.gov":
+            return httpx.Response(302, headers={"Location": "https://evil.example/x"})
+        return httpx.Response(200, text="<pre>owned</pre>")
+
+    _patch_httpx(monkeypatch, handler)
+    with pytest.raises(mcp_server.RuleTextError, match="off its own host"):
+        mcp_server._fetch_url_text("https://www.govinfo.gov/content/pkg/FR-2026-09-10/html/2026-18481.htm")
+
+
+def test_fetch_caps_the_download_size(monkeypatch):
+    monkeypatch.setattr(mcp_server, "RULE_TEXT_MAX_BYTES", 100)
+    _patch_httpx(monkeypatch, lambda request: httpx.Response(200, content=b"x" * 1000))
+    with pytest.raises(mcp_server.RuleTextError, match="larger than"):
+        mcp_server._fetch_url_text("https://www.govinfo.gov/content/pkg/FR-2026-09-10/html/2026-18481.htm")
+
+
+def test_fetch_turns_a_404_into_a_readable_error(monkeypatch):
+    _patch_httpx(monkeypatch, lambda request: httpx.Response(404))
+    with pytest.raises(mcp_server.RuleTextError, match="no text"):
+        mcp_server._fetch_url_text("https://www.govinfo.gov/content/pkg/FR-2026-09-10/html/2026-18481.htm")
+
+
+def test_get_rule_text_tool_runs_through_the_server(monkeypatch):
+    monkeypatch.setattr(mcp_server, "_build_connection", _rule_fixture_connection)
+    monkeypatch.setattr(mcp_server, "_fetch_rule_text", _fixture_fetch())
+    server = mcp_server.build_server()
+
+    result = asyncio.run(server.call_tool("get_rule_text", {"document": "USBC-2026-0628", "section": "60.4"}))
+
+    assert "Not counted for" in str(result)
