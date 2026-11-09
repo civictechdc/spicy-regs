@@ -17,6 +17,7 @@ where a transient download error produced an empty local file that overwrote the
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from os import getenv
 from pathlib import Path
+from typing import Any
 
 import boto3
 import httpx
@@ -147,7 +148,9 @@ def _assert_upload_safe(
         )
 
 
-def upload_file(local_path: Path, remote_key: str | None = None) -> None:
+def upload_file(
+    local_path: Path, remote_key: str | None = None, *, ingested_at: str | None = None
+) -> None:
     """Publish a single file to R2 (remote key defaults to the filename).
 
     Before overwriting an existing remote object, checks the current
@@ -188,11 +191,14 @@ def upload_file(local_path: Path, remote_key: str | None = None) -> None:
         if remote_key.endswith(".parquet")
         else "public, max-age=3600, stale-while-revalidate=86400"
     )
+    extra_args: dict[str, Any] = {"ContentType": "application/octet-stream", "CacheControl": cache_control}
+    if ingested_at is not None:
+        extra_args["Metadata"] = {"ingested-at": ingested_at}
     client.upload_file(
         str(local_path),
         bucket,
         remote_key,
-        ExtraArgs={"ContentType": "application/octet-stream", "CacheControl": cache_control},
+        ExtraArgs=extra_args,
     )
 
     public_url = getenv("R2_PUBLIC_URL", "")

@@ -61,7 +61,7 @@ def _tool_names(fastmcp) -> set[str]:
 
 def test_build_server_registers_expected_tools():
     server = mcp_server.build_server()
-    assert _tool_names(server) == {"list_sources", "describe_table", "query_sql", "prepare_comment", "get_rule_text"}
+    assert _tool_names(server) == {"list_sources", "describe_table", "query_sql", "prepare_comment", "get_rule_text", "get_data_freshness"}
 
 
 # --- catalog config resolution ----------------------------------------------
@@ -930,3 +930,31 @@ def test_get_rule_text_tool_runs_through_the_server(monkeypatch):
     result = asyncio.run(server.call_tool("get_rule_text", {"document": "USBC-2026-0628", "section": "60.4"}))
 
     assert "Not counted for" in str(result)
+
+
+def test_observed_redacts_inputs_and_logs_failure(caplog):
+    import json
+
+    @mcp_server._observed("govinfo_http")
+    def fail(secret):
+        raise TimeoutError(secret)
+
+    with pytest.raises(TimeoutError), caplog.at_level("WARNING"):
+        fail("private-draft")
+    event = json.loads(caplog.records[-1].message)
+    assert event["outcome"] == "error"
+    assert event["error_type"] == "TimeoutError"
+    assert event["elapsed_ms"] >= 0
+    assert "private-draft" not in caplog.text
+
+
+def test_freshness_partial_failure(monkeypatch):
+    for key in ("ALL_PROXY", "HTTPS_PROXY", "HTTP_PROXY", "all_proxy", "https_proxy", "http_proxy"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr(mcp_server, "_get_connection", lambda: (_ for _ in ()).throw(TimeoutError()))
+    monkeypatch.setattr(httpx.Client, "head", lambda *a, **k: (_ for _ in ()).throw(httpx.ConnectError("offline")))
+    server = mcp_server.build_server()
+    result = asyncio.run(server.call_tool("get_data_freshness", {"table": "federal_register"}))
+    assert "watermark_error" in str(result)
+    assert "artifact_error" in str(result)
+    assert "coverage_complete_through" in str(result)

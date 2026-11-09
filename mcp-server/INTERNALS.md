@@ -214,3 +214,23 @@ page; an extension published today will not show until tomorrow.
   no bind parameters.
 - `R2_CATALOG_NAMESPACE` uses `or DEFAULT` rather than `get`'s default argument so
   an env var set to the empty string falls back to `default` instead of `""`.
+
+## Operation diagnostics and freshness
+
+All actions emit JSON `mcp_operation` log events with stage, operation, outcome,
+elapsed milliseconds, and exception class. Connection setup and GovInfo HTTP
+fetches emit separate stage events. Inputs, SQL, drafts, exception messages, and
+response content are intentionally omitted. These logs describe server work;
+a client disconnect or platform kill may prevent a completion event entirely.
+
+`get_data_freshness(table)` checks one allowlisted table independently, exposing
+artifact Last-Modified/ETag and observed date watermarks for federal_register,
+documents, and dockets. HTTP or SQL failure leaves partial results usable.
+Rollup uploads now attach `ingested-at` object metadata after the build completes,
+before upload: it dates preparation of the published snapshot, not the newest
+source record, and does not certify complete source ingestion. Older artifacts,
+base-table publishers, or CDNs that omit custom metadata report null. The public
+HTTP endpoint must forward `x-amz-meta-ingested-at` for it to be visible.
+`coverage_complete_through` is deliberately null: a maximum publication/update
+date alone cannot prove complete coverage. Future-dated records can also move a
+maximum forward. No freshness or ingestion date is inferred from Last-Modified.

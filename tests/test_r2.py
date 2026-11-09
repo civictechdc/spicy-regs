@@ -143,3 +143,19 @@ def test_upload_dataset_is_a_noop_with_nothing_to_publish(tmp_path: Path, monkey
     monkeypatch.setattr(r2, "upload_file", lambda p, remote_key=None: None)
 
     r2.upload_dataset(tmp_path, ["dockets"])
+
+
+def test_upload_preserves_ingestion_metadata(tmp_path, monkeypatch):
+    from unittest.mock import MagicMock
+
+    _upload_env(monkeypatch)
+    client = MagicMock()
+    monkeypatch.setattr(r2, "get_r2_client", lambda: client)
+    monkeypatch.setattr(r2, "_get_remote_size", lambda *a, **k: None)
+    monkeypatch.setattr(r2, "purge_urls", lambda urls: None)
+    path = tmp_path / "test.parquet"
+    path.write_bytes(b"data")
+    r2.upload_file(path, ingested_at="2026-10-28T12:00:00+00:00")
+    assert client.upload_file.call_args.kwargs["ExtraArgs"]["Metadata"] == {
+        "ingested-at": "2026-10-28T12:00:00+00:00"
+    }

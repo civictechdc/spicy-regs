@@ -21,6 +21,7 @@ cross-pipeline race.
 """
 
 from abc import abstractmethod
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, ClassVar
 
@@ -63,7 +64,9 @@ class RollupPipeline(Pipeline):
             logger.info("skip_upload=True — {} left in {}", self.output, output_dir)
         else:
             logger.info("Uploading {} to R2...", self.output)
-            r2.upload_file(out_path, remote_key=self.output)
+            r2.upload_file(
+                out_path, remote_key=self.output, ingested_at=datetime.now(timezone.utc).isoformat()
+            )
 
         logger.info("Done!")
 

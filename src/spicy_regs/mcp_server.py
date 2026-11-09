@@ -11,7 +11,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
-from functools import lru_cache
+from functools import lru_cache, wraps
 from html import unescape
 from pathlib import Path
 from time import monotonic as _monotonic
@@ -62,6 +62,33 @@ logger = logging.getLogger(__name__)
 
 CATALOG_ALIAS = "reg_catalog"
 DEFAULT_CATALOG_NAMESPACE = "default"
+
+
+def _observed(stage: str):
+    def decorate(fn):
+        @wraps(fn)
+        def wrapped(*args, **kwargs):
+            started = _monotonic()
+            outcome = "ok"
+            error_type = None
+            try:
+                result = fn(*args, **kwargs)
+                if isinstance(result, dict) and "error" in result:
+                    outcome = "error_response"
+                return result
+            except Exception as exc:
+                outcome = "error"
+                error_type = type(exc).__name__
+                raise
+            finally:
+                logger.warning(json.dumps({
+                    "event": "mcp_operation", "stage": stage,
+                    "operation": fn.__name__, "outcome": outcome,
+                    "elapsed_ms": round((_monotonic() - started) * 1000, 2),
+                    "error_type": error_type,
+                }))
+        return wrapped
+    return decorate
 
 
 def _parse_timeout_seconds(raw: str) -> float | None:
@@ -337,6 +364,7 @@ _cached_connection: duckdb.DuckDBPyConnection | None = None
 _cached_connection_at = 0.0
 
 
+@_observed("connection_setup")
 def _get_connection() -> duckdb.DuckDBPyConnection:
     """Return a shared, cached DuckDB connection, rebuilding past the TTL.
 
@@ -365,27 +393,40 @@ def _reset_connection_cache() -> None:
 
 @contextmanager
 def _statement_timeout(cursor: duckdb.DuckDBPyConnection) -> Iterator[None]:
-    if STATEMENT_TIMEOUT_SECONDS is None:
-        yield
-        return
-    tripped = threading.Event()
-
-    def _interrupt() -> None:
-        tripped.set()
-        # Interrupt only this request's cursor, not the shared connection —
-        # sibling requests run on their own cursors and must not be cancelled.
-        cursor.interrupt()
-
-    timer = threading.Timer(STATEMENT_TIMEOUT_SECONDS, _interrupt)
-    timer.start()
+    started = _monotonic()
+    error_type = None
     try:
-        yield
-    except duckdb.InterruptException as exc:
-        if tripped.is_set():
-            raise TimeoutError(f"Query exceeded the {STATEMENT_TIMEOUT} statement timeout") from exc
+        if STATEMENT_TIMEOUT_SECONDS is None:
+            yield
+            return
+        tripped = threading.Event()
+
+        def _interrupt() -> None:
+            tripped.set()
+            # Interrupt only this request's cursor, not the shared connection —
+            # sibling requests run on their own cursors and must not be cancelled.
+            cursor.interrupt()
+
+        timer = threading.Timer(STATEMENT_TIMEOUT_SECONDS, _interrupt)
+        timer.start()
+        try:
+            yield
+        except duckdb.InterruptException as exc:
+            if tripped.is_set():
+                raise TimeoutError(f"Query exceeded the {STATEMENT_TIMEOUT} statement timeout") from exc
+            raise
+        finally:
+            timer.cancel()
+    except Exception as exc:
+        error_type = type(exc).__name__
         raise
     finally:
-        timer.cancel()
+        logger.warning(json.dumps({
+            "event": "mcp_operation", "stage": "query_or_r2_read",
+            "elapsed_ms": round((_monotonic() - started) * 1000, 2),
+            "error_type": error_type,
+            "outcome": "error" if error_type else "ok",
+        }))
 
 
 def _parse_utc(value: Any) -> datetime | None:
@@ -500,6 +541,7 @@ class RuleTextError(RuntimeError):
     pass
 
 
+@_observed("govinfo_http")
 def _fetch_url_text(url: str) -> str:
     with httpx.Client(timeout=20.0, follow_redirects=True, headers={"User-Agent": USER_AGENT}) as client:
         with client.stream("GET", url) as response:
@@ -761,6 +803,47 @@ def _json_list(raw: Any) -> list[Any]:
 
 def _register_tools(mcp: FastMCP) -> None:
     @mcp.tool()
+    @_observed("action")
+    def get_data_freshness(table: str = "federal_register") -> dict[str, Any]:
+        """Read one table's artifact timestamp and observed publication/update watermark.
+
+        Artifact Last-Modified is not an ingestion timestamp or proof of complete
+        source coverage. Unknown ingestion timestamps remain null. Each table is
+        checked independently so a failed table does not hide other results.
+        """
+        if table not in TABLES:
+            return {"error": "Unknown table", "available_tables": list(TABLES)}
+        result: dict[str, Any] = {
+            "table": table, "checked_at": datetime.now(timezone.utc).isoformat(),
+            "ingested_at": None, "coverage_complete_through": None,
+            "artifact_last_modified": None, "watermark": None,
+            "limitations": "Observed maximum dates do not prove complete coverage; artifact modification is not ingestion.",
+        }
+        try:
+            with httpx.Client(timeout=10.0) as client:
+                response = client.head(f"{R2_BASE_URL}/{table}.parquet")
+                response.raise_for_status()
+                result["artifact_last_modified"] = response.headers.get("last-modified")
+                result["artifact_etag"] = response.headers.get("etag")
+                result["ingested_at"] = response.headers.get("x-amz-meta-ingested-at")
+        except httpx.HTTPError as exc:
+            result["artifact_error"] = type(exc).__name__
+        column = {"federal_register": "publication_date", "documents": "modify_date",
+                  "dockets": "modify_date"}.get(table)
+        if column:
+            try:
+                cursor = _get_connection().cursor()
+                with _statement_timeout(cursor):
+                    row = cursor.execute(
+                        f"SELECT MAX(TRY_CAST({column} AS TIMESTAMP)) FROM {table}"
+                    ).fetchone()
+                result["watermark"] = {"column": column, "latest": _jsonify(row[0]) if row else None}
+            except Exception as exc:
+                result["watermark_error"] = type(exc).__name__
+        return result
+
+    @mcp.tool()
+    @_observed("action")
     def list_sources() -> dict[str, Any]:
         """List the logical tables available in the Spicy Regs R2 dataset."""
         return {
@@ -770,6 +853,7 @@ def _register_tools(mcp: FastMCP) -> None:
         }
 
     @mcp.tool()
+    @_observed("action")
     def describe_table(table: str) -> dict[str, Any]:
         """Return the column schema for one Spicy Regs table.
 
@@ -799,6 +883,7 @@ def _register_tools(mcp: FastMCP) -> None:
         }
 
     @mcp.tool()
+    @_observed("action")
     def query_sql(sql: str, max_rows: int = 25) -> dict[str, Any]:
         """Run a read-only SQL query against the Spicy Regs R2 tables and return up to max_rows rows.
 
@@ -832,6 +917,7 @@ def _register_tools(mcp: FastMCP) -> None:
         }
 
     @mcp.tool()
+    @_observed("action")
     def prepare_comment(docket_id: str, draft: str = "") -> dict[str, Any]:
         """Get ready to comment on a docket: find where to submit, and check a draft.
 
@@ -849,6 +935,7 @@ def _register_tools(mcp: FastMCP) -> None:
             return _prepare_comment(cursor, docket_id, draft, datetime.now(timezone.utc))
 
     @mcp.tool()
+    @_observed("action")
     def get_rule_text(
         document: str,
         section: str = "",
