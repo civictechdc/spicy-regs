@@ -71,6 +71,7 @@ Use the helper script's `--describe` output for the exact schema. In this repo, 
   - `feed_summary`
   - `agency_stats`
   - `agency_monthly_volume`
+  - `docket_daily_comment_volume`
 
 Complementary federal sources (all queryable by name; see the Data Dictionary for columns):
 

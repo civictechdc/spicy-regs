@@ -46,6 +46,7 @@ is queryable through the MCP server (`list_sources` / `describe_table` /
 | [`feed_summary`](tables/feed_summary.md) | one row per docket |
 | [`agency_stats`](tables/agency_stats.md) | one row per agency |
 | [`agency_monthly_volume`](tables/agency_monthly_volume.md) | one row per agency / month / document type |
+| [`docket_daily_comment_volume`](tables/docket_daily_comment_volume.md) | one row per docket / day with comments |
 
 ### Rulemaking lifecycle (external sources)
 
@@ -89,7 +90,7 @@ dockets (docket_id)
 - `documents.docket_id` and `comments.docket_id` reference `dockets.docket_id`.
 - `agency_code` appears on every table and is the join key for the agency rollups.
 - The rollups (`comments_index`, `feed_summary`, `agency_stats`,
-  `agency_monthly_volume`) are pre-aggregated views built from the three core
+  `agency_monthly_volume`, `docket_daily_comment_volume`) are pre-aggregated views built from the three core
   tables so consumers don't have to scan the tens-of-millions-of-rows comments
   dataset.
 

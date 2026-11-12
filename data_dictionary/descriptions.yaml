@@ -135,6 +135,27 @@ tables:
       document_type: "Document category counted in this bucket (e.g. `Rule`, `Notice`)."
       document_count: "Number of documents the agency posted of that type in that month."
 
+  docket_daily_comment_volume:
+    summary: >-
+      Per-docket daily comment volume — exactly one row per (docket, day) on
+      which at least one comment was posted; days with no comments have no row.
+      Bucketed on comment `posted_date` (the day regulations.gov posted the
+      comment, which can trail the day it was received), the same basis as
+      `comments_index`, so a docket's days summed over a month equal that
+      month's `comments_index.row_count` (except for the excluded sentinel
+      dates below). Comments without a `docket_id`, `agency_code`, or parseable
+      `posted_date` are excluded, as are `posted_date` values before 1900 —
+      regulations.gov's `0000-12-30` "no date" sentinel, which would otherwise
+      become a year-1 BC date that Python date types cannot hold. Sorted by
+      `docket_id` then `day` in small row groups, so filtering on one
+      `docket_id` reads only a small slice of the file. Built by
+      `build_docket_daily_comment_volume` from `comments`.
+    columns:
+      docket_id: "Docket the comments were posted to."
+      agency_code: "Agency short code of the docket (the minimum if a docket's comments ever carry more than one)."
+      day: "The UTC calendar date of `posted_date`, which for the usual 04:00Z/05:00Z values is the Eastern posting date. Always on or after 1900-01-01."
+      comment_count: "Number of comments posted to the docket on that day."
+
   rulemaking_lifecycles:
     summary: >-
       Proposed→final rulemaking arcs, one row per docket, discriminated by

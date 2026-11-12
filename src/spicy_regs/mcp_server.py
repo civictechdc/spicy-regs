@@ -38,6 +38,7 @@ TABLES = (
     "feed_summary",
     "agency_stats",
     "agency_monthly_volume",
+    "docket_daily_comment_volume",
     "rulemaking_lifecycles",
     "fr_docket_links",
     "discovery_signals",

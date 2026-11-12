@@ -50,6 +50,7 @@ TABLES: tuple[str, ...] = (
     "feed_summary",
     "agency_stats",
     "agency_monthly_volume",
+    "docket_daily_comment_volume",
     "rulemaking_lifecycles",
     "fr_docket_links",
     "discovery_signals",
@@ -81,6 +82,7 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
         "feed_summary",
         "agency_stats",
         "agency_monthly_volume",
+        "docket_daily_comment_volume",
         "rulemaking_lifecycles",
         "fr_docket_links",
         "discovery_signals",
@@ -102,7 +104,8 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
 )
 
 # Schemas for the derived rollups. These mirror the SQL/Polars schemas in
-# src/spicy_regs/transforms/{build_feed_summary,build_agency_rollups}.py and
+# src/spicy_regs/transforms/{build_feed_summary,build_agency_rollups,
+# build_docket_daily_comment_volume}.py and
 # sources/iceberg.py (_build_comments_index). Types are DuckDB type names, matching what a
 # DESCRIBE of the published parquet returns (see `check --source r2`).
 DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
@@ -136,6 +139,14 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("month", "BIGINT"),
         ("document_type", "VARCHAR"),
         ("document_count", "BIGINT"),
+    ],
+    # Built by build_docket_daily_comment_volume from comments.parquet; one row per
+    # (docket_id, day), bucketed on posted_date.
+    "docket_daily_comment_volume": [
+        ("docket_id", "VARCHAR"),
+        ("agency_code", "VARCHAR"),
+        ("day", "DATE"),
+        ("comment_count", "BIGINT"),
     ],
     # Ingested from GovInfo CFR (build_cfr_sections); section metadata + citations
     # only (not full text). All columns are stored as VARCHAR.
