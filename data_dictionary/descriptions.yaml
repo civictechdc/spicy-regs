@@ -23,7 +23,7 @@ tables:
       docket_type: "Docket category, typically `Rulemaking` or `Nonrulemaking`."
       modify_date: "Timestamp the docket was last modified on regulations.gov (ISO 8601 string)."
       abstract: "Agency-written summary of the docket (regulations.gov `dkAbstract`). Often null."
-      rin: "Regulation Identifier Number tying the docket to the Unified Agenda. Often null."
+      rin: "Regulation Identifier Number as reported by regulations.gov. Rarely populated: null, empty, or `Not Assigned` on more than 99% of dockets, and where set it holds a single RIN (the newest) even though a long-running docket can span several. Not a usable RIN join key; to link a RIN to a docket, go through `federal_register` (`regulation_id_numbers_json` × `docket_ids_json`) or `fr_docket_links`."
 
   documents:
     summary: >-
@@ -45,7 +45,7 @@ tables:
       fr_doc_num: "Federal Register document number, when the document was published in the FR. Often null."
       withdrawn: 'Whether the document was withdrawn, as the string `"true"`/`"false"`. Often null.'
       reason_withdrawn: "Agency-supplied reason for withdrawal, when withdrawn. Often null."
-      additional_rins: "JSON array of additional Regulation Identifier Numbers beyond the docket's primary RIN. Often null."
+      additional_rins: "JSON array of additional Regulation Identifier Numbers beyond the docket's primary RIN. Almost never populated (a few dozen of ~2M documents), so not a usable RIN join key; use `federal_register.regulation_id_numbers_json` / `fr_docket_links` instead."
       text_content: "Plain text extracted from the document's PDF attachment(s) by the PDF text-extraction step. Null until that step has run; see `text_extraction_status`."
       text_extraction_status: "Outcome of PDF text extraction: `ok`, `empty` (no extractable text, e.g. scanned/image-only PDFs — OCR is out of scope), `encrypted` (password-protected), or `error`. Null before extraction has been attempted."
 
