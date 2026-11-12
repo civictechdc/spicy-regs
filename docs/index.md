@@ -62,6 +62,17 @@ is queryable through the MCP server (`list_sources` / `describe_table` /
 | [`fcc_proceedings`](tables/fcc_proceedings.md) | one row per FCC proceeding (docket) | `name` |
 | [`fcc_filings`](tables/fcc_filings.md) | one row per FCC ECFS filing (comment) | `id_submission` |
 
+### State rulemaking
+
+Virginia only so far, from the Virginia Regulatory Town Hall. Each table has a
+`jurisdiction` column so later states can share it.
+
+| Table | Grain | Key |
+| --- | --- | --- |
+| [`state_actions`](tables/state_actions.md) | one row per state regulatory action (the state counterpart of a docket) | `jurisdiction`, `action_id` |
+| [`state_stages`](tables/state_stages.md) | one row per action stage (NOIRA, Proposed, Final, ...) | `jurisdiction`, `stage_id` |
+| [`state_comments`](tables/state_comments.md) | one row per public comment, with full text | `jurisdiction`, `comment_id` |
+
 ### Organizations & influence
 
 | Table | Grain | Key |

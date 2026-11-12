@@ -406,6 +406,89 @@ tables:
       state_effective_date: "State effective date of the approved rule (YYYY-MM-DD): the latest date in the document's state-effective-date table column, or, when there is no such table (e.g. proposed rules), the date in a \"became effective on\" sentence, for Clean Air Act programs only (`sip`, `state_plan_111d`, `title_v`, `ocs_air`). Dates after `publication_date` are dropped, since they come from text about the federal action. Parsed for Virginia and Maryland only; NULL otherwise or when not found."
       html_url: "federalregister.gov page for the document."
 
+  state_actions:
+    summary: >-
+      State regulatory actions, one row per action. An action is a state
+      rulemaking (the state counterpart of a regulations.gov docket) and moves
+      through stages listed in `state_stages`. Virginia only so far, crawled
+      from the Virginia Regulatory Town Hall (townhall.virginia.gov), back to
+      1999. The crawl is resumable: until the first backfill finishes, older
+      actions are still missing. Sorted by `jurisdiction`, then `action_id`
+      descending. Built by `build_va_townhall`.
+    columns:
+      jurisdiction: "USPS code of the state (`VA`). Part of the key, so later states can share the table."
+      action_id: "Town Hall action ID. Unique within `jurisdiction`; joins `state_stages.action_id`."
+      title: "Action title as the agency named it."
+      summary: "The agency's summary of the action."
+      agency: "Agency that owns the regulation, e.g. `Department of Health Professions`."
+      agency_id: "Town Hall agency number."
+      board: "Board or other body that adopts the regulation, e.g. `Board of Psychology`. Often the same as `agency`."
+      board_id: "Town Hall board ID."
+      chapter_citation: "Virginia Administrative Code chapter the action amends, normalized from Town Hall's `[18 VAC 125 ‑ 20]` to `18VAC125-20`. It is the chapter prefix of the section citations in `state_program_approvals.state_citations_json` (`9VAC5-10-20` is in `9VAC5-10`), so the two join with `starts_with`."
+      chapter_title: "Title of that chapter."
+      chapter_id: "Town Hall chapter ID."
+      chapters_affected: "Town Hall's note on other chapters the action touches, e.g. `Only affects this chapter.`"
+      withdrawn_date: "Date the action was withdrawn (YYYY-MM-DD); NULL if it was not."
+      stage_ids_json: "JSON array of the action's stage IDs, oldest first, as the action page lists them."
+      url: "Town Hall page for the action."
+      fetched_at: "UTC time this row was last fetched (ISO 8601)."
+
+  state_stages:
+    summary: >-
+      Stages of state regulatory actions, one row per stage: NOIRA (notice of
+      intended regulatory action), Proposed, Final, Fast-Track, Emergency and
+      similar. A stage is the state counterpart of a regulations.gov document:
+      it carries the comment period, the Virginia Register publication and the
+      agency's documents. Virginia only so far, from the Virginia Regulatory
+      Town Hall. In-progress stages are refetched at least weekly, and every
+      stage whose comment forum is open or recently closed is refetched daily;
+      older stages keep the values from their last fetch (`fetched_at`). Sorted
+      by `jurisdiction`, then `stage_id` descending. Built by `build_va_townhall`.
+    columns:
+      jurisdiction: "USPS code of the state (`VA`)."
+      stage_id: "Town Hall stage ID. Unique within `jurisdiction`; joins `state_comments.stage_id`."
+      action_id: "Action the stage belongs to (joins `state_actions.action_id`)."
+      stage_type: "Stage type as Town Hall labels it, e.g. `NOIRA`, `Proposed`, `Final`, `Fast-Track`, `Emergency/NOIRA`."
+      status: "Town Hall's status line for the stage, e.g. `Stage complete. This regulation became effective on 11/05/2026.` or `Comment period is underway and will end on 12/18/2026.`"
+      agency: "Agency that owns the regulation."
+      board: "Board or other body that adopts the regulation."
+      chapter_citation: "Virginia Administrative Code chapter, normalized to `18VAC125-20` (see `state_actions.chapter_citation`)."
+      comment_start_date: "Start of the public comment period (YYYY-MM-DD). Town Hall prints only the end date; under the Virginia Administrative Process Act the period opens on publication in the Virginia Register, so this is `register_date`. NULL when the stage has no comment period."
+      comment_end_date: "End of the public comment period (YYYY-MM-DD). NULL when the stage has no comment period (Final stages usually do not)."
+      comment_count: "Number of comments the stage page reported when fetched. Can trail `state_comments` for a stage that has not been refetched."
+      register_volume: "Virginia Register of Regulations volume the stage was published in."
+      register_issue: "Virginia Register issue number."
+      register_date: "Virginia Register publication date (YYYY-MM-DD)."
+      effective_date: "Date the regulation took effect (YYYY-MM-DD), on Final and Fast-Track stages that have one."
+      documents_json: "JSON array of the agency's documents for the stage (text, background document, economic impact analysis, review memos), each `{title, date, url}`. `url` is NULL for a listed document not yet submitted."
+      url: "Town Hall page for the stage."
+      fetched_at: "UTC time this row was last fetched (ISO 8601)."
+
+  state_comments:
+    summary: >-
+      Public comments on state regulatory actions, with full text, one row per
+      comment. Virginia only so far, from the Virginia Regulatory Town Hall,
+      whose Public Comment Policy makes comments public records. Comments are
+      posted to a forum: a stage's comment period (`forum_type = 'stage'`), a
+      general notice, or a petition for rulemaking. Sorted by `jurisdiction`,
+      `forum_type`, then `forum_id` descending, so `WHERE stage_id = ?` and
+      `WHERE forum_id = ?` prune row groups. Built by `build_va_townhall`.
+    columns:
+      jurisdiction: "USPS code of the state (`VA`)."
+      comment_id: "Town Hall comment ID. Unique within `jurisdiction`."
+      forum_type: "`stage` (a stage's comment period), `general_notice` or `petition`."
+      forum_id: "ID of the stage, general notice or petition the comment was posted to."
+      stage_id: "Stage the comment is on (joins `state_stages.stage_id`); NULL for general-notice and petition forums."
+      commenter: "Commenter's name: the part of `commenter_raw` before the first comma, keeping name suffixes and credentials such as `Jr.` or `PhD`. Often `Anonymous`, and sometimes an organization name."
+      organization: "Organization, from the part of `commenter_raw` after the first comma. Town Hall prints name and organization in one field, so this split is a best effort: a commenter who typed a comma in their name, or a role such as `parent`, lands here too. NULL when there was no comma."
+      commenter_raw: "Commenter field exactly as Town Hall prints it (`Name, Organization`)."
+      title: "Title the commenter gave the comment."
+      comment: "Comment text, converted from the posted HTML to plain text with a blank line between paragraphs. NULL for a comment posted with a title and no body."
+      posted_date: "Date the comment was posted (YYYY-MM-DD)."
+      posted_at: "Date and time the comment was posted, in Virginia local time with no zone (`YYYY-MM-DDTHH:MM`)."
+      url: "Town Hall page for the comment."
+      fetched_at: "UTC time this row was last fetched (ISO 8601)."
+
   sam_entities:
     summary: >-
       One row per registered federal entity, ingested from the SAM.gov Entity
