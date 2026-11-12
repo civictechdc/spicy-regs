@@ -429,8 +429,13 @@ tables:
       GAO's bulk/search surfaces are bot-blocked, so the RSS feed (a ~25-item
       recent-products window) is the only anonymous machine-readable source;
       the table is therefore an **append-only accumulator** that grows into a
-      rolling history over successive daily runs. Deduped on `report_id`. All
-      columns are stored as VARCHAR.
+      rolling history over successive daily runs. **Scope caveat:** accumulation
+      started on 2026-07-13, so there is no history before that date and the
+      feed cannot backfill it. This is also **not** Congressional Review Act
+      (CRA) coverage: it carries GAO's audit and evaluation products, not its
+      CRA major-rule reports or congressional disapproval actions, so an empty
+      result for a CRA question does not mean Congress didn't act. Deduped on
+      `report_id`. All columns are stored as VARCHAR.
     columns:
       report_id: "GAO product id parsed from the product URL (e.g. `gao-26-107974`), lowercased. Primary key / dedup key."
       title: "Product title as published in the feed."
@@ -464,10 +469,14 @@ tables:
       One row per federal court docket challenging agency action under the
       Administrative Procedure Act, ingested from the CourtListener v4 search API
       (`courtlistener.com`, RECAP dockets with nature-of-suit 899) by
-      `build_courtlistener`. When an agency finalizes a rule it is frequently
-      sued; these are those suits — the litigation counterpart to the rulemakings
-      in `dockets`/`documents`. There is no machine RIN/FR key on a court docket,
-      so it links to the corpus by name and topic: the defendant agency appears in
+      `build_courtlistener`. **Scope caveat:** the rows are almost entirely
+      *district-court* cases. Direct,
+      pre-enforcement challenges to a rule are usually filed in the *courts of
+      appeals* (e.g. the D.C. Circuit), and those are effectively absent — the
+      only appellate rows are a handful from the Federal Circuit. So an empty
+      result is not evidence that a rule went unchallenged. There is also no
+      machine join key (`docket_id`, RIN, FR document number, or CFR citation) on
+      a court docket, so it links to the corpus only by name and topic: the defendant agency appears in
       `case_name` and `parties_json` (joinable by name to `agency_stats` / the FR
       `agency_slugs`), and `cause` names the statute invoked. Primary / dedup key
       is `cl_docket_id`. All columns are stored as VARCHAR; array fields are JSON
