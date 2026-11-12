@@ -429,13 +429,15 @@ tables:
       GAO's bulk/search surfaces are bot-blocked, so the RSS feed (a ~25-item
       recent-products window) is the only anonymous machine-readable source;
       the table is therefore an **append-only accumulator** that grows into a
-      rolling history over successive daily runs. **Scope caveat:** accumulation
-      started on 2026-07-13, so there is no history before that date and the
-      feed cannot backfill it. This is also **not** Congressional Review Act
-      (CRA) coverage: it carries GAO's audit and evaluation products, not its
-      CRA major-rule reports or congressional disapproval actions, so an empty
-      result for a CRA question does not mean Congress didn't act. Deduped on
-      `report_id`. All columns are stored as VARCHAR.
+      rolling history over successive daily runs. **Scope caveat:** the earliest
+      product is dated 2026-07-13; there is no history before that, and the feed
+      cannot backfill it. This is also **not** Congressional Review Act (CRA)
+      coverage: it carries GAO's audit and evaluation products, not GAO's CRA
+      major-rule reports, so an empty result for a CRA question does not mean
+      Congress didn't act. CRA disapproval resolutions are in `congress_bills`
+      (`bill_type` `hjres`/`sjres`, titles mentioning "congressional disapproval
+      under chapter 8"). Deduped on `report_id`. All columns are stored as
+      VARCHAR.
     columns:
       report_id: "GAO product id parsed from the product URL (e.g. `gao-26-107974`), lowercased. Primary key / dedup key."
       title: "Product title as published in the feed."
@@ -470,22 +472,23 @@ tables:
       Administrative Procedure Act, ingested from the CourtListener v4 search API
       (`courtlistener.com`, RECAP dockets with nature-of-suit 899) by
       `build_courtlistener`. **Scope caveat:** the rows are almost entirely
-      *district-court* cases. Direct,
-      pre-enforcement challenges to a rule are usually filed in the *courts of
-      appeals* (e.g. the D.C. Circuit), and those are effectively absent — the
-      only appellate rows are a handful from the Federal Circuit. So an empty
-      result is not evidence that a rule went unchallenged. There is also no
-      machine join key (`docket_id`, RIN, FR document number, or CFR citation) on
-      a court docket, so it links to the corpus only by name and topic: the defendant agency appears in
-      `case_name` and `parties_json` (joinable by name to `agency_stats` / the FR
-      `agency_slugs`), and `cause` names the statute invoked. Primary / dedup key
-      is `cl_docket_id`. All columns are stored as VARCHAR; array fields are JSON
-      strings.
+      *district-court* cases, which include many APA challenges to rules. But
+      challenges that a statute routes directly to the *courts of appeals* (e.g.
+      many Clean Air Act and Clean Water Act rules, often in the D.C. Circuit)
+      are effectively absent: there are no D.C. Circuit or regional-circuit
+      rows, and the only appellate rows are a handful from the Federal Circuit.
+      So an empty result is not evidence that a rule went unchallenged. There is
+      also no machine join key (`docket_id`, RIN, FR document number, or CFR
+      citation) on a court docket, so it links to the corpus only by name and
+      topic: the defendant agency appears in `case_name` and `parties_json`
+      (joinable by name to `agency_stats` / the FR `agency_slugs`), and `cause`
+      names the statute invoked. Primary / dedup key is `cl_docket_id`. All
+      columns are stored as VARCHAR; array fields are JSON strings.
     columns:
       cl_docket_id: "CourtListener docket id (e.g. `73613631`). Primary key / dedup key. Distinct from the regulations.gov `docket_id`."
       case_name: "Short case name (e.g. `HENNEPIN COUNTY, MINNESOTA v. U.S. DEPARTMENT OF HEALTH AND HUMAN SERVICES`). Names the defendant agency."
       case_name_full: "Full case caption when available; often blank."
-      court_id: "CourtListener court identifier (e.g. `dcd` D.D.C., `cadc` D.C. Circuit, `akd` D. Alaska)."
+      court_id: "CourtListener court identifier (e.g. `dcd` D.D.C., `akd` D. Alaska, `cafc` Federal Circuit)."
       court: "Human-readable court name (e.g. `District Court, District of Columbia`)."
       court_citation_string: "Court citation abbreviation (e.g. `D.D.C.`)."
       docket_number: "Court docket number (e.g. `1:26-cv-02460`)."

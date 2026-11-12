@@ -2,7 +2,7 @@
 
 # `court_dockets`
 
-One row per federal court docket challenging agency action under the Administrative Procedure Act, ingested from the CourtListener v4 search API (`courtlistener.com`, RECAP dockets with nature-of-suit 899) by `build_courtlistener`. **Scope caveat:** the rows are almost entirely *district-court* cases. Direct, pre-enforcement challenges to a rule are usually filed in the *courts of appeals* (e.g. the D.C. Circuit), and those are effectively absent — the only appellate rows are a handful from the Federal Circuit. So an empty result is not evidence that a rule went unchallenged. There is also no machine join key (`docket_id`, RIN, FR document number, or CFR citation) on a court docket, so it links to the corpus only by name and topic: the defendant agency appears in `case_name` and `parties_json` (joinable by name to `agency_stats` / the FR `agency_slugs`), and `cause` names the statute invoked. Primary / dedup key is `cl_docket_id`. All columns are stored as VARCHAR; array fields are JSON strings.
+One row per federal court docket challenging agency action under the Administrative Procedure Act, ingested from the CourtListener v4 search API (`courtlistener.com`, RECAP dockets with nature-of-suit 899) by `build_courtlistener`. **Scope caveat:** the rows are almost entirely *district-court* cases, which include many APA challenges to rules. But challenges that a statute routes directly to the *courts of appeals* (e.g. many Clean Air Act and Clean Water Act rules, often in the D.C. Circuit) are effectively absent: there are no D.C. Circuit or regional-circuit rows, and the only appellate rows are a handful from the Federal Circuit. So an empty result is not evidence that a rule went unchallenged. There is also no machine join key (`docket_id`, RIN, FR document number, or CFR citation) on a court docket, so it links to the corpus only by name and topic: the defendant agency appears in `case_name` and `parties_json` (joinable by name to `agency_stats` / the FR `agency_slugs`), and `cause` names the statute invoked. Primary / dedup key is `cl_docket_id`. All columns are stored as VARCHAR; array fields are JSON strings.
 
 - **Parquet file:** `court_dockets.parquet`
 - **Queryable via MCP `query_sql`:** Yes
@@ -12,7 +12,7 @@ One row per federal court docket challenging agency action under the Administrat
 | `cl_docket_id` | `VARCHAR` | CourtListener docket id (e.g. `73613631`). Primary key / dedup key. Distinct from the regulations.gov `docket_id`. |
 | `case_name` | `VARCHAR` | Short case name (e.g. `HENNEPIN COUNTY, MINNESOTA v. U.S. DEPARTMENT OF HEALTH AND HUMAN SERVICES`). Names the defendant agency. |
 | `case_name_full` | `VARCHAR` | Full case caption when available; often blank. |
-| `court_id` | `VARCHAR` | CourtListener court identifier (e.g. `dcd` D.D.C., `cadc` D.C. Circuit, `akd` D. Alaska). |
+| `court_id` | `VARCHAR` | CourtListener court identifier (e.g. `dcd` D.D.C., `akd` D. Alaska, `cafc` Federal Circuit). |
 | `court` | `VARCHAR` | Human-readable court name (e.g. `District Court, District of Columbia`). |
 | `court_citation_string` | `VARCHAR` | Court citation abbreviation (e.g. `D.D.C.`). |
 | `docket_number` | `VARCHAR` | Court docket number (e.g. `1:26-cv-02460`). |
