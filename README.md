@@ -114,9 +114,15 @@ agenda is a single edition, so not every FR RIN matches), but it is rarely
 populated on regulations.gov. To get from a RIN to a docket, use
 `fr_docket_links`, which carries both `regulation_id_numbers_json` and
 `docket_id`, not `dockets.rin`.
-Some sources are deliberately bounded or sampled (e.g. `lobbying_filings` is
-2024+, `usaspending_recipients` is the top 100K by award dollars) — the data
-dictionary documents the scope of each.
+Some sources are deliberately bounded or sampled; the data dictionary documents
+the scope of each. For example:
+
+- `lobbying_filings` is 2024+.
+- `usaspending_recipients` is the top 100K by award dollars.
+- `court_dockets` is almost entirely district-court APA cases; rule challenges
+  that a statute routes directly to the courts of appeals are effectively absent.
+- `gao_reports` accumulates GAO's RSS feed from 2026-07-13 onward and is not
+  Congressional Review Act coverage.
 
 ## Quickstart
 
