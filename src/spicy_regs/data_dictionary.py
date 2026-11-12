@@ -60,6 +60,7 @@ TABLES: tuple[str, ...] = (
     "oira_reviews",
     "oira_meetings",
     "federal_register",
+    "state_program_approvals",
     "sam_entities",
     "lobbying_filings",
     "fec_committees",
@@ -94,6 +95,7 @@ MCP_QUERYABLE: frozenset[str] = frozenset(
         "oira_reviews",
         "oira_meetings",
         "federal_register",
+        "state_program_approvals",
         "sam_entities",
         "lobbying_filings",
         "fec_committees",
@@ -278,6 +280,22 @@ DERIVED_SCHEMAS: dict[str, list[tuple[str, str]]] = {
         ("summary", "VARCHAR"),
         ("source_file", "VARCHAR"),
         ("url", "VARCHAR"),
+    ],
+    # Built by build_state_program_approvals from federal_register (plus VA/MD
+    # document bodies for the citation columns); one row per document and state.
+    "state_program_approvals": [
+        ("document_number", "VARCHAR"),
+        ("publication_date", "VARCHAR"),
+        ("document_type", "VARCHAR"),
+        ("title", "VARCHAR"),
+        ("jurisdiction", "VARCHAR"),
+        ("program", "VARCHAR"),
+        ("cfr_title", "BIGINT"),
+        ("cfr_part", "BIGINT"),
+        ("docket_ids_json", "VARCHAR"),
+        ("state_citations_json", "VARCHAR"),
+        ("state_effective_date", "VARCHAR"),
+        ("html_url", "VARCHAR"),
     ],
     # Ingested from federalregister.gov (build_federal_register); all columns are
     # stored as VARCHAR, array fields serialized as JSON strings.

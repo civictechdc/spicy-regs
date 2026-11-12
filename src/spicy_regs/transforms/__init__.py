@@ -20,6 +20,7 @@ from spicy_regs.transforms.build_oira import build_oira_meetings, build_oira_rev
 from spicy_regs.transforms.build_rulemaking_lifecycles import build_rulemaking_lifecycles
 from spicy_regs.transforms.build_sam_entities import build_sam_entities
 from spicy_regs.transforms.build_search_index import INDEX_FILENAME, build_search_index
+from spicy_regs.transforms.build_state_program_approvals import build_state_program_approvals
 from spicy_regs.transforms.build_unified_agenda import build_unified_agenda
 from spicy_regs.transforms.build_usaspending_recipients import build_usaspending_recipients
 from spicy_regs.transforms.chain import Chain
@@ -60,6 +61,7 @@ __all__ = [
     "build_sam_entities",
     "build_federal_register",
     "build_fr_docket_links",
+    "build_state_program_approvals",
     "build_org_committee_links",
     "build_gao_reports",
     "build_lobbying_filings",

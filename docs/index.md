@@ -53,6 +53,7 @@ is queryable through the MCP server (`list_sources` / `describe_table` /
 | Table | Grain | Key |
 | --- | --- | --- |
 | [`federal_register`](tables/federal_register.md) | one row per Federal Register document | `document_number` |
+| [`state_program_approvals`](tables/state_program_approvals.md) | one row per FR state-program approval and state (SIPs, RCRA, SMCRA, ...) | `document_number`, `jurisdiction` |
 | [`unified_agenda`](tables/unified_agenda.md) | one row per RIN per agenda edition | `rin` |
 | [`oira_reviews`](tables/oira_reviews.md) | one row per OIRA EO 12866 review (concluded or pending) | `rin` (not unique) |
 | [`oira_meetings`](tables/oira_meetings.md) | one row per OIRA EO 12866 meeting-log entry (2024 only) | `rin` (not unique) |

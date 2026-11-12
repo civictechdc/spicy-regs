@@ -98,6 +98,9 @@ SKIPPED = {
     # under a row floor. max(day) is not a staleness signal either: comment
     # posting is bursty and dockets go quiet for weeks.
     "docket_daily_comment_volume": "derived from comments; guarded by its build-time row floor",
+    # Promote to a DateCheck on publication_date (EPA publishes SIP actions most
+    # weeks) once the first publish lands.
+    "state_program_approvals": "not yet published to R2; first build pending",
 }
 
 

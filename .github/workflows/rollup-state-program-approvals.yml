@@ -1,0 +1,25 @@
+name: Rollup — state_program_approvals
+
+# Decoupled rollup: selects state-program approvals (SIPs, RCRA/UST
+# authorizations, SMCRA state programs, ...) out of federal_register.parquet,
+# then fetches VA/MD document bodies for state code citations. Prior citations
+# carry over from the published table, so a daily run only fetches new docs.
+on:
+  schedule:
+    # 23:40 UTC: after the federal_register ingest (21:00) has published.
+    - cron: '40 23 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-state-program-approvals
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}

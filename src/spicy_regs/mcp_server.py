@@ -48,6 +48,7 @@ TABLES = (
     "oira_reviews",
     "oira_meetings",
     "federal_register",
+    "state_program_approvals",
     "sam_entities",
     "lobbying_filings",
     "fec_committees",

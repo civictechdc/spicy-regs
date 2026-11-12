@@ -97,7 +97,7 @@ actually published.
 **Rollups** — small, denormalized, meant to be read whole: `feed_summary`,
 `agency_stats`, `agency_monthly_volume`, `docket_daily_comment_volume`,
 `comments_index`, `docket_search`, `rulemaking_lifecycles`, `discovery_signals`,
-`fr_docket_links`.
+`fr_docket_links`, `state_program_approvals`.
 
 **Complementary federal sources** — each ingested from its own API so the
 rulemaking lifecycle, the organizations engaged in it, and its downstream
