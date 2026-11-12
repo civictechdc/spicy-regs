@@ -14,10 +14,12 @@ partition just to draw one docket's series.
   chart.
 * It is the basis ``comments_index`` partitions on, so a docket's daily counts
   summed over a month equal that month's ``comments_index.row_count``.
-* ``posted_date`` is always midnight US Eastern stored in UTC (``04:00Z`` /
-  ``05:00Z``), so its UTC calendar date *is* the Eastern posting date.
-  ``receive_date`` carries real submission times, so a UTC truncation would
-  push evening (Eastern) submissions onto the next day.
+* ``day`` is the UTC calendar date of ``posted_date``. Nearly all values are
+  midnight US Eastern stored in UTC (``04:00Z`` / ``05:00Z``), for which that is
+  the Eastern posting date; a minority sit at ``00:00Z`` or other hours and are
+  taken at their UTC date, exactly as the UI does. ``receive_date`` carries real
+  submission times, so a UTC truncation would push evening (Eastern)
+  submissions onto the next day.
 * ``receive_date`` is null far more often (~42K rows vs ~2K).
 
 The trade-off: ``posted_date`` reflects when the agency got through its review
@@ -27,6 +29,17 @@ queue, so a burst of submissions can show up later and flatter than it arrived.
 rows need a ``docket_id``, an ``agency_code``, and a ``posted_date`` that casts to
 a ``DATE``. ``docket_id`` is trimmed of stray quotes the same way. Rows are not
 deduplicated on ``comment_id``, matching both the UI query and ``comments_index``.
+
+One deliberate departure from the UI query: dates before :data:`MIN_DAY`
+(1900-01-01) are dropped. regulations.gov uses ``0000-12-30T00:00:00Z`` as a
+"no date" sentinel on a handful of comments (e.g. ``CMS-2009-0058``); DuckDB
+casts it to ``0001-12-30 (BC)``, which Python's ``datetime.date`` cannot
+represent, so a published row with it makes ``pyarrow``'s ``to_pylist()`` and
+``to_pandas()`` raise ``OverflowError``. Real old dates (1980s dockets) are kept.
+
+**Key.** Exactly one row per ``(docket_id, day)``: ``agency_code`` is carried as
+``MIN(agency_code)`` rather than grouped on, so a docket whose comments ever carry
+two agency codes (none do today) can't split a day into two rows.
 
 **Layout.** ~375K rows / ~1.4 MB today (60K dockets). Sorted by
 ``(docket_id, day)`` with small row groups so a reader filtering one docket over
@@ -45,6 +58,10 @@ from loguru import logger
 from spicy_regs.transforms.comments_source import resolve_comments_source
 
 OUTPUT = "docket_daily_comment_volume.parquet"
+
+# Earliest day kept. Excludes the 0000-12-30 "no date" sentinel (see module
+# docstring) while keeping every genuine historical posting date.
+MIN_DAY = "1900-01-01"
 
 # Small row groups keep a single-docket read to a few tens of KB: the footer
 # plus the one row group whose docket_id range covers the requested docket.
@@ -73,14 +90,14 @@ def build_query(comments_source: str, out_file: str) -> str:
     COPY (
         SELECT
             TRIM(docket_id, '"') AS docket_id,
-            agency_code,
+            MIN(agency_code) AS agency_code,
             TRY_CAST(posted_date AS DATE) AS day,
             CAST(COUNT(*) AS BIGINT) AS comment_count
         FROM read_parquet('{comments_source}')
         WHERE docket_id IS NOT NULL
           AND agency_code IS NOT NULL
-          AND TRY_CAST(posted_date AS DATE) IS NOT NULL
-        GROUP BY 1, 2, 3
+          AND TRY_CAST(posted_date AS DATE) >= DATE '{MIN_DAY}'
+        GROUP BY TRIM(docket_id, '"'), TRY_CAST(posted_date AS DATE)
         ORDER BY docket_id, day
     ) TO '{out_file}' (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE {ROW_GROUP_SIZE});
     """

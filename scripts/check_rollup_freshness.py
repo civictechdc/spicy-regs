@@ -86,6 +86,11 @@ SKIPPED = {
     # better signal — promote it to ROW_CHANGE_BUDGETS once the first publish
     # lands and a steady-state row count is known.
     "org_committee_links": "derived link table; no date watermark of its own",
+    # Derived from comments.parquet, which publish-comments-mirror already
+    # guards (row floor + agency coverage), and its own build refuses output
+    # under a row floor. max(day) is not a staleness signal either: comment
+    # posting is bursty and dockets go quiet for weeks.
+    "docket_daily_comment_volume": "derived from comments; guarded by its build-time row floor",
 }
 
 

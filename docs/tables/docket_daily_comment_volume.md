@@ -2,7 +2,7 @@
 
 # `docket_daily_comment_volume`
 
-Per-docket daily comment volume — one row per (docket, day) on which at least one comment was posted; days with no comments have no row. Bucketed on comment `posted_date` (the day regulations.gov posted the comment, which can trail the day it was received), the same basis as `comments_index`, so a docket's days summed over a month equal that month's `comments_index.row_count`. Comments without a `docket_id`, `agency_code`, or parseable `posted_date` are excluded. Sorted by `docket_id` then `day` in small row groups, so filtering on one `docket_id` reads only a small slice of the file. Built by `build_docket_daily_comment_volume` from `comments`.
+Per-docket daily comment volume — exactly one row per (docket, day) on which at least one comment was posted; days with no comments have no row. Bucketed on comment `posted_date` (the day regulations.gov posted the comment, which can trail the day it was received), the same basis as `comments_index`, so a docket's days summed over a month equal that month's `comments_index.row_count` (except for the excluded sentinel dates below). Comments without a `docket_id`, `agency_code`, or parseable `posted_date` are excluded, as are `posted_date` values before 1900 — regulations.gov's `0000-12-30` "no date" sentinel, which would otherwise become a year-1 BC date that Python date types cannot hold. Sorted by `docket_id` then `day` in small row groups, so filtering on one `docket_id` reads only a small slice of the file. Built by `build_docket_daily_comment_volume` from `comments`.
 
 - **Parquet file:** `docket_daily_comment_volume.parquet`
 - **Queryable via MCP `query_sql`:** Yes
@@ -10,6 +10,6 @@ Per-docket daily comment volume — one row per (docket, day) on which at least 
 | Column | Type | Description |
 | --- | --- | --- |
 | `docket_id` | `VARCHAR` | Docket the comments were posted to. |
-| `agency_code` | `VARCHAR` | Agency short code of the docket. |
-| `day` | `DATE` | Calendar date the comments were posted, from `posted_date` (midnight US Eastern, so this is the Eastern posting date). |
+| `agency_code` | `VARCHAR` | Agency short code of the docket (the minimum if a docket's comments ever carry more than one). |
+| `day` | `DATE` | The UTC calendar date of `posted_date`, which for the usual 04:00Z/05:00Z values is the Eastern posting date. Always on or after 1900-01-01. |
 | `comment_count` | `BIGINT` | Number of comments posted to the docket on that day. |

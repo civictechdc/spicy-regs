@@ -15,7 +15,10 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
+from spicy_regs.pipelines.rollups import docket_daily_comment_volume as rollup_module
 from spicy_regs.pipelines.rollups.docket_daily_comment_volume import DocketDailyCommentVolumeRollup
+from spicy_regs.schemas import COMMENT
+from spicy_regs.sources import iceberg
 from spicy_regs.transforms.build_docket_daily_comment_volume import (
     OUTPUT,
     SCHEMA,
@@ -151,30 +154,80 @@ def test_strips_stray_quotes_from_docket_ids(tmp_output: Path) -> None:
     assert [(r["docket_id"], r["comment_count"]) for r in rows] == [("EPA-2024-0001", 2)]
 
 
-def test_monthly_sums_match_comments_index_counting(tmp_output: Path) -> None:
-    """Summed per month, the series equals what ``comments_index`` counts."""
+def test_monthly_sums_match_the_real_comments_index(tmp_output: Path) -> None:
+    """Summed per month, the series equals what ``comments_index`` publishes.
+
+    Runs the real ``iceberg._build_comments_index`` against a local in-memory
+    DuckDB attached under the catalog alias (as ``tests/test_iceberg.py`` does),
+    loaded from the same fixture the rollup reads.
+    """
     import duckdb
 
     fixture = [
         _comment(f"C-{i}", "EPA-2024-0001", f"2024-0{1 + i % 3}-{1 + i % 27:02d}T05:00:00Z") for i in range(60)
-    ] + [_comment("C-x", "EPA-2024-0001", None), _comment("C-y", None, "2024-01-01T05:00:00Z")]
+    ] + [
+        _comment("C-q", '"EPA-2024-0001"', "2024-01-03T05:00:00Z"),
+        _comment("C-f", "FDA-2024-0010", "2024-02-11T04:00:00Z", agency_code="FDA"),
+        _comment("C-x", "EPA-2024-0001", None),
+        _comment("C-y", None, "2024-01-01T05:00:00Z"),
+        _comment("C-z", "EPA-2024-0001", "2024-01-01T05:00:00Z", agency_code=None),
+    ]
     _build(tmp_output, fixture)
+
     con = duckdb.connect()
+    con.execute(f"ATTACH ':memory:' AS {iceberg._CATALOG_ALIAS};")
+    iceberg._ensure_table(con, COMMENT)
+    con.execute(
+        f"INSERT INTO {iceberg._qualified(COMMENT)} BY NAME "
+        f"SELECT * FROM read_parquet('{tmp_output / 'comments.parquet'}')"
+    )
+    index_file = iceberg._build_comments_index(con, COMMENT, tmp_output / "index")
+
     daily = con.execute(
-        f"""SELECT year(day), month(day), SUM(comment_count)::BIGINT
-            FROM read_parquet('{tmp_output / OUTPUT}') GROUP BY 1, 2 ORDER BY 1, 2"""
+        f"""SELECT agency_code, docket_id, year(day)::BIGINT, month(day)::BIGINT, SUM(comment_count)::BIGINT
+            FROM read_parquet('{tmp_output / OUTPUT}') GROUP BY ALL ORDER BY ALL"""
     ).fetchall()
-    # Same filters and month extraction as iceberg._build_comments_index.
     index = con.execute(
-        f"""SELECT EXTRACT(YEAR FROM CAST(posted_date AS TIMESTAMP))::BIGINT,
-                   EXTRACT(MONTH FROM CAST(posted_date AS TIMESTAMP))::BIGINT,
-                   COUNT(*)::BIGINT
-            FROM read_parquet('{tmp_output / "comments.parquet"}')
-            WHERE posted_date IS NOT NULL AND agency_code IS NOT NULL AND docket_id IS NOT NULL
-            GROUP BY 1, 2 ORDER BY 1, 2"""
+        f"SELECT agency_code, docket_id, year, month, row_count FROM read_parquet('{index_file}') ORDER BY ALL"
     ).fetchall()
+    con.close()
     assert daily == index
-    assert sum(n for _, _, n in daily) == 60
+    assert sum(r[-1] for r in daily) == 62
+
+
+def test_drops_the_year_zero_sentinel_but_keeps_real_old_dates(tmp_output: Path) -> None:
+    rows = _build(
+        tmp_output,
+        [
+            _comment("C-1", "CMS-2009-0058", "0000-12-30T00:00:00Z", agency_code="CMS"),
+            _comment("C-2", "CMS-2009-0058", "2009-08-01T04:00:00Z", agency_code="CMS"),
+            _comment("C-3", "DOT-OST-2006-24227", "1987-12-31T05:00:00Z", agency_code="DOT"),
+            _comment("C-4", "DOT-OST-2006-24227", "1899-12-31T05:00:00Z", agency_code="DOT"),
+        ],
+    )
+    assert [(r["docket_id"], r["day"]) for r in rows] == [
+        ("CMS-2009-0058", date(2009, 8, 1)),
+        ("DOT-OST-2006-24227", date(1987, 12, 31)),
+    ]
+    # Every published day must be representable by Python / pandas consumers.
+    table = pq.read_table(tmp_output / OUTPUT)
+    table.column("day").to_pylist()
+    table.to_pandas()
+
+
+def test_one_row_per_docket_day_even_when_a_docket_spans_two_agency_codes(tmp_output: Path) -> None:
+    rows = _build(
+        tmp_output,
+        [
+            _comment("C-1", "EPA-2024-0001", "2024-06-20T04:00:00Z", agency_code="EPA"),
+            _comment("C-2", "EPA-2024-0001", "2024-06-20T04:00:00Z", agency_code="OAR"),
+            _comment("C-3", "EPA-2024-0001", "2024-06-21T04:00:00Z", agency_code="OAR"),
+        ],
+    )
+    assert rows == [
+        {"docket_id": "EPA-2024-0001", "agency_code": "EPA", "day": date(2024, 6, 20), "comment_count": 2},
+        {"docket_id": "EPA-2024-0001", "agency_code": "OAR", "day": date(2024, 6, 21), "comment_count": 1},
+    ]
 
 
 def test_empty_input_still_writes_the_schema(tmp_output: Path) -> None:
@@ -188,13 +241,21 @@ def test_sorted_by_docket_with_non_overlapping_row_group_stats(
 ) -> None:
     """A single-docket reader must be able to prune on row-group min/max stats."""
     monkeypatch.setattr(module, "ROW_GROUP_SIZE", 2048)
-    # Write the fixture deliberately out of order.
+    # Write the fixture deliberately out of order. Every third docket's ids
+    # arrive wrapped in stray quotes; once trimmed they must sort (and fall into
+    # row groups) with the clean ones, not ahead of them as '"' would.
     fixture = [
-        _comment(f"C-{d}-{k}", f"AG-2024-{d:05d}", f"2024-03-{1 + k:02d}T04:00:00Z", agency_code="AG")
+        _comment(
+            f"C-{d}-{k}",
+            f'"AG-2024-{d:05d}"' if d % 3 == 0 else f"AG-2024-{d:05d}",
+            f"2024-03-{1 + k:02d}T04:00:00Z",
+            agency_code="AG",
+        )
         for d in reversed(range(4000))
         for k in range(2)
     ]
     rows = _build(tmp_output, fixture)
+    assert not any(r["docket_id"].startswith('"') for r in rows)
 
     keys = [(r["docket_id"], r["day"]) for r in rows]
     assert keys == sorted(keys)
@@ -244,7 +305,24 @@ def test_pipeline_declares_no_primed_inputs_and_publishes_its_output() -> None:
     assert DocketDailyCommentVolumeRollup.output == OUTPUT
 
 
-def test_pipeline_runs_end_to_end_from_a_local_comments_file(tmp_output: Path) -> None:
+def test_pipeline_runs_end_to_end_from_a_local_comments_file(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(rollup_module, "MIN_EXPECTED_ROWS", 1)
     _write_comments(tmp_output, [_comment("C-1", "EPA-2024-0001", "2024-06-20T04:00:00Z")])
     DocketDailyCommentVolumeRollup(output_dir=tmp_output, skip_upload=True).run()
     assert pq.read_table(tmp_output / OUTPUT).num_rows == 1
+
+
+def test_pipeline_refuses_output_under_the_row_floor(tmp_output: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The first publish has no remote file for the shrink guard to compare
+    against, so the build itself refuses a gutted table before any upload."""
+    uploads: list[Path] = []
+    monkeypatch.setattr("spicy_regs.sources.r2.upload_file", lambda path, **_: uploads.append(path))
+    _write_comments(tmp_output, [_comment("C-1", "EPA-2024-0001", "2024-06-20T04:00:00Z")])
+    with pytest.raises(RuntimeError, match="row floor"):
+        DocketDailyCommentVolumeRollup(output_dir=tmp_output, skip_upload=False).run()
+    assert uploads == []
+
+
+def test_row_floor_is_far_below_the_live_table() -> None:
+    # ~375K rows live (Nov 2026); the floor must only catch breakage.
+    assert 10_000 <= rollup_module.MIN_EXPECTED_ROWS <= 200_000
