@@ -2,15 +2,21 @@
 
 Covers the pieces with real logic: the raw-filing → published-schema mapping
 (``_shape``, including the nested activity/government-entity projections) and the
-reader's DRF ``next``-following pagination + ``max_records`` bound.
+reader's DRF ``next``-following pagination + ``max_records`` bound, and failing
+loudly on a rejected request or exhausted retries.
 """
 
 from __future__ import annotations
 
+import importlib
 import json
 from datetime import date
 
-from spicy_regs.sources.lobbying_filings import API_BASE, LobbyingFilingsReader
+import httpx
+import pytest
+
+from spicy_regs.sources import lobbying_filings
+from spicy_regs.sources.lobbying_filings import API_BASE, LobbyingFilingsReader, LobbyingFilingsUnavailable
 from spicy_regs.transforms.build_lobbying_filings import COLUMNS, _bounded_until, _shape
 
 _RAW_FILING = {
@@ -154,3 +160,76 @@ def test_lagging_window_is_capped_to_thirty_days():
         None,
         today=date(2026, 7, 20),
     ) == date(2026, 7, 20)
+
+
+# --------------------------------------------------------------------------- #
+# Failing loudly: a failed page used to end the fetch as if it were the last,
+# so the build re-uploaded the prior table and reported success.
+# --------------------------------------------------------------------------- #
+
+# ``spicy_regs.transforms`` re-exports the build *function* under the module's
+# name, so fetch the module itself to monkeypatch its globals.
+build_lda = importlib.import_module("spicy_regs.transforms.build_lobbying_filings")
+
+
+def _envelope(n: int, next_url: str | None) -> dict:
+    return {"count": n, "next": next_url, "previous": None, "results": [{"filing_uuid": str(i)} for i in range(n)]}
+
+
+def _patch_client(monkeypatch, handler):
+    monkeypatch.setattr(lobbying_filings.time, "sleep", lambda _s: None)
+    real_client = httpx.Client
+    monkeypatch.setattr(
+        lobbying_filings.httpx, "Client", lambda **kw: real_client(transport=httpx.MockTransport(handler), **kw)
+    )
+
+
+@pytest.mark.parametrize("status", [401, 403, 404, 405])
+def test_client_error_raises_without_retry(monkeypatch, status):
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(status, json={"detail": "nope"})
+
+    _patch_client(monkeypatch, handler)
+    with pytest.raises(LobbyingFilingsUnavailable, match=f"HTTP {status}"):
+        list(LobbyingFilingsReader().iter_records())
+    assert len(calls) == 1
+
+
+def test_failure_mid_pagination_raises_instead_of_truncating(monkeypatch):
+    def handler(request):
+        if "page=2" in str(request.url):
+            return httpx.Response(503)
+        return httpx.Response(200, json=_envelope(3, f"{API_BASE}/filings/?page=2"))
+
+    _patch_client(monkeypatch, handler)
+    with pytest.raises(LobbyingFilingsUnavailable, match="giving up"):
+        list(LobbyingFilingsReader().iter_records())
+
+
+def test_keyless_still_works_and_key_is_sent(monkeypatch):
+    seen = []
+
+    def handler(request):
+        seen.append(request.headers.get("Authorization"))
+        if len(seen) == 1:
+            return httpx.Response(429)  # retried
+        return httpx.Response(200, json=_envelope(2, None))
+
+    _patch_client(monkeypatch, handler)
+    assert len(list(LobbyingFilingsReader(api_key=None).iter_records())) == 2
+    assert seen == [None, None]
+
+    seen.clear()
+    assert len(list(LobbyingFilingsReader(api_key="k").iter_records())) == 2
+    assert seen == ["Token k", "Token k"]
+
+
+def test_build_aborts_before_writing_on_fetch_failure(tmp_path, monkeypatch):
+    monkeypatch.setattr(build_lda.r2, "download", lambda *_a, **_k: False)
+    _patch_client(monkeypatch, lambda request: httpx.Response(401, json={"detail": "bad key"}))
+    with pytest.raises(LobbyingFilingsUnavailable, match="check LDA_API_KEY"):
+        build_lda.build_lobbying_filings(tmp_path)
+    assert not (tmp_path / "lobbying_filings.parquet").exists()
