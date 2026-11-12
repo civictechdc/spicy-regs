@@ -108,6 +108,12 @@ context are all joinable in one place:
 - *Telecom:* `fcc_proceedings`, `fcc_filings`
 
 Cross-source join keys: **RIN**, **CFR citation**, **UEI**, **`agency_code`**.
+RIN is a real key on the Federal Register / Unified Agenda side
+(`federal_register.regulation_id_numbers_json` ↔ `unified_agenda.rin`; the
+agenda is a single edition, so not every FR RIN matches), but it is rarely
+populated on regulations.gov. To get from a RIN to a docket, use
+`fr_docket_links`, which carries both `regulation_id_numbers_json` and
+`docket_id`, not `dockets.rin`.
 Some sources are deliberately bounded or sampled (e.g. `lobbying_filings` is
 2024+, `usaspending_recipients` is the top 100K by award dollars) — the data
 dictionary documents the scope of each.
