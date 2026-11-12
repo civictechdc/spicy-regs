@@ -225,6 +225,147 @@ class TestMergeStagingFiles:
         assert merged["modify_date"][0] == "2024-09-15"
         assert merged["title"][0] == "new"
 
+    def test_documents_merge_adds_subtype_to_published_file_without_it(self, tmp_path):
+        """An incremental run whose staging rows carry ``subtype`` merges into a
+        published documents.parquet written before the column existed: no row is
+        lost, existing rows get NULL, and the output has the full current schema."""
+        staging = tmp_path / "staging"
+        output = tmp_path / "output"
+        output.mkdir()
+
+        base = {
+            "docket_id": "EPA-2024-0001",
+            "agency_code": "EPA",
+            "document_type": "Proposed Rule",
+            "posted_date": "2024-06-01",
+            "comment_start_date": None,
+            "comment_end_date": None,
+            "file_url": None,
+            "attachments_json": None,
+            "fr_doc_num": None,
+            "withdrawn": None,
+            "reason_withdrawn": None,
+            "additional_rins": None,
+            "text_content": None,
+            "text_extraction_status": None,
+        }
+        old_schema = {c: t for c, t in DOCUMENT.schema.items() if c != "subtype"}
+        published = [
+            {
+                **base,
+                "document_id": "D-001",
+                "title": "untouched",
+                "modify_date": "2024-06-01",
+                "text_content": "extracted earlier",
+                "text_extraction_status": "ok",
+            },
+            {**base, "document_id": "D-002", "title": "stale", "modify_date": "2024-06-01"},
+        ]
+        write_parquet_from_dicts(output / "documents.parquet", published, old_schema)
+        assert "subtype" not in pq.ParquetFile(output / "documents.parquet").schema_arrow.names
+
+        staged = [
+            {
+                **base,
+                "document_id": "D-002",
+                "title": "fresh",
+                "modify_date": "2024-09-15",
+                "subtype": "Extension of Comment Period",
+            },
+            {
+                **base,
+                "document_id": "D-003",
+                "title": "new",
+                "modify_date": "2024-10-01",
+                "subtype": "Notice of Proposed Rulemaking (NPRM)",
+            },
+        ]
+        write_staging("EPA", "documents", staged, staging, DOCUMENT.schema)
+
+        merge_staging_files(
+            staging,
+            output,
+            ["documents"],
+            {"documents": DOCUMENT.schema},
+            {"documents": DOCUMENT.dedup_key},
+        )
+
+        merged = pl.read_parquet(output / "documents.parquet")
+        assert merged.columns == list(DOCUMENT.schema)
+        rows = {r["document_id"]: r for r in merged.iter_rows(named=True)}
+        assert set(rows) == {"D-001", "D-002", "D-003"}
+        assert rows["D-001"]["subtype"] is None
+        assert rows["D-001"]["text_content"] == "extracted earlier"
+        assert rows["D-002"]["title"] == "fresh"
+        assert rows["D-002"]["subtype"] == "Extension of Comment Period"
+        assert rows["D-003"]["subtype"] == "Notice of Proposed Rulemaking (NPRM)"
+
+    def test_merge_fills_schema_column_absent_from_every_input(self, tmp_path):
+        """If the only readable input predates a schema column (every staging
+        file was skipped as corrupt), the column is emitted as NULL rather than
+        DuckDB failing to bind it, and no published row is dropped."""
+        staging = tmp_path / "staging"
+        output = tmp_path / "output"
+        output.mkdir()
+
+        old_schema = {c: t for c, t in DOCUMENT.schema.items() if c != "subtype"}
+        published = [
+            {c: None for c in old_schema}
+            | {"document_id": f"D-00{i}", "docket_id": "EPA-2024-0001", "modify_date": "2024-06-01"}
+            for i in (1, 2)
+        ]
+        write_parquet_from_dicts(output / "documents.parquet", published, old_schema)
+        (staging / "documents").mkdir(parents=True)
+        (staging / "documents" / "EPA.parquet").write_bytes(b"not a parquet file")
+
+        merge_staging_files(
+            staging,
+            output,
+            ["documents"],
+            {"documents": DOCUMENT.schema},
+            {"documents": DOCUMENT.dedup_key},
+        )
+
+        merged = pl.read_parquet(output / "documents.parquet")
+        assert merged.columns == list(DOCUMENT.schema)
+        assert sorted(merged["document_id"].to_list()) == ["D-001", "D-002"]
+        assert merged["subtype"].to_list() == [None, None]
+
+    def test_merge_refuses_when_dedup_key_absent_from_every_input(self, tmp_path):
+        """A dedup key missing from every input would collapse all rows into one;
+        that must raise, not silently drop rows."""
+        staging = tmp_path / "staging"
+        output = tmp_path / "output"
+        output.mkdir()
+        write_staging(
+            "EPA",
+            "dockets",
+            [{"title": "t", "modify_date": "2024-01-01"}],
+            staging,
+            {"title": pl.Utf8, "modify_date": pl.Utf8},
+        )
+
+        with pytest.raises(ValueError, match="docket_id"):
+            merge_staging_files(staging, output, ["dockets"], {"dockets": DOCKET_SCHEMA}, {"dockets": "docket_id"})
+
+    def test_merge_refuses_when_one_input_lacks_dedup_key(self, tmp_path):
+        """If the published file has the key but one staging file doesn't, that
+        file's rows would get NULL keys and all but one would be deduped away;
+        refuse instead of silently dropping them."""
+        staging = tmp_path / "staging"
+        output = tmp_path / "output"
+        output.mkdir()
+        published = [{"docket_id": "EPA-2024-0001", "modify_date": "2024-01-01"}]
+        write_parquet_from_dicts(output / "dockets.parquet", published, DOCKET_SCHEMA)
+        keyless = {"title": pl.Utf8, "modify_date": pl.Utf8}
+        rows = [{"title": "a", "modify_date": "2024-02-01"}, {"title": "b", "modify_date": "2024-03-01"}]
+        write_staging("EPA", "dockets", rows, staging, keyless)
+
+        with pytest.raises(ValueError, match="EPA.parquet"):
+            merge_staging_files(staging, output, ["dockets"], {"dockets": DOCKET_SCHEMA}, {"dockets": "docket_id"})
+        # The published file is left untouched.
+        assert pl.read_parquet(output / "dockets.parquet")["docket_id"].to_list() == ["EPA-2024-0001"]
+
     def test_deduplicates_comments_keeping_latest_modify_date(self, tmp_path):
         """Comments should dedupe on comment_id, keeping latest modify_date."""
         staging = tmp_path / "staging"

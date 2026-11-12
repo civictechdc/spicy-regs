@@ -15,6 +15,7 @@ One row per document posted to a docket — proposed rules, final rules, notices
 | `agency_code` | `VARCHAR` | Posting agency's short code. |
 | `title` | `VARCHAR` | Document title. |
 | `document_type` | `VARCHAR` | Document category (e.g. `Rule`, `Proposed Rule`, `Notice`, `Supporting & Related Material`). |
+| `subtype` | `VARCHAR` | regulations.gov document subtype: a finer-grained kind within `document_type` that separates lifecycle stages, e.g. `Notice of Proposed Rulemaking (NPRM)`, `Request for Comment`, `Extension of Comment Period`, `Reopening of Comment Period`, `Final Rule`, `Interim Final Rule`, `Withdrawal`. Agency-chosen free text, not a fixed vocabulary; distinct from `fr_docket_links.subtype` (Federal Register side). Null on most documents, and null on rows ingested before this column was added until they are re-processed. |
 | `posted_date` | `VARCHAR` | Date the document was posted publicly (ISO 8601 string). |
 | `modify_date` | `VARCHAR` | Timestamp the document was last modified (ISO 8601 string). |
 | `comment_start_date` | `VARCHAR` | Start of the public comment period this document opens, if any. Often null. |
