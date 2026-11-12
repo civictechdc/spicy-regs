@@ -63,6 +63,7 @@ These fields are stable enough to start with, but use `--describe` for the actua
 - `agency_code`
 - `title`
 - `document_type`
+- `subtype` (finer kind within `document_type`, e.g. NPRM vs. extension of comment period; often null)
 - `posted_date`
 - `modify_date`
 - `comment_start_date`

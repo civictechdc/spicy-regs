@@ -15,6 +15,7 @@ One row per document posted to a docket — proposed rules, final rules, notices
 | `agency_code` | `VARCHAR` | Posting agency's short code. |
 | `title` | `VARCHAR` | Document title. |
 | `document_type` | `VARCHAR` | Document category (e.g. `Rule`, `Proposed Rule`, `Notice`, `Supporting & Related Material`). |
+| `subtype` | `VARCHAR` | regulations.gov document subtype: a finer-grained kind within `document_type` that separates lifecycle stages, e.g. `Notice of Proposed Rulemaking (NPRM)`, `Request for Comment`, `Extension of Comment Period`, `Reopening of Comment Period`, `Final Rule`, `Interim Final Rule`, `Withdrawal`. Agency-chosen free text, not a fixed vocabulary; distinct from `fr_docket_links.subtype` (Federal Register side). Null on most documents, and null on rows ingested before this column was added until they are re-processed. |
 | `posted_date` | `VARCHAR` | Date the document was posted publicly (ISO 8601 string). |
 | `modify_date` | `VARCHAR` | Timestamp the document was last modified (ISO 8601 string). |
 | `comment_start_date` | `VARCHAR` | Start of the public comment period this document opens, if any. Often null. |
@@ -24,6 +25,6 @@ One row per document posted to a docket — proposed rules, final rules, notices
 | `fr_doc_num` | `VARCHAR` | Federal Register document number, when the document was published in the FR. Often null. |
 | `withdrawn` | `VARCHAR` | Whether the document was withdrawn, as the string `"true"`/`"false"`. Often null. |
 | `reason_withdrawn` | `VARCHAR` | Agency-supplied reason for withdrawal, when withdrawn. Often null. |
-| `additional_rins` | `VARCHAR` | JSON array of additional Regulation Identifier Numbers beyond the docket's primary RIN. Often null. |
+| `additional_rins` | `VARCHAR` | JSON array of additional Regulation Identifier Numbers beyond the docket's primary RIN. Almost never populated (fewer than 100 of ~2M documents), so not a usable RIN join key; use `federal_register.regulation_id_numbers_json` / `fr_docket_links` instead. |
 | `text_content` | `VARCHAR` | Plain text extracted from the document's PDF attachment(s) by the PDF text-extraction step. Null until that step has run; see `text_extraction_status`. |
 | `text_extraction_status` | `VARCHAR` | Outcome of PDF text extraction: `ok`, `empty` (no extractable text, e.g. scanned/image-only PDFs — OCR is out of scope), `encrypted` (password-protected), or `error`. Null before extraction has been attempted. |

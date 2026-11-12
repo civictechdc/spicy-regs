@@ -16,4 +16,4 @@ One row per regulations.gov docket. A docket is the top-level folder a federal a
 | `docket_type` | `VARCHAR` | Docket category, typically `Rulemaking` or `Nonrulemaking`. |
 | `modify_date` | `VARCHAR` | Timestamp the docket was last modified on regulations.gov (ISO 8601 string). |
 | `abstract` | `VARCHAR` | Agency-written summary of the docket (regulations.gov `dkAbstract`). Often null. |
-| `rin` | `VARCHAR` | Regulation Identifier Number tying the docket to the Unified Agenda. Often null. |
+| `rin` | `VARCHAR` | Regulation Identifier Number as reported by regulations.gov. Rarely populated: null, empty, or `Not Assigned` on more than 99% of dockets, and where set it holds a single RIN, often not the most recent one, even though a long-running docket can span several. Not a usable RIN join key; to link a RIN to a docket, use `fr_docket_links` (it carries both `regulation_id_numbers_json` and `docket_id`). |

@@ -26,9 +26,25 @@ where ``EDITION`` is ``YYYYMM`` with MM in {04 (Spring), 10 (Fall)} — e.g.
 (Fall 2024). (One legacy file is ``REGINFO_RIN_DATA_2012.xml``.) No API key is
 required; reginfo.gov is fully open.
 
+Edition discovery
+-----------------
+reginfo.gov does keep an index: the ``eAgendaXmlReport`` HTML page (see the
+note below) links every ``REGINFO_RIN_DATA_{edition}.xml`` it serves, from
+``199510`` onward. Scraping it would tie us to that page's markup, though, and a
+"what's newest?" question only needs a couple of requests, so this reader probes
+instead. (The index is the natural source for enumerating historical editions
+in a backfill, #172.) A request for an edition that has not been published
+still answers ``200``, with an HTML error page instead of XML, so probing has to
+look at the body. The latest edition is found like this: :func:`candidate_editions`
+lists plausible editions newest-first from today's date (bounded by
+:data:`MAX_LOOKBACK_EDITIONS`), and :func:`discover_editions` streams just the
+first bytes of each candidate, treating anything but an XML body as "not
+published". Incremental callers pass the newest edition they already store as
+``after`` and get back only the published editions newer than it.
+
 .. note::
-   The older ``eAgendaXmlReport`` endpoint returns the **HTML listing page**, not
-   data — it is not a machine-readable export. ``XMLViewFileAction`` is the real
+   The older ``eAgendaXmlReport`` endpoint returns the **HTML listing page** (the
+   index of editions mentioned above), not data. It is not a machine-readable export. ``XMLViewFileAction`` is the real
    export and is what this reader fetches.
 
 Each file is a single ``<REGINFO_RIN_DATA>`` root containing many ``<RIN_INFO>``
@@ -64,6 +80,7 @@ import io
 import time
 import xml.etree.ElementTree as ET
 from collections.abc import Iterator
+from datetime import date
 
 import httpx
 from loguru import logger
@@ -84,10 +101,14 @@ XML_FILE_TEMPLATE = "REGINFO_RIN_DATA_{edition}.xml"
 _ROOT_TAG = "REGINFO_RIN_DATA"
 _RECORD_TAG = "RIN_INFO"
 
-# The most recent agenda edition to fetch when a caller does not specify one.
-# Editions are ``YYYYMM`` with MM in {04 (Spring), 10 (Fall)}. Fall 2025 is the
-# most recent edition validated against the live export.
-DEFAULT_EDITION = "202510"
+# Editions are ``YYYYMM`` with MM in {04 (Spring), 10 (Fall)}.
+EDITION_MONTHS = ("10", "04")  # newest-first within a year
+
+# How many candidate editions (counting back from this year's Fall edition)
+# discovery probes before giving up. Eight is four years: agendas are sometimes
+# published months late, but never years, and anything older than this is a
+# historical backfill (#172), not "the latest edition".
+MAX_LOOKBACK_EDITIONS = 8
 
 # Transport hygiene: bound every request and retry transient failures with
 # backoff so a flaky fetch fails slow-then-recovers rather than dropping records.
@@ -95,14 +116,159 @@ _TIMEOUT = httpx.Timeout(300.0, connect=30.0)
 _MAX_RETRIES = 5
 _PROGRESS_EVERY = 5_000
 
+# Probing reads only the start of the body: enough to see ``<?xml`` past any
+# leading whitespace (the HTML error page starts with ~20 blank lines).
+_PROBE_MAX_BYTES = 64 * 1024
+_PROBE_RETRIES = 3
+# A probe needs only the first chunk, so it gets a short timeout: a hung
+# reginfo.gov then fails discovery in about a minute instead of the
+# 300 s-per-attempt download timeout.
+_PROBE_TIMEOUT = httpx.Timeout(30.0, connect=10.0)
+
+
+class UnifiedAgendaUnavailable(RuntimeError):
+    """reginfo.gov could not be reached, or answered with no recognizable export."""
+
+
+def _is_xml(data: bytes) -> bool:
+    """True if ``data`` starts (after whitespace) like an XML document.
+
+    A missing edition comes back as ``200`` with an HTML error page, so the
+    status code alone cannot tell published from unpublished.
+    """
+    return data.lstrip().startswith(b"<?xml")
+
+
+def candidate_editions(today: date | None = None, *, count: int = MAX_LOOKBACK_EDITIONS) -> list[str]:
+    """Return ``count`` plausible editions newest-first, starting at this year's Fall.
+
+    E.g. on 2026-11-12: ``["202610", "202604", "202510", "202504", ...]``. This
+    year's editions are always included even if their month hasn't arrived yet:
+    probing a not-yet-published edition costs one small request.
+    """
+    year = (today or date.today()).year
+    out: list[str] = []
+    while len(out) < count:
+        for month in EDITION_MONTHS:
+            if len(out) == count:
+                break
+            out.append(f"{year}{month}")
+        year -= 1
+    return out
+
+
+def probe_edition(client: httpx.Client, edition: str) -> bool:
+    """Return whether ``edition``'s XML export is published, reading only its first bytes.
+
+    ``False`` means reginfo.gov answered but not with XML (the HTML error page
+    for an unpublished edition, or a non-retryable 4xx). Transport errors and
+    429/5xx are retried; if they persist, raises :class:`UnifiedAgendaUnavailable`
+    so callers never mistake "reginfo.gov is down" for "not published".
+    """
+    params = {"f": XML_FILE_TEMPLATE.format(edition=edition)}
+    for attempt in range(1, _PROBE_RETRIES + 1):
+        try:
+            with client.stream("GET", XML_EXPORT_ENDPOINT, params=params, timeout=_PROBE_TIMEOUT) as resp:
+                if resp.status_code == 429 or resp.status_code >= 500:
+                    raise httpx.HTTPStatusError("retryable", request=resp.request, response=resp)
+                if resp.status_code != 200:
+                    return False
+                head = b""
+                for chunk in resp.iter_bytes():
+                    head += chunk
+                    if len(head.lstrip()) >= len(b"<?xml") or len(head) >= _PROBE_MAX_BYTES:
+                        break
+                return _is_xml(head)
+        except httpx.HTTPError as exc:
+            if attempt == _PROBE_RETRIES:
+                raise UnifiedAgendaUnavailable(
+                    f"could not probe edition {edition} after {attempt} attempts: {exc}"
+                ) from exc
+            backoff = min(2**attempt, 30)
+            logger.warning(
+                "Unified Agenda: probe of {} failed ({}), attempt {}/{}, retrying in {}s",
+                edition,
+                exc,
+                attempt,
+                _PROBE_RETRIES,
+                backoff,
+            )
+            time.sleep(backoff)
+    raise AssertionError("unreachable")  # pragma: no cover
+
+
+def discover_editions(
+    after: str | None = None,
+    *,
+    today: date | None = None,
+    client: httpx.Client | None = None,
+) -> tuple[str, ...]:
+    """Return the published editions to fetch, oldest-first.
+
+    - ``after=None`` (nothing stored yet): probe candidates newest-first and
+      return just the first published one, i.e. the latest edition.
+    - ``after="YYYYMM"`` (the newest stored edition): probe every candidate
+      newer than it and return those that are published, oldest-first. ``()``
+      means the stored table is already current.
+
+    Raises :class:`UnifiedAgendaUnavailable` if reginfo.gov cannot be reached,
+    or if no candidate *and* not even ``after`` itself probes as published:
+    that means the export endpoint changed, not that nothing is new, and
+    reporting "up to date" would silently freeze the table again.
+    """
+    if client is None:
+        with httpx.Client(timeout=_PROBE_TIMEOUT, follow_redirects=True) as owned:
+            return discover_editions(after, today=today, client=owned)
+
+    candidates = candidate_editions(today)
+    if after is not None:
+        candidates = [c for c in candidates if c > after]
+
+    published: list[str] = []
+    for edition in candidates:  # newest-first
+        if probe_edition(client, edition):
+            logger.info("Unified Agenda: edition {} is published", edition)
+            published.append(edition)
+            if after is None:
+                break  # nothing stored: the latest edition is enough
+        else:
+            logger.info("Unified Agenda: edition {} is not published", edition)
+
+    if published:
+        # An older candidate that is still unpublished while a newer one is out
+        # gets skipped for good: the stored max moves past it. Gaps are real
+        # (reginfo.gov has no 201804), so this is a warning, not an error.
+        # Recovering a late edition is backfill work (#172).
+        newest = max(published)
+        skipped = sorted(c for c in candidates if c < newest and c not in published)
+        if skipped:
+            logger.warning(
+                "Unified Agenda: edition(s) {} are not published but newer edition {} is; "
+                "they will be skipped and not retried (backfill via #172 if they appear later)",
+                ", ".join(skipped),
+                newest,
+            )
+        return tuple(sorted(published))
+    if after is not None and probe_edition(client, after):
+        logger.info("Unified Agenda: no edition newer than stored {}; up to date", after)
+        return ()
+    stored = f" or the stored edition {after}" if after else ""
+    raise UnifiedAgendaUnavailable(
+        f"no published Unified Agenda edition among {candidate_editions(today)}{stored}; "
+        f"has {XML_EXPORT_ENDPOINT} changed?"
+    )
+
 
 class UnifiedAgendaReader(Reader):
     """Yields normalized Unified Agenda RIN dicts for one or more agenda editions.
 
-    ``editions`` defaults to :data:`DEFAULT_EDITION`. Callers doing incremental
-    runs pass only the edition(s) newer than what is already stored; the
-    transform handles merging with the prior table and dedup on
-    (``rin``, ``agenda_edition``).
+    ``editions`` defaults to the latest published edition, found at run time
+    via :func:`discover_editions`. Callers doing incremental runs pass only the
+    edition(s) newer than what is already stored; the transform handles merging
+    with the prior table and dedup on (``rin``, ``agenda_edition``).
+
+    After iteration, :attr:`edition_counts` maps each fetched edition to the
+    number of records it yielded (``0`` if its download failed).
     """
 
     def __init__(
@@ -111,16 +277,18 @@ class UnifiedAgendaReader(Reader):
         editions: tuple[str, ...] | None = None,
         verbose: bool = False,
     ) -> None:
-        self.editions = editions or (DEFAULT_EDITION,)
+        self.editions = editions
         self.verbose = verbose
         self._client: httpx.Client | None = None
         self._seen = 0
+        self.edition_counts: dict[str, int] = {}
 
     def iter_records(self) -> Iterator[dict]:
-        logger.info("Unified Agenda: fetching editions {}", ", ".join(self.editions))
         with httpx.Client(timeout=_TIMEOUT, follow_redirects=True) as client:
             self._client = client
-            for edition in self.editions:
+            editions = self.editions or discover_editions(client=client)
+            logger.info("Unified Agenda: fetching editions {}", ", ".join(editions))
+            for edition in editions:
                 yield from self._fetch_edition(edition)
         logger.info("Unified Agenda: yielded {:,} records", self._seen)
 
@@ -132,6 +300,7 @@ class UnifiedAgendaReader(Reader):
         Each yielded dict is annotated with the ``agenda_edition`` it came from,
         since it is half of the (``rin``, ``agenda_edition``) dedup key.
         """
+        self.edition_counts[edition] = 0
         data = self._download(edition)
         if data is None:
             return
@@ -146,6 +315,7 @@ class UnifiedAgendaReader(Reader):
                 continue
             record = _normalize(elem, edition)
             collected += 1
+            self.edition_counts[edition] = collected
             self._seen += 1
             if self._seen % _PROGRESS_EVERY == 0:
                 logger.info("Unified Agenda: {:,} records so far...", self._seen)
@@ -169,7 +339,7 @@ class UnifiedAgendaReader(Reader):
                     raise httpx.HTTPStatusError("retryable", request=resp.request, response=resp)
                 resp.raise_for_status()
                 data = resp.content
-                if not data.lstrip().startswith(b"<?xml"):
+                if not _is_xml(data):
                     # A non-XML body (e.g. the HTML listing page) means the edition
                     # is missing or the endpoint changed — surface it, don't parse.
                     logger.error(

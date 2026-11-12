@@ -71,6 +71,10 @@ def _extract_document(d: dict) -> dict:
         "agency_code": attrs.get("agencyId"),
         "title": attrs.get("title"),
         "document_type": attrs.get("documentType"),
+        # Finer-grained kind within document_type, e.g. "Notice of Proposed
+        # Rulemaking (NPRM)", "Extension of Comment Period", "Interim Final Rule".
+        # Agency-chosen free text; null on most documents.
+        "subtype": attrs.get("subtype"),
         "posted_date": attrs.get("postedDate"),
         "modify_date": attrs.get("modifyDate"),
         "comment_start_date": attrs.get("commentStartDate"),
@@ -122,6 +126,7 @@ DOCUMENT = RecordType(
         "agency_code": pl.Utf8,
         "title": pl.Utf8,
         "document_type": pl.Utf8,
+        "subtype": pl.Utf8,
         "posted_date": pl.Utf8,
         "modify_date": pl.Utf8,
         "comment_start_date": pl.Utf8,

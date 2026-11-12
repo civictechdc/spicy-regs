@@ -151,6 +151,34 @@ def test_document_extract_missing_withdrawal_fields_are_none() -> None:
     assert out["reason_withdrawn"] is None
 
 
+def test_document_extract_subtype() -> None:
+    # subtype is what separates lifecycle stages inside one document_type
+    # (NPRM vs. comment-period extension vs. interim final rule).
+    raw = {
+        "data": {
+            "id": "FINCEN-2023-0013-0001",
+            "attributes": {"documentType": "Proposed Rule", "subtype": "Notice of Proposed Rulemaking (NPRM)"},
+        }
+    }
+    out = DOCUMENT.extract(raw)
+    assert out["document_type"] == "Proposed Rule"
+    assert out["subtype"] == "Notice of Proposed Rulemaking (NPRM)"
+
+
+def test_document_extract_subtype_missing_or_null_is_none() -> None:
+    # Most documents carry "subtype": null; an absent key must not KeyError.
+    assert DOCUMENT.extract({"data": {"id": "X-1", "attributes": {}}})["subtype"] is None
+    assert DOCUMENT.extract({"data": {"id": "X-2", "attributes": {"subtype": None}}})["subtype"] is None
+
+
+def test_document_extract_subtype_from_real_sample_payload() -> None:
+    # The committed sample carries the key (camel-free "subtype") with a null
+    # value, which is the common case upstream.
+    raw = loads((SAMPLE_DATA / "document-ACF-2025-0038-0001.json").read_text())
+    assert "subtype" in raw["data"]["attributes"]
+    assert DOCUMENT.extract(raw)["subtype"] is None
+
+
 def test_document_extract_additional_rins_empty_or_missing_is_none() -> None:
     # additionalRins is a source array exploded into a link table downstream;
     # both an absent key and an empty list should collapse to None rather than
