@@ -1,21 +1,40 @@
 """Hermetic tests for the Unified Agenda ingest (no network).
 
-Covers the two pieces with real logic: parsing the reginfo.gov
-``REGINFO_RIN_DATA`` XML export into normalized RIN dicts
-(``UnifiedAgendaReader._fetch_edition`` / ``_normalize``) and mapping those onto
-the published 17-column schema (``_shape``, including timetable-date derivation
-and the deterministic per-RIN URL). The reader's HTTP download is monkeypatched
-so no network is touched.
+Covers the pieces with real logic: parsing the reginfo.gov ``REGINFO_RIN_DATA``
+XML export into normalized RIN dicts (``UnifiedAgendaReader._fetch_edition`` /
+``_normalize``), mapping those onto the published 17-column schema (``_shape``,
+including timetable-date derivation and the deterministic per-RIN URL),
+discovering the latest published edition (``candidate_editions`` /
+``probe_edition`` / ``discover_editions``), and the incremental build fetching
+only editions newer than what is stored. HTTP is either monkeypatched or served
+by ``httpx.MockTransport``, so no network is touched.
 """
 
 from __future__ import annotations
 
+import importlib
 import json
+from datetime import date
 from unittest.mock import patch
 
+import httpx
+import pyarrow as pa
+import pyarrow.parquet as pq
+import pytest
+
 from spicy_regs.sources import unified_agenda
-from spicy_regs.sources.unified_agenda import UnifiedAgendaReader
-from spicy_regs.transforms.build_unified_agenda import COLUMNS, _shape
+from spicy_regs.sources.unified_agenda import (
+    UnifiedAgendaReader,
+    UnifiedAgendaUnavailable,
+    candidate_editions,
+    discover_editions,
+    probe_edition,
+)
+from spicy_regs.transforms.build_unified_agenda import COLUMNS, _SCHEMA, _prior_max_edition, _shape
+
+# ``spicy_regs.transforms`` re-exports the build *function* under the module's
+# name, so fetch the module itself to monkeypatch its globals.
+build_mod = importlib.import_module("spicy_regs.transforms.build_unified_agenda")
 
 # A two-record slice of the real export, matching the observed tag structure:
 # <REGINFO_RIN_DATA> root, repeated <RIN_INFO> records, nested AGENCY / CFR_LIST /
@@ -189,7 +208,248 @@ def test_download_rejects_non_xml_body(monkeypatch):
     assert list(reader._fetch_edition("202510")) == []
 
 
-def test_default_edition_is_yyyymm():
-    ed = unified_agenda.DEFAULT_EDITION
-    assert len(ed) == 6 and ed.isdigit()
-    assert ed[4:] in {"04", "10"}
+# --------------------------------------------------------------------------- #
+# Edition discovery (hermetic via httpx.MockTransport).
+# --------------------------------------------------------------------------- #
+
+# What reginfo.gov actually returns for an unpublished edition: 200 + an HTML
+# error page that starts with a run of blank lines.
+_HTML_ERROR_PAGE = b"\n" * 20 + b'<html lang="en"><head><title>Regulatory Review Disclosure</title></head></html>'
+
+
+def _edition_of(request: httpx.Request) -> str:
+    name = request.url.params["f"]
+    assert name.startswith("REGINFO_RIN_DATA_") and name.endswith(".xml")
+    return name.removeprefix("REGINFO_RIN_DATA_").removesuffix(".xml")
+
+
+def _reginfo(published: set[str], probed: list[str] | None = None) -> httpx.Client:
+    """A MockTransport client serving XML for ``published`` editions, the HTML error page otherwise."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        edition = _edition_of(request)
+        if probed is not None:
+            probed.append(edition)
+        if edition in published:
+            return httpx.Response(200, content=_FIXTURE_XML, headers={"content-type": "application/xml"})
+        return httpx.Response(200, content=_HTML_ERROR_PAGE, headers={"content-type": "text/html"})
+
+    return httpx.Client(transport=httpx.MockTransport(handler))
+
+
+@pytest.fixture
+def no_sleep(monkeypatch):
+    monkeypatch.setattr(unified_agenda.time, "sleep", lambda _s: None)
+
+
+_TODAY = date(2026, 11, 12)
+
+
+def test_candidate_editions_newest_first_from_this_years_fall():
+    assert candidate_editions(_TODAY) == [
+        "202610",
+        "202604",
+        "202510",
+        "202504",
+        "202410",
+        "202404",
+        "202310",
+        "202304",
+    ]
+
+
+def test_candidate_editions_bounded_and_well_formed():
+    # Early in the year this year's editions are still candidates (cheap misses).
+    assert candidate_editions(date(2027, 1, 5), count=3) == ["202710", "202704", "202610"]
+    assert candidate_editions(_TODAY, count=1) == ["202610"]
+    cands = candidate_editions(_TODAY)
+    assert len(cands) == unified_agenda.MAX_LOOKBACK_EDITIONS
+    assert all(len(c) == 6 and c.isdigit() and c[4:] in {"04", "10"} for c in cands)
+    assert cands == sorted(cands, reverse=True)
+
+
+def test_probe_detects_xml_vs_html_error_page():
+    with _reginfo({"202510"}) as client:
+        assert probe_edition(client, "202510") is True
+        assert probe_edition(client, "202604") is False
+
+
+def test_probe_treats_non_200_as_not_published():
+    def handler(request):
+        return httpx.Response(404, content=b"not found")
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        assert probe_edition(client, "202604") is False
+
+
+def test_probe_retries_transient_errors(no_sleep):
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        if len(calls) == 1:
+            return httpx.Response(503)
+        return httpx.Response(200, content=b"  \n" + _FIXTURE_XML)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        assert probe_edition(client, "202510") is True
+    assert len(calls) == 2
+
+
+@pytest.mark.parametrize("failure", ["503", "connect"])
+def test_probe_raises_when_reginfo_is_down(no_sleep, failure):
+    def handler(request):
+        if failure == "503":
+            return httpx.Response(503)
+        raise httpx.ConnectError("down", request=request)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(UnifiedAgendaUnavailable):
+            probe_edition(client, "202510")
+
+
+def test_discover_first_run_stops_at_newest_published():
+    probed: list[str] = []
+    with _reginfo({"202504", "202510"}, probed) as client:
+        assert discover_editions(today=_TODAY, client=client) == ("202510",)
+    # Newest-first, and nothing older than the first hit is requested.
+    assert probed == ["202610", "202604", "202510"]
+
+
+def test_discover_incremental_returns_only_newer_published():
+    probed: list[str] = []
+    with _reginfo({"202510", "202604"}, probed) as client:
+        assert discover_editions("202510", today=_TODAY, client=client) == ("202604",)
+    assert probed == ["202610", "202604"]
+
+
+def test_discover_incremental_fills_a_multi_edition_gap_oldest_first():
+    with _reginfo({"202504", "202510", "202604"}) as client:
+        assert discover_editions("202504", today=_TODAY, client=client) == ("202510", "202604")
+
+
+def test_discover_incremental_up_to_date():
+    probed: list[str] = []
+    with _reginfo({"202510"}, probed) as client:
+        assert discover_editions("202510", today=_TODAY, client=client) == ()
+    # Newer candidates miss, then the stored edition is re-probed as a sanity check.
+    assert probed == ["202610", "202604", "202510"]
+
+
+def test_discover_raises_when_nothing_probes_as_published():
+    # Every response is the HTML page: the endpoint changed. Don't call that "up to date".
+    with _reginfo(set()) as client:
+        with pytest.raises(UnifiedAgendaUnavailable, match="changed"):
+            discover_editions("202510", today=_TODAY, client=client)
+        with pytest.raises(UnifiedAgendaUnavailable):
+            discover_editions(today=_TODAY, client=client)
+
+
+def test_discover_raises_when_reginfo_is_down(no_sleep):
+    def handler(request):
+        raise httpx.ConnectError("down", request=request)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(UnifiedAgendaUnavailable):
+            discover_editions("202510", today=_TODAY, client=client)
+
+
+def test_reader_without_editions_discovers_latest(monkeypatch):
+    monkeypatch.setattr(unified_agenda, "discover_editions", lambda **_kw: ("202604",))
+    monkeypatch.setattr(UnifiedAgendaReader, "_download", lambda self, ed: _FIXTURE_XML)
+    reader = UnifiedAgendaReader()
+    records = list(reader.iter_records())
+    assert {r["agenda_edition"] for r in records} == {"202604"}
+    assert reader.edition_counts == {"202604": 2}
+
+
+# --------------------------------------------------------------------------- #
+# Incremental build: fetch only editions newer than what is stored.
+# --------------------------------------------------------------------------- #
+
+
+def _write_prior(output_dir, editions: list[str]) -> None:
+    rows = [{c: None for c in COLUMNS} | {"rin": "0000-AA00", "agenda_edition": ed} for ed in editions]
+    pq.write_table(pa.Table.from_pylist(rows, schema=_SCHEMA), output_dir / "_ua_prior.parquet")
+
+
+def _editions_in(path) -> set[str]:
+    return set(pq.read_table(path, columns=["agenda_edition"]).column("agenda_edition").to_pylist())
+
+
+def test_prior_max_edition_ignores_malformed_values(tmp_output):
+    _write_prior(tmp_output, ["202410", "202510", "2012", "999999"])
+    assert _prior_max_edition(tmp_output / "_ua_prior.parquet") == "202510"
+    assert _prior_max_edition(tmp_output / "missing.parquet") is None
+
+
+def test_build_fetches_editions_newer_than_stored(tmp_output, monkeypatch):
+    _write_prior(tmp_output, ["202504", "202510"])
+    seen_after: list[str | None] = []
+
+    def fake_discover(after=None, **_kw):
+        seen_after.append(after)
+        return ("202604",)
+
+    fetched: list[str] = []
+
+    def fake_download(self, ed):
+        fetched.append(ed)
+        return _FIXTURE_XML
+
+    monkeypatch.setattr(build_mod, "discover_editions", fake_discover)
+    monkeypatch.setattr(UnifiedAgendaReader, "_download", fake_download)
+
+    out = build_mod.build_unified_agenda(tmp_output)
+    assert seen_after == ["202510"]
+    assert fetched == ["202604"]
+    # Prior editions are kept alongside the newly ingested one.
+    assert _editions_in(out) == {"202504", "202510", "202604"}
+
+
+def test_build_up_to_date_fetches_nothing_and_keeps_prior(tmp_output, monkeypatch):
+    _write_prior(tmp_output, ["202510"])
+    monkeypatch.setattr(build_mod, "discover_editions", lambda after=None, **_kw: ())
+
+    def boom(self, ed):
+        raise AssertionError("nothing should be downloaded")
+
+    monkeypatch.setattr(UnifiedAgendaReader, "_download", boom)
+    out = build_mod.build_unified_agenda(tmp_output)
+    assert _editions_in(out) == {"202510"}
+
+
+def test_build_first_run_discovers_latest(tmp_output, monkeypatch):
+    monkeypatch.setattr(build_mod.r2, "download", lambda *_a, **_kw: False)
+    seen_after: list[str | None] = []
+
+    def fake_discover(after=None, **_kw):
+        seen_after.append(after)
+        return ("202510",)
+
+    monkeypatch.setattr(build_mod, "discover_editions", fake_discover)
+    monkeypatch.setattr(UnifiedAgendaReader, "_download", lambda self, ed: _FIXTURE_XML)
+    out = build_mod.build_unified_agenda(tmp_output)
+    assert seen_after == [None]
+    assert _editions_in(out) == {"202510"}
+
+
+def test_build_fails_loudly_when_reginfo_is_down(tmp_output, monkeypatch):
+    _write_prior(tmp_output, ["202510"])
+
+    def down(after=None, **_kw):
+        raise UnifiedAgendaUnavailable("down")
+
+    monkeypatch.setattr(build_mod, "discover_editions", down)
+    with pytest.raises(UnifiedAgendaUnavailable):
+        build_mod.build_unified_agenda(tmp_output)
+    assert not (tmp_output / build_mod.OUTPUT).exists()
+
+
+def test_build_fails_when_a_published_edition_downloads_empty(tmp_output, monkeypatch):
+    _write_prior(tmp_output, ["202510"])
+    monkeypatch.setattr(build_mod, "discover_editions", lambda after=None, **_kw: ("202604",))
+    monkeypatch.setattr(UnifiedAgendaReader, "_download", lambda self, ed: None)
+    with pytest.raises(UnifiedAgendaUnavailable, match="202604"):
+        build_mod.build_unified_agenda(tmp_output)
+    assert not (tmp_output / build_mod.OUTPUT).exists()

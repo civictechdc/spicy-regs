@@ -12,11 +12,15 @@ wasteful *and* would trip the R2 catastrophic-shrink guard on any short run.
 Instead we:
 
 1. Best-effort download the prior ``unified_agenda.parquet`` from R2.
-2. Fetch only the requested edition(s) (defaulting to the current edition).
-3. Union prior + new and dedup on (``rin``, ``agenda_edition``), preferring the
+2. Probe reginfo.gov for published editions newer than the prior table's max
+   ``agenda_edition`` (see :func:`~spicy_regs.sources.unified_agenda.discover_editions`).
+3. Fetch only those edition(s); none means the table is already current.
+4. Union prior + new and dedup on (``rin``, ``agenda_edition``), preferring the
    freshly fetched row so a re-run of an edition refreshes it in place.
 
-With no prior table (first run) step 3 keeps only the freshly fetched editions.
+With no prior table (first run) step 2 finds just the latest published edition,
+and step 4 keeps only it. If reginfo.gov is unreachable the build raises rather
+than republishing the prior table as if it were current.
 
 The reginfo.gov XML export the reader parses is documented in
 :mod:`spicy_regs.sources.unified_agenda`; :func:`_shape` maps the reader's
@@ -34,7 +38,11 @@ import pyarrow.parquet as pq
 from loguru import logger
 
 from spicy_regs.sources import r2
-from spicy_regs.sources.unified_agenda import DEFAULT_EDITION, UnifiedAgendaReader
+from spicy_regs.sources.unified_agenda import (
+    UnifiedAgendaReader,
+    UnifiedAgendaUnavailable,
+    discover_editions,
+)
 
 OUTPUT = "unified_agenda.parquet"
 
@@ -135,8 +143,33 @@ def _shape(doc: dict) -> dict:
     }
 
 
+_EDITION_RE = r"^[0-9]{4}(04|10)$"
+
+
+def _prior_max_edition(prior_file: Path) -> str | None:
+    """Newest ``YYYYMM`` ``agenda_edition`` in the prior table, or None if empty/absent.
+
+    Only well-formed semiannual editions count, so a stray legacy value (e.g.
+    the one-off ``2012`` file) can't skew the comparison.
+    """
+    if not prior_file.exists():
+        return None
+    import duckdb
+
+    row = duckdb.execute(
+        f"SELECT max(agenda_edition) FROM read_parquet('{prior_file}') WHERE regexp_matches(agenda_edition, ?)",
+        [_EDITION_RE],
+    ).fetchone()
+    if not row or row[0] is None:
+        return None
+    return str(row[0])
+
+
 def build_unified_agenda(output_dir: Path, *, editions: tuple[str, ...] | None = None) -> Path:
-    """Build ``unified_agenda.parquet`` (incremental merge with the prior table)."""
+    """Build ``unified_agenda.parquet`` (incremental merge with the prior table).
+
+    ``editions`` overrides discovery and fetches exactly those editions.
+    """
     import duckdb
 
     out_file = output_dir / OUTPUT
@@ -149,16 +182,35 @@ def build_unified_agenda(output_dir: Path, *, editions: tuple[str, ...] | None =
     else:
         logger.info("Unified Agenda: no prior table found — starting fresh")
 
-    # 2. Fetch + shape the requested edition(s) into a "new rows" parquet.
-    editions = editions or (DEFAULT_EDITION,)
-    reader = UnifiedAgendaReader(editions=editions)
-    rows = [_shape(doc) for doc in reader.iter_records()]
+    # 2. Work out which editions to fetch: anything published that is newer than
+    #    the newest stored edition (or just the latest one, on a first run).
+    #    discover_editions raises if reginfo.gov is unreachable, so an outage
+    #    fails the run loudly instead of republishing a silently stale table.
+    if editions is None:
+        stored_max = _prior_max_edition(prior_file) if have_prior else None
+        logger.info("Unified Agenda: newest stored edition is {}", stored_max or "(none)")
+        editions = discover_editions(after=stored_max)
+
+    # 3. Fetch + shape those edition(s) into a "new rows" parquet.
+    rows: list[dict] = []
+    if editions:
+        reader = UnifiedAgendaReader(editions=editions)
+        rows = [_shape(doc) for doc in reader.iter_records()]
+        # Every edition here was requested explicitly or probed as published, so
+        # an empty one is a failed download, not a missing edition. Abort rather
+        # than publish without it: the next run would treat it as already stored
+        # (if a newer edition did land) and never fetch it again.
+        empty = [ed for ed in editions if not reader.edition_counts.get(ed)]
+        if empty:
+            raise UnifiedAgendaUnavailable(f"edition(s) {', '.join(empty)} yielded no records")
+    else:
+        logger.info("Unified Agenda: stored table is current; nothing to fetch")
     new_file = output_dir / "_ua_new.parquet"
     table = pa.Table.from_pylist(rows, schema=_SCHEMA) if rows else _SCHEMA.empty_table()
     pq.write_table(table, new_file, compression="zstd")
     logger.info("Unified Agenda: fetched {:,} entries this run", len(rows))
 
-    # 3. Merge prior + new, dedup on (rin, agenda_edition) preferring the new row.
+    # 4. Merge prior + new, dedup on (rin, agenda_edition) preferring the new row.
     spill_dir = output_dir / ".duckdb_tmp"
     spill_dir.mkdir(exist_ok=True)
     con = duckdb.connect()
