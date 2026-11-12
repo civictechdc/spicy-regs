@@ -2,16 +2,25 @@
 
 Covers the pieces with real logic: the raw-search-result → published-schema
 mapping (``_shape``, including array-field JSON serialization and URL
-absolutization) and the reader's cursor ``next``-following pagination +
-``max_records`` bound.
+absolutization), the reader's cursor ``next``-following pagination +
+``max_records`` bound, and failing loudly on a missing token or rejected request.
 """
 
 from __future__ import annotations
 
+import importlib
 import json
 
-from spicy_regs.sources.courtlistener import CourtListenerReader
+import httpx
+import pytest
+
+from spicy_regs.sources import courtlistener
+from spicy_regs.sources.courtlistener import CourtListenerReader, CourtListenerUnavailable
 from spicy_regs.transforms.build_courtlistener import COLUMNS, _shape
+
+# ``spicy_regs.transforms`` re-exports the build *function* under the module's
+# name, so fetch the module itself to monkeypatch its globals.
+build_cl = importlib.import_module("spicy_regs.transforms.build_courtlistener")
 
 _RAW_DOCKET = {
     "docket_id": 73613631,
@@ -151,3 +160,68 @@ def test_since_sets_filed_after_param(monkeypatch):
     assert captured["filed_after"] == "07/01/2024"
     assert captured["type"] == "r"
     assert captured["nature_of_suit"] == "899"
+
+
+# --------------------------------------------------------------------------- #
+# Failing loudly: CourtListener ended keyless access (405 from 2026-10-27, then
+# 401), and the old reader turned every failure into "0 dockets" + a green run.
+# --------------------------------------------------------------------------- #
+
+
+def _mock_client(handler):
+    return httpx.Client(transport=httpx.MockTransport(handler))
+
+
+def test_missing_token_raises():
+    reader = CourtListenerReader(api_token=None)
+    with pytest.raises(CourtListenerUnavailable, match="COURTLISTENER_API_TOKEN is not set"):
+        list(reader.iter_records())
+
+
+@pytest.mark.parametrize("status", [401, 403, 405])
+def test_client_error_raises_without_retry(monkeypatch, status):
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(status, json={"detail": "Authentication credentials were not provided."})
+
+    reader = CourtListenerReader(api_token="t")
+    reader._client = _mock_client(handler)
+    with pytest.raises(CourtListenerUnavailable, match=f"HTTP {status}"):
+        list(reader._paginate())
+    assert len(calls) == 1
+
+
+def test_exhausted_retries_raise(monkeypatch):
+    monkeypatch.setattr(courtlistener.time, "sleep", lambda _s: None)
+    reader = CourtListenerReader(api_token="t")
+    reader._client = _mock_client(lambda request: httpx.Response(503))
+    with pytest.raises(CourtListenerUnavailable, match="giving up"):
+        list(reader._paginate())
+
+
+def test_token_sent_and_transient_error_retried(monkeypatch):
+    monkeypatch.setattr(courtlistener.time, "sleep", lambda _s: None)
+    seen = []
+
+    def handler(request):
+        seen.append(request.headers.get("Authorization"))
+        if len(seen) == 1:
+            return httpx.Response(429)
+        return httpx.Response(200, json=_page([1, 2], None))
+
+    real_client = httpx.Client
+    monkeypatch.setattr(
+        courtlistener.httpx, "Client", lambda **kw: real_client(transport=httpx.MockTransport(handler), **kw)
+    )
+    reader = CourtListenerReader(api_token="secret")
+    assert [d["docket_id"] for d in reader.iter_records()] == [1, 2]
+    assert seen == ["Token secret", "Token secret"]
+
+
+def test_build_aborts_before_writing_on_fetch_failure(tmp_path, monkeypatch):
+    monkeypatch.setattr(build_cl.r2, "download", lambda *_a, **_k: False)
+    with pytest.raises(CourtListenerUnavailable):
+        build_cl.build_courtlistener(tmp_path)  # no token configured
+    assert not (tmp_path / "court_dockets.parquet").exists()

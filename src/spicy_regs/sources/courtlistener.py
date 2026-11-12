@@ -16,19 +16,23 @@ the API returns them. Shaping them into the published schema is the job of
 Administrative Procedures Act/Review or Appeal of Agency Decision", the precise
 docket classification for APA challenges to federal agency action. That is a
 bounded, high-signal corpus (~7.6K dockets across all federal courts) rather than
-the whole PACER firehose. ``/search/`` is chosen over ``/dockets/`` deliberately:
-the raw ``/dockets/`` endpoint requires authentication, whereas ``/search/`` is
-fully functional keyless.
+the whole PACER firehose.
 
 **Cursor pagination.** The v4 search endpoint paginates with an opaque cursor
 carried in the ``next`` URL (deep pagination requires ``order_by=dateFiled asc``
 or ``desc``; score ordering does not support cursors). We follow ``next`` until
 it is null, which is robust to the exact page size.
 
-**API key.** CourtListener works **keyless** at a lower rate limit; an optional
-``COURTLISTENER_API_TOKEN`` sent as an ``Authorization: Token <token>`` header
-raises the limit. This reader is fully functional with no token — it just fetches
-more slowly. When a token is present it is used automatically.
+**API token (required).** ``COURTLISTENER_API_TOKEN`` is sent as an
+``Authorization: Token <token>`` header. CourtListener used to serve ``/search/``
+keyless, but stopped: from 2026-10-27 keyless requests got ``405 Not Allowed``,
+and from 2026-11-03 ``401 Authentication credentials were not provided``. Tokens
+are free with a CourtListener account (https://www.courtlistener.com/profile/api/).
+
+**Failing loudly.** Without a token, or on any non-retryable 4xx, the reader
+raises :class:`CourtListenerUnavailable` instead of yielding nothing. Unlike the
+keyed sources that treat a keyless run as a no-op, a no-op here would still
+re-upload the prior table and report success; that hid this outage for 17 days.
 """
 
 from __future__ import annotations
@@ -54,15 +58,19 @@ API_TOKEN_ENV_VAR = "COURTLISTENER_API_TOKEN"
 
 # Transport hygiene: bound every request and retry transient failures with
 # backoff so a flaky page fails slow-then-recovers rather than dropping dockets.
-# Keyless requests are rate-limited more aggressively, so 429s are expected and
-# retried with backoff.
+# 429s and 5xx are retried with backoff; any other 4xx is a configuration
+# problem (bad or missing token, blocked client) and fails immediately.
 _TIMEOUT = httpx.Timeout(60.0, connect=30.0)
 _MAX_RETRIES = 6
 _PROGRESS_EVERY = 1_000
 
 
+class CourtListenerUnavailable(RuntimeError):
+    """CourtListener could not be queried: no token, a rejected request, or retries exhausted."""
+
+
 def _resolve_api_token() -> str | None:
-    """Return the ``COURTLISTENER_API_TOKEN`` if set, else None (keyless works)."""
+    """Return the ``COURTLISTENER_API_TOKEN`` if set, else None."""
     value = os.environ.get(API_TOKEN_ENV_VAR)
     return value or None
 
@@ -72,8 +80,8 @@ class CourtListenerReader(Reader):
 
     ``since`` scopes the fetch to dockets filed on/after a date (server-side via
     the ``filed_after`` search param); incremental runs pass the max ``date_filed``
-    already stored. ``max_records`` bounds the fetch for validation. With no token
-    configured the reader still fetches, just slower.
+    already stored. ``max_records`` bounds the fetch for validation. Raises
+    :class:`CourtListenerUnavailable` if no token is configured or a request fails.
     """
 
     def __init__(
@@ -94,17 +102,18 @@ class CourtListenerReader(Reader):
         self._seen = 0
 
     def iter_records(self) -> Iterator[dict]:
-        keyed = "with API token" if self.api_token else "keyless (lower rate limit)"
+        if not self.api_token:
+            raise CourtListenerUnavailable(
+                f"{API_TOKEN_ENV_VAR} is not set. CourtListener no longer serves /search/ without a token; "
+                "create one at https://www.courtlistener.com/profile/api/ and add it as a repository secret."
+            )
         logger.info(
-            "CourtListener: fetching RECAP dockets {} (nature_of_suit={}, since={}, max_records={})",
-            keyed,
+            "CourtListener: fetching RECAP dockets (nature_of_suit={}, since={}, max_records={})",
             self.nature_of_suit,
             self.since or "the beginning",
             self.max_records or "unbounded",
         )
-        headers = {"Accept": "application/json"}
-        if self.api_token:
-            headers["Authorization"] = f"Token {self.api_token}"
+        headers = {"Accept": "application/json", "Authorization": f"Token {self.api_token}"}
         with httpx.Client(timeout=_TIMEOUT, headers=headers) as client:
             self._client = client
             yield from self._paginate()
@@ -128,8 +137,6 @@ class CourtListenerReader(Reader):
         while url:
             payload = self._get(url, params if first else None)
             first = False
-            if payload is None:
-                break
             for docket in payload.get("results") or []:
                 self._seen += 1
                 if self._seen % _PROGRESS_EVERY == 0:
@@ -141,23 +148,33 @@ class CourtListenerReader(Reader):
                     return
             url = payload.get("next") or ""
 
-    def _get(self, url: str, params: dict | None) -> dict | None:
-        """GET with bounded retries + exponential backoff. Returns parsed JSON or None."""
+    def _get(self, url: str, params: dict | None) -> dict:
+        """GET with bounded retries + exponential backoff on 429/5xx/transport errors.
+
+        Any other 4xx raises at once: retrying a rejected token or a blocked
+        client only delays the failure. Exhausted retries also raise, so a
+        failed page can never be mistaken for the end of the results.
+        """
         assert self._client is not None
         for attempt in range(1, _MAX_RETRIES + 1):
             try:
                 resp = self._client.get(url, params=params)
                 if resp.status_code == 429 or resp.status_code >= 500:
                     raise httpx.HTTPStatusError("retryable", request=resp.request, response=resp)
-                resp.raise_for_status()
+                if resp.status_code >= 400:
+                    raise CourtListenerUnavailable(
+                        f"CourtListener rejected {url} with HTTP {resp.status_code}: {resp.text[:200]}"
+                        + (f" (check {API_TOKEN_ENV_VAR})" if resp.status_code in (401, 403) else "")
+                    )
                 return resp.json()
             except (httpx.HTTPError, ValueError) as exc:
                 if attempt == _MAX_RETRIES:
-                    logger.error("CourtListener: giving up on {} after {} attempts: {}", url, attempt, exc)
-                    return None
+                    raise CourtListenerUnavailable(
+                        f"CourtListener: giving up on {url} after {attempt} attempts: {exc}"
+                    ) from exc
                 backoff = min(2**attempt, 60)
                 logger.warning(
                     "CourtListener: {} (attempt {}/{}), retrying in {}s", exc, attempt, _MAX_RETRIES, backoff
                 )
                 time.sleep(backoff)
-        return None
+        raise AssertionError("unreachable")  # pragma: no cover

@@ -98,8 +98,8 @@ jobs:
           CONGRESS_UNTIL: ${{ inputs.congress_until }}
           FCC_SINCE: ${{ inputs.fcc_since }}
           FCC_PROCEEDINGS: ${{ inputs.fcc_proceedings }}
-          # Optional: raises the CourtListener API rate limit. The court_dockets
-          # rollup is fully functional keyless, so an unset secret is fine.
+          # Required by the court_dockets rollup: CourtListener stopped serving
+          # its search API keyless in late Oct 2026, and the rollup fails without it.
           COURTLISTENER_API_TOKEN: ${{ secrets.COURTLISTENER_API_TOKEN }}
           # Passed via env (not interpolated into the command) to keep the run
           # step free of any templated string in an executable position.
