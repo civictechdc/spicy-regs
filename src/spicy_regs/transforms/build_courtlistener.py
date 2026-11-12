@@ -29,8 +29,9 @@ short run. Instead we:
    catch newly-indexed / corrected dockets).
 3. Dedup the union on ``cl_docket_id``, preferring the freshly fetched row.
 
-With no prior table (first run) step 2 becomes a full backfill. The reader is
-functional keyless, so this runs in CI with or without ``COURTLISTENER_API_TOKEN``.
+With no prior table (first run) step 2 becomes a full backfill. The reader
+requires ``COURTLISTENER_API_TOKEN`` and raises if it is missing or a request
+fails, so a broken fetch aborts the build before anything is uploaded.
 """
 
 from __future__ import annotations
