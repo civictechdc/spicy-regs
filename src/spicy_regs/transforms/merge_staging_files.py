@@ -56,7 +56,9 @@ def merge_staging_files(
             except Exception as e:
                 logger.warning(
                     "{}: skipping corrupt file {}: {}",
-                    data_type, file_path.name, e,
+                    data_type,
+                    file_path.name,
+                    e,
                 )
                 continue
             valid_files.append(file_path)
@@ -67,13 +69,10 @@ def merge_staging_files(
         target_columns = list(schemas[data_type].keys())
         key_col = dedup_keys.get(data_type)
         if key_col is None:
-            raise ValueError(
-                f"merge_staging_files: no dedup key configured for '{data_type}'"
-            )
+            raise ValueError(f"merge_staging_files: no dedup key configured for '{data_type}'")
         if key_col not in target_columns or "modify_date" not in target_columns:
             raise ValueError(
-                f"merge_staging_files: schema for '{data_type}' must include "
-                f"'{key_col}' and 'modify_date'"
+                f"merge_staging_files: schema for '{data_type}' must include '{key_col}' and 'modify_date'"
             )
 
         # A column the schema gained after the published file was written (e.g.
@@ -147,5 +146,7 @@ def merge_staging_files(
         total_rows = pq.ParquetFile(output_file).metadata.num_rows
         logger.info(
             "{}: merged {:,} deduped rows (key={})",
-            data_type, total_rows, key_col,
+            data_type,
+            total_rows,
+            key_col,
         )

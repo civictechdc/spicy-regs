@@ -1,6 +1,5 @@
 """Tests for the BloomFilter used by the manifest loader."""
 
-
 from spicy_regs.manifest import BloomFilter
 
 

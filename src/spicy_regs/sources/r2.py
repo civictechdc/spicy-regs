@@ -148,9 +148,7 @@ def _assert_upload_safe(
         )
 
 
-def upload_file(
-    local_path: Path, remote_key: str | None = None, *, ingested_at: str | None = None
-) -> None:
+def upload_file(local_path: Path, remote_key: str | None = None, *, ingested_at: str | None = None) -> None:
     """Publish a single file to R2 (remote key defaults to the filename).
 
     Before overwriting an existing remote object, checks the current

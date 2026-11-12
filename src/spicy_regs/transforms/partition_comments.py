@@ -43,9 +43,7 @@ def partition_comments(output_dir: Path) -> Path:
     for batch in pf.iter_batches(batch_size=500_000):
         table = pa.Table.from_batches([batch])
         if target_schema is None:
-            target_schema = pa.schema(
-                [f for f in table.schema if f.name != "agency_code"]
-            )
+            target_schema = pa.schema([f for f in table.schema if f.name != "agency_code"])
 
         # Group by agency_code
         agencies = table.column("agency_code").to_pylist()
@@ -60,9 +58,7 @@ def partition_comments(output_dir: Path) -> Path:
                 agency_dir = partition_dir / f"agency_code={agency}"
                 agency_dir.mkdir(parents=True, exist_ok=True)
                 out_path = agency_dir / "part-0.parquet"
-                writers[agency] = pq.ParquetWriter(
-                    out_path, target_schema, compression="zstd"
-                )
+                writers[agency] = pq.ParquetWriter(out_path, target_schema, compression="zstd")
                 agency_row_counts[agency] = 0
 
             writers[agency].write_table(agency_table)
@@ -92,9 +88,7 @@ def partition_comments(output_dir: Path) -> Path:
     # SELECT so DuckDB doesn't re-infer the hive partition column and
     # bake it back into the file.
     assert target_schema is not None, "target_schema is populated in the first batch above"
-    select_cols = ", ".join(
-        f'"{f.name}"' for f in target_schema if f.name != "agency_code"
-    )
+    select_cols = ", ".join(f'"{f.name}"' for f in target_schema if f.name != "agency_code")
     # Allow DuckDB to spill to disk when a single agency's decompressed
     # string columns exceed RAM.  Reuse partition_dir as the spill area
     # so temp files land on the same volume as the output.

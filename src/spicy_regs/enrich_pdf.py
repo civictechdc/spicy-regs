@@ -440,7 +440,12 @@ def _enrich_comment_agency_in_catalog(
 
     logger.info(
         "catalog[{}]: PDF-enriched {} row(s) (ok={}, empty={}, encrypted={}, error={})",
-        agency, stats["selected"], stats["ok"], stats["empty"], stats["encrypted"], stats["error"],
+        agency,
+        stats["selected"],
+        stats["ok"],
+        stats["empty"],
+        stats["encrypted"],
+        stats["error"],
     )
     return stats
 

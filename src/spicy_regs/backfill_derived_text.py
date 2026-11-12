@@ -133,7 +133,9 @@ def _derived_text_updates(
 
     logger.info(
         "Backfilling {} comments across {} dockets from derived-data ({} workers)...",
-        selected, len(work_by_docket), max_workers,
+        selected,
+        len(work_by_docket),
+        max_workers,
     )
 
     def _fetch_docket(item: tuple[tuple[str, str], list[str]]) -> dict[str, str]:

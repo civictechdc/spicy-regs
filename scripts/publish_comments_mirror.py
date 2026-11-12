@@ -140,9 +140,7 @@ def check_agencies(new_index: Path, allow_missing: set[str], allow_shrink: set[s
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=Path("output"))
-    parser.add_argument(
-        "--skip-upload", action="store_true", help="Build the mirror locally but don't publish to R2"
-    )
+    parser.add_argument("--skip-upload", action="store_true", help="Build the mirror locally but don't publish to R2")
     parser.add_argument(
         "--allow-missing-agency",
         action="append",

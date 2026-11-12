@@ -86,7 +86,9 @@ def main() -> int:
             return 0
 
         total_dupe_rows = sum(rows - distinct for _, rows, distinct in dupes)
-        logger.warning("{} agency(ies) carry duplicate comment rows ({:,} duplicate rows total):", len(dupes), total_dupe_rows)
+        logger.warning(
+            "{} agency(ies) carry duplicate comment rows ({:,} duplicate rows total):", len(dupes), total_dupe_rows
+        )
         logger.warning("{:<10} {:>14} {:>14} {:>8}", "agency", "rows", "distinct_ids", "factor")
         for agency, rows, distinct in dupes:
             factor = rows / distinct if distinct else 0
@@ -96,7 +98,10 @@ def main() -> int:
             logger.info("Audit only (pass --apply to rebuild the table deduplicated).")
             return 0
 
-        logger.info("Rebuilding {} deduplicated (CREATE OR REPLACE, keeping latest modify_date per comment_id)...", comments_rt.name)
+        logger.info(
+            "Rebuilding {} deduplicated (CREATE OR REPLACE, keeping latest modify_date per comment_id)...",
+            comments_rt.name,
+        )
         before, after = iceberg.dedupe_table(con, comments_rt)
         logger.info("Rebuilt: {:,} rows -> {:,} rows ({:,} duplicates removed)", before, after, before - after)
 

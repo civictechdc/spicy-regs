@@ -61,7 +61,14 @@ def _tool_names(fastmcp) -> set[str]:
 
 def test_build_server_registers_expected_tools():
     server = mcp_server.build_server()
-    assert _tool_names(server) == {"list_sources", "describe_table", "query_sql", "prepare_comment", "get_rule_text", "get_data_freshness"}
+    assert _tool_names(server) == {
+        "list_sources",
+        "describe_table",
+        "query_sql",
+        "prepare_comment",
+        "get_rule_text",
+        "get_data_freshness",
+    }
 
 
 # --- catalog config resolution ----------------------------------------------

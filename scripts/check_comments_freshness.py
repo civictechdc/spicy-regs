@@ -112,10 +112,7 @@ def _check_freshness(con, idx_where: str, rows_where: str, limit: int) -> bool:
     print(f"{'agency':<10} {'index_to':<9} {'rows_to':<9} {'index_rows':>12} {'actual_rows':>12}")
     print("-" * 56)
     for agency, idx_ym, rows_ym, idx_rows, actual_rows in flagged[:limit]:
-        print(
-            f"{agency:<10} {_fmt_ym(idx_ym):<9} {_fmt_ym(rows_ym):<9} "
-            f"{idx_rows:>12,} {actual_rows:>12,}"
-        )
+        print(f"{agency:<10} {_fmt_ym(idx_ym):<9} {_fmt_ym(rows_ym):<9} {idx_rows:>12,} {actual_rows:>12,}")
     if len(flagged) > limit:
         print(f"... and {len(flagged) - limit} more (raise --limit to see them)")
     return True
@@ -143,9 +140,7 @@ def _check_duplicates(con, rows_where: str, limit: int) -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--agency", help="Restrict the check to a single agency_code")
-    parser.add_argument(
-        "--limit", type=int, default=100, help="Max flagged agencies to print (default 100)"
-    )
+    parser.add_argument("--limit", type=int, default=100, help="Max flagged agencies to print (default 100)")
     args = parser.parse_args()
 
     if args.agency:

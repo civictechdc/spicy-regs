@@ -49,9 +49,6 @@ def test_extract_records_is_lazy_and_streams() -> None:
 
 
 def test_extract_records_preserves_order_and_count() -> None:
-    raws = [
-        {"data": {"id": f"EPA-{i}", "attributes": {"agencyId": "EPA"}}}
-        for i in range(3)
-    ]
+    raws = [{"data": {"id": f"EPA-{i}", "attributes": {"agencyId": "EPA"}}} for i in range(3)]
     out = list(ExtractRecords(DOCKET).apply(raws))
     assert [r["docket_id"] for r in out] == ["EPA-0", "EPA-1", "EPA-2"]

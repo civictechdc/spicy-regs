@@ -82,13 +82,21 @@ def _observed(stage: str):
                 error_type = type(exc).__name__
                 raise
             finally:
-                logger.warning(json.dumps({
-                    "event": "mcp_operation", "stage": stage,
-                    "operation": fn.__name__, "outcome": outcome,
-                    "elapsed_ms": round((_monotonic() - started) * 1000, 2),
-                    "error_type": error_type,
-                }))
+                logger.warning(
+                    json.dumps(
+                        {
+                            "event": "mcp_operation",
+                            "stage": stage,
+                            "operation": fn.__name__,
+                            "outcome": outcome,
+                            "elapsed_ms": round((_monotonic() - started) * 1000, 2),
+                            "error_type": error_type,
+                        }
+                    )
+                )
+
         return wrapped
+
     return decorate
 
 
@@ -422,12 +430,17 @@ def _statement_timeout(cursor: duckdb.DuckDBPyConnection) -> Iterator[None]:
         error_type = type(exc).__name__
         raise
     finally:
-        logger.warning(json.dumps({
-            "event": "mcp_operation", "stage": "query_or_r2_read",
-            "elapsed_ms": round((_monotonic() - started) * 1000, 2),
-            "error_type": error_type,
-            "outcome": "error" if error_type else "ok",
-        }))
+        logger.warning(
+            json.dumps(
+                {
+                    "event": "mcp_operation",
+                    "stage": "query_or_r2_read",
+                    "elapsed_ms": round((_monotonic() - started) * 1000, 2),
+                    "error_type": error_type,
+                    "outcome": "error" if error_type else "ok",
+                }
+            )
+        )
 
 
 def _parse_utc(value: Any) -> datetime | None:
@@ -815,9 +828,12 @@ def _register_tools(mcp: FastMCP) -> None:
         if table not in TABLES:
             return {"error": "Unknown table", "available_tables": list(TABLES)}
         result: dict[str, Any] = {
-            "table": table, "checked_at": datetime.now(timezone.utc).isoformat(),
-            "ingested_at": None, "coverage_complete_through": None,
-            "artifact_last_modified": None, "watermark": None,
+            "table": table,
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "ingested_at": None,
+            "coverage_complete_through": None,
+            "artifact_last_modified": None,
+            "watermark": None,
             "limitations": "Observed maximum dates do not prove complete coverage; artifact modification is not ingestion.",
         }
         try:
@@ -829,15 +845,14 @@ def _register_tools(mcp: FastMCP) -> None:
                 result["ingested_at"] = response.headers.get("x-amz-meta-ingested-at")
         except httpx.HTTPError as exc:
             result["artifact_error"] = type(exc).__name__
-        column = {"federal_register": "publication_date", "documents": "modify_date",
-                  "dockets": "modify_date"}.get(table)
+        column = {"federal_register": "publication_date", "documents": "modify_date", "dockets": "modify_date"}.get(
+            table
+        )
         if column:
             try:
                 cursor = _get_connection().cursor()
                 with _statement_timeout(cursor):
-                    row = cursor.execute(
-                        f"SELECT MAX(TRY_CAST({column} AS TIMESTAMP)) FROM {table}"
-                    ).fetchone()
+                    row = cursor.execute(f"SELECT MAX(TRY_CAST({column} AS TIMESTAMP)) FROM {table}").fetchone()
                 result["watermark"] = {"column": column, "latest": _jsonify(row[0]) if row else None}
             except Exception as exc:
                 result["watermark_error"] = type(exc).__name__

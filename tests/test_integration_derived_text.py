@@ -28,19 +28,14 @@ from spicy_regs.transforms import Chain, EnrichCommentText, ExtractRecords
 
 BUCKET = "mirrulations"
 
-COMMENT_KEY = (
-    "raw-data/ACF/ACF-2025-0038/text-ACF-2025-0038/"
-    "comments/ACF-2025-0038-0004.json"
-)
+COMMENT_KEY = "raw-data/ACF/ACF-2025-0038/text-ACF-2025-0038/comments/ACF-2025-0038-0004.json"
 EXPECTED_COMMENT_ID = "ACF-2025-0038-0004"
 EXPECTED_DOCKET_ID = "ACF-2025-0038"
 
 
 @pytest.mark.integration
 def test_real_comment_text_filled_from_derived_data() -> None:
-    s3 = boto3.resource(
-        "s3", region_name="us-east-1", config=BotoConfig(signature_version=UNSIGNED)
-    )
+    s3 = boto3.resource("s3", region_name="us-east-1", config=BotoConfig(signature_version=UNSIGNED))
 
     logger.info("Fetching live comment s3://{}/{}", BUCKET, COMMENT_KEY)
     payload = download_and_parse(s3, BUCKET, COMMENT_KEY, lambda d: d)

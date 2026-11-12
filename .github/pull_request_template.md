@@ -7,7 +7,7 @@
 <!-- How did you verify this works? Paste relevant commands and output. -->
 
 - [ ] `uv run pytest`
-- [ ] `uv run ruff check .`
+- [ ] `uv run ruff check .` and `uv run ruff format --check .`
 - [ ] Manually exercised the change (describe how)
 
 ## Checklist
