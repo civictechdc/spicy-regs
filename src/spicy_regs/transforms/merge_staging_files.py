@@ -49,9 +49,10 @@ def merge_staging_files(
 
         # Drop corrupt files so DuckDB doesn't abort the whole merge.
         valid_files: list[Path] = []
+        present_columns: set[str] = set()
         for file_path in files_to_merge:
             try:
-                pq.ParquetFile(file_path)
+                present_columns.update(pq.ParquetFile(file_path).schema_arrow.names)
             except Exception as e:
                 logger.warning(
                     "{}: skipping corrupt file {}: {}",
@@ -75,18 +76,34 @@ def merge_staging_files(
                 f"'{key_col}' and 'modify_date'"
             )
 
+        # A column the schema gained after the published file was written (e.g.
+        # documents.subtype) is absent from that file. union_by_name fills it
+        # with NULL as long as some input has it; when none does (say every
+        # staging file was skipped as corrupt), select a typed NULL instead of
+        # letting DuckDB fail to bind the column. The dedup and sort columns
+        # can't be defaulted that way: a NULL key would collapse every row into
+        # one, so refuse instead of silently dropping rows.
+        for required in (key_col, "modify_date"):
+            if required not in present_columns:
+                raise ValueError(
+                    f"merge_staging_files: no input file for '{data_type}' has column '{required}'"
+                )
+
         temp_output = output_dir / f"{data_type}_merged.parquet"
 
         # Escape single quotes in paths for inline SQL.
         files_sql = ", ".join(f"'{str(p).replace(chr(39), chr(39) * 2)}'" for p in valid_files)
-        col_select = ", ".join(f'CAST("{c}" AS VARCHAR) AS "{c}"' for c in target_columns)
+        col_select = ", ".join(
+            f'CAST("{c}" AS VARCHAR) AS "{c}"' if c in present_columns else f'CAST(NULL AS VARCHAR) AS "{c}"'
+            for c in target_columns
+        )
 
         # Cluster the output by docket_id so consumers filtering on it (the UI
         # docket page reads documents/dockets with `WHERE docket_id = ?` over
         # HTTP range requests) can prune to a few row groups via the parquet
         # min/max stats instead of scanning the whole file. Without the sort
         # every row group spans the full docket_id range and nothing prunes.
-        sort_clause = 'ORDER BY "docket_id"' if "docket_id" in target_columns else ""
+        sort_clause = 'ORDER BY "docket_id"' if "docket_id" in target_columns and "docket_id" in present_columns else ""
 
         query = f"""
         COPY (
