@@ -69,6 +69,10 @@ EXTERNAL_DATE_CHECKS = (
     DateCheck("court_dockets", "date_filed", 14),
     DateCheck("gao_reports", "published_date", 14),
     DateCheck("crs_reports", "published_date", 14),
+    # OIRA receives rules most weeks. The longest gaps since 2018 were 18 days
+    # (2018-19 shutdown) and 14 days (Jan 2025 regulatory freeze), so 21 days
+    # avoids paging on a freeze but still catches a stalled ingest.
+    DateCheck("oira_reviews", "received_date", 21),
 )
 
 DATE_CHECKS = BASE_TABLE_CHECKS + EXTERNAL_DATE_CHECKS
@@ -81,9 +85,6 @@ SKIPPED = {
     # publish lands — checking before then would 404 the whole freshness query.
     "fcc_proceedings": "not yet published to R2; first backfill pending",
     "fcc_filings": "not yet published to R2; first backfill pending",
-    # Promote oira_reviews to a DateCheck on received_date (~14 days; OIRA
-    # receives rules most weeks) once the first publish lands.
-    "oira_reviews": "not yet published to R2; first run pending",
     # reginfo.gov's bulk meeting export covers 2024 only, so there is no
     # watermark that should advance.
     "oira_meetings": "static 2024 export; no advancing date watermark",
