@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import json
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 
 import pyarrow as pa
@@ -162,7 +162,7 @@ def load_prior_citations(prior_file: Path) -> dict[tuple[str, str], tuple[str, s
 
 def attach_citations(
     rows: list[dict],
-    prior: dict[tuple[str, str], tuple[str, str | None]],
+    prior: Mapping[tuple[str, str], tuple[str, str | None]],
     fetch: Fetch,
     *,
     pause_s: float = FETCH_PAUSE_S,
