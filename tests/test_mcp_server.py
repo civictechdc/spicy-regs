@@ -672,7 +672,15 @@ def test_prepare_comment_counts_utf8_bytes_against_the_limit():
     assert check["fits_comment_box"] is False
 
 
+class _FrozenDatetime(datetime):
+    @classmethod
+    def now(cls, tz=None):
+        return _NOW if tz is None else _NOW.astimezone(tz)
+
+
 def test_prepare_comment_tool_runs_through_the_server(monkeypatch):
+    # The tool reads the wall clock; pin it so the fixture's comment period stays open.
+    monkeypatch.setattr(mcp_server, "datetime", _FrozenDatetime)
     monkeypatch.setattr(mcp_server, "_build_connection", _comment_fixture_connection)
     server = mcp_server.build_server()
 
