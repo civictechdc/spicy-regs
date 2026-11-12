@@ -23,6 +23,7 @@ Core regulations.gov tables + rollups:
 - `feed_summary.parquet`
 - `agency_stats.parquet`
 - `agency_monthly_volume.parquet`
+- `docket_daily_comment_volume.parquet`
 - Local-only: `comments/` partitioned comment parquet files may exist instead of a monolithic `comments.parquet`
 
 Complementary federal sources (each also queryable by name via the MCP server):

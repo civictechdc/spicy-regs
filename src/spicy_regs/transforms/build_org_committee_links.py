@@ -77,15 +77,14 @@ consumer computes there.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pyarrow.parquet as pq
 from loguru import logger
 
-OUTPUT = "org_committee_links.parquet"
+from spicy_regs.transforms.comments_source import resolve_comments_source
 
-DEFAULT_R2_BASE_URL = "https://data.spicy-regs.dev"
+OUTPUT = "org_committee_links.parquet"
 
 # The published schema, in a fixed order.
 COLUMNS: tuple[tuple[str, str], ...] = (
@@ -295,25 +294,9 @@ def _core(expr: str, *, decorations: bool) -> str:
 def _resolve_comments_source(output_dir: Path) -> str:
     """Return the ``read_parquet`` target for comments: local file, else R2 URL.
 
-    A local ``comments.parquet`` (a primed run, or a developer's copy) wins so
-    the transform never reaches the network unnecessarily. Otherwise the public
-    bucket is read directly and projection pushdown keeps the transfer to the
-    handful of columns this query names.
+    See :func:`spicy_regs.transforms.comments_source.resolve_comments_source`.
     """
-    local = output_dir / "comments.parquet"
-    if local.exists():
-        logger.info("org_committee_links: using local {}", local)
-        return str(local)
-
-    base_url = os.environ.get("R2_PUBLIC_URL") or DEFAULT_R2_BASE_URL
-    base_url = base_url.rstrip("/")
-    if not base_url.startswith("https://"):
-        raise RuntimeError(f"R2_PUBLIC_URL must be an https:// URL, got {base_url!r}")
-    if any(c in base_url for c in ("'", "\\", "\x00", "\n", "\r")):
-        raise RuntimeError(f"R2_PUBLIC_URL contains illegal characters: {base_url!r}")
-    url = f"{base_url}/comments.parquet"
-    logger.info("org_committee_links: reading comments remotely from {} (column projection)", url)
-    return url
+    return resolve_comments_source(output_dir, consumer="org_committee_links")
 
 
 def build_query(comments_source: str, committees_file: str, out_file: str) -> str:

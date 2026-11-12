@@ -1,0 +1,28 @@
+name: Rollup — docket_daily_comment_volume
+
+# Decoupled rollup: rebuilds docket_daily_comment_volume.parquet from the public
+# comments.parquet monolith, reading only four narrow columns over HTTPS.
+#
+# comments.parquet is republished by publish-comments-mirror.yml (cron 21:30
+# UTC), whose runs have recently been starting hours late and finishing between
+# ~01:00 and ~04:00 UTC. 05:30 UTC lands after that, so this normally rolls up
+# the same night's mirror; if the mirror is later still, this just rolls up the
+# previous one and the series is a day behind until the next run.
+on:
+  schedule:
+    - cron: '30 5 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-docket-daily-comment-volume
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}

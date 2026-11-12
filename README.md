@@ -95,8 +95,9 @@ actually published.
 | `comments` | Public comments (Hive-partitioned Parquet + an Iceberg table) | ~25.4M rows |
 
 **Rollups** — small, denormalized, meant to be read whole: `feed_summary`,
-`agency_stats`, `agency_monthly_volume`, `comments_index`, `docket_search`,
-`rulemaking_lifecycles`, `discovery_signals`, `fr_docket_links`.
+`agency_stats`, `agency_monthly_volume`, `docket_daily_comment_volume`,
+`comments_index`, `docket_search`, `rulemaking_lifecycles`, `discovery_signals`,
+`fr_docket_links`.
 
 **Complementary federal sources** — each ingested from its own API so the
 rulemaking lifecycle, the organizations engaged in it, and its downstream
