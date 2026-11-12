@@ -326,6 +326,10 @@ _CITATION_PARSERS = {"VA": _va, "MD": _md}
 #: ``state_citations_json`` NULL.
 CITATION_STATES: frozenset[str] = frozenset(_CITATION_PARSERS)
 
+#: Programs whose prose "became effective on <date>" refers to the state rule.
+#: Elsewhere (RCRA, UST, SMCRA, ...) it usually dates the federal approval.
+PROSE_DATE_PROGRAMS: frozenset[str] = frozenset({"sip", "state_plan_111d", "title_v", "ocs_air"})
+
 #: Bump when a parser changes so the next build re-fetches and re-parses every
 #: document instead of reusing the prior table's results.
 PARSER_VERSION = 1
@@ -352,19 +356,22 @@ def _parse_date(value: str) -> date | None:
 
 
 _PROSE_EFFECTIVE = re.compile(
-    r"(?:became|becomes|become)\s+(?:state-)?effective\s+(?:on\s+)?"
+    # Past tense only: "becomes effective on" is the federal action's own date
+    # (e.g. RCRA/UST authorizations), which falls after publication.
+    r"became\s+(?:state-)?effective\s+(?:on\s+)?"
     r"((?:January|February|March|April|May|June|July|August|September|October|November|December)"
     r"\s+\d{1,2},\s+\d{4})"
 )
 
 
-def _effective_date(text: str, tables: list[list[list[str]]]) -> str | None:
+def _effective_date(text: str, tables: list[list[list[str]]], *, prose: bool) -> str | None:
     """Latest date in the amendatory table's state-effective-date column.
 
     Proposed rules have no amendatory table; for those, fall back to prose
     ("...and the revision became effective on April 11, 2024"). The document's
     own effective date is phrased "This final rule is effective on ...", which
-    the prose pattern doesn't match.
+    the prose pattern doesn't match. In RCRA/UST documents "became effective"
+    describes EPA's own approval, so callers turn the fallback off there.
     """
     dates: list[date] = []
     for rows in _state_tables(tables):
@@ -375,15 +382,16 @@ def _effective_date(text: str, tables: list[list[list[str]]]) -> str | None:
                 continue
             if col < len(row) and (d := _parse_date(row[col])) is not None:
                 dates.append(d)
-    if not dates:
+    if not dates and prose:
         dates = [d for m in _PROSE_EFFECTIVE.finditer(text) if (d := _parse_date(m.group(1))) is not None]
     return max(dates).isoformat() if dates else None
 
 
-def extract_citations(state: str, body_html: str) -> tuple[list[str], str | None]:
+def extract_citations(state: str, body_html: str, *, prose_dates: bool = True) -> tuple[list[str], str | None]:
     """Parse a document body for ``state``'s code citations and state effective date.
 
     Returns ``(sorted unique citations, ISO state effective date or None)``.
+    ``prose_dates=False`` reads the date from amendatory tables only.
     Raises ``KeyError`` for a state without a parser (see :data:`CITATION_STATES`).
     """
     parser = _CITATION_PARSERS[state]
@@ -392,4 +400,4 @@ def extract_citations(state: str, body_html: str) -> tuple[list[str], str | None
     body.close()
     text = " ".join(unescape("".join(body.text)).split())
     citations = sorted(set(parser(text, body.tables)))
-    return citations, _effective_date(text, body.tables)
+    return citations, _effective_date(text, body.tables, prose=prose_dates)

@@ -403,7 +403,7 @@ tables:
       cfr_part: "CFR part of the allow-listed reference that selected the document."
       docket_ids_json: "JSON array of docket IDs from the FR document (e.g. `EPA-R03-OAR-2025-0225`). Unnest it to join `dockets.docket_id` and reach the regulations.gov comments."
       state_citations_json: "JSON array of state code sections the document cites, parsed from its full text, e.g. `[\"9VAC5-10-20\"]` or `[\"COMAR 26.11.08.10\"]`. Parsed for Virginia and Maryland only so far. NULL when the body was not parsed (other states; a fetch that failed; or an older document not yet reached, since each run parses at most 200 new bodies, newest first); `[]` when parsed and nothing was found."
-      state_effective_date: "State effective date of the approved rule (YYYY-MM-DD): the latest date in the document's state-effective-date table column, or for proposed rules the date in a \"became effective on\" sentence. Parsed for Virginia and Maryland only; NULL otherwise or when not found."
+      state_effective_date: "State effective date of the approved rule (YYYY-MM-DD): the latest date in the document's state-effective-date table column, or, when there is no such table (e.g. proposed rules), the date in a \"became effective on\" sentence, for Clean Air Act programs only (`sip`, `state_plan_111d`, `title_v`, `ocs_air`). Dates after `publication_date` are dropped, since they come from text about the federal action. Parsed for Virginia and Maryland only; NULL otherwise or when not found."
       html_url: "federalregister.gov page for the document."
 
   sam_entities:

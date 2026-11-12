@@ -185,6 +185,13 @@ def test_extract_proposed_rule_prose_date_and_empty():
     assert extract_citations("VA", "<p>nothing</p>") == ([], None)
 
 
+def test_extract_prose_dates_can_be_disabled():
+    # RCRA/UST amendatory text: the date is EPA's approval, not the state rule's.
+    body = "<p>A program revision application was approved by EPA and became effective on November 10, 2025.</p>"
+    assert extract_citations("MD", body, prose_dates=False) == ([], None)
+    assert extract_citations("MD", body) == ([], "2025-11-10")
+
+
 def test_extract_unsupported_state():
     assert "TX" not in CITATION_STATES
     with pytest.raises(KeyError):
@@ -249,6 +256,17 @@ def test_attach_citations_tolerates_isolated_failures():
     assert (fetched, failed) == (99, 1)
     assert rows[7]["state_citations_json"] is None  # retried next run
     assert rows[8]["state_citations_json"] == '["9VAC5-10-20"]'
+
+
+def test_attach_citations_drops_effective_dates_after_publication():
+    body = "<p>The revision became effective on March 3, 2026.</p>"
+    sip = _row("S", "VA") | {"program": "sip", "publication_date": "2026-04-01"}
+    late = _row("L", "VA") | {"program": "sip", "publication_date": "2026-02-01"}
+    ust = _row("U", "VA") | {"program": "ust", "publication_date": "2026-04-01"}
+    bspa.attach_citations([sip, late, ust], {}, lambda url: body, pause_s=0)
+    assert sip["state_effective_date"] == "2026-03-03"
+    assert late["state_effective_date"] is None  # after publication: the federal action's date
+    assert ust["state_effective_date"] is None  # no prose fallback outside CAA programs
 
 
 def test_attach_citations_aborts_on_widespread_failure():

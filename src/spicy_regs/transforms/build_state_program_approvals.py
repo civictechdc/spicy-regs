@@ -42,6 +42,7 @@ from spicy_regs.sources import r2
 from spicy_regs.sources.fr_bodies import FrBodyUnavailable, fetch_body_html, make_client
 from spicy_regs.transforms.state_programs import (
     CITATION_STATES,
+    PROSE_DATE_PROGRAMS,
     PARSER_VERSION,
     extract_citations,
     program_for,
@@ -207,9 +208,14 @@ def attach_citations(
             continue
         fetched += 1
         for row in doc_rows:
-            citations, effective = extract_citations(row["jurisdiction"], body)
+            citations, effective = extract_citations(
+                row["jurisdiction"], body, prose_dates=row.get("program") in PROSE_DATE_PROGRAMS
+            )
             row["state_citations_json"] = json.dumps(citations)
-            row["state_effective_date"] = effective
+            # A state rule is in effect before the federal agency acts on it; a
+            # later date was read from text about the federal action itself.
+            pub = row.get("publication_date")
+            row["state_effective_date"] = None if effective and pub and effective > pub else effective
         if i % 100 == 0:
             logger.info("State programs: {:,}/{:,} bodies fetched", i, len(queue))
 
