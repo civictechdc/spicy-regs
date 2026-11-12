@@ -41,8 +41,18 @@ def _frame(rows: list[dict]) -> pl.DataFrame:
 def test_enrich_fills_from_derived_data_using_agency_column() -> None:
     df = _frame(
         [
-            {"comment_id": "ACF-2025-0038-0004", "docket_id": "ACF-2025-0038", "agency_code": "ACF", "attachments_json": _attach()},
-            {"comment_id": "ACF-2025-0038-0015", "docket_id": "ACF-2025-0038", "agency_code": "ACF", "attachments_json": _attach()},
+            {
+                "comment_id": "ACF-2025-0038-0004",
+                "docket_id": "ACF-2025-0038",
+                "agency_code": "ACF",
+                "attachments_json": _attach(),
+            },
+            {
+                "comment_id": "ACF-2025-0038-0015",
+                "docket_id": "ACF-2025-0038",
+                "agency_code": "ACF",
+                "attachments_json": _attach(),
+            },
         ]
     )
     out, stats = enrich_comments_with_derived_text(df, resource_factory=_factory())
@@ -66,8 +76,20 @@ def test_enrich_with_explicit_agency_override() -> None:
 def test_enrich_skips_no_attachment_and_already_filled() -> None:
     df = _frame(
         [
-            {"comment_id": "ACF-2025-0038-0004", "docket_id": "ACF-2025-0038", "agency_code": "ACF", "attachments_json": None},
-            {"comment_id": "ACF-2025-0038-0015", "docket_id": "ACF-2025-0038", "agency_code": "ACF", "attachments_json": _attach(), "text_extraction_status": "ok", "text_content": "kept"},
+            {
+                "comment_id": "ACF-2025-0038-0004",
+                "docket_id": "ACF-2025-0038",
+                "agency_code": "ACF",
+                "attachments_json": None,
+            },
+            {
+                "comment_id": "ACF-2025-0038-0015",
+                "docket_id": "ACF-2025-0038",
+                "agency_code": "ACF",
+                "attachments_json": _attach(),
+                "text_extraction_status": "ok",
+                "text_content": "kept",
+            },
         ]
     )
     out, stats = enrich_comments_with_derived_text(df, resource_factory=_factory())
@@ -77,7 +99,14 @@ def test_enrich_skips_no_attachment_and_already_filled() -> None:
 
 def test_enrich_missing_derived_text_counts_as_missing() -> None:
     df = _frame(
-        [{"comment_id": "ACF-2025-0038-9999", "docket_id": "ACF-2025-0038", "agency_code": "ACF", "attachments_json": _attach()}]
+        [
+            {
+                "comment_id": "ACF-2025-0038-9999",
+                "docket_id": "ACF-2025-0038",
+                "agency_code": "ACF",
+                "attachments_json": _attach(),
+            }
+        ]
     )
     out, stats = enrich_comments_with_derived_text(df, resource_factory=_factory())
     assert stats == {"selected": 1, "ok": 0, "missing": 1}
@@ -88,8 +117,18 @@ def test_enrich_missing_derived_text_counts_as_missing() -> None:
 def test_enrich_respects_limit() -> None:
     df = _frame(
         [
-            {"comment_id": "ACF-2025-0038-0004", "docket_id": "ACF-2025-0038", "agency_code": "ACF", "attachments_json": _attach()},
-            {"comment_id": "ACF-2025-0038-0015", "docket_id": "ACF-2025-0038", "agency_code": "ACF", "attachments_json": _attach()},
+            {
+                "comment_id": "ACF-2025-0038-0004",
+                "docket_id": "ACF-2025-0038",
+                "agency_code": "ACF",
+                "attachments_json": _attach(),
+            },
+            {
+                "comment_id": "ACF-2025-0038-0015",
+                "docket_id": "ACF-2025-0038",
+                "agency_code": "ACF",
+                "attachments_json": _attach(),
+            },
         ]
     )
     _, stats = enrich_comments_with_derived_text(df, resource_factory=_factory(), limit=1)
@@ -102,7 +141,14 @@ def test_discover_from_derived_finds_rows_with_no_attachments_json() -> None:
     # column existed), yet the fake derived-data store has extracted text for
     # it. Default mode must skip it; discover_from_derived must find it.
     df = _frame(
-        [{"comment_id": "ACF-2025-0038-0004", "docket_id": "ACF-2025-0038", "agency_code": "ACF", "attachments_json": None}]
+        [
+            {
+                "comment_id": "ACF-2025-0038-0004",
+                "docket_id": "ACF-2025-0038",
+                "agency_code": "ACF",
+                "attachments_json": None,
+            }
+        ]
     )
 
     default_out, default_stats = enrich_comments_with_derived_text(df, resource_factory=_factory())
@@ -120,7 +166,14 @@ def test_discover_from_derived_finds_rows_with_no_attachments_json() -> None:
 def test_discover_from_derived_is_incremental() -> None:
     # A second run over the already-filled frame must not reselect the row.
     df = _frame(
-        [{"comment_id": "ACF-2025-0038-0004", "docket_id": "ACF-2025-0038", "agency_code": "ACF", "attachments_json": None}]
+        [
+            {
+                "comment_id": "ACF-2025-0038-0004",
+                "docket_id": "ACF-2025-0038",
+                "agency_code": "ACF",
+                "attachments_json": None,
+            }
+        ]
     )
     filled, _ = enrich_comments_with_derived_text(df, resource_factory=_factory(), discover_from_derived=True)
 
@@ -131,7 +184,14 @@ def test_discover_from_derived_is_incremental() -> None:
 def test_discover_from_derived_still_counts_true_misses() -> None:
     # No attachments_json AND no derived-data text available at all.
     df = _frame(
-        [{"comment_id": "ACF-2025-0038-9999", "docket_id": "ACF-2025-0038", "agency_code": "ACF", "attachments_json": None}]
+        [
+            {
+                "comment_id": "ACF-2025-0038-9999",
+                "docket_id": "ACF-2025-0038",
+                "agency_code": "ACF",
+                "attachments_json": None,
+            }
+        ]
     )
     _, stats = enrich_comments_with_derived_text(df, resource_factory=_factory(), discover_from_derived=True)
     assert stats == {"selected": 1, "ok": 0, "missing": 1}
@@ -146,9 +206,7 @@ def test_backfill_partitions_reads_agency_from_path(tmp_path) -> None:
     ).drop("agency_code")
     df.write_parquet(part_dir / "part-0.parquet")
 
-    totals, changed = backfill_comment_partitions(
-        tmp_path / "comments" / "agency", resource_factory=_factory()
-    )
+    totals, changed = backfill_comment_partitions(tmp_path / "comments" / "agency", resource_factory=_factory())
     assert totals["ok"] == 1
     assert len(changed) == 1
     written = pl.read_parquet(part_dir / "part-0.parquet")
@@ -159,9 +217,7 @@ def test_backfill_partitions_reads_agency_from_path(tmp_path) -> None:
 def _seed_catalog(con, rows: list[dict]) -> None:
     """Insert comment rows into the local catalog table (all COMMENT columns)."""
     iceberg._ensure_table(con, COMMENT)
-    frame = pl.DataFrame(
-        [{**{c: None for c in COMMENT.schema}, **r} for r in rows], schema=COMMENT.schema
-    )
+    frame = pl.DataFrame([{**{c: None for c in COMMENT.schema}, **r} for r in rows], schema=COMMENT.schema)
     col_list = ", ".join(f'"{c}"' for c in COMMENT.schema)
     con.register("_seed_src", frame.to_arrow())
     con.execute(f"INSERT INTO {iceberg._qualified(COMMENT)} ({col_list}) SELECT {col_list} FROM _seed_src;")
@@ -178,14 +234,30 @@ def test_catalog_backfill_upserts_filled_rows_in_place() -> None:
             con,
             [
                 # found in the fake derived-data store → gets filled
-                {"comment_id": "ACF-2025-0038-0004", "docket_id": "ACF-2025-0038", "agency_code": "ACF",
-                 "attachments_json": _attach(), "modify_date": "2025-01-01", "comment": "orig body"},
+                {
+                    "comment_id": "ACF-2025-0038-0004",
+                    "docket_id": "ACF-2025-0038",
+                    "agency_code": "ACF",
+                    "attachments_json": _attach(),
+                    "modify_date": "2025-01-01",
+                    "comment": "orig body",
+                },
                 # attachment but no derived text → counts as missing, stays NULL
-                {"comment_id": "ACF-2025-0038-9999", "docket_id": "ACF-2025-0038", "agency_code": "ACF",
-                 "attachments_json": _attach(), "modify_date": "2025-01-01"},
+                {
+                    "comment_id": "ACF-2025-0038-9999",
+                    "docket_id": "ACF-2025-0038",
+                    "agency_code": "ACF",
+                    "attachments_json": _attach(),
+                    "modify_date": "2025-01-01",
+                },
                 # no attachment → not a candidate at all
-                {"comment_id": "ACF-2025-0038-0007", "docket_id": "ACF-2025-0038", "agency_code": "ACF",
-                 "attachments_json": None, "modify_date": "2025-01-01"},
+                {
+                    "comment_id": "ACF-2025-0038-0007",
+                    "docket_id": "ACF-2025-0038",
+                    "agency_code": "ACF",
+                    "attachments_json": None,
+                    "modify_date": "2025-01-01",
+                },
             ],
         )
 
@@ -230,11 +302,21 @@ def test_catalog_backfill_discover_from_derived_finds_legacy_rows_without_attach
             con,
             [
                 # legacy row: attachments_json was never populated
-                {"comment_id": "ACF-2025-0038-0004", "docket_id": "ACF-2025-0038", "agency_code": "ACF",
-                 "attachments_json": None, "modify_date": "2025-01-01"},
+                {
+                    "comment_id": "ACF-2025-0038-0004",
+                    "docket_id": "ACF-2025-0038",
+                    "agency_code": "ACF",
+                    "attachments_json": None,
+                    "modify_date": "2025-01-01",
+                },
                 # legacy row with no derived-data text available either
-                {"comment_id": "ACF-2025-0038-9999", "docket_id": "ACF-2025-0038", "agency_code": "ACF",
-                 "attachments_json": None, "modify_date": "2025-01-01"},
+                {
+                    "comment_id": "ACF-2025-0038-9999",
+                    "docket_id": "ACF-2025-0038",
+                    "agency_code": "ACF",
+                    "attachments_json": None,
+                    "modify_date": "2025-01-01",
+                },
             ],
         )
 

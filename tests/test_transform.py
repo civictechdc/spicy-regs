@@ -98,7 +98,16 @@ class TestMergeStagingFiles:
         write_parquet_from_dicts(output / "dockets.parquet", old_records, old_schema)
 
         # New staging file with full schema
-        new_records = [{"docket_id": "NEW-001", "agency_code": "NEW", "title": "New", "docket_type": "Rulemaking", "modify_date": "2024-01-01", "abstract": "Test"}]
+        new_records = [
+            {
+                "docket_id": "NEW-001",
+                "agency_code": "NEW",
+                "title": "New",
+                "docket_type": "Rulemaking",
+                "modify_date": "2024-01-01",
+                "abstract": "Test",
+            }
+        ]
         write_staging("NEW", "dockets", new_records, staging, DOCKET_SCHEMA)
 
         schemas = {"dockets": DOCKET_SCHEMA}
@@ -117,9 +126,7 @@ class TestMergeStagingFiles:
         output = tmp_path / "output"
         output.mkdir()
         # staging/dockets doesn't exist — should silently skip
-        merge_staging_files(
-            staging, output, ["dockets"], {"dockets": DOCKET_SCHEMA}, {"dockets": "docket_id"}
-        )
+        merge_staging_files(staging, output, ["dockets"], {"dockets": DOCKET_SCHEMA}, {"dockets": "docket_id"})
         assert not (output / "dockets.parquet").exists()
 
     def test_deduplicates_dockets_keeping_latest_modify_date(self, tmp_path):
@@ -130,30 +137,32 @@ class TestMergeStagingFiles:
         output.mkdir()
 
         # Existing output: stale version of the same docket
-        existing = [{
-            "docket_id": "EPA-2024-0001",
-            "agency_code": "EPA",
-            "title": "Stale Title",
-            "docket_type": "Rulemaking",
-            "modify_date": "2024-01-01T00:00:00Z",
-            "abstract": "old",
-        }]
+        existing = [
+            {
+                "docket_id": "EPA-2024-0001",
+                "agency_code": "EPA",
+                "title": "Stale Title",
+                "docket_type": "Rulemaking",
+                "modify_date": "2024-01-01T00:00:00Z",
+                "abstract": "old",
+            }
+        ]
         write_parquet_from_dicts(output / "dockets.parquet", existing, DOCKET_SCHEMA)
 
         # New staging: updated version of the same docket
-        updated = [{
-            "docket_id": "EPA-2024-0001",
-            "agency_code": "EPA",
-            "title": "Fresh Title",
-            "docket_type": "Rulemaking",
-            "modify_date": "2024-06-15T00:00:00Z",
-            "abstract": "new",
-        }]
+        updated = [
+            {
+                "docket_id": "EPA-2024-0001",
+                "agency_code": "EPA",
+                "title": "Fresh Title",
+                "docket_type": "Rulemaking",
+                "modify_date": "2024-06-15T00:00:00Z",
+                "abstract": "new",
+            }
+        ]
         write_staging("EPA", "dockets", updated, staging, DOCKET_SCHEMA)
 
-        merge_staging_files(
-            staging, output, ["dockets"], {"dockets": DOCKET_SCHEMA}, {"dockets": "docket_id"}
-        )
+        merge_staging_files(staging, output, ["dockets"], {"dockets": DOCKET_SCHEMA}, {"dockets": "docket_id"})
 
         merged = pl.read_parquet(output / "dockets.parquet")
         assert len(merged) == 1
@@ -172,18 +181,34 @@ class TestMergeStagingFiles:
         # Multiple copies of the same docket in a single staging file —
         # mirrors what happens when the same JSON key is re-downloaded.
         records = [
-            {"docket_id": "FDA-2015-N-0030", "agency_code": "FDA", "title": "v1",
-             "docket_type": "Rulemaking", "modify_date": "2023-05-31T12:53:19Z", "abstract": None},
-            {"docket_id": "FDA-2015-N-0030", "agency_code": "FDA", "title": "v2",
-             "docket_type": "Rulemaking", "modify_date": "2024-04-30T14:51:09Z", "abstract": None},
-            {"docket_id": "FDA-2015-N-0030", "agency_code": "FDA", "title": "v3",
-             "docket_type": "Rulemaking", "modify_date": "2025-12-18T15:39:35Z", "abstract": None},
+            {
+                "docket_id": "FDA-2015-N-0030",
+                "agency_code": "FDA",
+                "title": "v1",
+                "docket_type": "Rulemaking",
+                "modify_date": "2023-05-31T12:53:19Z",
+                "abstract": None,
+            },
+            {
+                "docket_id": "FDA-2015-N-0030",
+                "agency_code": "FDA",
+                "title": "v2",
+                "docket_type": "Rulemaking",
+                "modify_date": "2024-04-30T14:51:09Z",
+                "abstract": None,
+            },
+            {
+                "docket_id": "FDA-2015-N-0030",
+                "agency_code": "FDA",
+                "title": "v3",
+                "docket_type": "Rulemaking",
+                "modify_date": "2025-12-18T15:39:35Z",
+                "abstract": None,
+            },
         ]
         write_staging("FDA", "dockets", records, staging, DOCKET_SCHEMA)
 
-        merge_staging_files(
-            staging, output, ["dockets"], {"dockets": DOCKET_SCHEMA}, {"dockets": "docket_id"}
-        )
+        merge_staging_files(staging, output, ["dockets"], {"dockets": DOCKET_SCHEMA}, {"dockets": "docket_id"})
 
         merged = pl.read_parquet(output / "dockets.parquet")
         assert len(merged) == 1
@@ -196,26 +221,42 @@ class TestMergeStagingFiles:
         output = tmp_path / "output"
         output.mkdir()
 
-        existing = [{
-            "document_id": "D-001", "docket_id": "EPA-2024-0001", "agency_code": "EPA",
-            "title": "old", "document_type": "Proposed Rule",
-            "posted_date": "2024-06-01", "modify_date": "2024-06-01",
-            "comment_start_date": "2024-06-01", "comment_end_date": "2024-07-01",
-            "file_url": None,
-        }]
+        existing = [
+            {
+                "document_id": "D-001",
+                "docket_id": "EPA-2024-0001",
+                "agency_code": "EPA",
+                "title": "old",
+                "document_type": "Proposed Rule",
+                "posted_date": "2024-06-01",
+                "modify_date": "2024-06-01",
+                "comment_start_date": "2024-06-01",
+                "comment_end_date": "2024-07-01",
+                "file_url": None,
+            }
+        ]
         write_parquet_from_dicts(output / "documents.parquet", existing, DOCUMENT_SCHEMA)
 
-        updated = [{
-            "document_id": "D-001", "docket_id": "EPA-2024-0001", "agency_code": "EPA",
-            "title": "new", "document_type": "Proposed Rule",
-            "posted_date": "2024-06-01", "modify_date": "2024-09-15",
-            "comment_start_date": "2024-06-01", "comment_end_date": "2024-07-01",
-            "file_url": None,
-        }]
+        updated = [
+            {
+                "document_id": "D-001",
+                "docket_id": "EPA-2024-0001",
+                "agency_code": "EPA",
+                "title": "new",
+                "document_type": "Proposed Rule",
+                "posted_date": "2024-06-01",
+                "modify_date": "2024-09-15",
+                "comment_start_date": "2024-06-01",
+                "comment_end_date": "2024-07-01",
+                "file_url": None,
+            }
+        ]
         write_staging("EPA", "documents", updated, staging, DOCUMENT_SCHEMA)
 
         merge_staging_files(
-            staging, output, ["documents"],
+            staging,
+            output,
+            ["documents"],
             {"documents": DOCUMENT_SCHEMA},
             {"documents": "document_id"},
         )
@@ -372,24 +413,42 @@ class TestMergeStagingFiles:
         output = tmp_path / "output"
         output.mkdir()
 
-        existing = [{
-            "comment_id": "C-001", "docket_id": "EPA-2024-0001", "agency_code": "EPA",
-            "title": "old", "comment": "old body", "document_type": "Public Comment",
-            "posted_date": "2024-06-20", "modify_date": "2024-06-20",
-            "receive_date": "2024-06-20", "attachments_json": None,
-        }]
+        existing = [
+            {
+                "comment_id": "C-001",
+                "docket_id": "EPA-2024-0001",
+                "agency_code": "EPA",
+                "title": "old",
+                "comment": "old body",
+                "document_type": "Public Comment",
+                "posted_date": "2024-06-20",
+                "modify_date": "2024-06-20",
+                "receive_date": "2024-06-20",
+                "attachments_json": None,
+            }
+        ]
         write_parquet_from_dicts(output / "comments.parquet", existing, COMMENT_SCHEMA)
 
-        updated = [{
-            "comment_id": "C-001", "docket_id": "EPA-2024-0001", "agency_code": "EPA",
-            "title": "updated", "comment": "new body", "document_type": "Public Comment",
-            "posted_date": "2024-06-20", "modify_date": "2024-08-01",
-            "receive_date": "2024-06-20", "attachments_json": None,
-        }]
+        updated = [
+            {
+                "comment_id": "C-001",
+                "docket_id": "EPA-2024-0001",
+                "agency_code": "EPA",
+                "title": "updated",
+                "comment": "new body",
+                "document_type": "Public Comment",
+                "posted_date": "2024-06-20",
+                "modify_date": "2024-08-01",
+                "receive_date": "2024-06-20",
+                "attachments_json": None,
+            }
+        ]
         write_staging("EPA", "comments", updated, staging, COMMENT_SCHEMA)
 
         merge_staging_files(
-            staging, output, ["comments"],
+            staging,
+            output,
+            ["comments"],
             {"comments": COMMENT_SCHEMA},
             {"comments": "comment_id"},
         )
@@ -406,20 +465,42 @@ class TestMergeStagingFiles:
         output.mkdir()
 
         records = [
-            {"docket_id": "EPA-2024-0001", "agency_code": "EPA", "title": "a",
-             "docket_type": "Rulemaking", "modify_date": "2024-01-01", "abstract": None},
-            {"docket_id": "EPA-2024-0001", "agency_code": "EPA", "title": "a2",
-             "docket_type": "Rulemaking", "modify_date": "2024-06-01", "abstract": None},
-            {"docket_id": "EPA-2024-0002", "agency_code": "EPA", "title": "b",
-             "docket_type": "Rulemaking", "modify_date": "2024-02-01", "abstract": None},
-            {"docket_id": "FDA-2024-0010", "agency_code": "FDA", "title": "c",
-             "docket_type": "Rulemaking", "modify_date": "2024-03-01", "abstract": None},
+            {
+                "docket_id": "EPA-2024-0001",
+                "agency_code": "EPA",
+                "title": "a",
+                "docket_type": "Rulemaking",
+                "modify_date": "2024-01-01",
+                "abstract": None,
+            },
+            {
+                "docket_id": "EPA-2024-0001",
+                "agency_code": "EPA",
+                "title": "a2",
+                "docket_type": "Rulemaking",
+                "modify_date": "2024-06-01",
+                "abstract": None,
+            },
+            {
+                "docket_id": "EPA-2024-0002",
+                "agency_code": "EPA",
+                "title": "b",
+                "docket_type": "Rulemaking",
+                "modify_date": "2024-02-01",
+                "abstract": None,
+            },
+            {
+                "docket_id": "FDA-2024-0010",
+                "agency_code": "FDA",
+                "title": "c",
+                "docket_type": "Rulemaking",
+                "modify_date": "2024-03-01",
+                "abstract": None,
+            },
         ]
         write_staging("MIX", "dockets", records, staging, DOCKET_SCHEMA)
 
-        merge_staging_files(
-            staging, output, ["dockets"], {"dockets": DOCKET_SCHEMA}, {"dockets": "docket_id"}
-        )
+        merge_staging_files(staging, output, ["dockets"], {"dockets": DOCKET_SCHEMA}, {"dockets": "docket_id"})
 
         merged = pl.read_parquet(output / "dockets.parquet").sort("docket_id")
         assert merged["docket_id"].to_list() == ["EPA-2024-0001", "EPA-2024-0002", "FDA-2024-0010"]
@@ -570,8 +651,30 @@ class TestBuildFeedSummary:
 
     def test_handles_quoted_docket_ids(self, tmp_output):
         """Docket IDs with surrounding quotes should still match."""
-        dockets = [{"docket_id": '"EPA-2024-0001"', "agency_code": "EPA", "title": "Test", "docket_type": "Rulemaking", "modify_date": "2024-01-01", "abstract": None}]
-        comments = [{"comment_id": "C-001", "docket_id": '"EPA-2024-0001"', "agency_code": "EPA", "title": "T", "comment": "C", "document_type": "Public Comment", "posted_date": "2024-01-02", "modify_date": "2024-01-02", "receive_date": "2024-01-02", "attachments_json": None}]
+        dockets = [
+            {
+                "docket_id": '"EPA-2024-0001"',
+                "agency_code": "EPA",
+                "title": "Test",
+                "docket_type": "Rulemaking",
+                "modify_date": "2024-01-01",
+                "abstract": None,
+            }
+        ]
+        comments = [
+            {
+                "comment_id": "C-001",
+                "docket_id": '"EPA-2024-0001"',
+                "agency_code": "EPA",
+                "title": "T",
+                "comment": "C",
+                "document_type": "Public Comment",
+                "posted_date": "2024-01-02",
+                "modify_date": "2024-01-02",
+                "receive_date": "2024-01-02",
+                "attachments_json": None,
+            }
+        ]
 
         write_parquet_from_dicts(tmp_output / "dockets.parquet", dockets, DOCKET_SCHEMA)
         write_parquet_from_dicts(tmp_output / "comments.parquet", comments, COMMENT_SCHEMA)
@@ -591,10 +694,16 @@ class TestBuildFeedSummary:
             {"agency_code": "FDA", "docket_id": "FDA-2024-0010", "year": 2024, "month": 5, "row_count": 1},
             {"agency_code": "EPA", "docket_id": "EPA-2024-0002", "year": 2024, "month": 7, "row_count": 1},
         ]
-        pl.DataFrame(index_data, schema={
-            "agency_code": pl.Utf8, "docket_id": pl.Utf8,
-            "year": pl.Int64, "month": pl.Int64, "row_count": pl.Int64,
-        }).write_parquet(tmp_output / "comments_index.parquet")
+        pl.DataFrame(
+            index_data,
+            schema={
+                "agency_code": pl.Utf8,
+                "docket_id": pl.Utf8,
+                "year": pl.Int64,
+                "month": pl.Int64,
+                "row_count": pl.Int64,
+            },
+        ).write_parquet(tmp_output / "comments_index.parquet")
 
         summary = pl.read_parquet(build_feed_summary(tmp_output))
         assert len(summary) == 3
@@ -689,7 +798,23 @@ class TestBuildAgencyRollups:
     def test_monthly_volume_aggregates_same_bucket(self, tmp_output, sample_dockets):
         write_parquet_from_dicts(tmp_output / "dockets.parquet", sample_dockets, DOCKET_SCHEMA)
         docs = [
-            {"document_id": f"D-{i}", "docket_id": "EPA-2024-0001", "agency_code": "EPA", "title": "t", "document_type": "Notice", "posted_date": "2024-06-15", "modify_date": "2024-06-15", "comment_start_date": None, "comment_end_date": None, "file_url": None, "attachments_json": None, "fr_doc_num": None, "withdrawn": None, "reason_withdrawn": None, "additional_rins": None}
+            {
+                "document_id": f"D-{i}",
+                "docket_id": "EPA-2024-0001",
+                "agency_code": "EPA",
+                "title": "t",
+                "document_type": "Notice",
+                "posted_date": "2024-06-15",
+                "modify_date": "2024-06-15",
+                "comment_start_date": None,
+                "comment_end_date": None,
+                "file_url": None,
+                "attachments_json": None,
+                "fr_doc_num": None,
+                "withdrawn": None,
+                "reason_withdrawn": None,
+                "additional_rins": None,
+            }
             for i in range(3)
         ]
         write_parquet_from_dicts(tmp_output / "documents.parquet", docs, DOCUMENT_SCHEMA)
@@ -730,7 +855,9 @@ class TestDocumentAttachmentColumns:
         write_staging("ACF", "documents", [record], staging, DOCUMENT_SCHEMA)
 
         merge_staging_files(
-            staging, output, ["documents"],
+            staging,
+            output,
+            ["documents"],
             {"documents": DOCUMENT_SCHEMA},
             {"documents": "document_id"},
         )
@@ -757,20 +884,32 @@ class TestDocumentAttachmentColumns:
         output.mkdir()
 
         legacy_schema = {k: v for k, v in DOCUMENT_SCHEMA.items() if k not in ("attachments_json", "fr_doc_num")}
-        existing = [{
-            "document_id": "OLD-001", "docket_id": "ACF-2025-0038", "agency_code": "ACF",
-            "title": "old", "document_type": "Notice",
-            "posted_date": "2024-01-01", "modify_date": "2024-01-01",
-            "comment_start_date": None, "comment_end_date": None, "file_url": None,
-            "withdrawn": "false", "reason_withdrawn": None, "additional_rins": None,
-        }]
+        existing = [
+            {
+                "document_id": "OLD-001",
+                "docket_id": "ACF-2025-0038",
+                "agency_code": "ACF",
+                "title": "old",
+                "document_type": "Notice",
+                "posted_date": "2024-01-01",
+                "modify_date": "2024-01-01",
+                "comment_start_date": None,
+                "comment_end_date": None,
+                "file_url": None,
+                "withdrawn": "false",
+                "reason_withdrawn": None,
+                "additional_rins": None,
+            }
+        ]
         write_parquet_from_dicts(output / "documents.parquet", existing, legacy_schema)
 
         raw = json.loads((SAMPLE_DATA / "document-ACF-2025-0038-0001.json").read_text())
         write_staging("ACF", "documents", [DOCUMENT.extract(raw)], staging, DOCUMENT_SCHEMA)
 
         merge_staging_files(
-            staging, output, ["documents"],
+            staging,
+            output,
+            ["documents"],
             {"documents": DOCUMENT_SCHEMA},
             {"documents": "document_id"},
         )

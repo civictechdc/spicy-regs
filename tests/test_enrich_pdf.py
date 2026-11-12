@@ -217,14 +217,22 @@ def test_catalog_pdf_enrich_upserts_extracted_text_in_place() -> None:
         _seed_catalog(
             con,
             [
-                {"comment_id": "ACF-1", "docket_id": "ACF-2025-0001", "agency_code": "ACF",
-                 "attachments_json": _pdf_attach("https://x/c1.pdf"), "comment": "See attached file(s)"},
+                {
+                    "comment_id": "ACF-1",
+                    "docket_id": "ACF-2025-0001",
+                    "agency_code": "ACF",
+                    "attachments_json": _pdf_attach("https://x/c1.pdf"),
+                    "comment": "See attached file(s)",
+                },
                 # attachment but the download fails → status recorded (error), text stays NULL
-                {"comment_id": "ACF-2", "docket_id": "ACF-2025-0001", "agency_code": "ACF",
-                 "attachments_json": _pdf_attach("https://x/c2.pdf")},
+                {
+                    "comment_id": "ACF-2",
+                    "docket_id": "ACF-2025-0001",
+                    "agency_code": "ACF",
+                    "attachments_json": _pdf_attach("https://x/c2.pdf"),
+                },
                 # no attachment → never a candidate
-                {"comment_id": "ACF-3", "docket_id": "ACF-2025-0001", "agency_code": "ACF",
-                 "attachments_json": None},
+                {"comment_id": "ACF-3", "docket_id": "ACF-2025-0001", "agency_code": "ACF", "attachments_json": None},
             ],
         )
 

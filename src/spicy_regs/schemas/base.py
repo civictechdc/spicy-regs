@@ -28,11 +28,6 @@ class RecordType:
 
     def __post_init__(self) -> None:
         if self.dedup_key not in self.schema:
-            raise ValueError(
-                f"RecordType {self.name!r}: dedup_key {self.dedup_key!r} "
-                f"not in schema"
-            )
+            raise ValueError(f"RecordType {self.name!r}: dedup_key {self.dedup_key!r} not in schema")
         if "modify_date" not in self.schema:
-            raise ValueError(
-                f"RecordType {self.name!r}: schema must include 'modify_date'"
-            )
+            raise ValueError(f"RecordType {self.name!r}: schema must include 'modify_date'")

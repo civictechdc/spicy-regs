@@ -30,10 +30,7 @@ BUCKET = "mirrulations"
 # A real, published EPA notice in the mirror. Posted documents are immutable, so
 # the identifiers below are stable; file sizes are asserted structurally (present
 # and positive) rather than exactly, in case regulations.gov re-renders a file.
-DOC_KEY = (
-    "raw-data/EPA/EPA-HQ-OA-2025-0172/text-EPA-HQ-OA-2025-0172/"
-    "documents/EPA-HQ-OA-2025-0172-0001.json"
-)
+DOC_KEY = "raw-data/EPA/EPA-HQ-OA-2025-0172/text-EPA-HQ-OA-2025-0172/documents/EPA-HQ-OA-2025-0172-0001.json"
 EXPECTED_DOCUMENT_ID = "EPA-HQ-OA-2025-0172-0001"
 EXPECTED_DOCKET_ID = "EPA-HQ-OA-2025-0172"
 EXPECTED_FR_DOC_NUM = "2025-16478"
@@ -41,9 +38,7 @@ EXPECTED_FR_DOC_NUM = "2025-16478"
 
 @pytest.mark.integration
 def test_real_document_attachment_metadata_through_transform(tmp_path):
-    s3 = boto3.resource(
-        "s3", region_name="us-east-1", config=BotoConfig(signature_version=UNSIGNED)
-    )
+    s3 = boto3.resource("s3", region_name="us-east-1", config=BotoConfig(signature_version=UNSIGNED))
 
     logger.info("Fetching live document s3://{}/{}", BUCKET, DOC_KEY)
     # download_and_parse is the exact function the pipeline uses per file.
@@ -51,7 +46,9 @@ def test_real_document_attachment_metadata_through_transform(tmp_path):
     assert record is not None, f"could not fetch {DOC_KEY} from s3://{BUCKET}"
     logger.success(
         "Fetched + extracted {} (docket {}, fr_doc_num {})",
-        record["document_id"], record["docket_id"], record["fr_doc_num"],
+        record["document_id"],
+        record["docket_id"],
+        record["fr_doc_num"],
     )
 
     staging = tmp_path / "staging"
@@ -62,7 +59,9 @@ def test_real_document_attachment_metadata_through_transform(tmp_path):
     write_staging("EPA", "documents", [record], staging, DOCUMENT_SCHEMA)
     logger.info("Merging staging -> {}/documents.parquet", output)
     merge_staging_files(
-        staging, output, ["documents"],
+        staging,
+        output,
+        ["documents"],
         {"documents": DOCUMENT_SCHEMA},
         {"documents": "document_id"},
     )
@@ -91,6 +90,6 @@ def test_real_document_attachment_metadata_through_transform(tmp_path):
     # file_url stays the first usable rendition for backward compatibility.
     assert row["file_url"] == attachments[0]["url"]
     logger.success(
-        "Document attachment metadata survived extract -> staging -> merge "
-        "for {}", row["document_id"],
+        "Document attachment metadata survived extract -> staging -> merge for {}",
+        row["document_id"],
     )

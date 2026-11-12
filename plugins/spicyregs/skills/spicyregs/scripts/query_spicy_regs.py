@@ -127,8 +127,7 @@ def cmd_describe(source: str, output_dir: Path, base_url: str, table: str) -> in
 
     rows = con.execute(f"DESCRIBE {table}").fetchall()
     result = [
-        {"column_name": row[0], "column_type": row[1], "null": row[2], "key": row[3], "default": row[4]}
-        for row in rows
+        {"column_name": row[0], "column_type": row[1], "null": row[2], "key": row[3], "default": row[4]} for row in rows
     ]
     print(json.dumps({"table": table, "columns": result}, indent=2))
     return 0

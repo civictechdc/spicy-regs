@@ -156,6 +156,4 @@ def test_upload_preserves_ingestion_metadata(tmp_path, monkeypatch):
     path = tmp_path / "test.parquet"
     path.write_bytes(b"data")
     r2.upload_file(path, ingested_at="2026-10-28T12:00:00+00:00")
-    assert client.upload_file.call_args.kwargs["ExtraArgs"]["Metadata"] == {
-        "ingested-at": "2026-10-28T12:00:00+00:00"
-    }
+    assert client.upload_file.call_args.kwargs["ExtraArgs"]["Metadata"] == {"ingested-at": "2026-10-28T12:00:00+00:00"}

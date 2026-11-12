@@ -91,7 +91,7 @@ the maintainers publish.
 - Keep changes focused and scoped to one concern per PR.
 - Follow existing code style and conventions (ruff handles most of this).
 - Add or update tests for any behavior change.
-- Run `uv run pytest` and `uv run ruff check .` before pushing.
+- Run `uv run pytest`, `uv run ruff check .`, and `uv run ruff format --check .` before pushing (CI enforces all three).
 - Never call `load_dotenv()` at module scope. Importing the package must not
   mutate `os.environ` — that leaks a developer's `.env` into unit tests and
   points them at production R2. Call it in the CLI entry point instead (the

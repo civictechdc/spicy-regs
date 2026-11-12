@@ -400,13 +400,7 @@ def score_pair(
 
     exact_title_bonus = 0.20 if left.norm_title == right.norm_title else 0.0
     abstract_bonus = min(abstract_ratio, 0.85) * 0.15
-    score = (
-        title_ratio * 0.50
-        + token_jaccard * 0.25
-        + abstract_bonus
-        + exact_title_bonus
-        + date_bonus
-    )
+    score = title_ratio * 0.50 + token_jaccard * 0.25 + abstract_bonus + exact_title_bonus + date_bonus
     score = min(score, 1.0)
 
     return PairScore(
