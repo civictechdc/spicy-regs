@@ -1,0 +1,20 @@
+name: Rollup — oira_reviews
+on:
+  schedule:
+    # 20:30 UTC: after unified_agenda (20:00), the other reginfo.gov ingest.
+    # Daily: the under-review list changes every day.
+    - cron: '30 20 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-oira-reviews
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}

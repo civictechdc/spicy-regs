@@ -16,6 +16,7 @@ from spicy_regs.transforms.build_fr_docket_links import build_fr_docket_links
 from spicy_regs.transforms.build_org_committee_links import build_org_committee_links
 from spicy_regs.transforms.build_gao_reports import build_gao_reports
 from spicy_regs.transforms.build_lobbying_filings import build_lobbying_filings
+from spicy_regs.transforms.build_oira import build_oira_meetings, build_oira_reviews
 from spicy_regs.transforms.build_rulemaking_lifecycles import build_rulemaking_lifecycles
 from spicy_regs.transforms.build_sam_entities import build_sam_entities
 from spicy_regs.transforms.build_search_index import INDEX_FILENAME, build_search_index
@@ -63,6 +64,8 @@ __all__ = [
     "build_gao_reports",
     "build_lobbying_filings",
     "build_unified_agenda",
+    "build_oira_reviews",
+    "build_oira_meetings",
     "build_usaspending_recipients",
     "build_search_index",
     "INDEX_FILENAME",
