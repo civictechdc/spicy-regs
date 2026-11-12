@@ -19,6 +19,12 @@ it is null, which is robust to the exact page cap.
 ``LDA_API_KEY`` sent as an ``Authorization: Token <key>`` header raises the
 limit. This reader is fully functional with no key — it just fetches more
 slowly. When a key is present it is used automatically.
+
+**Failing loudly.** A non-retryable 4xx (bad key, blocked client, changed
+endpoint) or exhausted 429/5xx retries raise :class:`LobbyingFilingsUnavailable`
+rather than ending the fetch early. Treating a failure as "no more results"
+would let the build re-upload the prior table and report success; that is how
+``court_dockets`` sat frozen for 17 days when CourtListener ended keyless access.
 """
 
 from __future__ import annotations
@@ -46,10 +52,14 @@ API_KEY_ENV_VAR = "LDA_API_KEY"
 # Transport hygiene: bound every request and retry transient failures with
 # backoff so a flaky page fails slow-then-recovers rather than dropping filings.
 # Keyless requests are rate-limited more aggressively, so 429s are expected and
-# retried with backoff.
+# retried with backoff. Any other 4xx fails immediately.
 _TIMEOUT = httpx.Timeout(60.0, connect=30.0)
 _MAX_RETRIES = 6
 _PROGRESS_EVERY = 2_500
+
+
+class LobbyingFilingsUnavailable(RuntimeError):
+    """The LDA API could not be queried: a rejected request, or retries exhausted."""
 
 
 def _resolve_api_key() -> str | None:
@@ -124,8 +134,6 @@ class LobbyingFilingsReader(Reader):
         while url:
             payload = self._get(url, params if first else None)
             first = False
-            if payload is None:
-                break
             for filing in payload.get("results") or []:
                 self._seen += 1
                 if self._seen % _PROGRESS_EVERY == 0:
@@ -137,21 +145,30 @@ class LobbyingFilingsReader(Reader):
                     return
             url = payload.get("next") or ""
 
-    def _get(self, url: str, params: dict | None) -> dict | None:
-        """GET with bounded retries + exponential backoff. Returns parsed JSON or None."""
+    def _get(self, url: str, params: dict | None) -> dict:
+        """GET with bounded retries + exponential backoff on 429/5xx/transport errors.
+
+        Any other 4xx raises at once, and exhausted retries raise too, so a
+        failed page can never be mistaken for the end of the results.
+        """
         assert self._client is not None
         for attempt in range(1, _MAX_RETRIES + 1):
             try:
                 resp = self._client.get(url, params=params)
                 if resp.status_code == 429 or resp.status_code >= 500:
                     raise httpx.HTTPStatusError("retryable", request=resp.request, response=resp)
-                resp.raise_for_status()
+                if resp.status_code >= 400:
+                    raise LobbyingFilingsUnavailable(
+                        f"LDA API rejected {url} with HTTP {resp.status_code}: {resp.text[:200]}"
+                        + (f" (check {API_KEY_ENV_VAR})" if resp.status_code in (401, 403) else "")
+                    )
                 return resp.json()
             except (httpx.HTTPError, ValueError) as exc:
                 if attempt == _MAX_RETRIES:
-                    logger.error("LDA filings: giving up on {} after {} attempts: {}", url, attempt, exc)
-                    return None
+                    raise LobbyingFilingsUnavailable(
+                        f"LDA filings: giving up on {url} after {attempt} attempts: {exc}"
+                    ) from exc
                 backoff = min(2**attempt, 60)
                 logger.warning("LDA filings: {} (attempt {}/{}), retrying in {}s", exc, attempt, _MAX_RETRIES, backoff)
                 time.sleep(backoff)
-        return None
+        raise AssertionError("unreachable")  # pragma: no cover

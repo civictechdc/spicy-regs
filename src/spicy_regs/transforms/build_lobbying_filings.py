@@ -14,7 +14,8 @@ the R2 catastrophic-shrink guard on any short run. Instead we:
 3. Dedup the union on ``filing_uuid``, preferring the freshly fetched row.
 
 With no prior table (first run) step 2 becomes a full backfill. The reader is
-functional keyless, so this runs in CI with or without ``LDA_API_KEY``.
+functional keyless, so this runs in CI with or without ``LDA_API_KEY``. A failed
+fetch raises from the reader, aborting the build before anything is uploaded.
 """
 
 from __future__ import annotations
