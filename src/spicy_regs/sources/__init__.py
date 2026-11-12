@@ -10,6 +10,7 @@ from spicy_regs.sources.oira import OiraMeetingsReader, OiraReviewsReader
 from spicy_regs.sources.parquet import StagingWriter
 from spicy_regs.sources.pdf import fetch_pdf_bytes
 from spicy_regs.sources.unified_agenda import UnifiedAgendaReader
+from spicy_regs.sources.va_townhall import VaTownHallReader
 
 __all__ = [
     "Reader",
@@ -20,6 +21,7 @@ __all__ = [
     "UnifiedAgendaReader",
     "OiraReviewsReader",
     "OiraMeetingsReader",
+    "VaTownHallReader",
     "FederalRegisterReader",
     "FccEcfsProceedingsReader",
     "FccEcfsFilingsReader",

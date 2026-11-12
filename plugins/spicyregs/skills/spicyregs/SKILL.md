@@ -76,6 +76,7 @@ Use the helper script's `--describe` output for the exact schema. In this repo, 
 Complementary federal sources (all queryable by name; see the Data Dictionary for columns):
 
 - Rulemaking lifecycle: `federal_register` (published rules; RIN + CFR refs), `unified_agenda` (planned actions, keyed by `rin`), `oira_reviews` (OIRA EO 12866 review dates and outcomes, by `rin`), `oira_meetings` (OIRA meetings with outside parties, 2024 only, by `rin`), `state_program_approvals` (FR actions approving a state's rules, e.g. SIPs, by `jurisdiction`; VA/MD rows carry state code citations), `congress_bills`, `cfr_sections`
+- State rulemaking (Virginia only so far): `state_actions` (a state rulemaking, like a docket), `state_stages` (NOIRA/Proposed/Final stages with comment periods, by `action_id`; `chapter_citation` like `9VAC25-194`), `state_comments` (full-text public comments, by `stage_id` or `forum_type` + `forum_id`). Filter on `jurisdiction`.
 - Organizations & influence: `sam_entities` (entity registry, keyed by `uei`), `lobbying_filings`, `fec_committees`, `org_committee_links` (commenter org names name-matched to FEC committees; filter on `confidence`)
 - Outcomes & context: `usaspending_recipients` (keyed by `uei`), `court_dockets`, `gao_reports`, `crs_reports`
 

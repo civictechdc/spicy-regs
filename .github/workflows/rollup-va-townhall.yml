@@ -1,0 +1,32 @@
+name: Rollup — va_townhall (state_actions, state_stages, state_comments)
+
+# Crawls the Virginia Regulatory Town Hall at its 5-second Crawl-delay. Each run
+# refreshes open forums and in-progress stages, then spends the rest of its
+# budget (TOWNHALL_MAX_MINUTES, default 270) on a resumable backfill whose
+# cursor is kept on R2. The first backfill takes about a week of nightly runs;
+# after that a run finishes in well under an hour.
+on:
+  schedule:
+    # 05:00 UTC (midnight/1 am Eastern): Town Hall traffic is lowest overnight.
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+
+# Two overlapping runs would read the same cursor and race on the upload.
+concurrency:
+  group: rollup-va-townhall
+  cancel-in-progress: false
+
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-va-townhall
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}
+      timeout_minutes: 330

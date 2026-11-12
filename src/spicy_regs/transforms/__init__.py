@@ -23,6 +23,7 @@ from spicy_regs.transforms.build_search_index import INDEX_FILENAME, build_searc
 from spicy_regs.transforms.build_state_program_approvals import build_state_program_approvals
 from spicy_regs.transforms.build_unified_agenda import build_unified_agenda
 from spicy_regs.transforms.build_usaspending_recipients import build_usaspending_recipients
+from spicy_regs.transforms.build_va_townhall import build_va_townhall
 from spicy_regs.transforms.chain import Chain
 from spicy_regs.transforms.enrich_derived_text import EnrichCommentText
 from spicy_regs.transforms.extract import ExtractRecords
@@ -68,6 +69,7 @@ __all__ = [
     "build_unified_agenda",
     "build_oira_reviews",
     "build_oira_meetings",
+    "build_va_townhall",
     "build_usaspending_recipients",
     "build_search_index",
     "INDEX_FILENAME",

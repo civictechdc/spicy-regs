@@ -108,6 +108,10 @@ context are all joinable in one place:
 - *Outcomes & context:* `usaspending_recipients`, `court_dockets`, `gao_reports`, `crs_reports`
 - *Telecom:* `fcc_proceedings`, `fcc_filings`
 
+**State rulemaking** — `state_actions`, `state_stages`, `state_comments`:
+actions, stages and full-text public comments from the Virginia Regulatory Town
+Hall, keyed by `jurisdiction` so later states can share the tables.
+
 Cross-source join keys: **RIN**, **CFR citation**, **UEI**, **`agency_code`**.
 RIN is a real key on the Federal Register / Unified Agenda side
 (`federal_register.regulation_id_numbers_json` ↔ `unified_agenda.rin`; the

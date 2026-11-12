@@ -57,6 +57,9 @@ nav:
       - oira_meetings: tables/oira_meetings.md
       - federal_register: tables/federal_register.md
       - state_program_approvals: tables/state_program_approvals.md
+      - state_actions: tables/state_actions.md
+      - state_stages: tables/state_stages.md
+      - state_comments: tables/state_comments.md
       - sam_entities: tables/sam_entities.md
       - lobbying_filings: tables/lobbying_filings.md
       - fec_committees: tables/fec_committees.md

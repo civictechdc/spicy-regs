@@ -101,6 +101,13 @@ SKIPPED = {
     # Promote to a DateCheck on publication_date (EPA publishes SIP actions most
     # weeks) once the first publish lands.
     "state_program_approvals": "not yet published to R2; first build pending",
+    # Virginia Town Hall. Promote state_stages to a DateCheck on fetched_at (the
+    # daily refresh rewrites it) once the first publish lands. state_comments is
+    # bursty (forums go quiet for weeks) and state_actions changes only when a
+    # stage is refetched, so neither has a date that must keep advancing.
+    "state_actions": "not yet published to R2; first backfill pending",
+    "state_stages": "not yet published to R2; first backfill pending",
+    "state_comments": "not yet published to R2; first backfill pending",
 }
 
 
