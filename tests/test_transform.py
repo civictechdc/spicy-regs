@@ -234,31 +234,58 @@ class TestMergeStagingFiles:
         output.mkdir()
 
         base = {
-            "docket_id": "EPA-2024-0001", "agency_code": "EPA", "document_type": "Proposed Rule",
-            "posted_date": "2024-06-01", "comment_start_date": None, "comment_end_date": None,
-            "file_url": None, "attachments_json": None, "fr_doc_num": None, "withdrawn": None,
-            "reason_withdrawn": None, "additional_rins": None, "text_content": None,
+            "docket_id": "EPA-2024-0001",
+            "agency_code": "EPA",
+            "document_type": "Proposed Rule",
+            "posted_date": "2024-06-01",
+            "comment_start_date": None,
+            "comment_end_date": None,
+            "file_url": None,
+            "attachments_json": None,
+            "fr_doc_num": None,
+            "withdrawn": None,
+            "reason_withdrawn": None,
+            "additional_rins": None,
+            "text_content": None,
             "text_extraction_status": None,
         }
         old_schema = {c: t for c, t in DOCUMENT.schema.items() if c != "subtype"}
         published = [
-            {**base, "document_id": "D-001", "title": "untouched", "modify_date": "2024-06-01",
-             "text_content": "extracted earlier", "text_extraction_status": "ok"},
+            {
+                **base,
+                "document_id": "D-001",
+                "title": "untouched",
+                "modify_date": "2024-06-01",
+                "text_content": "extracted earlier",
+                "text_extraction_status": "ok",
+            },
             {**base, "document_id": "D-002", "title": "stale", "modify_date": "2024-06-01"},
         ]
         write_parquet_from_dicts(output / "documents.parquet", published, old_schema)
         assert "subtype" not in pq.ParquetFile(output / "documents.parquet").schema_arrow.names
 
         staged = [
-            {**base, "document_id": "D-002", "title": "fresh", "modify_date": "2024-09-15",
-             "subtype": "Extension of Comment Period"},
-            {**base, "document_id": "D-003", "title": "new", "modify_date": "2024-10-01",
-             "subtype": "Notice of Proposed Rulemaking (NPRM)"},
+            {
+                **base,
+                "document_id": "D-002",
+                "title": "fresh",
+                "modify_date": "2024-09-15",
+                "subtype": "Extension of Comment Period",
+            },
+            {
+                **base,
+                "document_id": "D-003",
+                "title": "new",
+                "modify_date": "2024-10-01",
+                "subtype": "Notice of Proposed Rulemaking (NPRM)",
+            },
         ]
         write_staging("EPA", "documents", staged, staging, DOCUMENT.schema)
 
         merge_staging_files(
-            staging, output, ["documents"],
+            staging,
+            output,
+            ["documents"],
             {"documents": DOCUMENT.schema},
             {"documents": DOCUMENT.dedup_key},
         )
@@ -283,8 +310,8 @@ class TestMergeStagingFiles:
 
         old_schema = {c: t for c, t in DOCUMENT.schema.items() if c != "subtype"}
         published = [
-            {c: None for c in old_schema} | {"document_id": f"D-00{i}", "docket_id": "EPA-2024-0001",
-                                              "modify_date": "2024-06-01"}
+            {c: None for c in old_schema}
+            | {"document_id": f"D-00{i}", "docket_id": "EPA-2024-0001", "modify_date": "2024-06-01"}
             for i in (1, 2)
         ]
         write_parquet_from_dicts(output / "documents.parquet", published, old_schema)
@@ -292,7 +319,9 @@ class TestMergeStagingFiles:
         (staging / "documents" / "EPA.parquet").write_bytes(b"not a parquet file")
 
         merge_staging_files(
-            staging, output, ["documents"],
+            staging,
+            output,
+            ["documents"],
             {"documents": DOCUMENT.schema},
             {"documents": DOCUMENT.dedup_key},
         )
@@ -308,13 +337,34 @@ class TestMergeStagingFiles:
         staging = tmp_path / "staging"
         output = tmp_path / "output"
         output.mkdir()
-        write_staging("EPA", "dockets", [{"title": "t", "modify_date": "2024-01-01"}], staging,
-                      {"title": pl.Utf8, "modify_date": pl.Utf8})
+        write_staging(
+            "EPA",
+            "dockets",
+            [{"title": "t", "modify_date": "2024-01-01"}],
+            staging,
+            {"title": pl.Utf8, "modify_date": pl.Utf8},
+        )
 
         with pytest.raises(ValueError, match="docket_id"):
-            merge_staging_files(
-                staging, output, ["dockets"], {"dockets": DOCKET_SCHEMA}, {"dockets": "docket_id"}
-            )
+            merge_staging_files(staging, output, ["dockets"], {"dockets": DOCKET_SCHEMA}, {"dockets": "docket_id"})
+
+    def test_merge_refuses_when_one_input_lacks_dedup_key(self, tmp_path):
+        """If the published file has the key but one staging file doesn't, that
+        file's rows would get NULL keys and all but one would be deduped away;
+        refuse instead of silently dropping them."""
+        staging = tmp_path / "staging"
+        output = tmp_path / "output"
+        output.mkdir()
+        published = [{"docket_id": "EPA-2024-0001", "modify_date": "2024-01-01"}]
+        write_parquet_from_dicts(output / "dockets.parquet", published, DOCKET_SCHEMA)
+        keyless = {"title": pl.Utf8, "modify_date": pl.Utf8}
+        rows = [{"title": "a", "modify_date": "2024-02-01"}, {"title": "b", "modify_date": "2024-03-01"}]
+        write_staging("EPA", "dockets", rows, staging, keyless)
+
+        with pytest.raises(ValueError, match="EPA.parquet"):
+            merge_staging_files(staging, output, ["dockets"], {"dockets": DOCKET_SCHEMA}, {"dockets": "docket_id"})
+        # The published file is left untouched.
+        assert pl.read_parquet(output / "dockets.parquet")["docket_id"].to_list() == ["EPA-2024-0001"]
 
     def test_deduplicates_comments_keeping_latest_modify_date(self, tmp_path):
         """Comments should dedupe on comment_id, keeping latest modify_date."""

@@ -49,10 +49,10 @@ def merge_staging_files(
 
         # Drop corrupt files so DuckDB doesn't abort the whole merge.
         valid_files: list[Path] = []
-        present_columns: set[str] = set()
+        columns_by_file: dict[Path, set[str]] = {}
         for file_path in files_to_merge:
             try:
-                present_columns.update(pq.ParquetFile(file_path).schema_arrow.names)
+                columns_by_file[file_path] = set(pq.ParquetFile(file_path).schema_arrow.names)
             except Exception as e:
                 logger.warning(
                     "{}: skipping corrupt file {}: {}",
@@ -80,14 +80,23 @@ def merge_staging_files(
         # documents.subtype) is absent from that file. union_by_name fills it
         # with NULL as long as some input has it; when none does (say every
         # staging file was skipped as corrupt), select a typed NULL instead of
-        # letting DuckDB fail to bind the column. The dedup and sort columns
-        # can't be defaulted that way: a NULL key would collapse every row into
-        # one, so refuse instead of silently dropping rows.
-        for required in (key_col, "modify_date"):
-            if required not in present_columns:
-                raise ValueError(
-                    f"merge_staging_files: no input file for '{data_type}' has column '{required}'"
-                )
+        # letting DuckDB fail to bind the column.
+        #
+        # The dedup key can't be defaulted that way. union_by_name would give
+        # every row of a file lacking it a NULL key, and the dedup below would
+        # then keep only one of those rows, silently dropping the rest. So each
+        # readable input must carry the key. A file without modify_date only
+        # loses its tiebreak (NULLS LAST), not rows, so that column just has to
+        # exist in at least one input for the ORDER BY to bind.
+        present_columns = set().union(*columns_by_file.values())
+        missing_key = [p.name for p, cols in columns_by_file.items() if key_col not in cols]
+        if missing_key:
+            raise ValueError(
+                f"merge_staging_files: input file(s) for '{data_type}' lack dedup key "
+                f"'{key_col}': {', '.join(missing_key)}"
+            )
+        if "modify_date" not in present_columns:
+            raise ValueError(f"merge_staging_files: no input file for '{data_type}' has column 'modify_date'")
 
         temp_output = output_dir / f"{data_type}_merged.parquet"
 
