@@ -45,6 +45,8 @@ TABLES = (
     "cfr_sections",
     "congress_bills",
     "unified_agenda",
+    "oira_reviews",
+    "oira_meetings",
     "federal_register",
     "sam_entities",
     "lobbying_filings",

@@ -54,6 +54,8 @@ is queryable through the MCP server (`list_sources` / `describe_table` /
 | --- | --- | --- |
 | [`federal_register`](tables/federal_register.md) | one row per Federal Register document | `document_number` |
 | [`unified_agenda`](tables/unified_agenda.md) | one row per RIN per agenda edition | `rin` |
+| [`oira_reviews`](tables/oira_reviews.md) | one row per OIRA EO 12866 review (concluded or pending) | `rin` (not unique) |
+| [`oira_meetings`](tables/oira_meetings.md) | one row per OIRA EO 12866 meeting-log entry (2024 only) | `rin` (not unique) |
 | [`congress_bills`](tables/congress_bills.md) | one row per bill | `bill_id` |
 | [`cfr_sections`](tables/cfr_sections.md) | one row per CFR granule | `granule_id` |
 | [`fcc_proceedings`](tables/fcc_proceedings.md) | one row per FCC proceeding (docket) | `name` |
@@ -98,7 +100,9 @@ The complementary sources are **reference tables** rather than strict children
 of `dockets`; they join to the corpus (and to each other) on a few shared keys:
 
 - **RIN** (Regulation Identifier Number) links `unified_agenda` (the planned
-  action) to `federal_register.regulation_id_numbers_json` (the published rule).
+  action) to `oira_reviews` / `oira_meetings` (OIRA's EO 12866 review of the
+  draft, and outside meetings about it) and to
+  `federal_register.regulation_id_numbers_json` (the published rule).
 - **CFR citations** link `cfr_sections` to `federal_register.cfr_references_json`
   and `unified_agenda.cfr_references_json` (the codified text a rule amends).
 - **Docket IDs** in `federal_register.docket_ids_json` tie FR documents back to

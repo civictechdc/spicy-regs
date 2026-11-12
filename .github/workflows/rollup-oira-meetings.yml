@@ -1,0 +1,20 @@
+name: Rollup — oira_meetings
+on:
+  schedule:
+    # Weekly (Mon 20:45 UTC): the meeting export changes rarely (2024 only so far),
+    # but a weekly run picks up any new half-year file reginfo.gov posts.
+    - cron: '45 20 * * 1'
+  workflow_dispatch:
+    inputs:
+      skip_upload:
+        description: 'Skip R2 upload (dry run)'
+        required: false
+        default: false
+        type: boolean
+jobs:
+  run:
+    uses: ./.github/workflows/_rollup.yml
+    secrets: inherit
+    with:
+      command: run-rollup-oira-meetings
+      skip_upload: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_upload || false }}

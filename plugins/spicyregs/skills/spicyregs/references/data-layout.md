@@ -28,7 +28,7 @@ Core regulations.gov tables + rollups:
 
 Complementary federal sources (each also queryable by name via the MCP server):
 
-- Rulemaking lifecycle: `federal_register.parquet`, `unified_agenda.parquet`, `congress_bills.parquet`, `cfr_sections.parquet`
+- Rulemaking lifecycle: `federal_register.parquet`, `unified_agenda.parquet`, `oira_reviews.parquet`, `oira_meetings.parquet`, `congress_bills.parquet`, `cfr_sections.parquet`
 - Organizations & influence: `sam_entities.parquet`, `lobbying_filings.parquet`, `fec_committees.parquet`, `org_committee_links.parquet`
 - Outcomes & context: `usaspending_recipients.parquet`, `court_dockets.parquet`, `gao_reports.parquet`, `crs_reports.parquet`
 

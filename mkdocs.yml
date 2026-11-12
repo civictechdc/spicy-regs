@@ -53,6 +53,8 @@ nav:
       - cfr_sections: tables/cfr_sections.md
       - congress_bills: tables/congress_bills.md
       - unified_agenda: tables/unified_agenda.md
+      - oira_reviews: tables/oira_reviews.md
+      - oira_meetings: tables/oira_meetings.md
       - federal_register: tables/federal_register.md
       - sam_entities: tables/sam_entities.md
       - lobbying_filings: tables/lobbying_filings.md
