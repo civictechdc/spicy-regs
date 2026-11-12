@@ -354,6 +354,70 @@ def test_discover_raises_when_reginfo_is_down(no_sleep):
             discover_editions("202510", today=_TODAY, client=client)
 
 
+@pytest.fixture
+def warnings_log():
+    """Collect loguru WARNING-and-above messages (loguru bypasses caplog)."""
+    messages: list[str] = []
+    sink_id = unified_agenda.logger.add(lambda m: messages.append(str(m)), level="WARNING", format="{message}")
+    yield messages
+    unified_agenda.logger.remove(sink_id)
+
+
+def test_discover_warns_about_an_older_edition_skipped_for_good(warnings_log):
+    # Stored 202510; Fall 2026 is out but Spring 2026 still isn't. 202604 can't be
+    # an error (real gaps exist, e.g. no 201804), but it must not vanish silently.
+    with _reginfo({"202510", "202610"}) as client:
+        assert discover_editions("202510", today=_TODAY, client=client) == ("202610",)
+    assert len(warnings_log) == 1
+    assert "202604" in warnings_log[0] and "202610" in warnings_log[0]
+
+
+def test_discover_does_not_warn_without_a_gap(warnings_log):
+    with _reginfo({"202510", "202604"}) as client:
+        # 202610 is newer than the newest published edition, so it's not "skipped".
+        assert discover_editions("202510", today=_TODAY, client=client) == ("202604",)
+    assert warnings_log == []
+
+
+class _OneChunkThenFail(httpx.SyncByteStream):
+    """A streamed body whose reads past the first chunk fail the test."""
+
+    def __init__(self, first: bytes) -> None:
+        self.first = first
+        self.chunks_read = 0
+
+    def __iter__(self):
+        self.chunks_read += 1
+        yield self.first
+        self.chunks_read += 1
+        raise AssertionError("probe read past the first chunk")
+
+
+@pytest.mark.parametrize("first", [_FIXTURE_XML[:200], _HTML_ERROR_PAGE[:200]])
+def test_probe_stops_after_the_first_chunk(first):
+    stream = _OneChunkThenFail(first)
+
+    def handler(request):
+        return httpx.Response(200, stream=stream)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        assert probe_edition(client, "202510") is first.lstrip().startswith(b"<?xml")
+    assert stream.chunks_read == 1
+
+
+def test_probe_uses_a_short_timeout():
+    seen: list[dict] = []
+
+    def handler(request):
+        seen.append(request.extensions["timeout"])
+        return httpx.Response(200, content=_FIXTURE_XML)
+
+    # Even on a client configured with the long download timeout.
+    with httpx.Client(transport=httpx.MockTransport(handler), timeout=300.0) as client:
+        probe_edition(client, "202510")
+    assert seen[0]["read"] == 30.0 and seen[0]["connect"] == 10.0
+
+
 def test_reader_without_editions_discovers_latest(monkeypatch):
     monkeypatch.setattr(unified_agenda, "discover_editions", lambda **_kw: ("202604",))
     monkeypatch.setattr(UnifiedAgendaReader, "_download", lambda self, ed: _FIXTURE_XML)
@@ -368,9 +432,18 @@ def test_reader_without_editions_discovers_latest(monkeypatch):
 # --------------------------------------------------------------------------- #
 
 
-def _write_prior(output_dir, editions: list[str]) -> None:
-    rows = [{c: None for c in COLUMNS} | {"rin": "0000-AA00", "agenda_edition": ed} for ed in editions]
+def _write_prior(output_dir, editions: list[str], rins: tuple[str, ...] = ("0000-AA00",)) -> None:
+    """Write a prior table with one row per (rin, edition), each RIN distinct within an edition."""
+    rows = [
+        {c: None for c in COLUMNS} | {"rin": rin, "agenda_edition": ed, "title": f"prior {rin} {ed}"}
+        for ed in editions
+        for rin in rins
+    ]
     pq.write_table(pa.Table.from_pylist(rows, schema=_SCHEMA), output_dir / "_ua_prior.parquet")
+
+
+def _scratch_left(output_dir) -> list[str]:
+    return sorted(p.name for p in output_dir.glob("_ua_*.parquet"))
 
 
 def _editions_in(path) -> set[str]:
@@ -384,7 +457,8 @@ def test_prior_max_edition_ignores_malformed_values(tmp_output):
 
 
 def test_build_fetches_editions_newer_than_stored(tmp_output, monkeypatch):
-    _write_prior(tmp_output, ["202504", "202510"])
+    # Two distinct RINs in each of two stored editions = 4 prior rows.
+    _write_prior(tmp_output, ["202504", "202510"], rins=("1111-AA01", "2222-AA02"))
     seen_after: list[str | None] = []
 
     def fake_discover(after=None, **_kw):
@@ -403,8 +477,28 @@ def test_build_fetches_editions_newer_than_stored(tmp_output, monkeypatch):
     out = build_mod.build_unified_agenda(tmp_output)
     assert seen_after == ["202510"]
     assert fetched == ["202604"]
-    # Prior editions are kept alongside the newly ingested one.
+    # Prior editions are kept alongside the newly ingested one: 4 prior rows + the
+    # fixture's 2 RINs stamped 202604.
+    table = pq.read_table(out)
+    assert table.num_rows == 6
     assert _editions_in(out) == {"202504", "202510", "202604"}
+    pairs = set(zip(table.column("rin").to_pylist(), table.column("agenda_edition").to_pylist(), strict=True))
+    assert len(pairs) == 6
+    assert ("2060-AV12", "202604") in pairs and ("1111-AA01", "202504") in pairs
+    assert _scratch_left(tmp_output) == []
+
+
+def test_build_new_row_replaces_same_rin_and_edition(tmp_output, monkeypatch):
+    # The prior already holds 2060-AV12 @ 202604; re-fetching it refreshes in place.
+    _write_prior(tmp_output, ["202510", "202604"], rins=("2060-AV12",))
+    monkeypatch.setattr(UnifiedAgendaReader, "_download", lambda self, ed: _FIXTURE_XML)
+    out = build_mod.build_unified_agenda(tmp_output, editions=("202604",))
+    table = pq.read_table(out)
+    # 202510/2060-AV12 (prior) + 202604/{2060-AV12, 1234-AB56} (new) = 3; no duplicate.
+    assert table.num_rows == 3
+    rows = {(r["rin"], r["agenda_edition"]): r["title"] for r in table.to_pylist()}
+    assert rows[("2060-AV12", "202604")] == "A Planned Rule"
+    assert rows[("2060-AV12", "202510")] == "prior 2060-AV12 202510"
 
 
 def test_build_up_to_date_fetches_nothing_and_keeps_prior(tmp_output, monkeypatch):
@@ -444,6 +538,8 @@ def test_build_fails_loudly_when_reginfo_is_down(tmp_output, monkeypatch):
     with pytest.raises(UnifiedAgendaUnavailable):
         build_mod.build_unified_agenda(tmp_output)
     assert not (tmp_output / build_mod.OUTPUT).exists()
+    # Scratch files are cleaned up on the raise path too (no stale prior left behind).
+    assert _scratch_left(tmp_output) == []
 
 
 def test_build_fails_when_a_published_edition_downloads_empty(tmp_output, monkeypatch):
@@ -453,3 +549,5 @@ def test_build_fails_when_a_published_edition_downloads_empty(tmp_output, monkey
     with pytest.raises(UnifiedAgendaUnavailable, match="202604"):
         build_mod.build_unified_agenda(tmp_output)
     assert not (tmp_output / build_mod.OUTPUT).exists()
+    # Scratch files are cleaned up on the raise path too (no stale prior left behind).
+    assert _scratch_left(tmp_output) == []

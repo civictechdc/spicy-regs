@@ -28,9 +28,14 @@ required; reginfo.gov is fully open.
 
 Edition discovery
 -----------------
-There is no index of published editions, and a request for an edition that has
-not been published still answers ``200``, with an HTML error page instead of
-XML. So the latest edition is found by probing: :func:`candidate_editions`
+reginfo.gov does keep an index: the ``eAgendaXmlReport`` HTML page (see the
+note below) links every ``REGINFO_RIN_DATA_{edition}.xml`` it serves, from
+``199510`` onward. Scraping it would tie us to that page's markup, though, and a
+"what's newest?" question only needs a couple of requests, so this reader probes
+instead. (The index is the natural source for enumerating historical editions
+in a backfill, #172.) A request for an edition that has not been published
+still answers ``200``, with an HTML error page instead of XML, so probing has to
+look at the body. The latest edition is found like this: :func:`candidate_editions`
 lists plausible editions newest-first from today's date (bounded by
 :data:`MAX_LOOKBACK_EDITIONS`), and :func:`discover_editions` streams just the
 first bytes of each candidate, treating anything but an XML body as "not
@@ -38,8 +43,8 @@ published". Incremental callers pass the newest edition they already store as
 ``after`` and get back only the published editions newer than it.
 
 .. note::
-   The older ``eAgendaXmlReport`` endpoint returns the **HTML listing page**, not
-   data — it is not a machine-readable export. ``XMLViewFileAction`` is the real
+   The older ``eAgendaXmlReport`` endpoint returns the **HTML listing page** (the
+   index of editions mentioned above), not data. It is not a machine-readable export. ``XMLViewFileAction`` is the real
    export and is what this reader fetches.
 
 Each file is a single ``<REGINFO_RIN_DATA>`` root containing many ``<RIN_INFO>``
@@ -115,6 +120,10 @@ _PROGRESS_EVERY = 5_000
 # leading whitespace (the HTML error page starts with ~20 blank lines).
 _PROBE_MAX_BYTES = 64 * 1024
 _PROBE_RETRIES = 3
+# A probe needs only the first chunk, so it gets a short timeout: a hung
+# reginfo.gov then fails discovery in about a minute instead of the
+# 300 s-per-attempt download timeout.
+_PROBE_TIMEOUT = httpx.Timeout(30.0, connect=10.0)
 
 
 class UnifiedAgendaUnavailable(RuntimeError):
@@ -159,7 +168,7 @@ def probe_edition(client: httpx.Client, edition: str) -> bool:
     params = {"f": XML_FILE_TEMPLATE.format(edition=edition)}
     for attempt in range(1, _PROBE_RETRIES + 1):
         try:
-            with client.stream("GET", XML_EXPORT_ENDPOINT, params=params) as resp:
+            with client.stream("GET", XML_EXPORT_ENDPOINT, params=params, timeout=_PROBE_TIMEOUT) as resp:
                 if resp.status_code == 429 or resp.status_code >= 500:
                     raise httpx.HTTPStatusError("retryable", request=resp.request, response=resp)
                 if resp.status_code != 200:
@@ -208,7 +217,7 @@ def discover_editions(
     reporting "up to date" would silently freeze the table again.
     """
     if client is None:
-        with httpx.Client(timeout=_TIMEOUT, follow_redirects=True) as owned:
+        with httpx.Client(timeout=_PROBE_TIMEOUT, follow_redirects=True) as owned:
             return discover_editions(after, today=today, client=owned)
 
     candidates = candidate_editions(today)
@@ -226,6 +235,19 @@ def discover_editions(
             logger.info("Unified Agenda: edition {} is not published", edition)
 
     if published:
+        # An older candidate that is still unpublished while a newer one is out
+        # gets skipped for good: the stored max moves past it. Gaps are real
+        # (reginfo.gov has no 201804), so this is a warning, not an error.
+        # Recovering a late edition is backfill work (#172).
+        newest = max(published)
+        skipped = sorted(c for c in candidates if c < newest and c not in published)
+        if skipped:
+            logger.warning(
+                "Unified Agenda: edition(s) {} are not published but newer edition {} is; "
+                "they will be skipped and not retried (backfill via #172 if they appear later)",
+                ", ".join(skipped),
+                newest,
+            )
         return tuple(sorted(published))
     if after is not None and probe_edition(client, after):
         logger.info("Unified Agenda: no edition newer than stored {}; up to date", after)

@@ -174,81 +174,83 @@ def build_unified_agenda(output_dir: Path, *, editions: tuple[str, ...] | None =
 
     out_file = output_dir / OUTPUT
     prior_file = output_dir / "_ua_prior.parquet"
-
-    # 1. Pull the prior table (best effort — absence just means no merge base).
-    have_prior = prior_file.exists() or r2.download(OUTPUT, prior_file)
-    if have_prior:
-        logger.info("Unified Agenda: merging against prior table {}", prior_file)
-    else:
-        logger.info("Unified Agenda: no prior table found — starting fresh")
-
-    # 2. Work out which editions to fetch: anything published that is newer than
-    #    the newest stored edition (or just the latest one, on a first run).
-    #    discover_editions raises if reginfo.gov is unreachable, so an outage
-    #    fails the run loudly instead of republishing a silently stale table.
-    if editions is None:
-        stored_max = _prior_max_edition(prior_file) if have_prior else None
-        logger.info("Unified Agenda: newest stored edition is {}", stored_max or "(none)")
-        editions = discover_editions(after=stored_max)
-
-    # 3. Fetch + shape those edition(s) into a "new rows" parquet.
-    rows: list[dict] = []
-    if editions:
-        reader = UnifiedAgendaReader(editions=editions)
-        rows = [_shape(doc) for doc in reader.iter_records()]
-        # Every edition here was requested explicitly or probed as published, so
-        # an empty one is a failed download, not a missing edition. Abort rather
-        # than publish without it: the next run would treat it as already stored
-        # (if a newer edition did land) and never fetch it again.
-        empty = [ed for ed in editions if not reader.edition_counts.get(ed)]
-        if empty:
-            raise UnifiedAgendaUnavailable(f"edition(s) {', '.join(empty)} yielded no records")
-    else:
-        logger.info("Unified Agenda: stored table is current; nothing to fetch")
     new_file = output_dir / "_ua_new.parquet"
-    table = pa.Table.from_pylist(rows, schema=_SCHEMA) if rows else _SCHEMA.empty_table()
-    pq.write_table(table, new_file, compression="zstd")
-    logger.info("Unified Agenda: fetched {:,} entries this run", len(rows))
 
-    # 4. Merge prior + new, dedup on (rin, agenda_edition) preferring the new row.
-    spill_dir = output_dir / ".duckdb_tmp"
-    spill_dir.mkdir(exist_ok=True)
-    con = duckdb.connect()
-    con.execute("SET memory_limit='4GB'")
-    con.execute("SET preserve_insertion_order=false")
-    con.execute("SET threads=2")
-    con.execute(f"SET temp_directory='{spill_dir}'")
+    try:
+        # 1. Pull the prior table (best effort — absence just means no merge base).
+        have_prior = prior_file.exists() or r2.download(OUTPUT, prior_file)
+        if have_prior:
+            logger.info("Unified Agenda: merging against prior table {}", prior_file)
+        else:
+            logger.info("Unified Agenda: no prior table found — starting fresh")
 
-    cols = ", ".join(COLUMNS)
-    if have_prior:
-        union = (
-            f"SELECT {cols}, 0 AS _src FROM read_parquet('{prior_file}') "
-            f"UNION ALL BY NAME "
-            f"SELECT {cols}, 1 AS _src FROM read_parquet('{new_file}')"
-        )
-    else:
-        union = f"SELECT {cols}, 1 AS _src FROM read_parquet('{new_file}')"
+        # 2. Work out which editions to fetch: anything published that is newer than
+        #    the newest stored edition (or just the latest one, on a first run).
+        #    discover_editions raises if reginfo.gov is unreachable, so an outage
+        #    fails the run loudly instead of republishing a silently stale table.
+        if editions is None:
+            stored_max = _prior_max_edition(prior_file) if have_prior else None
+            logger.info("Unified Agenda: newest stored edition is {}", stored_max or "(none)")
+            editions = discover_editions(after=stored_max)
 
-    con.execute(
-        f"""
-        COPY (
-            SELECT {cols} FROM (
-                SELECT {cols}, ROW_NUMBER() OVER (
-                    PARTITION BY rin, agenda_edition ORDER BY _src DESC
-                ) AS _rn
-                FROM ({union})
-                WHERE rin IS NOT NULL
+        # 3. Fetch + shape those edition(s) into a "new rows" parquet.
+        rows: list[dict] = []
+        if editions:
+            reader = UnifiedAgendaReader(editions=editions)
+            rows = [_shape(doc) for doc in reader.iter_records()]
+            # Every edition here was requested explicitly or probed as published, so
+            # an empty one is a failed download, not a missing edition. Abort rather
+            # than publish without it: the next run would treat it as already stored
+            # (if a newer edition did land) and never fetch it again.
+            empty = [ed for ed in editions if not reader.edition_counts.get(ed)]
+            if empty:
+                raise UnifiedAgendaUnavailable(f"edition(s) {', '.join(empty)} yielded no records")
+        else:
+            logger.info("Unified Agenda: stored table is current; nothing to fetch")
+        table = pa.Table.from_pylist(rows, schema=_SCHEMA) if rows else _SCHEMA.empty_table()
+        pq.write_table(table, new_file, compression="zstd")
+        logger.info("Unified Agenda: fetched {:,} entries this run", len(rows))
+
+        # 4. Merge prior + new, dedup on (rin, agenda_edition) preferring the new row.
+        spill_dir = output_dir / ".duckdb_tmp"
+        spill_dir.mkdir(exist_ok=True)
+        con = duckdb.connect()
+        con.execute("SET memory_limit='4GB'")
+        con.execute("SET preserve_insertion_order=false")
+        con.execute("SET threads=2")
+        con.execute(f"SET temp_directory='{spill_dir}'")
+
+        cols = ", ".join(COLUMNS)
+        if have_prior:
+            union = (
+                f"SELECT {cols}, 0 AS _src FROM read_parquet('{prior_file}') "
+                f"UNION ALL BY NAME "
+                f"SELECT {cols}, 1 AS _src FROM read_parquet('{new_file}')"
             )
-            WHERE _rn = 1
-            ORDER BY agenda_edition DESC, rin
-        ) TO '{out_file}' (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 50000);
-        """
-    )
-    con.close()
+        else:
+            union = f"SELECT {cols}, 1 AS _src FROM read_parquet('{new_file}')"
 
-    # Housekeeping: drop scratch files so they aren't mistaken for outputs.
-    for scratch in (prior_file, new_file):
-        scratch.unlink(missing_ok=True)
+        con.execute(
+            f"""
+            COPY (
+                SELECT {cols} FROM (
+                    SELECT {cols}, ROW_NUMBER() OVER (
+                        PARTITION BY rin, agenda_edition ORDER BY _src DESC
+                    ) AS _rn
+                    FROM ({union})
+                    WHERE rin IS NOT NULL
+                )
+                WHERE _rn = 1
+                ORDER BY agenda_edition DESC, rin
+            ) TO '{out_file}' (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 50000);
+            """
+        )
+        con.close()
+    finally:
+        # Housekeeping, on success *and* on the raise paths above: a leftover
+        # _ua_prior.parquet would be reused as a stale prior by a later local run.
+        for scratch in (prior_file, new_file):
+            scratch.unlink(missing_ok=True)
 
     total = pq.ParquetFile(out_file).metadata.num_rows
     logger.info("Unified Agenda: {:,} rows", total)
