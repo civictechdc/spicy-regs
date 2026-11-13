@@ -1,0 +1,129 @@
+name: Backfill documents.subtype (manual)
+
+# One-off / re-runnable fill of documents.subtype on the published
+# documents.parquet (#221). New documents get subtype from the ETL (#218), but the
+# ~2M rows ingested before it stay NULL because the manifest never revisits their
+# JSON keys.
+#
+# Two jobs, so the long one never holds the lock the daily ETL waits on:
+#   1. harvest — read-only. GETs the raw document JSON (anonymous Mirrulations S3)
+#      for every published row whose subtype is NULL and keeps only
+#      (document_id, subtype, modify_date). Its output is a workflow artifact.
+#   2. apply   — downloads the CURRENT documents.parquet, fills NULL subtypes from
+#      the harvest, verifies nothing but subtype changed, and publishes once via
+#      r2.upload_file (shrink guard intact). Runs in the ETL's concurrency group so
+#      it can't interleave with an ETL download→upload of the same file.
+#
+# Re-running is safe: rows that already have a subtype are left alone, so a second
+# run only fetches what's still NULL.
+#
+# Requires: R2_PUBLIC_URL (both jobs); R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
+# R2_ENDPOINT, R2_BUCKET_NAME (apply, to publish).
+on:
+  workflow_dispatch:
+    inputs:
+      document_types:
+        description: 'Comma-separated document_type filter (empty = all types). e.g. "Proposed Rule,Rule,Notice"'
+        required: false
+        default: ''
+        type: string
+      agency:
+        description: 'Comma-separated agency_code filter (empty = all agencies)'
+        required: false
+        default: ''
+        type: string
+      limit:
+        description: 'Max documents to fetch (0 = no cap). A small cap is a safe first check.'
+        required: false
+        default: '0'
+        type: string
+      publish:
+        description: 'Publish the patched documents.parquet to R2 (off = dry run; the patched file is kept as an artifact)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    # ~2M small GETs for a full run.
+    timeout-minutes: 360
+    env:
+      R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync
+
+      # Inputs go through env: and a quoted bash array, never interpolated into
+      # the script text (workflow-injection guidance).
+      - name: Harvest subtypes from Mirrulations
+        env:
+          DOCUMENT_TYPES: ${{ inputs.document_types }}
+          AGENCY: ${{ inputs.agency }}
+          LIMIT: ${{ inputs.limit }}
+        run: |
+          args=()
+          if [ -n "$DOCUMENT_TYPES" ]; then args+=(--document-types "$DOCUMENT_TYPES"); fi
+          if [ -n "$AGENCY" ]; then args+=(--agency "$AGENCY"); fi
+          if [ -n "$LIMIT" ] && [ "$LIMIT" != "0" ]; then args+=(--limit "$LIMIT"); fi
+          echo "Running: uv run backfill-document-subtype harvest ${args[*]}"
+          uv run backfill-document-subtype harvest "${args[@]}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: subtype-harvest
+          path: output/subtype_backfill/
+          if-no-files-found: error
+          retention-days: 7
+
+  apply:
+    needs: harvest
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Same group as the ETL (etl-new-pipeline.yml), the only other writer of
+    # documents.parquet, so the two never interleave.
+    concurrency:
+      group: comments-catalog-write
+      cancel-in-progress: false
+    env:
+      R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: subtype-harvest
+          path: output/subtype_backfill/
+
+      - name: Apply subtypes to documents.parquet
+        env:
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          args=()
+          if [ "$PUBLISH" = "true" ]; then args+=(--upload); fi
+          echo "Running: uv run backfill-document-subtype apply ${args[*]}"
+          uv run backfill-document-subtype apply "${args[@]}"
+
+      - name: Keep the dry-run output
+        if: ${{ !inputs.publish }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: documents-subtype-dry-run
+          path: output/documents.parquet
+          if-no-files-found: ignore
+          retention-days: 3
