@@ -321,13 +321,16 @@ def apply_subtypes(documents_path: Path, work_dir: Path, output_path: Path) -> A
         def fingerprint(source: str) -> tuple:
             cols = ", ".join(f'"{c}"' for c in other_columns)
             subtype_count = "count(subtype)" if source != docs or has_subtype else "0"
-            return con.execute(
+            row = con.execute(
                 f"""
                 SELECT count(*), count(DISTINCT document_id),
                        sum(hash({cols})::HUGEINT), {subtype_count}
                 FROM {source}
                 """
             ).fetchone()
+            # An aggregate with no GROUP BY always returns exactly one row.
+            assert row is not None
+            return row
 
         before = fingerprint(docs)
         after = fingerprint(f"read_parquet({_sql_str(output_path)})")
