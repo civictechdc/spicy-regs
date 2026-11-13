@@ -271,7 +271,7 @@ def test_client_posts_page_size_for_forums():
     assert f"vPerPage={th.FORUM_PAGE_SIZE}" in seen["body"] and "vPage=2" in seen["body"]
 
 
-def test_client_treats_login_redirect_as_missing_and_follows_other_redirects():
+def test_client_treats_draft_and_invalid_redirects_as_missing_and_follows_others():
     def handler(request: httpx.Request) -> httpx.Response:
         stage = request.url.params.get("stageid")
         if stage == "1":  # a draft stage, as the real site answers
@@ -284,11 +284,17 @@ def test_client_treats_login_redirect_as_missing_and_follows_other_redirects():
             )
         if stage == "2":
             return httpx.Response(302, headers={"location": "ViewStage.cfm?stageid=3"})
+        if stage == "4":  # a deleted or never-used ID
+            return httpx.Response(
+                302, headers={"location": "showmessage.cfm?Error=Invalid Stage Number 4. Please let the ..."}
+            )
         return httpx.Response(200, text=f"stage {stage}")
 
     client = _client(handler)
     assert client.stage(1) == ""
     assert client.requests == 1  # the login page is never fetched
+    assert client.stage(4) == ""
+    assert client.requests == 2
     assert client.stage(2) == "stage 3"
 
 
