@@ -15,6 +15,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import httpx
+import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
@@ -255,7 +256,7 @@ def test_client_spaces_requests_by_crawl_delay():
     assert all(p.startswith("/L/") for p in paths)
 
 
-def test_client_posts_large_page_size_for_forums():
+def test_client_posts_page_size_for_forums():
     seen = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -264,10 +265,31 @@ def test_client_posts_large_page_size_for_forums():
         seen["body"] = request.content.decode()
         return httpx.Response(200, text="")
 
-    _client(handler).forum(FORUM_GENERAL_NOTICE, 3470)
+    _client(handler).forum(FORUM_GENERAL_NOTICE, 3470, page=2)
     assert seen["method"] == "POST"
     assert seen["query"] == {"generalnoticeid": "3470"}
-    assert "vPerPage=10000" in seen["body"] and "vPage=1" in seen["body"]
+    assert f"vPerPage={th.FORUM_PAGE_SIZE}" in seen["body"] and "vPage=2" in seen["body"]
+
+
+def test_client_treats_login_redirect_as_missing_and_follows_other_redirects():
+    def handler(request: httpx.Request) -> httpx.Response:
+        stage = request.url.params.get("stageid")
+        if stage == "1":  # a draft stage, as the real site answers
+            return httpx.Response(
+                302,
+                headers={
+                    "location": "statelogin.cfm?error=This stage is not yet publicly viewable."
+                    "&forward=/L/ViewStage.cfm?stageid=1"
+                },
+            )
+        if stage == "2":
+            return httpx.Response(302, headers={"location": "ViewStage.cfm?stageid=3"})
+        return httpx.Response(200, text=f"stage {stage}")
+
+    client = _client(handler)
+    assert client.stage(1) == ""
+    assert client.requests == 1  # the login page is never fetched
+    assert client.stage(2) == "stage 3"
 
 
 def test_client_retries_server_errors_then_raises():
@@ -461,9 +483,81 @@ def test_parse_failure_is_recorded_and_skipped():
     assert reader.cursors[FORUM_STAGE] == 0
 
 
+def _paged_forum(per_page: int) -> Callable[[httpx.Request], httpx.Response]:
+    """Stage 9926's forum with 3 comments, served ``per_page`` at a time whatever vPerPage asks for."""
+    text = fixture("forum_stage_11256.html").replace("11256", "9926").replace("15 comments", "3 comments")
+    starts = [m.start() for m in th._CBOX.finditer(text)]
+    head, boxes = text[: starts[0]], [text[a:b] for a, b in zip(starts, [*starts[1:], len(text)], strict=True)]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if not request.url.path.endswith("ViewComments.cfm"):
+            return httpx.Response(200, text="")
+        page = int(dict(x.split("=") for x in request.content.decode().split("&"))["vPage"])
+        return httpx.Response(200, text=head + "".join(boxes[(page - 1) * per_page : page * per_page]))
+
+    return handler
+
+
+@pytest.mark.parametrize(("per_page", "requests"), [(1, 3), (2, 2), (50, 1)])
+def test_forum_pages_until_header_count_is_reached(per_page, requests):
+    clock = FakeClock()
+    calls = []
+    handler = _paged_forum(per_page)
+
+    def site(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return handler(request)
+
+    client = TownHallClient(
+        client=httpx.Client(transport=httpx.MockTransport(site)), delay=0, sleep=clock.sleep, clock=clock
+    )
+    reader = VaTownHallReader(client=client, cursors={FORUM_STAGE: 0, FORUM_GENERAL_NOTICE: 0, FORUM_PETITION: 0})
+    comments = list(reader._forum(FORUM_STAGE, 9926))
+    assert [c["comment_id"] for c in comments] == [242807, 242845, 242860]
+    assert len(calls) == requests
+    assert reader.forum_count_mismatches == []
+
+
+def test_incomplete_stored_forum_is_refetched():
+    site = FakeSite()
+    # Stage 9926 is stored with 6 comments, but its forum is not stored complete.
+    known = KnownState(stages={9926: StoredStage("2999-01-01", 6, "Stage complete.")}, actions={6186})
+    reader = _reader(site, known=known, cursors={FORUM_STAGE: 0, FORUM_GENERAL_NOTICE: 0, FORUM_PETITION: 0})
+    records = list(reader.iter_records())
+    assert {r["stage_id"] for r in records if r["kind"] == "comment"} == {9926}
+    assert "ViewStage.cfm?stageid=9926" not in site.requests  # the stage page itself is not refetched
+
+
 # --------------------------------------------------------------------------- #
 # Build
 # --------------------------------------------------------------------------- #
+
+
+def test_known_leaves_out_stage_forums_with_fewer_comments_than_the_stage(tmp_path):
+    stages, comments = tmp_path / "stages.parquet", tmp_path / "comments.parquet"
+    pq.write_table(
+        pa.table(
+            {
+                "stage_id": [1, 2],
+                "fetched_at": ["2026-11-12T00:00:00Z"] * 2,
+                "comment_count": [321, 2],
+                "status": [None, None],
+            }
+        ),
+        stages,
+    )
+    forum_ids = [1] * 50 + [2, 2, 7]
+    pq.write_table(
+        pa.table(
+            {
+                "forum_type": [FORUM_STAGE] * 52 + [FORUM_GENERAL_NOTICE],
+                "forum_id": forum_ids,
+            }
+        ),
+        comments,
+    )
+    known = build._known({STAGES_OUTPUT: stages, COMMENTS_OUTPUT: comments})
+    assert known.forums == {(FORUM_STAGE, 2), (FORUM_GENERAL_NOTICE, 7)}
 
 
 @pytest.fixture
