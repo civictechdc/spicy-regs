@@ -11,6 +11,7 @@ import importlib
 from datetime import date
 from pathlib import Path
 
+import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
@@ -261,15 +262,24 @@ def test_sorted_by_docket_with_non_overlapping_row_group_stats(
     assert keys == sorted(keys)
     assert len(rows) == 8000
 
-    meta = pq.ParquetFile(tmp_output / OUTPUT).metadata
-    assert meta.num_row_groups > 1
+    # Read the stats the way our readers do (DuckDB). pyarrow >= 25 hides string
+    # min/max from DuckDB-written files (no column sort order recorded), even
+    # though the stats are in the footer and DuckDB prunes on them.
+    stats = duckdb.sql(
+        f"""
+        SELECT row_group_id, stats_min_value, stats_max_value
+        FROM parquet_metadata('{tmp_output / OUTPUT}')
+        WHERE column_id = 0
+        ORDER BY row_group_id
+        """
+    ).fetchall()
+    assert len(stats) > 1
     previous_max = None
-    for i in range(meta.num_row_groups):
-        stats = meta.row_group(i).column(0).statistics
-        assert stats is not None and stats.has_min_max
+    for _, lo, hi in stats:
+        assert lo is not None and hi is not None
         if previous_max is not None:
-            assert stats.min >= previous_max
-        previous_max = stats.max
+            assert lo >= previous_max
+        previous_max = hi
 
 
 # --- plumbing -------------------------------------------------------------
