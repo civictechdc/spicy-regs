@@ -238,6 +238,18 @@ It's incremental and re-runnable — rows with a `text_extraction_status` are
 skipped unless you pass `--overwrite`. Document text isn't published to
 `derived-data`; backfill those with `uv run enrich-pdf-text --target documents`.
 
+`documents.subtype` (NPRM, ANPRM, interim final rule, comment-period extension,
+...) is only captured for documents ingested after it was added. Fill it on the
+rest of the published file by re-reading just that field from the raw JSON:
+
+```bash
+uv run backfill-document-subtype harvest --limit 5000   # fetch subtypes (resumable)
+uv run backfill-document-subtype apply                  # patch output/documents.parquet locally
+uv run backfill-document-subtype apply --upload         # republish to R2 (needs credentials)
+```
+
+The `Backfill documents.subtype (manual)` workflow runs the same two steps.
+
 ### Working on the data dictionary
 
 ```bash
