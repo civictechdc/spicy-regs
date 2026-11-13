@@ -42,6 +42,7 @@ from loguru import logger
 from spicy_regs.sources import r2
 from spicy_regs.sources.va_townhall import (
     BASE_URL,
+    FORUM_STAGE,
     JURISDICTION,
     KnownState,
     StoredStage,
@@ -265,8 +266,17 @@ def _known(priors: dict[str, Path | None]) -> KnownState:
     if actions := priors.get(ACTIONS_OUTPUT):
         known.actions = {int(a) for (a,) in duckdb.sql(f"SELECT action_id FROM read_parquet('{actions}')").fetchall()}
     if comments := priors.get(COMMENTS_OUTPUT):
-        rows = duckdb.sql(f"SELECT DISTINCT forum_type, forum_id FROM read_parquet('{comments}')").fetchall()
-        known.forums = {(t, int(i)) for t, i in rows}
+        rows = duckdb.sql(
+            f"SELECT forum_type, forum_id, count(*) FROM read_parquet('{comments}') GROUP BY ALL"
+        ).fetchall()
+
+        # A stage forum with fewer stored comments than its stage reports is
+        # incomplete, so leave it out and let the crawl refetch it.
+        def complete(forum_type: str, forum_id: int, stored: int) -> bool:
+            stage = known.stages.get(forum_id) if forum_type == FORUM_STAGE else None
+            return stage is None or stored >= (stage.comment_count or 0)
+
+        known.forums = {(t, int(i)) for t, i, n in rows if complete(t, int(i), n)}
     logger.info(
         "Town Hall: prior tables hold {:,} stages, {:,} actions, {:,} forums with comments",
         len(known.stages),

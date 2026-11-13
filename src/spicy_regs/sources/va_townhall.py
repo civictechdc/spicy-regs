@@ -27,11 +27,16 @@ apart. The site's Public Comment Policy states that comments are public records.
 What the site does, as observed in 2026-11:
 
 - A missing ID (stage, action or forum) returns ``200`` with an **empty body**.
+- A stage that is not publicly viewable yet (a draft) redirects to
+  ``statelogin.cfm?error=This stage is not yet publicly viewable``. The client
+  does not follow that redirect and treats the stage as missing too.
 - IDs are served all the way back to 1999 (stage 100, action 10).
-- ``ViewComments.cfm`` pages forums at 50 comments, but the page form is a POST
-  with ``vPage`` / ``vPerPage``, and ``vPerPage`` is not capped: posting
-  ``vPerPage=10000`` returns an 821-comment forum on one page. Each forum is one
-  request regardless of size.
+- ``ViewComments.cfm`` pages forums at 50 comments. The page form is a POST with
+  ``vPage`` / ``vPerPage``, and larger pages are honored up to a cap: in
+  2026-11, 2,500 worked, while 5,000 and 10,000 silently fell back to 50. The
+  cap has moved before, so :meth:`VaTownHallReader._forum` asks for
+  :data:`FORUM_PAGE_SIZE` per page and keeps paging until it has the count the
+  forum header prints. That stays correct even if the site falls back to 50.
 - Pages are UTF-8 (the HTTP header is right; the ``<meta>`` tag claims
   windows-1251 and is wrong).
 - Comment bodies are user HTML pasted into the page verbatim, often a whole
@@ -59,6 +64,8 @@ runs under a time budget and is resumable:
    does not yet show it complete. (Those two lists take a ``DayCount`` but, as
    of 2026-11, return the same ~130 and ~70 stages whatever it is set to, so
    membership alone does not mean the stage just changed.)
+   Finally, any stored stage whose forum holds fewer comments than the stage's
+   ``comment_count`` has its forum refetched (see ``KnownState.forums``).
 3. **Backfill** with the time left: walk stage, then general-notice, then
    petition IDs downward from a cursor, skipping IDs already stored. The cursor
    is returned in :attr:`VaTownHallReader.cursors` and persisted by the caller,
@@ -77,6 +84,7 @@ import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
+from functools import partial
 from html.parser import HTMLParser
 from typing import NamedTuple, TypeVar
 from urllib.parse import quote
@@ -101,10 +109,14 @@ REFRESH_AFTER_DAYS = 7
 #: few days; a week covers missed runs.
 RECENT_DAYS = 7
 
-#: ``vPerPage`` posted to ``ViewComments.cfm`` so a forum comes back on one page.
-FORUM_PAGE_SIZE = 10_000
+#: ``vPerPage`` posted to ``ViewComments.cfm``. This is under the site's cap
+#: (between 2,500 and 5,000 in 2026-11), so nearly every forum is one request.
+FORUM_PAGE_SIZE = 1_000
 
 USER_AGENT = "spicy-regs/1.0 (+https://github.com/civictechdc/spicy-regs)"
+
+#: Where the site redirects a stage that is not publicly viewable yet (a draft).
+_LOGIN_REDIRECT = "statelogin.cfm"
 
 _TIMEOUT = httpx.Timeout(120.0, connect=30.0)
 _MAX_RETRIES = 5
@@ -570,9 +582,15 @@ class TownHallClient:
             self.requests += 1
             try:
                 if data is None:
-                    resp = self._client.get(url, params=params)
+                    resp = self._client.get(url, params=params, follow_redirects=False)
                 else:
-                    resp = self._client.post(url, params=params, data=data)
+                    resp = self._client.post(url, params=params, data=data, follow_redirects=False)
+                if resp.is_redirect:
+                    if _LOGIN_REDIRECT in resp.headers.get("location", "").lower():
+                        return ""  # not publicly viewable (a draft): same as a missing ID
+                    self._wait()
+                    self.requests += 1
+                    resp = self._client.get(resp.url.join(resp.headers["location"]), follow_redirects=True)
                 if resp.status_code == 429 or resp.status_code >= 500:
                     raise httpx.HTTPStatusError("retryable", request=resp.request, response=resp)
                 resp.raise_for_status()
@@ -602,11 +620,11 @@ class TownHallClient:
     def action(self, action_id: int) -> str:
         return self.get("ViewAction.cfm", params={"actionid": action_id})
 
-    def forum(self, forum_type: str, forum_id: int) -> str:
+    def forum(self, forum_type: str, forum_id: int, page: int = 1) -> str:
         return self.get(
             "ViewComments.cfm",
             params={FORUM_PARAMS[forum_type]: forum_id},
-            data={"vPage": 1, "vPerPage": FORUM_PAGE_SIZE},
+            data={"vPage": page, "vPerPage": FORUM_PAGE_SIZE},
         )
 
 
@@ -635,6 +653,8 @@ class KnownState:
 
     stages: dict[int, StoredStage] = field(default_factory=dict)
     actions: set[int] = field(default_factory=set)
+    #: Forums stored complete. A stage forum holding fewer comments than the
+    #: stage's ``comment_count`` should be left out, so the crawl refetches it.
     forums: set[tuple[str, int]] = field(default_factory=set)
 
 
@@ -698,20 +718,34 @@ class VaTownHallReader(Reader):
         if (forum_type, forum_id) in self._done_forums:
             return
         self._done_forums.add((forum_type, forum_id))
-        parsed = self._fetch(
-            f"{forum_type} forum {forum_id}",
-            lambda: self.client.forum(forum_type, forum_id),
-            lambda p: parse_forum(p, forum_type, forum_id),
-        )
-        if not parsed:
-            return
-        header_count, comments = parsed
+        comments: dict[int, dict] = {}
+        header_count: int | None = None
+        page = 1
+        while True:
+            parsed = self._fetch(
+                f"{forum_type} forum {forum_id}" + (f" page {page}" if page > 1 else ""),
+                partial(self.client.forum, forum_type, forum_id, page),
+                lambda p: parse_forum(p, forum_type, forum_id),
+            )
+            if not parsed:
+                break
+            count, batch = parsed
+            if page == 1:
+                header_count = count
+            new = [c for c in batch if c["comment_id"] not in comments]
+            comments.update((c["comment_id"], c) for c in new)
+            # Keep paging while the header promises more and pages still add
+            # comments. If the site ignores the page size and serves 50 at a
+            # time, this still walks every page.
+            if not new or header_count is None or len(comments) >= header_count:
+                break
+            page += 1
         if header_count is not None and header_count != len(comments):
             # Hidden or removed comments would show up here.
             self.forum_count_mismatches.append(
                 f"{forum_type} {forum_id}: page says {header_count}, parsed {len(comments)}"
             )
-        yield from comments
+        yield from comments.values()
 
     def _action(self, action_id: int) -> Iterator[dict]:
         if action_id in self._done_actions:
@@ -793,6 +827,13 @@ class VaTownHallReader(Reader):
                 return
             if self._stale(stage_id) or (stage_id in changed and self._newly_complete(stage_id)):
                 yield from self._stage(stage_id, refetch_action=True)
+        # Stored stages whose forum is missing or incomplete, for example forums
+        # cut short by an earlier fetch. The stage page itself is still current.
+        for stage_id, prior in sorted(self.known.stages.items(), reverse=True):
+            if (prior.comment_count or 0) > 0 and (FORUM_STAGE, stage_id) not in self.known.forums:
+                if not self._time_left():
+                    return
+                yield from self._forum(FORUM_STAGE, stage_id)
 
     def _backfill(self) -> Iterator[dict]:
         for kind in BACKFILL_KINDS:
