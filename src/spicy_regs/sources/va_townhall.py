@@ -27,9 +27,12 @@ apart. The site's Public Comment Policy states that comments are public records.
 What the site does, as observed in 2026-11:
 
 - A missing ID (stage, action or forum) returns ``200`` with an **empty body**.
-- A stage that is not publicly viewable yet (a draft) redirects to
-  ``statelogin.cfm?error=This stage is not yet publicly viewable``. The client
-  does not follow that redirect and treats the stage as missing too.
+- Some IDs inside the served range redirect instead of returning a page. A
+  stage that is not publicly viewable yet (a draft) redirects to
+  ``statelogin.cfm?error=This stage is not yet publicly viewable``. A deleted
+  or never-used one redirects to ``showmessage.cfm?Error=Invalid Stage Number N``.
+  The client does not follow either redirect and treats the ID as missing too
+  (see :func:`_missing_redirect`).
 - IDs are served all the way back to 1999 (stage 100, action 10).
 - ``ViewComments.cfm`` pages forums at 50 comments. The page form is a POST with
   ``vPage`` / ``vPerPage``, and larger pages are honored up to a cap: in
@@ -115,8 +118,12 @@ FORUM_PAGE_SIZE = 1_000
 
 USER_AGENT = "spicy-regs/1.0 (+https://github.com/civictechdc/spicy-regs)"
 
-#: Where the site redirects a stage that is not publicly viewable yet (a draft).
-_LOGIN_REDIRECT = "statelogin.cfm"
+
+def _missing_redirect(location: str) -> bool:
+    """A redirect the site uses in place of a page for an ID with nothing public."""
+    location = location.lower()
+    return "statelogin.cfm" in location or ("showmessage.cfm" in location and "invalid" in location)
+
 
 _TIMEOUT = httpx.Timeout(120.0, connect=30.0)
 _MAX_RETRIES = 5
@@ -586,8 +593,8 @@ class TownHallClient:
                 else:
                     resp = self._client.post(url, params=params, data=data, follow_redirects=False)
                 if resp.is_redirect:
-                    if _LOGIN_REDIRECT in resp.headers.get("location", "").lower():
-                        return ""  # not publicly viewable (a draft): same as a missing ID
+                    if _missing_redirect(resp.headers.get("location", "")):
+                        return ""  # a draft or an invalid ID: same as a missing ID
                     self._wait()
                     self.requests += 1
                     resp = self._client.get(resp.url.join(resp.headers["location"]), follow_redirects=True)
