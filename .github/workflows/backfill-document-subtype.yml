@@ -84,10 +84,15 @@ jobs:
     needs: harvest
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Same group as the ETL (etl-new-pipeline.yml), the only other writer of
-    # documents.parquet, so the two never interleave.
+    # A publishing run joins the ETL's group (etl-new-pipeline.yml, the only
+    # other writer of documents.parquet) so the two never interleave. A dry run
+    # writes nothing to R2, so it takes a per-run group instead of queueing
+    # behind an hours-long ETL sweep. Note that GitHub keeps only one pending
+    # run per group: if a publishing apply is queued behind the ETL and another
+    # ETL run queues, one of the pending runs is cancelled. Dispatch publishing
+    # runs when no ETL sweep is in flight.
     concurrency:
-      group: comments-catalog-write
+      group: ${{ inputs.publish && 'comments-catalog-write' || format('subtype-dry-run-{0}', github.run_id) }}
       cancel-in-progress: false
     env:
       R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
