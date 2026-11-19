@@ -14,6 +14,7 @@ where a transient download error produced an empty local file that overwrote the
 3.3 GB historical ``comments.parquet`` on R2.
 """
 
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from os import getenv
 from pathlib import Path
@@ -28,6 +29,17 @@ from spicy_regs.sources.cloudflare import purge_urls
 
 # --- download (public URL) -------------------------------------------------
 
+# httpx's default 5 s read timeout is too tight for multi-GB objects: a brief
+# stall mid-stream aborted the whole ETL batch (run 44429554235). Allow longer
+# stalls, and retry transient failures (network errors, timeouts, 5xx) from
+# scratch with backoff before giving up.
+_DOWNLOAD_TIMEOUT = httpx.Timeout(120.0, connect=30.0)
+_DOWNLOAD_MAX_ATTEMPTS = 4
+
+
+class _TransientDownloadError(RuntimeError):
+    """A retryable non-200/404 response (5xx, 429)."""
+
 
 def download_from_r2(remote_key: str, local_path: Path) -> bool:
     """Download a file from R2 bucket using the public URL.
@@ -35,6 +47,9 @@ def download_from_r2(remote_key: str, local_path: Path) -> bool:
     Returns ``True`` if the file was downloaded, ``False`` if R2 is not
     configured or the file does not exist on R2 (HTTP 404). Any other
     error — 5xx responses, network failures, disk write errors — raises.
+    Transient failures (network errors, timeouts, 5xx/429) are first retried
+    up to ``_DOWNLOAD_MAX_ATTEMPTS`` times with backoff; only the last one
+    raises.
 
     Silent failures here caused the March 2026 data-loss incident: a
     transient download error on the 3.3 GB ``comments.parquet`` returned
@@ -56,11 +71,47 @@ def download_from_r2(remote_key: str, local_path: Path) -> bool:
     url = f"{public_url}/{remote_key}"
     temp_path = local_path.with_suffix(local_path.suffix + ".tmp")
 
+    for attempt in range(1, _DOWNLOAD_MAX_ATTEMPTS + 1):
+        try:
+            found = _download_once(url, remote_key, temp_path)
+        except (httpx.TransportError, _TransientDownloadError) as exc:
+            if attempt == _DOWNLOAD_MAX_ATTEMPTS:
+                logger.error("Giving up on {} after {} attempts: {}", remote_key, attempt, exc)
+                raise
+            backoff = min(2**attempt, 30)
+            logger.warning(
+                "Download of {} failed ({}: {}), attempt {}/{}; retrying in {}s",
+                remote_key,
+                type(exc).__name__,
+                exc,
+                attempt,
+                _DOWNLOAD_MAX_ATTEMPTS,
+                backoff,
+            )
+            time.sleep(backoff)
+            continue
+        if not found:
+            return False
+        break
+
+    temp_path.replace(local_path)
+    logger.info("Downloaded {} from R2", remote_key)
+    return True
+
+
+def _download_once(url: str, remote_key: str, temp_path: Path) -> bool:
+    """One streaming attempt into ``temp_path``; False on 404.
+
+    Removes ``temp_path`` on any failure so a retry starts clean and nothing
+    partial is left behind.
+    """
     try:
-        with httpx.stream("GET", url, follow_redirects=True) as response:
+        with httpx.stream("GET", url, follow_redirects=True, timeout=_DOWNLOAD_TIMEOUT) as response:
             if response.status_code == 404:
                 logger.info("{} not found on R2 (404)", remote_key)
                 return False
+            if response.status_code == 429 or response.status_code >= 500:
+                raise _TransientDownloadError(f"Failed to download {remote_key} from R2: HTTP {response.status_code}")
             if response.status_code != 200:
                 raise RuntimeError(f"Failed to download {remote_key} from R2: HTTP {response.status_code}")
             with open(temp_path, "wb") as f:
@@ -70,9 +121,6 @@ def download_from_r2(remote_key: str, local_path: Path) -> bool:
         if temp_path.exists():
             temp_path.unlink()
         raise
-
-    temp_path.replace(local_path)
-    logger.info("Downloaded {} from R2", remote_key)
     return True
 
 
