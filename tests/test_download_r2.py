@@ -19,7 +19,7 @@ def _fake_stream(*, status_code: int = 200, body: bytes = b"", raise_exc: Except
     """Build a callable that mimics ``httpx.stream(...)`` as a context manager."""
 
     @contextmanager
-    def fake_stream(method, url, follow_redirects=True):
+    def fake_stream(method, url, follow_redirects=True, **kwargs):
         if raise_exc is not None:
             raise raise_exc
         resp = MagicMock()
@@ -28,6 +28,11 @@ def _fake_stream(*, status_code: int = 200, body: bytes = b"", raise_exc: Except
         yield resp
 
     return fake_stream
+
+
+@pytest.fixture(autouse=True)
+def _no_backoff_sleep(monkeypatch):
+    monkeypatch.setattr(download_r2.time, "sleep", lambda _s: None)
 
 
 class TestDownloadFromR2:
@@ -89,7 +94,7 @@ class TestDownloadFromR2:
         monkeypatch.setenv("R2_PUBLIC_URL", "https://fake.r2.dev")
 
         @contextmanager
-        def dying_stream(method, url, follow_redirects=True):
+        def dying_stream(method, url, follow_redirects=True, **kwargs):
             resp = MagicMock()
             resp.status_code = 200
 
@@ -127,7 +132,7 @@ class TestDownloadFromR2:
         monkeypatch.setenv("R2_PUBLIC_URL", "https://fake.r2.dev")
 
         @contextmanager
-        def dying_stream(method, url, follow_redirects=True):
+        def dying_stream(method, url, follow_redirects=True, **kwargs):
             resp = MagicMock()
             resp.status_code = 200
 
@@ -147,3 +152,85 @@ class TestDownloadFromR2:
         # No lingering .tmp file either
         tmp_files = list(tmp_path.glob("*.tmp"))
         assert tmp_files == []
+
+
+class TestDownloadRetries:
+    def test_retries_read_timeout_then_succeeds(self, tmp_path, monkeypatch):
+        """A mid-stream stall on a large object must not abort the ETL batch
+        (run 44429554235 died on httpx.ReadTimeout with no retry)."""
+        monkeypatch.setenv("R2_PUBLIC_URL", "https://fake.r2.dev")
+        attempts = []
+
+        @contextmanager
+        def flaky_stream(method, url, follow_redirects=True, **kwargs):
+            attempts.append(kwargs.get("timeout"))
+            resp = MagicMock()
+            resp.status_code = 200
+
+            def iter_bytes():
+                yield b"part"
+                if len(attempts) == 1:
+                    raise httpx.ReadTimeout("The read operation timed out")
+                yield b"-rest"
+
+            resp.iter_bytes = iter_bytes
+            yield resp
+
+        monkeypatch.setattr(download_r2.httpx, "stream", flaky_stream)
+
+        target = tmp_path / "foo.parquet"
+        assert download_from_r2("foo.parquet", target) is True
+        assert target.read_bytes() == b"part-rest"
+        assert len(attempts) == 2
+        assert attempts[0] is download_r2._DOWNLOAD_TIMEOUT
+        assert list(tmp_path.glob("*.tmp")) == []
+
+    def test_retries_5xx_then_succeeds(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("R2_PUBLIC_URL", "https://fake.r2.dev")
+        codes = iter([503, 500, 200])
+
+        @contextmanager
+        def stream(method, url, follow_redirects=True, **kwargs):
+            resp = MagicMock()
+            resp.status_code = next(codes)
+            resp.iter_bytes = lambda: iter([b"ok"])
+            yield resp
+
+        monkeypatch.setattr(download_r2.httpx, "stream", stream)
+
+        target = tmp_path / "foo.parquet"
+        assert download_from_r2("foo.parquet", target) is True
+        assert target.read_bytes() == b"ok"
+
+    def test_gives_up_after_max_attempts(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("R2_PUBLIC_URL", "https://fake.r2.dev")
+        calls = []
+
+        @contextmanager
+        def stream(method, url, follow_redirects=True, **kwargs):
+            calls.append(1)
+            raise httpx.ReadTimeout("timed out")
+            yield  # pragma: no cover
+
+        monkeypatch.setattr(download_r2.httpx, "stream", stream)
+
+        with pytest.raises(httpx.ReadTimeout):
+            download_from_r2("foo.parquet", tmp_path / "foo.parquet")
+        assert len(calls) == download_r2._DOWNLOAD_MAX_ATTEMPTS
+
+    def test_does_not_retry_client_errors(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("R2_PUBLIC_URL", "https://fake.r2.dev")
+        calls = []
+
+        @contextmanager
+        def stream(method, url, follow_redirects=True, **kwargs):
+            calls.append(1)
+            resp = MagicMock()
+            resp.status_code = 403
+            yield resp
+
+        monkeypatch.setattr(download_r2.httpx, "stream", stream)
+
+        with pytest.raises(RuntimeError, match="403"):
+            download_from_r2("foo.parquet", tmp_path / "foo.parquet")
+        assert len(calls) == 1
