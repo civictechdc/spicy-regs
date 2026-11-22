@@ -33,8 +33,14 @@ from spicy_regs.sources.cloudflare import purge_urls
 # stall mid-stream aborted the whole ETL batch (run 44429554235). Allow longer
 # stalls, and retry transient failures (network errors, timeouts, 5xx) from
 # scratch with backoff before giving up.
+#
+# The retry budget has to outlast a short R2 outage, not just a blip: on
+# 2026-11-22 R2 returned HTTP 500 for ~7 minutes and the old 4-attempt budget
+# (~14 s of waiting) failed 12 ETL batches and a rollup (runs 44961875658,
+# 44966053201). 12 attempts with backoff capped at 60 s waits ~7 minutes.
 _DOWNLOAD_TIMEOUT = httpx.Timeout(120.0, connect=30.0)
-_DOWNLOAD_MAX_ATTEMPTS = 4
+_DOWNLOAD_MAX_ATTEMPTS = 12
+_DOWNLOAD_MAX_BACKOFF_S = 60
 
 
 class _TransientDownloadError(RuntimeError):
@@ -78,7 +84,7 @@ def download_from_r2(remote_key: str, local_path: Path) -> bool:
             if attempt == _DOWNLOAD_MAX_ATTEMPTS:
                 logger.error("Giving up on {} after {} attempts: {}", remote_key, attempt, exc)
                 raise
-            backoff = min(2**attempt, 30)
+            backoff = min(2**attempt, _DOWNLOAD_MAX_BACKOFF_S)
             logger.warning(
                 "Download of {} failed ({}: {}), attempt {}/{}; retrying in {}s",
                 remote_key,

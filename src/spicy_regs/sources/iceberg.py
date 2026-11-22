@@ -34,11 +34,13 @@ Credentials are read from the environment, alongside the existing ``R2_*`` vars:
 * ``R2_CATALOG_NAMESPACE``  — Iceberg namespace/schema (optional, default ``default``)
 """
 
+import re
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from os import getenv
 from pathlib import Path
+from typing import Any, TypeVar
 from urllib.parse import urlparse
 
 from loguru import logger
@@ -108,6 +110,56 @@ def _connect():
     con.execute(f"CREATE OR REPLACE SECRET r2_catalog_secret (TYPE ICEBERG, TOKEN '{_sql_str(token)}');")
     con.execute(f"ATTACH '{_sql_str(warehouse)}' AS {_CATALOG_ALIAS} (TYPE ICEBERG, ENDPOINT '{_sql_str(uri)}');")
     return con
+
+
+_T = TypeVar("_T")
+
+# A catalog operation that hits a transient R2 error is retried from a fresh
+# connection. Sized like the R2 download retry (sources/r2.py) to outlast a
+# short outage: on 2026-11-22 R2 returned HTTP 500 for ~7 minutes and an ETL
+# batch died reading an Iceberg manifest mid-MERGE (run 44961875658).
+_CATALOG_MAX_ATTEMPTS = 12
+_CATALOG_MAX_BACKOFF_S = 60
+# DuckDB reports the status as "... (HTTP 500)" or "... (HTTP code 502)".
+_TRANSIENT_HTTP_STATUS = re.compile(r"\bHTTP (?:code )?(?:5\d\d|429)\b")
+
+
+def _is_transient_catalog_error(exc: BaseException) -> bool:
+    """True for a DuckDB HTTP error carrying a 5xx/429 status."""
+    import duckdb
+
+    return isinstance(exc, duckdb.HTTPException) and bool(_TRANSIENT_HTTP_STATUS.search(str(exc)))
+
+
+def _with_catalog_retry(what: str, work: Callable[[Any], _T]) -> _T:
+    """Run ``work(con)`` on a fresh catalog connection, retrying transient errors.
+
+    Each attempt opens its own connection (``ATTACH`` itself can hit the outage,
+    and a connection that saw an error mid-transaction is not reused). Only
+    callers whose ``work`` is safe to re-run may use this; see :func:`_merge`.
+    """
+    for attempt in range(1, _CATALOG_MAX_ATTEMPTS + 1):
+        con = None
+        try:
+            con = _connect()
+            return work(con)
+        except Exception as exc:
+            if attempt == _CATALOG_MAX_ATTEMPTS or not _is_transient_catalog_error(exc):
+                raise
+            backoff = min(2**attempt, _CATALOG_MAX_BACKOFF_S)
+            logger.warning(
+                "iceberg: {} failed ({}), attempt {}/{}; retrying in {}s",
+                what,
+                exc,
+                attempt,
+                _CATALOG_MAX_ATTEMPTS,
+                backoff,
+            )
+        finally:
+            if con is not None:
+                con.close()
+        time.sleep(backoff)
+    raise AssertionError("unreachable")  # pragma: no cover
 
 
 def _qualified(record_type: RecordType) -> str:
@@ -185,6 +237,11 @@ def _merge(con, staging_files: list[Path], record_type: RecordType) -> None:
     and physical duplicates are reclaimed out-of-band by ``dedupe_table``; a
     delete-free incremental upsert is not possible here because the only reliable
     removal primitive on this catalog is a whole-table ``DROP`` + rebuild.
+
+    Safe to re-run after a failure (which :func:`_with_catalog_retry` relies
+    on): the DELETE + INSERT is one commit, and if that commit landed despite
+    an error, the re-run's winners exclude those keys because their incoming
+    ``modify_date`` is no longer strictly newer than the table's.
     """
     cols = list(record_type.schema)
     key = record_type.dedup_key
@@ -516,8 +573,7 @@ def merge_comments(staging_dir: Path, output_dir: Path, record_type: RecordType)
         logger.info("iceberg: no staging files for {}; skipping merge", record_type.name)
         return None
 
-    con = _connect()
-    try:
+    def work(con) -> Path:
         _ensure_table(con, record_type)
         logger.info(
             "iceberg: MERGE {} staging file(s) into {}",
@@ -530,8 +586,8 @@ def merge_comments(staging_dir: Path, output_dir: Path, record_type: RecordType)
         index_file = _build_comments_index(con, record_type, output_dir)
         logger.info("iceberg: rebuilt comments index at {}", index_file)
         return index_file
-    finally:
-        con.close()
+
+    return _with_catalog_retry(f"merge {record_type.name}", work)
 
 
 def export_public_comments(output_dir: Path, record_type: RecordType) -> dict[str, Path]:
@@ -785,8 +841,7 @@ def merge_and_export(staging_dir: Path, output_dir: Path, record_type: RecordTyp
         logger.info("iceberg: no staging files for {}; skipping merge", record_type.name)
         return None
 
-    con = _connect()
-    try:
+    def work(con) -> Path:
         _ensure_table(con, record_type)
         logger.info(
             "iceberg: MERGE {} staging file(s) into {}",
@@ -799,5 +854,5 @@ def merge_and_export(staging_dir: Path, output_dir: Path, record_type: RecordTyp
         out_file = _export_parquet(con, record_type, output_dir)
         logger.info("iceberg: exported public snapshot to {}", out_file)
         return out_file
-    finally:
-        con.close()
+
+    return _with_catalog_retry(f"merge {record_type.name}", work)

@@ -918,3 +918,100 @@ def test_upsert_comment_text_interrupted_keeps_rows(tmp_path, local_catalog) -> 
 
     tbl = iceberg._qualified(COMMENT)
     assert con.execute(f"SELECT comment_id, text_content FROM {tbl}").fetchall() == [("c1", None)]
+
+
+# --- transient catalog errors (R2 5xx) are retried from a fresh connection ---
+
+
+@pytest.mark.parametrize(
+    ("message", "transient"),
+    [
+        ("HTTP Error: HTTP GET error on 'x/metadata/m0.avro' (HTTP 500)", True),
+        ("HTTP Error: Bad Gateway (HTTP code 502)", True),
+        ("HTTP Error: Too Many Requests (HTTP 429)", True),
+        ("HTTP Error: Forbidden (HTTP 403)", False),
+    ],
+)
+def test_is_transient_catalog_error(message, transient) -> None:
+    assert iceberg._is_transient_catalog_error(duckdb.HTTPException(message)) is transient
+
+
+def test_is_transient_catalog_error_ignores_non_http_errors() -> None:
+    assert not iceberg._is_transient_catalog_error(duckdb.CatalogException("HTTP 500 in a table name"))
+
+
+class _FailFirstMerges:
+    """Hand out local-catalog connections whose first ``n`` uses fail the way
+    R2's 500 did mid-MERGE, after the staging read."""
+
+    def __init__(self, con, n: int, message: str = "HTTP Error: GET error on 'm0.avro' (HTTP 500)") -> None:
+        self._con, self._remaining, self._message = con, n, message
+        self.connects = 0
+
+    def connect(self):
+        self.connects += 1
+        outer = self
+
+        class _Con:
+            def execute(self, sql: str, *args):
+                if outer._remaining and "LEFT JOIN" in sql:
+                    outer._remaining -= 1
+                    raise duckdb.HTTPException(outer._message)
+                return outer._con.execute(sql, *args)
+
+            def close(self) -> None:  # the fixture owns the real connection
+                pass
+
+        return _Con()
+
+
+def test_merge_and_export_retries_a_transient_catalog_error(tmp_path, local_catalog, monkeypatch) -> None:
+    monkeypatch.setattr(iceberg.time, "sleep", lambda _s: None)
+    flaky = _FailFirstMerges(local_catalog, n=2)
+    monkeypatch.setattr(iceberg, "_connect", flaky.connect)
+    staging = tmp_path / "staging"
+    _write_staging(staging, "EPA", [_docket("EPA-1", "EPA", "First", "2025-01-01")])
+
+    out = iceberg.merge_and_export(staging, tmp_path / "out", DOCKET)
+
+    assert out is not None and out.exists()
+    assert flaky.connects == 3
+    assert local_catalog.execute(f"SELECT count(*) FROM {iceberg._qualified(DOCKET)}").fetchone()[0] == 1
+
+
+def test_merge_and_export_gives_up_after_max_attempts(tmp_path, local_catalog, monkeypatch) -> None:
+    monkeypatch.setattr(iceberg.time, "sleep", lambda _s: None)
+    flaky = _FailFirstMerges(local_catalog, n=10**6)
+    monkeypatch.setattr(iceberg, "_connect", flaky.connect)
+    staging = tmp_path / "staging"
+    _write_staging(staging, "EPA", [_docket("EPA-1", "EPA", "First", "2025-01-01")])
+
+    with pytest.raises(duckdb.HTTPException, match="HTTP 500"):
+        iceberg.merge_and_export(staging, tmp_path / "out", DOCKET)
+    assert flaky.connects == iceberg._CATALOG_MAX_ATTEMPTS
+
+
+def test_merge_and_export_does_not_retry_a_client_error(tmp_path, local_catalog, monkeypatch) -> None:
+    monkeypatch.setattr(iceberg.time, "sleep", lambda _s: None)
+    flaky = _FailFirstMerges(local_catalog, n=1, message="HTTP Error: Forbidden (HTTP 403)")
+    monkeypatch.setattr(iceberg, "_connect", flaky.connect)
+    staging = tmp_path / "staging"
+    _write_staging(staging, "EPA", [_docket("EPA-1", "EPA", "First", "2025-01-01")])
+
+    with pytest.raises(duckdb.HTTPException, match="403"):
+        iceberg.merge_and_export(staging, tmp_path / "out", DOCKET)
+    assert flaky.connects == 1
+
+
+def test_merge_comments_retries_a_transient_catalog_error(tmp_path, local_catalog, monkeypatch) -> None:
+    monkeypatch.setattr(iceberg.time, "sleep", lambda _s: None)
+    flaky = _FailFirstMerges(local_catalog, n=1)
+    monkeypatch.setattr(iceberg, "_connect", flaky.connect)
+    staging = tmp_path / "staging"
+    _write_comment_staging(staging, "EPA", [_comment("EPA-1-0001", "EPA-1", "EPA", "2025-01-01")])
+
+    out = iceberg.merge_comments(staging, tmp_path / "out", COMMENT)
+
+    assert out is not None and out.exists()
+    assert flaky.connects == 2
+    assert local_catalog.execute(f"SELECT count(*) FROM {iceberg._qualified(COMMENT)}").fetchone()[0] == 1
