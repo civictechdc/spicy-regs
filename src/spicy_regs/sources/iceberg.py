@@ -315,6 +315,101 @@ def _export_parquet(con, record_type: RecordType, output_dir: Path) -> Path:
     return out_file
 
 
+# Rows a partition buffers before the bucketing COPY in _export_parquet_by_agency
+# flushes it. DuckDB's default (524,288) is sized for narrow rows; with comment
+# text and ~180 agencies open at once that buffering alone can exhaust the runner.
+_BUCKET_FLUSH_ROWS = 50_000
+# Rows per batch streamed from each agency's sort into the monolith writer; also
+# the monolith's row-group size, matching _export_parquet.
+_MONOLITH_BATCH_ROWS = 100_000
+
+
+def _export_parquet_by_agency(con, record_type: RecordType, output_dir: Path) -> Path:
+    """Write ``{name}.parquet`` sorted by ``agency_code, modify_date`` without a global sort.
+
+    Produces the same file as :func:`_export_parquet` (same columns, zstd, rows
+    ordered by agency_code with NULLs last, then modify_date) but bounds memory by
+    the largest agency rather than the whole table, which is what OOM'd the comments
+    mirror once the table passed ~27M rows:
+
+    1. One scan of the catalog table, bucketed to local Parquet by agency rank
+       (``PARTITION_BY``). Ranks come from the same statement's ``DISTINCT``, so
+       they match the rows written. The Iceberg table is unpartitioned, so scanning
+       it once beats one filtered scan per agency.
+    2. Bucket by bucket in rank order: sort that agency's rows by ``modify_date``
+       (spilling as needed) and stream them into a single ``ParquetWriter``. Each
+       bucket is deleted once appended, so local disk peaks at about twice the
+       compressed table.
+
+    Written to a temp file and renamed, so a failed export never leaves a partial
+    monolith where the uploader would pick it up.
+    """
+    import shutil
+
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    if "agency_code" not in record_type.schema or "modify_date" not in record_type.schema:
+        return _export_parquet(con, record_type, output_dir)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_file = output_dir / f"{record_type.name}.parquet"
+    tmp_file = out_file.with_suffix(".tmp.parquet")
+    buckets_dir = output_dir / f".{record_type.name}_by_agency"
+    shutil.rmtree(buckets_dir, ignore_errors=True)
+
+    tbl = _qualified(record_type)
+    col_list = ", ".join(f'"{c}"' for c in record_type.schema)
+    con.execute(f"SET partitioned_write_flush_threshold={_BUCKET_FLUSH_ROWS}")
+    try:
+        # NULL agency_code ranks last, matching ORDER BY's default NULLS LAST.
+        con.execute(
+            f"""
+            COPY (
+                WITH ranks AS (
+                    SELECT agency_code,
+                           row_number() OVER (ORDER BY agency_code NULLS LAST) AS _bucket
+                    FROM (SELECT DISTINCT agency_code FROM {tbl})
+                )
+                SELECT t.*, r._bucket
+                FROM {tbl} t
+                JOIN ranks r ON t.agency_code IS NOT DISTINCT FROM r.agency_code
+            ) TO '{_sql_str(str(buckets_dir))}'
+            (FORMAT PARQUET, COMPRESSION ZSTD, PARTITION_BY (_bucket), ROW_GROUP_SIZE 10000);
+            """
+        )
+        buckets = sorted(
+            (p for p in buckets_dir.glob("_bucket=*") if p.is_dir()),
+            key=lambda p: int(p.name.split("=", 1)[1]),
+        )
+        if not buckets:
+            # Empty table: nothing to bucket, but still publish a schema-correct file.
+            return _export_parquet(con, record_type, output_dir)
+
+        logger.info("iceberg: writing {} sorted by agency across {} bucket(s)", out_file.name, len(buckets))
+        writer = None
+        try:
+            for bucket in buckets:
+                glob = _sql_str(str(bucket / "*.parquet"))
+                reader = con.execute(
+                    f"SELECT {col_list} FROM read_parquet('{glob}', hive_partitioning=false) ORDER BY modify_date"
+                ).fetch_record_batch(_MONOLITH_BATCH_ROWS)
+                for batch in reader:
+                    if writer is None:
+                        writer = pq.ParquetWriter(tmp_file, batch.schema, compression="zstd")
+                    writer.write_table(pa.Table.from_batches([batch]), row_group_size=_MONOLITH_BATCH_ROWS)
+                shutil.rmtree(bucket)
+        finally:
+            if writer is not None:
+                writer.close()
+        tmp_file.replace(out_file)
+        return out_file
+    finally:
+        con.execute("RESET partitioned_write_flush_threshold")
+        shutil.rmtree(buckets_dir, ignore_errors=True)
+        tmp_file.unlink(missing_ok=True)
+
+
 def _build_comments_index(con, record_type: RecordType, output_dir: Path) -> Path:
     """Rebuild ``comments_index.parquet`` from the catalog comments table.
 
@@ -590,12 +685,13 @@ def merge_comments(staging_dir: Path, output_dir: Path, record_type: RecordType)
     return _with_catalog_retry(f"merge {record_type.name}", work)
 
 
-# DuckDB settings for the full-table mirror export. The global sort in
-# _export_parquet buffers whole rows (comment text included) per thread, and at
-# ~27M rows a 6GB cap with the default 4 threads OOM'd the runner most nights
-# from 2026-11-21 on ("5.5 GiB/5.5 GiB used"). Fewer threads shrink the per-thread
-# sort state so more of it spills; the higher cap uses the headroom of a 16GB
-# ubuntu-latest runner. Both are overridable for a bigger or smaller host.
+# DuckDB settings for the full-table mirror export. A global sort of the comments
+# table buffers whole rows (comment text included) per thread, and at ~27M rows a
+# 6GB cap with the default 4 threads OOM'd the runner most nights from 2026-11-21
+# on ("5.5 GiB/5.5 GiB used"). The export now sorts one agency at a time
+# (_export_parquet_by_agency); these settings add headroom on top: fewer threads
+# shrink the per-thread sort state so more of it spills, and the higher cap uses a
+# 16GB ubuntu-latest runner. Both are overridable for a bigger or smaller host.
 _EXPORT_MEMORY_LIMIT = "10GB"
 _EXPORT_THREADS = 2
 
@@ -649,7 +745,7 @@ def export_public_comments(output_dir: Path, record_type: RecordType) -> dict[st
         _ensure_table(con, record_type)
         total = con.execute(f"SELECT count(*) FROM {_qualified(record_type)}").fetchone()[0]
         logger.info("iceberg: exporting {:,} catalog rows to the public comments mirror", total)
-        monolith = _export_parquet(con, record_type, output_dir)
+        monolith = _export_parquet_by_agency(con, record_type, output_dir)
         index_file = _build_comments_index(con, record_type, output_dir)
         logger.info("iceberg: wrote public monolith {} and index {}", monolith, index_file)
         return {"comments": monolith, "index": index_file}
