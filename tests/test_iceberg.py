@@ -34,7 +34,9 @@ def _write_comment_staging(staging_dir: Path, agency: str, rows: list[dict]) -> 
     pl.DataFrame(rows, schema=COMMENT.schema).write_parquet(type_dir / f"{agency}.parquet")
 
 
-def _comment(comment_id: str, docket_id: str, agency: str, posted_date: str, modify_date: str | None = None) -> dict:
+def _comment(
+    comment_id: str, docket_id: str, agency: str | None, posted_date: str, modify_date: str | None = None
+) -> dict:
     row = {col: None for col in COMMENT.schema}
     row.update(
         comment_id=comment_id,
@@ -1015,3 +1017,95 @@ def test_merge_comments_retries_a_transient_catalog_error(tmp_path, local_catalo
     assert out is not None and out.exists()
     assert flaky.connects == 2
     assert local_catalog.execute(f"SELECT count(*) FROM {iceberg._qualified(COMMENT)}").fetchone()[0] == 1
+
+
+def _setting(con, name: str):
+    row = con.execute(f"SELECT current_setting('{name}')").fetchone()
+    assert row is not None
+    return row[0]
+
+
+def test_tune_for_export_defaults_and_overrides(tmp_path, monkeypatch) -> None:
+    """The mirror export caps DuckDB threads + memory so the full-table sort spills
+    instead of OOM-ing the runner, and env vars override the defaults."""
+    import duckdb
+
+    for var in ("MIRROR_DUCKDB_MEMORY_LIMIT", "MIRROR_DUCKDB_THREADS", "MIRROR_DUCKDB_TEMP_DIR"):
+        monkeypatch.delenv(var, raising=False)
+    con = duckdb.connect()
+    iceberg._tune_for_export(con)
+    assert _setting(con, "threads") == iceberg._EXPORT_THREADS
+    assert _setting(con, "preserve_insertion_order") is False
+    default_limit = _setting(con, "memory_limit")
+
+    spill = tmp_path / "spill"
+    monkeypatch.setenv("MIRROR_DUCKDB_MEMORY_LIMIT", "1GB")
+    monkeypatch.setenv("MIRROR_DUCKDB_THREADS", "1")
+    monkeypatch.setenv("MIRROR_DUCKDB_TEMP_DIR", str(spill))
+    con = duckdb.connect()
+    iceberg._tune_for_export(con)
+    assert _setting(con, "threads") == 1
+    assert _setting(con, "memory_limit") != default_limit
+    assert _setting(con, "temp_directory") == str(spill)
+    assert spill.is_dir()
+
+
+def test_export_parquet_by_agency_matches_global_sort(tmp_path, local_catalog) -> None:
+    """The bucketed per-agency export writes the same rows, columns, and order as the
+    single global ORDER BY it replaces, including NULL agencies (last) and agency
+    codes that aren't path-safe."""
+    con = local_catalog
+    iceberg._ensure_table(con, COMMENT)
+    agencies = ["EPA", "OMB", "ACF", "A/B 'x'", None]
+    rows = []
+    for i in range(60):
+        agency = agencies[i % len(agencies)]
+        day = 1 + (i * 7) % 28  # scrambled modify_date within each agency
+        rows.append(_comment(f"c{i}", f"D-{i}", agency, f"2025-03-{day:02d}T00:00:00Z"))
+    staging = tmp_path / "staging"
+    _write_comment_staging(staging, "ALL", rows)
+    iceberg._merge(con, iceberg._staging_files(staging, COMMENT), COMMENT)
+
+    out = tmp_path / "bucketed"
+    result = iceberg._export_parquet_by_agency(con, COMMENT, out)
+    assert result == out / "comments.parquet"
+    assert not (out / ".comments_by_agency").exists()
+    assert not (out / "comments.tmp.parquet").exists()
+
+    expected = pl.read_parquet(iceberg._export_parquet(con, COMMENT, tmp_path / "global"))
+    got = pl.read_parquet(result)
+    assert got.columns == expected.columns
+    assert got.height == 60
+    # Same (agency_code, modify_date) sequence; ties within it may differ in order.
+    assert got.select("agency_code", "modify_date").rows() == expected.select("agency_code", "modify_date").rows()
+    assert sorted(got.rows(), key=str) == sorted(expected.rows(), key=str)
+    assert got["agency_code"][-1] is None
+
+
+def test_export_parquet_by_agency_empty_table(tmp_path, local_catalog) -> None:
+    """An empty catalog table still yields a schema-correct, zero-row monolith."""
+    con = local_catalog
+    iceberg._ensure_table(con, COMMENT)
+    result = iceberg._export_parquet_by_agency(con, COMMENT, tmp_path / "out")
+    got = pl.read_parquet(result)
+    assert got.height == 0
+    assert got.columns == list(COMMENT.schema)
+
+
+def test_export_parquet_by_agency_many_buckets_multi_file(tmp_path, local_catalog, monkeypatch) -> None:
+    """More than nine agencies (bucket 10 must follow bucket 9, not 1) with a flush
+    threshold small enough that each bucket is written as several files."""
+    monkeypatch.setattr(iceberg, "_BUCKET_FLUSH_ROWS", 2)
+    con = local_catalog
+    iceberg._ensure_table(con, COMMENT)
+    rows = [
+        _comment(f"c{i}", f"D-{i}", f"AG{i % 12:02d}", f"2025-01-{1 + (i * 5) % 28:02d}T00:00:00Z") for i in range(120)
+    ]
+    staging = tmp_path / "staging"
+    _write_comment_staging(staging, "ALL", rows)
+    iceberg._merge(con, iceberg._staging_files(staging, COMMENT), COMMENT)
+
+    got = pl.read_parquet(iceberg._export_parquet_by_agency(con, COMMENT, tmp_path / "out"))
+    keys = got.select("agency_code", "modify_date").rows()
+    assert len(keys) == 120
+    assert keys == sorted(keys)
