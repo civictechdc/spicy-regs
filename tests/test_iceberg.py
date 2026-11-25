@@ -1015,3 +1015,28 @@ def test_merge_comments_retries_a_transient_catalog_error(tmp_path, local_catalo
     assert out is not None and out.exists()
     assert flaky.connects == 2
     assert local_catalog.execute(f"SELECT count(*) FROM {iceberg._qualified(COMMENT)}").fetchone()[0] == 1
+
+
+def test_tune_for_export_defaults_and_overrides(tmp_path, monkeypatch) -> None:
+    """The mirror export caps DuckDB threads + memory so the full-table sort spills
+    instead of OOM-ing the runner, and env vars override the defaults."""
+    import duckdb
+
+    for var in ("MIRROR_DUCKDB_MEMORY_LIMIT", "MIRROR_DUCKDB_THREADS", "MIRROR_DUCKDB_TEMP_DIR"):
+        monkeypatch.delenv(var, raising=False)
+    con = duckdb.connect()
+    iceberg._tune_for_export(con)
+    assert con.execute("SELECT current_setting('threads')").fetchone()[0] == iceberg._EXPORT_THREADS
+    assert con.execute("SELECT current_setting('preserve_insertion_order')").fetchone()[0] is False
+    default_limit = con.execute("SELECT current_setting('memory_limit')").fetchone()[0]
+
+    spill = tmp_path / "spill"
+    monkeypatch.setenv("MIRROR_DUCKDB_MEMORY_LIMIT", "1GB")
+    monkeypatch.setenv("MIRROR_DUCKDB_THREADS", "1")
+    monkeypatch.setenv("MIRROR_DUCKDB_TEMP_DIR", str(spill))
+    con = duckdb.connect()
+    iceberg._tune_for_export(con)
+    assert con.execute("SELECT current_setting('threads')").fetchone()[0] == 1
+    assert con.execute("SELECT current_setting('memory_limit')").fetchone()[0] != default_limit
+    assert con.execute("SELECT current_setting('temp_directory')").fetchone()[0] == str(spill)
+    assert spill.is_dir()

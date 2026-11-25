@@ -590,6 +590,42 @@ def merge_comments(staging_dir: Path, output_dir: Path, record_type: RecordType)
     return _with_catalog_retry(f"merge {record_type.name}", work)
 
 
+# DuckDB settings for the full-table mirror export. The global sort in
+# _export_parquet buffers whole rows (comment text included) per thread, and at
+# ~27M rows a 6GB cap with the default 4 threads OOM'd the runner most nights
+# from 2026-11-21 on ("5.5 GiB/5.5 GiB used"). Fewer threads shrink the per-thread
+# sort state so more of it spills; the higher cap uses the headroom of a 16GB
+# ubuntu-latest runner. Both are overridable for a bigger or smaller host.
+_EXPORT_MEMORY_LIMIT = "10GB"
+_EXPORT_THREADS = 2
+
+
+def _tune_for_export(con) -> None:
+    """Apply the memory/thread settings for a full-table export.
+
+    Disables insertion-order preservation so the sort can spill to disk, and caps
+    memory and threads (``MIRROR_DUCKDB_MEMORY_LIMIT`` / ``MIRROR_DUCKDB_THREADS``
+    override the defaults). ``MIRROR_DUCKDB_TEMP_DIR`` points the spill at another
+    disk; otherwise DuckDB's default temp directory is used (this never runs on
+    the read-only serverless host).
+    """
+    memory_limit = getenv("MIRROR_DUCKDB_MEMORY_LIMIT") or _EXPORT_MEMORY_LIMIT
+    threads = int(getenv("MIRROR_DUCKDB_THREADS") or _EXPORT_THREADS)
+    temp_dir = getenv("MIRROR_DUCKDB_TEMP_DIR")
+    con.execute("SET preserve_insertion_order=false")
+    con.execute(f"SET memory_limit='{_sql_str(memory_limit)}'")
+    con.execute(f"SET threads={threads}")
+    if temp_dir:
+        Path(temp_dir).mkdir(parents=True, exist_ok=True)
+        con.execute(f"SET temp_directory='{_sql_str(temp_dir)}'")
+    logger.info(
+        "iceberg: export tuned to memory_limit={} threads={} temp_directory={}",
+        memory_limit,
+        threads,
+        con.execute("SELECT current_setting('temp_directory')").fetchone()[0],
+    )
+
+
 def export_public_comments(output_dir: Path, record_type: RecordType) -> dict[str, Path]:
     """Rebuild the public comments read-mirror from the catalog.
 
@@ -609,12 +645,7 @@ def export_public_comments(output_dir: Path, record_type: RecordType) -> dict[st
     """
     con = _connect()
     try:
-        # Full-table export of tens of millions of rows. Cap memory and disable
-        # insertion-order preservation so the sort in _export_parquet spills to
-        # disk instead of OOM-ing the CI runner (temp_directory defaults to a
-        # writable dir here — this never runs on the read-only serverless host).
-        con.execute("SET preserve_insertion_order=false")
-        con.execute("SET memory_limit='6GB'")
+        _tune_for_export(con)
         _ensure_table(con, record_type)
         total = con.execute(f"SELECT count(*) FROM {_qualified(record_type)}").fetchone()[0]
         logger.info("iceberg: exporting {:,} catalog rows to the public comments mirror", total)
