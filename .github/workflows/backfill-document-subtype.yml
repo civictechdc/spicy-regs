@@ -51,11 +51,11 @@ jobs:
     env:
       R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - uses: astral-sh/setup-uv@v4
+      - uses: astral-sh/setup-uv@v7
       - run: uv sync
 
       # Inputs go through env: and a quoted bash array, never interpolated into
@@ -73,7 +73,7 @@ jobs:
           echo "Running: uv run backfill-document-subtype harvest ${args[*]}"
           uv run backfill-document-subtype harvest "${args[@]}"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: subtype-harvest
           path: output/subtype_backfill/
@@ -103,14 +103,14 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - uses: astral-sh/setup-uv@v4
+      - uses: astral-sh/setup-uv@v7
       - run: uv sync
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: subtype-harvest
           path: output/subtype_backfill/
@@ -126,7 +126,7 @@ jobs:
 
       - name: Keep the dry-run output
         if: ${{ !inputs.publish }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: documents-subtype-dry-run
           path: output/documents.parquet
